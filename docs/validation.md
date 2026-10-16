@@ -3,15 +3,13 @@
 Validated on 2026-10-16 UTC:
 
 - ANTLR 4.13.2 generated the Java lexer, parser and visitor without errors.
-- Java 17 source compiled using Eclipse ECJ 3.37.0 against the ANTLR runtime.
-- JUnit Platform 1.11.4 / Jupiter 5.11.4 ran all 15 tests successfully.
-- Both example files parsed; tests also exercised invalid syntax and CLI exit codes.
+- Java 17 source compiled locally with Eclipse ECJ 3.37.0.
+- All 15 JUnit frontend and CLI tests passed locally.
+- GitHub Actions successfully ran the full Maven `verify` lifecycle, including
+  parser generation, Java compilation, tests and shaded executable JAR packaging.
+- The packaged JAR successfully checked both `hello.bhash` and `factorial.bhash`.
 
-The complete Maven lifecycle and shaded executable JAR were not verified in
-the preparation environment because Maven dependency downloads were blocked by
-its network/proxy configuration. The provided GitHub Actions workflow runs
-`mvn verify` and checks both examples through the packaged JAR. That workflow
-has not run yet; there is no claimed successful GitHub Actions build.
+Verified CI run: https://github.com/bhashitva/bhash/actions/runs/38835530967
 
-No semantic checker, runtime execution or code generation has been tested or
-implemented. The tests establish frontend syntax behavior only.
+No semantic checker, runtime execution or code generation has been implemented.
+These checks establish frontend syntax behavior and executable CLI packaging only.
