@@ -1,9 +1,11 @@
 # Bhash / भाष — v0.2 language definition
 
-Status: v0.2 core implemented on JVM and .NET 10 CLR, open to revision. `Bhash.g4` defines
+Status: v0.2 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
-uses checked C# source lowering. Both targets share one semantic checker.
+uses checked C# source lowering. The browser target reuses CLR lowering with the
+.NET WebAssembly runtime. All targets share one semantic checker. Browser input
+is supplied before execution; see [browser target](wasm-browser.md).
 
 ## 1. Source and lexical rules
 

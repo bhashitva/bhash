@@ -1,6 +1,6 @@
 # Implementation roadmap
 
-## Completed: syntax and executable JVM and CLR backends
+## Completed: syntax, JVM, CLR and browser WebAssembly backends
 
 - ANTLR grammar, Java parser, CLI and syntax diagnostics.
 - Function signature collection, normalized symbol resolution and lexical scopes.
@@ -10,6 +10,8 @@
   return/control-flow checks, literal decoding and range validation.
 - Shared managed semantic checker, Java lowering and executable JVM JAR generation.
 - C# lowering, .NET 10 CLR DLL/deployment metadata generation and console runtime.
+- Browser WebAssembly runtime bundles, pre-supplied input, output/error display,
+  worker isolation, Stop/restart and Chromium execution checks.
 - `पढ़ो()` integer console input, UTF-8 output, interactive factorial example.
 - Frontend tests plus independent-process JVM/CLR execution and error-case tests.
 
@@ -26,7 +28,7 @@
 - Extend the current arithmetic, text and I/O golden tests into a backend corpus.
 - Specify target triples, runtime linkage and backend diagnostics.
 
-## Native and WebAssembly
+## Native and standalone WASI
 
 - Prototype LLVM IR emission from Java and pin an external LLVM toolchain.
 - x86-64 Linux assembly/object/executable pipeline, then AArch64 cross-build.
@@ -45,4 +47,4 @@
 Interfaces, static/abstract/final members, generics, overloads, constructor-assigned
 immutable fields, modules, arrays/records, arbitrary-precision arithmetic, standard
 library, debugger support, editor tooling, package management and FFI. Changes require a spec update,
-examples and tests. Generated code, JVM JARs and CLR deployment folders remain build products.
+examples and tests. Generated code, JVM JARs, CLR deployment folders and browser bundles remain build products.

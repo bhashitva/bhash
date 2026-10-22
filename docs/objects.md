@@ -1,6 +1,6 @@
 # Objects and inheritance — Bhash v0.2
 
-Bhash now has a statically typed, class-based object model on both JVM and CLR.
+Bhash now has a statically typed, class-based object model on JVM, CLR and browser WebAssembly.
 Objects have identity, fields and instance methods. A class may extend one parent
 class. This is not a JavaScript prototype or dynamic-property model.
 
@@ -118,7 +118,7 @@ type is expected. Downcasts and implicit base-to-derived conversions are rejecte
 `पात्र.लो().स्वयं().संख्या`. Assignment targets must be mutable variables or fields.
 Receivers evaluate once and are null-checked before call arguments or assignment
 right-hand sides execute. A null dereference reports a concise runtime error and
-exits with status 1 on both targets.
+returns exit status 1 on all three targets.
 
 `रिक्त` is assignable only to class-reference types. Equality/inequality compare
 object identity; comparisons with null and between related class types are allowed.

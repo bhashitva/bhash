@@ -103,7 +103,7 @@ range message and return normally. Integer output uses Devanagari digits.
 The v0.2 core supports classes (`वर्ग`), constructors (`निर्माता`), object creation
 (`नया`), fields, instance methods (`कार्य`), single inheritance (`विस्तार`), explicit
 method overriding (`अधिलेखन`), `यह`/`आधार`, access modifiers and null references
-(`रिक्त`). These features compile on **both JVM and .NET CLR**.
+(`रिक्त`). These features compile on **JVM, .NET CLR and browser WebAssembly**.
 
 ```bash
 java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/objects.bhash
@@ -111,7 +111,7 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/objects.bhash --
 java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/factorial-objects.bhash --target clr
 ```
 
-The account example prints `मनोज १५० १५ १६५` on both targets. The object-oriented
+The account example prints `मनोज १५० १५ १६५` on all three targets. The object-oriented
 factorial example accepts console input and dispatches through a base-class reference.
 See the [object model and keyword guide](docs/objects.md) for syntax, constructor
 rules, visibility, reference types and current scope.
@@ -122,7 +122,7 @@ rules, visibility, reference types and current scope.
 | --- | --- |
 | `check file.bhash` | Syntax validation only |
 | `parse file.bhash` | Print the ANTLR parse tree |
-| `compile file.bhash [-o output] [--target jvm|clr]` | Validate semantics and emit a JVM JAR or CLR output folder |
+| `compile file.bhash [-o output] [--target jvm|clr|wasm-browser]` | Validate semantics and emit a JVM JAR, CLR folder or browser bundle |
 | `run file.bhash [--target jvm|clr]` | Compile temporary output, run with console I/O, then clean up |
 | `targets` | List implemented and planned targets |
 
