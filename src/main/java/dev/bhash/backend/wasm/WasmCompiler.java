@@ -33,7 +33,6 @@ public final class WasmCompiler {
                 <WasmEnableHotReload>false</WasmEnableHotReload>
                 <WasmBuildNative>false</WasmBuildNative>
                 <RunAOTCompilation>false</RunAOTCompilation>
-                <InvariantGlobalization>true</InvariantGlobalization>
               </PropertyGroup>
             </Project>
             """;
