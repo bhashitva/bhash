@@ -1,5 +1,6 @@
 // Bhash (भाष) v0.1 draft. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
+// पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
 
 program : functionDecl* EOF ;

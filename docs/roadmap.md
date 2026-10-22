@@ -1,50 +1,43 @@
 # Implementation roadmap
 
-## Milestone 0 — repository and syntax (this starter)
+## Completed: syntax and first executable JVM backend
 
-Grammar, generated parser build, CLI syntax checking, sample programs, language
-draft, target catalog and automated frontend tests. Code generation: not started.
+- ANTLR grammar, Java parser, CLI and syntax diagnostics.
+- Function signature collection, normalized symbol resolution and lexical scopes.
+- Type checking, entry-point and argument validation, immutable bindings,
+  return/control-flow checks, literal decoding and range validation.
+- Java lowering and executable JVM JAR generation, including its console runtime.
+- `पढ़ो()` integer console input, UTF-8 output, interactive factorial example.
+- Frontend tests plus independent-process JVM execution and error-case tests.
 
-## Milestone 1 — semantic frontend
+## Next: frontend structure and developer experience
 
-- Source spans and AST visitor; preserve literal source text and original names.
-- NFC symbol keys, scope tree, function signature pass and duplicate detection.
-- Literal decoding, digit conversion, surrogate/range validation and typed AST.
-- Type checking, entry-point rules, return-path analysis and loop-control rules.
-- Diagnostic codes and negative semantic test corpus.
+- Extract a source-located typed AST from combined semantic checking/Java lowering.
+- Improve diagnostic codes, multiple-error recovery and runtime source mapping.
+- Expand standard input support beyond integers; design explicit numeric conversions.
+- Choose an open-source license and contribution policy.
 
-Done when well-typed samples pass and each semantic rule has a failing fixture.
+## Shared IR and portability
 
-## Milestone 2 — first executable JVM slice
-
-- Emit hello world and integer expressions, then locals, calls, branches and loops.
-- Implement console runtime and entry wrapper; execute factorial and verify output.
-- Add bytecode verification and integer edge-case tests.
-
-Done when a `.jar` built from Bhash source runs independently with a supported JRE.
-
-## Milestone 3 — shared IR and runtime contract
-
-- Introduce typed control-flow IR and verifier; refactor JVM emission to consume it.
-- Freeze observable numeric/text/I/O behavior with golden tests.
+- Introduce typed basic-block IR and a verifier; refactor JVM emission to consume it.
+- Extend the current arithmetic, text and I/O golden tests into a backend corpus.
 - Specify target triples, runtime linkage and backend diagnostics.
 
-## Milestone 4 — native and WebAssembly
+## Native and WebAssembly
 
-- Prototype LLVM IR emission from Java; pin an external LLVM toolchain.
-- x86-64 Linux assembly/object/executable pipeline first, then AArch64 cross-build.
+- Prototype LLVM IR emission from Java and pin an external LLVM toolchain.
+- x86-64 Linux assembly/object/executable pipeline, then AArch64 cross-build.
 - WASM/WASI runtime, memory and I/O support; execute using a chosen WASI engine.
-- Compare output and errors against JVM golden tests, including overflow/traps.
+- Match JVM behavior on overflow, division, Unicode, errors and evaluation order.
 
-## Milestone 5 — CLR
+## CLR
 
 - Select CIL emitter/assembler toolchain and managed runtime integration.
-- Implement assembly metadata, runtime helpers and executable packaging.
+- Implement metadata, entry wrapper, runtime helpers and executable packaging.
 - Run the common conformance corpus under a supported .NET runtime.
 
 ## Later language growth
 
-Modules, arrays/records, standard library, explicit conversions, debugger mapping,
-editor tooling, package management and platform FFI. Choose a license and contribution
-policy before accepting community work. Grammar changes must include examples,
-spec updates and tests; generated code remains excluded from version control.
+Modules, arrays/records, arbitrary-precision arithmetic, standard library, debugger
+support, editor tooling, package management and FFI. Changes require a spec update,
+examples and tests. Generated code and compiled JARs remain build products.

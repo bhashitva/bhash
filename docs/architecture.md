@@ -1,58 +1,59 @@
 # Compiler architecture
 
-The compiler is implemented in Java. ANTLR generates a **Java lexer/parser**;
-ANTLR's own language targets do not implement Bhash's output targets.
+## Implemented JVM pipeline
 
-## Shared pipeline
+1. Decode UTF-8, accept an optional leading BOM, then lex/parse with ANTLR.
+2. Collect function signatures and reject duplicate or reserved names.
+3. Resolve NFC-normalized names in lexical scopes; validate types, entry point,
+   arguments, bindings, returns, loops and literal values.
+4. Lower expressions and statements to Java, using synthetic Java identifiers.
+5. Use the JDK `JavaCompiler` API with `--release 17`, annotation processing disabled,
+   and an isolated classpath to produce bytecode.
+6. Package generated classes and the small runtime into an executable JAR with a
+   `BhashProgram` entry point. Stage the output before replacing its destination.
 
-1. Decode UTF-8 and handle an optional leading BOM (implemented in CLI).
-2. Lex and parse with `Bhash.g4`, collecting diagnostics (implemented).
-3. Build a source-located AST through `BhashBaseVisitor` (next).
-4. Collect function signatures; resolve names using NFC-normalized keys.
-5. Type-check, validate entry point, returns, loops and literal ranges.
-6. Lower to a typed, target-independent IR with basic blocks, explicit branches,
-   calls, typed values and source spans.
-7. Emit backend code and link the target's Bhash runtime.
+`JavaEmitter` currently combines semantic checking and Java lowering over ANTLR
+contexts. This is a working first backend, not the final target-independent AST/IR.
+`JvmCompiler` handles the JDK invocation, packaging and temporary-file cleanup.
+The compiler requires a full JDK 17+; generated applications require Java 17+ only.
+They contain no ANTLR dependency and no generated Java source.
 
-Only steps 1–2 exist today. Never generate runnable code from a parse tree that
-contains diagnostics. Keep ANTLR classes within the frontend boundary when the
-AST is introduced; later compiler phases should consume AST/IR rather than
-parser contexts. A future `Backend` interface should take verified IR plus a
-target triple and return artifacts/diagnostics. It is deliberately not stubbed
-against an imaginary IR in this starter.
+`run` compiles a temporary JAR, starts a separate Java process with inherited
+console streams, forwards its exit status and removes the JAR afterwards.
+Programs are ordinary applications with the current user's permissions, not sandboxed.
 
-## Target strategy (proposed)
+## Semantic and runtime behavior
 
-| Target | Emission route | Required supporting work |
+All Bhash names become synthetic Java names, allowing nested variable shadowing
+without Java naming restrictions. Runtime integer input accepts either digit script;
+output uses Devanagari digits. Java's left-to-right evaluation, short-circuit logic,
+64-bit wrapping arithmetic and binary64 operations implement the core contract.
+Text equality uses value comparison. Integer division/remainder helpers give even
+literal zero divisors clean runtime errors. Console input errors and arithmetic
+failures produce concise UTF-8 diagnostics with exit status 1.
+
+Semantic diagnostics use Bhash source locations. Unexpected Java toolchain failures
+are reported as backend errors. Debug source maps, runtime Bhash stack traces,
+resource limits and optimization are future work. Return analysis treats all loops
+as potentially executing zero iterations. JVM method/class size and recursion-stack
+limits still apply.
+
+## Target status
+
+| Target | Status | Route |
 | --- | --- | --- |
-| JVM | Emit `.class` bytecode using a Java bytecode library such as ASM | JVM verification, entry wrapper, runtime JAR, stack-map frames |
-| .NET CLR | Emit CIL and assemble to a managed assembly using a selected .NET toolchain | Assembly metadata, CLI entry point, runtime support library and SDK/tool distribution |
-| WASM | Lower IR to LLVM IR, then use an LLVM WASM toolchain | WASI runtime first; UTF-8 I/O, memory model and toolchain compatibility |
-| x86-64 | Lower IR to LLVM IR, emit assembly/object code | Initially Linux System V ABI, linking, runtime library |
-| ARM64 / AArch64 | Lower IR to LLVM IR, emit assembly/object code | Initially Linux AAPCS64, cross-linking, runtime library |
+| JVM | Implemented | Bhash → checked Java → JVM bytecode → executable JAR |
+| .NET CLR | Planned | CIL emission and selected .NET assembly toolchain |
+| WASM | Planned | Proposed LLVM lowering with WASI runtime |
+| x86-64 | Planned | Proposed LLVM assembly/object emission, initially Linux System V ABI |
+| ARM64 / AArch64 | Planned | Proposed LLVM assembly/object emission, initially Linux AAPCS64 |
 
-LLVM and ASM are architecture proposals, not installed dependencies or implemented
-emitters. The compiler remains written in Java if it invokes LLVM command-line
-tools; those would be external build prerequisites. Managed JVM/CLR output needs
-separate backend work and does not follow automatically from native LLVM support.
-If learning instruction selection is a primary goal, replace the native LLVM
-route with direct assembly emitters; expect more ABI/register-allocation work.
+ANTLR generates the compiler's Java parser, not Bhash's application backends.
+LLVM remains a proposal and is not a dependency. Managed CLR output requires its
+own emitter/runtime; it does not follow automatically from native LLVM support.
+32-bit architectures, browser WASM and other native OS/ABI combinations are separate
+extensions. Native assembly still needs assembling/linking and a target runtime.
 
-The user-requested x86 and ARM families are initially narrowed to **64-bit**.
-32-bit x86/ARM, Windows/macOS native ABIs and browser WASM are separate extensions.
-Native assembly alone is not a runnable executable; assembly and linking still
-require a target toolchain and matching Bhash runtime.
-
-## Runtime and portability
-
-Specify arithmetic, evaluation order, text equality and console behavior once,
-then test every backend against the same programs. Map language errors explicitly:
-JVM/CLR exceptions, WASM traps and native signals are not automatically equivalent.
-Managed strings may use UTF-16 internally while native/WASM strings use UTF-8;
-the language's observable text behavior must agree. Start without user heap objects;
-string lifetime and allocation still require a runtime strategy before adding
-concatenation, dynamic input or collections.
-
-Recommended order: frontend and semantics → JVM execution → verified shared IR
-→ LLVM native/WASM and CLR implementations. A JVM-first slice makes the language
-usable while the broader backend design develops.
+Next, extract a source-located typed AST and shared control-flow IR from the current
+backend, then use cross-backend golden tests to preserve evaluation, arithmetic,
+text and I/O semantics when adding another target.

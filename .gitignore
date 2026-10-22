@@ -3,4 +3,5 @@ target/
 .vscode/
 *.iml
 *.class
+*.jar
 .DS_Store

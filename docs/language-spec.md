@@ -1,8 +1,8 @@
 # Bhash / भाष — v0.1 language definition (draft)
 
-Status: proposed design, open to revision. `Bhash.g4` implements the syntax below.
-Semantic rules are an implementation contract for the next compiler phases;
-they are not yet enforced by the syntax checker.
+Status: v0.1 core implemented on the JVM, open to revision. `Bhash.g4` defines
+syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
+syntax-only command. JVM output is produced through checked Java source lowering.
 
 ## 1. Source and lexical rules
 
@@ -15,16 +15,16 @@ they are not yet enforced by the syntax checker.
   covers the explicit ranges in the grammar, not every Indic Unicode extension.
 - Symbol tables must use NFC-normalized identifier keys via `Identifiers.key`.
   Canonically equivalent names refer to the same symbol and duplicate definitions
-  must be rejected. The frontend currently preserves original token spelling;
-  strings and comments must never be normalized as a side effect of name handling.
+  are rejected. The parser preserves original token spelling;
+  strings and comments are not normalized as a side effect of name handling.
 - Numeric literals use ASCII digits (`123`) or Devanagari digits (`१२३`).
   A single literal cannot mix scripts. Different literals in one file may use either.
 - Integers are decimal digits. Real literals require digits on both sides of `.`:
   `१२.५`, `12.5`. No exponent, radix prefix or digit separator in v0.1.
 - String literals use double quotes and allow arbitrary Unicode text. Escapes:
   `\"`, `\\`, `\n`, `\r`, `\t`, and `\uXXXX` with four hexadecimal digits.
-  Literal newlines in strings are forbidden. A future semantic literal decoder
-  must reject unpaired surrogate escapes; supplementary characters can be typed
+  Literal newlines in strings are forbidden. The semantic literal decoder
+  rejects unpaired surrogate escapes; supplementary characters can be typed
   directly or represented with a valid escaped surrogate pair.
 - Whitespace is insignificant. `//` begins a line comment; `/* ... */` is a
   non-nesting block comment. Unterminated comments and invalid tokens are errors.
@@ -43,6 +43,7 @@ they are not yet enforced by the syntax checker.
 | `लौटाओ` | Return | `लौटाओ परिणाम;` |
 | `विराम` / `जारी` | Break / continue | `विराम;` |
 | `लिखो` | Console output statement | `लिखो("उत्तर", परिणाम);` |
+| `पढ़ो` | Predeclared integer input function | `स्थिर संख्या: पूर्णांक = पढ़ो();` |
 | `पूर्णांक` | Signed 64-bit integer | `४२` |
 | `दशमलव` | IEEE 754 binary64 floating-point | `३.१४` |
 | `तार्किक` | Boolean | `सत्य`, `असत्य` |
@@ -84,7 +85,9 @@ shadow an outer binding. A variable is not in scope within its own initializer.
 Conditions must be `तार्किक`; integers are not truthy. `विराम` and `जारी`
 are legal only within loops and affect the innermost loop. A void function may
 fall through or use `लौटाओ;`. A value-returning function must return a compatible
-value on every reachable path. Only function calls may be standalone expression
+value on every reachable path. Analysis conservatively assumes a loop can execute
+zero times, even for a literal true condition. Code after an unconditional return,
+break or continue is rejected as unreachable. Only function calls may be standalone expression
 statements, although the grammar intentionally accepts a wider expression here.
 Assignments are statements, not expressions; assignment targets are names only.
 
@@ -106,7 +109,7 @@ Precedence, highest to lowest; binary operators associate left to right:
 - No implicit integer/real conversion in v0.1. Numeric binary operands must have
   the same type; conversion functions can be designed later.
 - Integer range: −2^63 through 2^63−1. Out-of-range literals are compile-time
-  errors. The constant checker must handle unary minus before range validation
+  errors. The constant checker handles unary minus before range validation
   so that the minimum signed integer can be expressed.
 - Integer arithmetic wraps in two's complement. Integer division truncates
   toward zero; remainder has the dividend's sign. Division/remainder by zero
@@ -126,11 +129,26 @@ are not sufficient (notably native overflow and WASM signed division overflow).
 
 ## 6. Runtime surface
 
+`पढ़ो()` is a predeclared, zero-argument function returning `पूर्णांक`. Its name
+cannot be redeclared as a function. Each call reads one UTF-8 line from stdin,
+strips leading/trailing whitespace using Java `String.strip`, and accepts an
+optional ASCII `+` or `-` followed by one or more ASCII digits or one or more
+Devanagari digits. Scripts cannot be mixed within an input integer. Empty lines,
+multiple values on one line, malformed UTF-8, EOF and out-of-range values terminate
+the program with a concise error on stderr and exit status 1. Multiple calls
+consume successive lines. This is integer input only, not arbitrary text input.
+
 `लिखो` accepts zero or more primitive arguments, prints them separated by a
-single space, then appends a newline. `लिखो();` prints a blank line. Output is
-UTF-8. The proposed integer display uses Devanagari digits and boolean display
-uses `सत्य` / `असत्य`. Exact real-number formatting must be specified before
-runtime conformance; the formatter and all I/O are unimplemented today.
+single space, then appends a newline and flushes stdout. `लिखो();` prints a blank
+line. Output is UTF-8. Integers use Devanagari digits; booleans use `सत्य` /
+`असत्य`. Reals use Java 17 `Double.toString` formatting with digits replaced by
+Devanagari digits; punctuation, exponent markers, `NaN` and `Infinity` are retained.
+Text is printed unchanged. This formatting contract must be matched by future
+backends. Prompts should be printed before calling `पढ़ो()`.
+
+The factorial sample validates 0–20 before computing with signed 64-bit integers.
+Other integer arithmetic retains wrapping behavior; there is no arbitrary-precision
+integer type yet.
 
 Strings are immutable sequences of Unicode scalars; their physical representation
 may differ by backend. There is no indexing, null, character type, collection,

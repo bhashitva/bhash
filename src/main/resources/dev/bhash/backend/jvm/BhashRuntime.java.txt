@@ -1,0 +1,60 @@
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+
+/** Compiled into each generated program; no compiler or ANTLR dependency at runtime. */
+final class BhashRuntime {
+    private static final BufferedReader INPUT = new BufferedReader(new InputStreamReader(
+            System.in, StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)));
+    private static final PrintWriter OUTPUT = new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8), true);
+    private static final PrintWriter ERRORS = new PrintWriter(new OutputStreamWriter(System.err, StandardCharsets.UTF_8), true);
+
+    static final class Failure extends RuntimeException {
+        Failure(String message) { super(message); }
+    }
+
+    static long readInteger() {
+        final String input;
+        try { input = INPUT.readLine(); }
+        catch (IOException error) { throw new Failure("कंसोल से UTF-8 इनपुट पढ़ा नहीं जा सका।"); }
+        if (input == null) throw new Failure("इनपुट समाप्त: एक पूर्णांक अपेक्षित था।");
+        String value = input.strip();
+        if (!value.matches("[+-]?(?:[0-9]+|[०-९]+)"))
+            throw new Failure("अमान्य इनपुट: एक पंक्ति में एक पूर्णांक लिखें (0-9 या ०-९)।");
+        var ascii = new StringBuilder();
+        for (char c : value.toCharArray()) ascii.append(c >= '०' && c <= '९' ? (char) ('0' + c - '०') : c);
+        try { return Long.parseLong(ascii.toString()); }
+        catch (NumberFormatException error) { throw new Failure("पूर्णांक 64-बिट सीमा से बाहर है।"); }
+    }
+
+    static void print(Object... values) {
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) OUTPUT.print(' ');
+            Object value = values[i];
+            if (value instanceof Long number) OUTPUT.print(devanagari(Long.toString(number)));
+            else if (value instanceof Boolean flag) OUTPUT.print(flag ? "सत्य" : "असत्य");
+            else if (value instanceof Double number) OUTPUT.print(devanagari(Double.toString(number)));
+            else OUTPUT.print(value);
+        }
+        OUTPUT.println();
+    }
+
+    private static String devanagari(String ascii) {
+        var result = new StringBuilder();
+        for (char c : ascii.toCharArray()) result.append(c >= '0' && c <= '9' ? (char) ('०' + c - '0') : c);
+        return result.toString();
+    }
+
+    static long divide(long left, long right) {
+        if (right == 0) throw new Failure("शून्य से भाग देना संभव नहीं है।");
+        return left / right;
+    }
+    static long remainder(long left, long right) {
+        if (right == 0) throw new Failure("शून्य से शेषफल निकालना संभव नहीं है।");
+        return left % right;
+    }
+    static boolean truth(boolean value) { return value; }
+    static void discard(Object value) {}
+    static void report(String message) { ERRORS.println("भाष: " + message); }
+}

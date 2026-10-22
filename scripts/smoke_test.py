@@ -1,0 +1,26 @@
+"""Exercise the packaged compiler and standalone JVM output on Windows and Linux."""
+from pathlib import Path
+import subprocess
+
+
+compiler = Path("target/bhash-compiler-0.1.0-SNAPSHOT.jar")
+program = Path("target/factorial-console.jar")
+
+
+def invoke(args, text="", expected_exit=0):
+    result = subprocess.run(args, input=text, encoding="utf-8", capture_output=True, timeout=30)
+    assert result.returncode == expected_exit, (args, result.returncode, result.stdout, result.stderr)
+    return result.stdout.replace("\r\n", "\n"), result.stderr
+
+
+invoke(["java", "-jar", str(compiler), "compile", "examples/factorial-console.bhash", "-o", str(program)])
+for text, answer in [("5\n", "१२०"), ("५\n", "१२०"), ("0\n", "१"), ("20\n", "२४३२९०२००८१७६६४००००")]:
+    output, errors = invoke(["java", "-Xverify:all", "-jar", str(program)], text)
+    assert output == "० से २० तक एक पूर्णांक लिखें:\nगुणनफल: " + answer + "\n", output
+    assert not errors, errors
+
+output, _ = invoke(["java", "-jar", str(compiler), "run", "examples/factorial-console.bhash"], "6\n")
+assert output.endswith("गुणनफल: ७२०\n"), output
+_, errors = invoke(["java", "-jar", str(compiler), "run", "examples/factorial-console.bhash"], "invalid\n", expected_exit=1)
+assert "भाष:" in errors, errors
+print("Packaged compiler, standalone JAR, UTF-8 console input/output, and run command passed.")

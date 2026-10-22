@@ -1,15 +1,26 @@
-# Starter validation
+# JVM compiler validation
 
-Validated on 2026-10-16 UTC:
+The JVM implementation is tested by compiling Bhash source to standalone JARs
+and executing them in separate Java processes with bytecode verification enabled.
+There is no compiler/ANTLR classpath when running the generated programs.
 
-- ANTLR 4.13.2 generated the Java lexer, parser and visitor without errors.
-- Java 17 source compiled locally with Eclipse ECJ 3.37.0.
-- All 15 JUnit frontend and CLI tests passed locally.
-- GitHub Actions successfully ran the full Maven `verify` lifecycle, including
-  parser generation, Java compilation, tests and shaded executable JAR packaging.
-- The packaged JAR successfully checked both `hello.bhash` and `factorial.bhash`.
+Current local checks: all 28 JUnit tests pass (15 frontend tests and 13 JVM/CLI
+test groups), plus `scripts/smoke_test.py` against the packaged compiler.
 
-Verified CI run: https://github.com/bhashitva/bhash/actions/runs/38835530967
+Coverage includes:
 
-No semantic checker, runtime execution or code generation has been implemented.
-These checks establish frontend syntax behavior and executable CLI packaging only.
+- Interactive factorial for ASCII/Devanagari input, 0!, 1!, 5!, 6!, 10! and 20!.
+- Negative/out-of-domain input messages; malformed, mixed-script, overflowing
+  and missing console input with nonzero runtime exit status.
+- Multiple reads, recursive/forward calls, scopes, loops, break/continue and returns.
+- Short-circuit logic and left-to-right argument evaluation.
+- Type/name/signature errors, immutable bindings, entry points and unreachable code.
+- Signed integer boundaries, wrapping overflow, division/remainder edge cases,
+  operator precedence, real arithmetic, Unicode text and value equality.
+- CLI output/source protection, executable JAR contents and failed-compile preservation.
+
+GitHub Actions runs `mvn verify` and packaged compiler/application smoke tests
+on both Windows and Linux, and uploads compiler and factorial JAR artifacts.
+See the repository's Actions page for current CI results.
+
+The CLR, WASM and native targets are not implemented or tested.

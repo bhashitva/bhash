@@ -1,6 +1,6 @@
 package dev.bhash.backend;
 
-/** Planned output targets; no code generators are implemented in the starter. */
+/** JVM output is implemented; other targets remain planned. */
 public enum Target {
     JVM("JVM bytecode (.class / .jar)"),
     CLR(".NET Common Intermediate Language (CIL)"),
