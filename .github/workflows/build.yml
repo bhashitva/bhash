@@ -32,6 +32,12 @@ jobs:
             target/bhash-compiler-0.1.0-SNAPSHOT.jar
             target/factorial-console.jar
             target/factorial-clr/
+            target/objects.jar
+            target/objects-clr/
+            target/factorial-objects.jar
+            target/factorial-objects-clr/
             examples/factorial-console.bhash
+            examples/objects.bhash
+            examples/factorial-objects.bhash
           include-hidden-files: true
           if-no-files-found: error

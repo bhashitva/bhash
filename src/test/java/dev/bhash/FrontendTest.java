@@ -13,6 +13,27 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FrontendTest {
+    @Test void parsesClassMembersConstructorsInheritanceAndPostfixChains() {
+        var result = Frontend.parse("objects.bhash", """
+                वर्ग मूल { मान संख्या: पूर्णांक; }
+                वर्ग बच्चा विस्तार मूल {
+                    निजी मान अगला: मूल = रिक्त;
+                    निर्माता(संख्या: पूर्णांक) : आधार() { यह.संख्या = संख्या; }
+                    सार्वजनिक अधिलेखन कार्य स्वयं() -> मूल { लौटाओ यह; }
+                }
+                कार्य मुख्य() -> शून्य { नया बच्चा(१).स्वयं().संख्या = २; }
+                """);
+        assertTrue(result.valid(), () -> result.diagnostics().toString());
+        assertEquals(2, result.tree().classDecl().size());
+        assertEquals(1, result.tree().functionDecl().size());
+    }
+
+    @Test void objectKeywordsAreReservedButLongerNamesRemainIdentifiers() {
+        var lexer = new BhashLexer(CharStreams.fromString("वर्ग नया यह आधार रिक्त वर्गीकरण"));
+        for (int expected : new int[]{BhashLexer.CLASS, BhashLexer.NEW, BhashLexer.THIS,
+                BhashLexer.BASE, BhashLexer.NULL, BhashLexer.IDENTIFIER})
+            assertEquals(expected, lexer.nextToken().getType());
+    }
     private Frontend.Result parseBody(String body) {
         return Frontend.parse("test.bhash", "कार्य मुख्य() -> शून्य { " + body + " }");
     }

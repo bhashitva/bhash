@@ -4,6 +4,8 @@
 
 - ANTLR grammar, Java parser, CLI and syntax diagnostics.
 - Function signature collection, normalized symbol resolution and lexical scopes.
+- Classes, constructors, typed fields, member methods, single inheritance, access
+  control, explicit overrides, virtual dispatch, object references and null checks.
 - Type checking, entry-point and argument validation, immutable bindings,
   return/control-flow checks, literal decoding and range validation.
 - Shared managed semantic checker, Java lowering and executable JVM JAR generation.
@@ -40,6 +42,7 @@
 
 ## Later language growth
 
-Modules, arrays/records, arbitrary-precision arithmetic, standard library, debugger
-support, editor tooling, package management and FFI. Changes require a spec update,
+Interfaces, static/abstract/final members, generics, overloads, constructor-assigned
+immutable fields, modules, arrays/records, arbitrary-precision arithmetic, standard
+library, debugger support, editor tooling, package management and FFI. Changes require a spec update,
 examples and tests. Generated code, JVM JARs and CLR deployment folders remain build products.

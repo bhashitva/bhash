@@ -9,16 +9,54 @@ import org.antlr.v4.runtime.ParserRuleContext;
 
 /** Shared semantic checking and source lowering for JVM and CLR. User names are mangled. */
 public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> {
-    enum Type {
-        INT("long", "पूर्णांक"), REAL("double", "दशमलव"),
-        BOOL("boolean", "तार्किक"), TEXT("String", "पाठ"), VOID("void", "शून्य");
+    static final class Type {
+        static final Type INT = new Type("long", "पूर्णांक"), REAL = new Type("double", "दशमलव"),
+                BOOL = new Type("boolean", "तार्किक"), TEXT = new Type("String", "पाठ"),
+                VOID = new Type("void", "शून्य"), NULL = new Type("", "रिक्त");
         final String java, bhash;
-        Type(String java, String bhash) { this.java = java; this.bhash = bhash; }
+        final ClassInfo object;
+        Type(String java, String bhash) { this(java, bhash, null); }
+        Type(String java, String bhash, ClassInfo object) { this.java = java; this.bhash = bhash; this.object = object; }
+        static Type[] values() { return new Type[]{INT, REAL, BOOL, TEXT, VOID}; }
+        boolean reference() { return object != null || this == NULL; }
     }
-    record Expr(Type type, String java, boolean call) {
-        Expr(Type type, String java) { this(type, java, false); }
+    record Location(boolean mutable) {}
+    record Expr(Type type, String java, boolean call, Location location, boolean base) {
+        Expr(Type type, String java) { this(type, java, false, null, false); }
+        Expr(Type type, String java, boolean call) { this(type, java, call, null, false); }
+        Expr(Type type, String java, Location location) { this(type, java, false, location, false); }
     }
-    record Function(String java, Type result, List<Type> parameters) {}
+    enum Access { PRIVATE, PROTECTED, PUBLIC }
+    static final class ClassInfo {
+        final String spelling, java;
+        final Type type;
+        final ClassDeclContext declaration;
+        final Map<String, Field> fields = new LinkedHashMap<>();
+        final Map<String, Function> methods = new LinkedHashMap<>();
+        ClassInfo parent;
+        Constructor constructor;
+        int state;
+        ClassInfo(String spelling, String java, ClassDeclContext declaration) {
+            this.spelling = spelling; this.java = java; this.declaration = declaration;
+            this.type = new Type(java, spelling, this);
+        }
+    }
+    record Field(String java, Type type, boolean mutable, Access access, ClassInfo owner, FieldDeclContext declaration) {}
+    record Constructor(List<Type> parameters, Access access, ConstructorDeclContext declaration) {}
+    static final class Function {
+        final String java;
+        final Type result;
+        final List<Type> parameters;
+        final ClassInfo owner;
+        final Access access;
+        final boolean overriding;
+        final FunctionDeclContext declaration;
+        Function(String java, Type result, List<Type> parameters, ClassInfo owner, Access access,
+                 boolean overriding, FunctionDeclContext declaration) {
+            this.java = java; this.result = result; this.parameters = parameters; this.owner = owner;
+            this.access = access; this.overriding = overriding; this.declaration = declaration;
+        }
+    }
     record Binding(String java, Type type, boolean mutable) {}
     enum Flow { NORMAL, RETURN, BREAK, CONTINUE }
     private static final BigInteger MIN = BigInteger.valueOf(Long.MIN_VALUE);
@@ -26,10 +64,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private final String sourceName;
     private final Target target;
     private final Map<String, Function> functions = new LinkedHashMap<>();
+    private final Map<String, ClassInfo> classes = new LinkedHashMap<>();
+    private final List<ClassInfo> classOrder = new ArrayList<>();
     private final Deque<Map<String, Binding>> scopes = new ArrayDeque<>();
     private final StringBuilder output = new StringBuilder();
     private Type returnType;
-    private int variableId, loopDepth;
+    private ClassInfo currentClass;
+    private boolean fieldInitializer, baseArguments, constructorBody;
+    private int variableId, loopDepth, methodId, fieldId;
 
     // Visitor APIs cannot throw checked exceptions; unwrap this at the public boundary.
     private static final class Invalid extends RuntimeException {
@@ -49,8 +91,12 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 + (at.getStart().getCharPositionInLine() + 1) + ": " + message);
     }
 
-    private Type type(String spelling) {
-        return Arrays.stream(Type.values()).filter(t -> t.bhash.equals(spelling)).findFirst().orElseThrow();
+    private Type type(ParserRuleContext at) {
+        String spelling = at.getText();
+        for (Type primitive : Type.values()) if (primitive.bhash.equals(spelling)) return primitive;
+        ClassInfo found = classes.get(Identifiers.key(spelling));
+        if (found == null) throw error(at, "Unknown type: " + spelling);
+        return found.type;
     }
 
     private String typeName(Type type) {
@@ -60,14 +106,12 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private String program(ProgramContext program) {
-        functions.put(Identifiers.key("पढ़ो"), new Function("BhashRuntime.readInteger", Type.INT, List.of()));
+        collectClasses(program);
+        functions.put(Identifiers.key("पढ़ो"), new Function("BhashRuntime.readInteger", Type.INT, List.of(), null, Access.PUBLIC, false, null));
         for (var declaration : program.functionDecl()) {
             String name = Identifiers.key(declaration.IDENTIFIER().getText());
-            var parameters = new ArrayList<Type>();
-            if (declaration.parameters() != null) {
-                for (var p : declaration.parameters().parameter()) parameters.add(type(p.valueType().getText()));
-            }
-            var function = new Function("f" + functions.size(), type(declaration.returnType().getText()), List.copyOf(parameters));
+            var function = new Function("f" + functions.size(), type(declaration.returnType()), parameters(declaration.parameters()),
+                    null, Access.PUBLIC, false, declaration);
             if (functions.putIfAbsent(name, function) != null)
                 throw error(declaration, "Duplicate or reserved function: " + declaration.IDENTIFIER().getText());
         }
@@ -85,29 +129,212 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     .append("(); return 0; } catch (Exception e) when (e is BhashRuntime.Failure || e is ArithmeticException) {")
                     .append(" BhashRuntime.report(e.Message); return 1; } }\n");
         }
-        for (var declaration : program.functionDecl()) emitFunction(declaration);
+        for (var declaration : program.functionDecl()) emitFunction(functions.get(Identifiers.key(declaration.IDENTIFIER().getText())));
+        for (ClassInfo definition : classOrder) emitClass(definition);
         return output.append("}\n").toString();
     }
 
-    private void emitFunction(FunctionDeclContext declaration) {
-        var function = functions.get(Identifiers.key(declaration.IDENTIFIER().getText()));
+    private void emitFunction(Function function) {
+        var declaration = function.declaration;
+        currentClass = function.owner;
         returnType = function.result;
         scopes.push(new HashMap<>());
-        output.append("static ").append(typeName(function.result)).append(' ').append(function.java).append('(');
-        if (declaration.parameters() != null) {
-            int index = 0;
-            for (var parameter : declaration.parameters().parameter()) {
-                if (index > 0) output.append(',');
-                var binding = declare(parameter, parameter.IDENTIFIER().getText(), function.parameters.get(index++), false);
-                output.append(target == Target.JVM ? "final " : "").append(typeName(binding.type)).append(' ').append(binding.java);
-            }
+        if (function.owner == null) output.append("static ");
+        else {
+            if (target == Target.JVM && function.overriding) output.append("@Override ");
+            output.append(accessName(function.access)).append(' ');
+            if (target == Target.CLR && function.access != Access.PRIVATE) output.append(function.overriding ? "override " : "virtual ");
         }
+        output.append(typeName(function.result)).append(' ').append(function.java).append('(');
+        emitParameters(declaration.parameters(), function.parameters);
         output.append(") {\n");
         var flow = statements(declaration.block());
         if (returnType != Type.VOID && flow.contains(Flow.NORMAL))
             throw error(declaration, "Function must return " + returnType.bhash + " on every path.");
         output.append("}\n");
         scopes.pop();
+        currentClass = null;
+    }
+
+    private List<Type> parameters(ParametersContext parameters) {
+        return parameters == null ? List.of() : parameters.parameter().stream().map(p -> type(p.valueType())).toList();
+    }
+
+    private Access access(VisibilityContext visibility) {
+        if (visibility == null || visibility.PUBLIC() != null) return Access.PUBLIC;
+        return visibility.PRIVATE() != null ? Access.PRIVATE : Access.PROTECTED;
+    }
+
+    private String accessName(Access access) { return access.name().toLowerCase(Locale.ROOT); }
+
+    private void collectClasses(ProgramContext program) {
+        for (var declaration : program.classDecl()) {
+            String name = declaration.IDENTIFIER(0).getText();
+            var definition = new ClassInfo(name, "C" + classes.size(), declaration);
+            if (classes.putIfAbsent(Identifiers.key(name), definition) != null) throw error(declaration, "Duplicate class: " + name);
+        }
+        for (ClassInfo definition : classes.values()) {
+            if (definition.declaration.EXTENDS() != null) {
+                String name = definition.declaration.IDENTIFIER(1).getText();
+                definition.parent = classes.get(Identifiers.key(name));
+                if (definition.parent == null) throw error(definition.declaration, "Unknown base class: " + name);
+            }
+        }
+        for (ClassInfo definition : classes.values()) orderClass(definition);
+        for (ClassInfo definition : classOrder) {
+            for (var member : definition.declaration.classMember()) {
+                Access access = access(member.visibility());
+                if (member.fieldDecl() != null) {
+                    var declaration = member.fieldDecl();
+                    String name = Identifiers.key(declaration.IDENTIFIER().getText());
+                    if (definition.fields.containsKey(name) || definition.methods.containsKey(name)
+                            || field(definition.parent, name) != null || method(definition.parent, name) != null)
+                        throw error(member, "Duplicate or hidden member: " + declaration.IDENTIFIER().getText());
+                    if (declaration.CONST() != null && declaration.expression() == null)
+                        throw error(declaration, "An immutable field requires an initializer.");
+                    definition.fields.put(name, new Field("p" + fieldId++, type(declaration.valueType()),
+                            declaration.LET() != null, access, definition, declaration));
+                } else if (member.constructorDecl() != null) {
+                    if (definition.constructor != null) throw error(member, "Only one constructor is supported per class.");
+                    var declaration = member.constructorDecl();
+                    definition.constructor = new Constructor(parameters(declaration.parameters()), access, declaration);
+                } else {
+                    var declaration = member.functionDecl();
+                    String name = Identifiers.key(declaration.IDENTIFIER().getText());
+                    if (definition.fields.containsKey(name) || definition.methods.containsKey(name) || field(definition.parent, name) != null)
+                        throw error(member, "Duplicate or hidden member: " + declaration.IDENTIFIER().getText());
+                    Function parent = method(definition.parent, name);
+                    boolean overriding = member.OVERRIDE() != null;
+                    if (overriding && (parent == null || parent.access == Access.PRIVATE))
+                        throw error(member, "Override requires an inherited non-private method.");
+                    if (parent != null && !overriding) throw error(member, "Inherited method requires अधिलेखन.");
+                    var signature = parameters(declaration.parameters());
+                    Type result = type(declaration.returnType());
+                    if (parent != null && (!parent.parameters.equals(signature) || parent.result != result))
+                        throw error(member, "Override must preserve parameter and return types exactly.");
+                    if (parent != null && access.ordinal() < parent.access.ordinal()) throw error(member, "Override cannot narrow access.");
+                    definition.methods.put(name, new Function(parent == null ? "m" + methodId++ : parent.java,
+                            result, signature, definition, access, overriding, declaration));
+                }
+            }
+            if (definition.constructor == null) definition.constructor = new Constructor(List.of(), Access.PUBLIC, null);
+        }
+    }
+
+    private void orderClass(ClassInfo definition) {
+        if (definition.state == 1) throw error(definition.declaration, "Inheritance cycle detected.");
+        if (definition.state == 2) return;
+        definition.state = 1;
+        if (definition.parent != null) orderClass(definition.parent);
+        definition.state = 2;
+        classOrder.add(definition);
+    }
+
+    private Field field(ClassInfo definition, String name) {
+        for (; definition != null; definition = definition.parent) {
+            var field = definition.fields.get(Identifiers.key(name));
+            if (field != null) return field;
+        }
+        return null;
+    }
+
+    private Function method(ClassInfo definition, String name) {
+        for (; definition != null; definition = definition.parent) {
+            var method = definition.methods.get(Identifiers.key(name));
+            if (method != null) return method;
+        }
+        return null;
+    }
+
+    private boolean subclass(ClassInfo child, ClassInfo parent) {
+        for (; child != null; child = child.parent) if (child == parent) return true;
+        return false;
+    }
+
+    private boolean compatible(Type expected, Type actual) {
+        return expected == actual || (expected.object != null && (actual == Type.NULL || subclass(actual.object, expected.object)));
+    }
+
+    private void checkAccess(ParserRuleContext at, ClassInfo owner, Access access, Expr receiver) {
+        if (access == Access.PUBLIC || currentClass == owner) return;
+        if (access == Access.PROTECTED && currentClass != null && subclass(currentClass, owner)
+                && (receiver.base || subclass(receiver.type.object, currentClass))) return;
+        throw error(at, "Member is not accessible (" + accessName(access) + ").");
+    }
+
+    private void emitParameters(ParametersContext parameters, List<Type> types) {
+        if (parameters == null) return;
+        int index = 0;
+        for (var parameter : parameters.parameter()) {
+            if (index > 0) output.append(',');
+            var binding = declare(parameter, parameter.IDENTIFIER().getText(), types.get(index++), false);
+            output.append(target == Target.JVM ? "final " : "").append(typeName(binding.type)).append(' ').append(binding.java);
+        }
+    }
+
+    private void emitClass(ClassInfo definition) {
+        currentClass = definition;
+        output.append(target == Target.JVM ? "static class " : "public class ").append(definition.java);
+        if (definition.parent != null) output.append(target == Target.JVM ? " extends " : " : ").append(definition.parent.java);
+        output.append(" {\n");
+        Map<Field, String> initializers = new LinkedHashMap<>();
+        for (Field field : definition.fields.values()) {
+            currentClass = definition;
+            Expr value;
+            if (field.declaration.expression() == null) value = new Expr(field.type,
+                    field.type == Type.TEXT ? "\"\"" : field.type == Type.BOOL ? "false" : field.type.object != null ? "null" : field.type == Type.REAL ? "0.0" : "0L");
+            else {
+                fieldInitializer = true;
+                value = visit(field.declaration.expression());
+                fieldInitializer = false;
+                require(field.declaration, field.type, value.type);
+            }
+            output.append(accessName(field.access)).append(' ');
+            if (!field.mutable) output.append(target == Target.JVM ? "final " : "readonly ");
+            output.append(typeName(field.type)).append(' ').append(field.java).append(";\n");
+            initializers.put(field, value.java);
+        }
+        emitConstructor(definition, initializers);
+        for (Function method : definition.methods.values()) emitFunction(method);
+        output.append("}\n");
+        currentClass = null;
+    }
+
+    private void emitConstructor(ClassInfo definition, Map<Field, String> initializers) {
+        currentClass = definition;
+        returnType = Type.VOID;
+        var constructor = definition.constructor;
+        var declaration = constructor.declaration;
+        ParserRuleContext at = declaration == null ? definition.declaration : declaration;
+        scopes.push(new HashMap<>());
+        output.append(accessName(constructor.access)).append(' ').append(definition.java).append('(');
+        emitParameters(declaration == null ? null : declaration.parameters(), constructor.parameters);
+        output.append(')');
+        baseArguments = true;
+        List<Expr> arguments = declaration == null ? List.of() : arguments(declaration.arguments());
+        baseArguments = false;
+        if (definition.parent == null) {
+            if (declaration != null && declaration.BASE() != null) throw error(at, "A base initializer requires a parent class.");
+        } else {
+            Constructor parent = definition.parent.constructor;
+            if (parent.access == Access.PRIVATE) throw error(at, "Base constructor is not accessible (private).");
+            checkArguments(at, arguments, parent.parameters, "base constructor");
+            if (target == Target.CLR) output.append(" : base(").append(join(arguments)).append(')');
+        }
+        output.append(" {\n");
+        if (definition.parent != null && target == Target.JVM) output.append("super(").append(join(arguments)).append(");\n");
+        for (var initializer : initializers.entrySet()) output.append("this.").append(initializer.getKey().java)
+                .append('=').append(initializer.getValue()).append(";\n");
+        constructorBody = true;
+        if (declaration != null) statements(declaration.block());
+        constructorBody = false;
+        output.append("}\n");
+        scopes.pop();
+    }
+
+    private void checkArguments(ParserRuleContext at, List<Expr> arguments, List<Type> parameters, String name) {
+        if (arguments.size() != parameters.size()) throw error(at, "Wrong argument count for " + name + ".");
+        for (int i = 0; i < arguments.size(); i++) require(at, parameters.get(i), arguments.get(i).type);
     }
 
     private Binding declare(ParserRuleContext at, String spelling, Type type, boolean mutable) {
@@ -123,12 +350,6 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (binding != null) return binding;
         }
         return null;
-    }
-
-    private Binding binding(ParserRuleContext at, String name) {
-        var binding = find(name);
-        if (binding == null) throw error(at, "Undefined variable: " + name);
-        return binding;
     }
 
     private EnumSet<Flow> statements(BlockContext block) {
@@ -153,18 +374,19 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (statement.variableDecl() != null) {
             var declaration = statement.variableDecl();
             var value = visit(declaration.expression());
-            var declaredType = type(declaration.valueType().getText());
+            var declaredType = type(declaration.valueType());
             require(declaration, declaredType, value.type);
             var binding = declare(declaration, declaration.IDENTIFIER().getText(), declaredType, declaration.LET() != null);
             output.append(binding.mutable || target == Target.CLR ? "" : "final ").append(typeName(declaredType)).append(' ')
                     .append(binding.java).append('=').append(value.java).append(";\n");
         } else if (statement.assignment() != null) {
             var assignment = statement.assignment();
-            var binding = binding(assignment, assignment.IDENTIFIER().getText());
-            if (!binding.mutable) throw error(assignment, "Cannot assign to an immutable binding.");
+            var destination = visit(assignment.postfix());
+            if (destination.location == null) throw error(assignment, "Assignment requires a variable or field.");
+            if (!destination.location.mutable) throw error(assignment, "Cannot assign to an immutable binding or field.");
             var value = visit(assignment.expression());
-            require(assignment, binding.type, value.type);
-            output.append(binding.java).append('=').append(value.java).append(";\n");
+            require(assignment, destination.type, value.type);
+            output.append(destination.java).append('=').append(value.java).append(";\n");
         } else if (statement.ifStatement() != null) {
             return ifStatement(statement.ifStatement());
         } else if (statement.whileStatement() != null) {
@@ -192,7 +414,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             return EnumSet.of(isBreak ? Flow.BREAK : Flow.CONTINUE);
         } else if (statement.PRINT() != null) {
             var args = arguments(statement.arguments());
-            for (var arg : args) valueRequired(statement, arg.type);
+            for (var arg : args) {
+                valueRequired(statement, arg.type);
+                if (arg.type.reference()) throw error(statement, "Print an object's primitive fields or method results, not the object reference.");
+            }
             output.append("BhashRuntime.print(").append(join(args)).append(");\n");
         } else if (statement.block() != null) {
             return block(statement.block());
@@ -222,7 +447,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
     private String join(List<Expr> args) { return String.join(",", args.stream().map(Expr::java).toList()); }
     private void require(ParserRuleContext at, Type expected, Type actual) {
-        if (expected != actual) throw error(at, "Expected " + expected.bhash + ", found " + actual.bhash + ".");
+        if (!compatible(expected, actual)) throw error(at, "Expected " + expected.bhash + ", found " + actual.bhash + ".");
     }
     private void valueRequired(ParserRuleContext at, Type type) {
         if (type == Type.VOID) throw error(at, "A void function does not produce a value.");
@@ -245,6 +470,13 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             String operator = ctx.getChild(i).getText();
             var right = visit(ctx.getChild(i + 1));
             valueRequired(ctx, result.type);
+            if ((operator.equals("==") || operator.equals("!=")) && result.type.reference() && right.type.reference()) {
+                if (result.type != Type.NULL && right.type != Type.NULL
+                        && !compatible(result.type, right.type) && !compatible(right.type, result.type))
+                    throw error(ctx, "Cannot compare unrelated object types.");
+                result = new Expr(Type.BOOL, (operator.equals("!=") ? "!" : "") + "BhashRuntime.same(" + result.java + "," + right.java + ")");
+                continue;
+            }
             require(ctx, result.type, right.type);
             Type type = result.type;
             String java;
@@ -271,7 +503,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     @Override public Expr visitUnary(UnaryContext ctx) {
-        if (ctx.primary() != null) return visit(ctx.primary());
+        if (ctx.postfix() != null) return visit(ctx.postfix());
         String op = ctx.getChild(0).getText();
         // Accept the minimum signed literal, including parenthesized magnitude.
         String magnitude = ctx.unary().getText().replace("(", "").replace(")", "");
@@ -284,6 +516,53 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return new Expr(value.type, code);
     }
 
+    private Expr self(ParserRuleContext at, boolean base) {
+        if (currentClass == null || fieldInitializer || baseArguments) throw error(at, "Instance access is unavailable in this context.");
+        if (base && currentClass.parent == null) throw error(at, "आधार requires a parent class.");
+        return new Expr(base ? currentClass.parent.type : currentClass.type,
+                base ? (target == Target.JVM ? "super" : "base") : "this", false, null, base);
+    }
+
+    private String receiver(Expr object) {
+        return object.base ? object.java : "BhashRuntime.instance(" + object.java + ")";
+    }
+
+    private String memberReceiver(Expr object, ClassInfo owner, Access access) {
+        String code = receiver(object);
+        // Private members are not inherited by the host's subtype; resolve them in their declaring class.
+        return access == Access.PRIVATE && object.type.object != owner ? "((" + owner.java + ")" + code + ")" : code;
+    }
+
+    private Expr readField(ParserRuleContext at, Expr object, String name) {
+        Field field = field(object.type.object, name);
+        if (field == null) throw error(at, "Undefined field: " + name);
+        checkAccess(at, field.owner, field.access, object);
+        return new Expr(field.type, memberReceiver(object, field.owner, field.access) + "." + field.java, new Location(field.mutable));
+    }
+
+    private Expr callMethod(ParserRuleContext at, Expr object, String name, List<Expr> arguments) {
+        Function method = method(object.type.object, name);
+        if (method == null) throw error(at, "Undefined method: " + name);
+        if (constructorBody && (object.base || object.java.equals("this")))
+            throw error(at, "Constructors cannot call instance methods on यह or आधार before construction completes.");
+        checkAccess(at, method.owner, method.access, object);
+        checkArguments(at, arguments, method.parameters, name);
+        return new Expr(method.result, memberReceiver(object, method.owner, method.access) + "." + method.java + "(" + join(arguments) + ")", true);
+    }
+
+    @Override public Expr visitPostfix(PostfixContext ctx) {
+        Expr value = visit(ctx.primary());
+        if (ctx.postfixPart().isEmpty() && value.base) throw error(ctx, "आधार is only valid as a member receiver.");
+        if (ctx.postfixPart().isEmpty() && constructorBody && value.java.equals("this"))
+            throw error(ctx, "Constructors may use यह only as a direct field receiver; the new object cannot escape early.");
+        for (var part : ctx.postfixPart()) {
+            if (value.type.object == null) throw error(part, "Member access requires a class instance.");
+            value = part.LPAREN() == null ? readField(part, value, part.IDENTIFIER().getText())
+                    : callMethod(part, value, part.IDENTIFIER().getText(), arguments(part.arguments()));
+        }
+        return value;
+    }
+
     @Override public Expr visitPrimary(PrimaryContext ctx) {
         if (ctx.INTEGER_LITERAL() != null) return integer(ctx, digits(ctx.getText()));
         if (ctx.REAL_LITERAL() != null) {
@@ -293,18 +572,36 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         }
         if (ctx.STRING_LITERAL() != null) return string(ctx);
         if (ctx.TRUE() != null || ctx.FALSE() != null) return new Expr(Type.BOOL, ctx.TRUE() != null ? "true" : "false");
+        if (ctx.NULL() != null) return new Expr(Type.NULL, "null");
+        if (ctx.THIS() != null) return self(ctx, false);
+        if (ctx.BASE() != null) return self(ctx, true);
+        if (ctx.NEW() != null) {
+            if (fieldInitializer) throw error(ctx, "Field initializers must be constant expressions, without calls or new objects.");
+            var definition = classes.get(Identifiers.key(ctx.IDENTIFIER().getText()));
+            if (definition == null) throw error(ctx, "Unknown class: " + ctx.IDENTIFIER().getText());
+            var constructor = definition.constructor;
+            if (constructor.access != Access.PUBLIC && currentClass != definition)
+                throw error(ctx, "Constructor is not accessible (" + accessName(constructor.access) + ").");
+            var arguments = arguments(ctx.arguments());
+            checkArguments(ctx, arguments, constructor.parameters, "constructor " + definition.spelling);
+            return new Expr(definition.type, "new " + definition.java + "(" + join(arguments) + ")", true);
+        }
         if (ctx.IDENTIFIER() != null) {
             String name = ctx.IDENTIFIER().getText();
+            if (fieldInitializer) throw error(ctx, "Field initializers must be constant expressions, without names or calls.");
             if (ctx.LPAREN() == null) {
-                var binding = binding(ctx, name);
-                return new Expr(binding.type, binding.java);
+                var local = find(name);
+                if (local != null) return new Expr(local.type, local.java, new Location(local.mutable));
+                if (field(currentClass, name) != null) return readField(ctx, self(ctx, false), name);
+                throw error(ctx, "Undefined variable: " + name);
             }
             if (find(name) != null) throw error(ctx, "Binding is not callable: " + name);
+            if (method(currentClass, name) != null) return callMethod(ctx, self(ctx, false), name, arguments(ctx.arguments()));
+            if (field(currentClass, name) != null) throw error(ctx, "Binding is not callable: " + name);
             var function = functions.get(Identifiers.key(name));
             if (function == null) throw error(ctx, "Undefined function: " + name);
             var args = arguments(ctx.arguments());
-            if (args.size() != function.parameters.size()) throw error(ctx, "Wrong argument count for " + name + ".");
-            for (int i = 0; i < args.size(); i++) require(ctx, function.parameters.get(i), args.get(i).type);
+            checkArguments(ctx, args, function.parameters, name);
             return new Expr(function.result, function.java + "(" + join(args) + ")", true);
         }
         var value = visit(ctx.expression());

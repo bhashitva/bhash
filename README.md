@@ -98,6 +98,24 @@ and exit status 1. The example accepts 0–20 because `20!` is the largest facto
 that fits in `पूर्णांक`. Negative values and values over 20 produce the example's
 range message and return normally. Integer output uses Devanagari digits.
 
+## Objects, classes and inheritance
+
+The v0.2 core supports classes (`वर्ग`), constructors (`निर्माता`), object creation
+(`नया`), fields, instance methods (`कार्य`), single inheritance (`विस्तार`), explicit
+method overriding (`अधिलेखन`), `यह`/`आधार`, access modifiers and null references
+(`रिक्त`). These features compile on **both JVM and .NET CLR**.
+
+```bash
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/objects.bhash
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/objects.bhash --target clr
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/factorial-objects.bhash --target clr
+```
+
+The account example prints `मनोज १५० १५ १६५` on both targets. The object-oriented
+factorial example accepts console input and dispatches through a base-class reference.
+See the [object model and keyword guide](docs/objects.md) for syntax, constructor
+rules, visibility, reference types and current scope.
+
 ## Commands
 
 | Command | Behavior |
@@ -119,7 +137,7 @@ I/O error. `run` forwards the generated process's exit status.
 ## Implemented language core
 
 - Devanagari keywords and NFC-normalized identifiers; ASCII/Devanagari numbers.
-- Signed 64-bit integers, binary64 reals, booleans and immutable Unicode text.
+- Signed 64-bit integers, binary64 reals, booleans, immutable Unicode text and class references.
 - Typed functions, forward calls, recursion, mutable/immutable locals and lexical scope.
 - Conditions, loops, break/continue, returns, short-circuit operators and text equality.
 - Entry-point, name, type, return-path, literal-range and control-flow checks.
@@ -141,6 +159,7 @@ Java method/class limits; optimization and debug source maps remain future work.
 | `src/main/java/dev/bhash/backend/clr/` | CLR build and deployment-folder generation |
 | `src/main/resources/dev/bhash/backend/` | Java and C# runtime sources embedded in generated applications |
 | `examples/factorial-console.bhash` | Interactive factorial application |
+| `examples/objects.bhash` / `examples/factorial-objects.bhash` | Classes, constructors, inheritance and polymorphism |
 | `src/test/java/dev/bhash/` | Frontend and end-to-end tests |
 | `scripts/smoke_test.py` | Packaged compiler checks for CI |
 | `docs/language-spec.md` | Language contract |

@@ -1,6 +1,6 @@
-# Bhash / भाष — v0.1 language definition (draft)
+# Bhash / भाष — v0.2 language definition
 
-Status: v0.1 core implemented on JVM and .NET 10 CLR, open to revision. `Bhash.g4` defines
+Status: v0.2 core implemented on JVM and .NET 10 CLR, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
 uses checked C# source lowering. Both targets share one semantic checker.
@@ -21,7 +21,7 @@ uses checked C# source lowering. Both targets share one semantic checker.
 - Numeric literals use ASCII digits (`123`) or Devanagari digits (`१२३`).
   A single literal cannot mix scripts. Different literals in one file may use either.
 - Integers are decimal digits. Real literals require digits on both sides of `.`:
-  `१२.५`, `12.5`. No exponent, radix prefix or digit separator in v0.1.
+  `१२.५`, `12.5`. No exponent, radix prefix or digit separator in v0.2.
 - String literals use double quotes and allow arbitrary Unicode text. Escapes:
   `\"`, `\\`, `\n`, `\r`, `\t`, and `\uXXXX` with four hexadecimal digits.
   Literal newlines in strings are forbidden. The semantic literal decoder
@@ -67,17 +67,19 @@ arithmetic; revisit the name if exact decimal becomes a language requirement.
 }
 ```
 
-A compilation unit contains top-level functions only. No top-level executable
-statements, imports or globals in v0.1. Executables must define exactly one
+A compilation unit contains top-level functions and class declarations. No top-level
+executable statements, imports, globals or nested class declarations are supported. Executables must define exactly one
 `मुख्य()` returning `शून्य`. Empty source is syntactically valid but is not a
-valid executable. Function names must be unique; no overloading. Forward calls
+valid executable. Top-level function names must be unique; no overloading. Classes have their own
+member scopes, described in [Objects and inheritance](objects.md). Forward calls
 and recursion are permitted; collect function signatures before resolving bodies.
 All parameters and return types are explicit. Parameters are immutable bindings.
 Arguments evaluate left to right and must match the signature in count and type.
 
 ## 4. Bindings, scope and control flow
 
-All bindings require a type and initializer. `मान` allows later assignment;
+Local bindings require a type and initializer. Class fields follow the object-model
+initialization rules. `मान` allows later assignment;
 `स्थिर` prevents rebinding but is not restricted to compile-time constants.
 Blocks introduce lexical scopes. Duplicate names within one scope, including
 parameters in a function's outermost body scope, are errors. A nested block may
@@ -107,7 +109,7 @@ Precedence, highest to lowest; binary operators associate left to right:
 | 7 | `&&` | Short-circuit AND |
 | 8 | `||` | Short-circuit OR |
 
-- No implicit integer/real conversion in v0.1. Numeric binary operands must have
+- No implicit integer/real conversion in v0.2. Numeric binary operands must have
   the same type; conversion functions can be designed later.
 - Integer range: −2^63 through 2^63−1. Out-of-range literals are compile-time
   errors. The constant checker handles unary minus before range validation
@@ -155,13 +157,28 @@ Other integer arithmetic retains wrapping behavior; there is no arbitrary-precis
 integer type yet.
 
 Strings are immutable sequences of Unicode scalars; their physical representation
-may differ by backend. There is no indexing, null, character type, collection,
-object model, user exception or memory-management syntax in this initial draft.
+may differ by backend. Text has no indexing or character type yet. Collection, user-exception and
+manual memory-management syntax are not implemented. Class-based objects and host
+garbage collection are described below.
 
-## 7. Deferred design questions
+## 7. Object model
+
+Classes, fields, constructors, instance methods, single inheritance, explicit virtual
+method overrides, public/private/protected access and nullable class references are
+implemented on both managed targets. Class types can appear in locals, fields,
+parameters and return positions; derived-to-base assignment is implicit. Text is
+still a primitive value, while class equality uses reference identity.
+
+New reserved keywords: `वर्ग`, `विस्तार`, `निर्माता`, `नया`, `यह`, `आधार`,
+`सार्वजनिक`, `निजी`, `संरक्षित`, `अधिलेखन` and `रिक्त`. Existing `कार्य`, `मान`
+and `स्थिर` are reused for members. `स्थिर` denotes immutability, not static storage.
+All detailed syntax, initialization order, constructor-safety constraints and access
+rules are specified in [Objects and inheritance](objects.md).
+
+## 8. Deferred design questions
 
 Confirm vocabulary; choose exact real formatting; define module/import syntax;
-design arrays and records; choose error/exception behavior beyond arithmetic
+design arrays, records, interfaces and generics; choose error/exception behavior beyond arithmetic
 traps; settle WASI vs browser environments and native OS/ABI support; define
 foreign-function interfaces separately for each platform. Do not grow the grammar
 to cover these until their semantics and tests are agreed.

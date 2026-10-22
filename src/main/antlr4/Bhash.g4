@@ -1,14 +1,19 @@
-// Bhash (भाष) v0.1 draft. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
+// Bhash (भाष) v0.2 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
 
-program : functionDecl* EOF ;
+program : (functionDecl | classDecl)* EOF ;
+classDecl : CLASS IDENTIFIER (EXTENDS IDENTIFIER)? LBRACE classMember* RBRACE ;
+classMember : visibility? (fieldDecl | constructorDecl | OVERRIDE? functionDecl) ;
+visibility : PUBLIC | PRIVATE | PROTECTED ;
+fieldDecl : (LET | CONST) IDENTIFIER COLON valueType (ASSIGN expression)? SEMI ;
+constructorDecl : CONSTRUCTOR LPAREN parameters? RPAREN (COLON BASE LPAREN arguments? RPAREN)? block ;
 functionDecl : FUNCTION IDENTIFIER LPAREN parameters? RPAREN ARROW returnType block ;
 parameters : parameter (COMMA parameter)* ;
 parameter : IDENTIFIER COLON valueType ;
 returnType : valueType | VOID ;
-valueType : INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE ;
+valueType : INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | IDENTIFIER ;
 block : LBRACE statement* RBRACE ;
 statement
     : variableDecl
@@ -23,7 +28,7 @@ statement
     | block
     ;
 variableDecl : (LET | CONST) IDENTIFIER COLON valueType ASSIGN expression SEMI ;
-assignment : IDENTIFIER ASSIGN expression SEMI ;
+assignment : postfix ASSIGN expression SEMI ;
 ifStatement : IF LPAREN expression RPAREN block (ELSE (ifStatement | block))? ;
 whileStatement : WHILE LPAREN expression RPAREN block ;
 arguments : expression (COMMA expression)* ;
@@ -36,19 +41,36 @@ equality : comparison ((EQ | NE) comparison)* ;
 comparison : additive ((LT | LE | GT | GE) additive)* ;
 additive : multiplicative ((PLUS | MINUS) multiplicative)* ;
 multiplicative : unary ((STAR | SLASH | PERCENT) unary)* ;
-unary : (NOT | MINUS | PLUS) unary | primary ;
+unary : (NOT | MINUS | PLUS) unary | postfix ;
+postfix : primary postfixPart* ;
+postfixPart : DOT IDENTIFIER (LPAREN arguments? RPAREN)? ;
 primary
     : INTEGER_LITERAL
     | REAL_LITERAL
     | STRING_LITERAL
     | TRUE
     | FALSE
+    | NULL
+    | THIS
+    | BASE
+    | NEW IDENTIFIER LPAREN arguments? RPAREN
     | IDENTIFIER (LPAREN arguments? RPAREN)?
     | LPAREN expression RPAREN
     ;
 
 // Reserve keywords before IDENTIFIER; longer names still use longest match.
 FUNCTION : 'कार्य' ;
+CLASS : 'वर्ग' ;
+EXTENDS : 'विस्तार' ;
+CONSTRUCTOR : 'निर्माता' ;
+NEW : 'नया' ;
+THIS : 'यह' ;
+BASE : 'आधार' ;
+PUBLIC : 'सार्वजनिक' ;
+PRIVATE : 'निजी' ;
+PROTECTED : 'संरक्षित' ;
+OVERRIDE : 'अधिलेखन' ;
+NULL : 'रिक्त' ;
 LET : 'मान' ;
 CONST : 'स्थिर' ;
 IF : 'यदि' ;
@@ -73,6 +95,7 @@ LT : '<' ; GT : '>' ; ASSIGN : '=' ;
 PLUS : '+' ; MINUS : '-' ; STAR : '*' ; SLASH : '/' ; PERCENT : '%' ;
 LPAREN : '(' ; RPAREN : ')' ; LBRACE : '{' ; RBRACE : '}' ;
 COLON : ':' ; COMMA : ',' ; SEMI : ';' ;
+DOT : '.' ;
 
 // Each numeric literal uses one digit script; signs are unary operators.
 REAL_LITERAL : ASCII_DIGIT+ '.' ASCII_DIGIT+ | DEV_DIGIT+ '.' DEV_DIGIT+ ;

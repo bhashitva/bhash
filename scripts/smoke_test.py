@@ -35,4 +35,14 @@ output, _ = invoke(["java", "-jar", str(compiler), "run", "examples/factorial-co
 assert output.endswith("गुणनफल: ७२०\n"), output
 _, errors = invoke(["java", "-jar", str(compiler), "run", "examples/factorial-console.bhash", "--target", "clr"], "invalid\n", expected_exit=1)
 assert "भाष:" in errors, errors
-print("Packaged compiler, JVM JAR, CLR DLL, UTF-8 console I/O, and both run commands passed.")
+for target in ("jvm", "clr"):
+    for example, expected, stdin in [
+        ("objects", "मनोज १५० १५ १६५\n", ""),
+        ("factorial-objects", "० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १२०\n", "५\n"),
+    ]:
+        output_path = Path("target") / (example + (".jar" if target == "jvm" else "-clr"))
+        invoke(["java", "-jar", str(compiler), "compile", f"examples/{example}.bhash", "--target", target, "-o", str(output_path)])
+        command = ["java", "-Xverify:all", "-jar", str(output_path)] if target == "jvm" else [dotnet, str(output_path / "BhashProgram.dll")]
+        output, errors = invoke(command, stdin)
+        assert output == expected and not errors, (example, target, output, errors)
+print("Packaged JVM/CLR compiler, console factorial, objects, inheritance and virtual dispatch passed.")

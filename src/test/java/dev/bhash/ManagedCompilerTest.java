@@ -259,4 +259,167 @@ abstract class ManagedCompilerTest {
         assertEquals(1, Main.run(new String[]{"compile", source.toString(), "--target", clr() ? "clr" : "jvm"}, out, err));
         assertTrue(stderr.toString(StandardCharsets.UTF_8).contains("Undefined variable"));
     }
+    @Test void objectExamplesRunWithPolymorphismAndConsoleFactorial() throws Exception {
+        var account = run(compile(Files.readString(Path.of("examples/objects.bhash"))), "");
+        assertEquals(0, account.exit);
+        assertEquals("मनोज १५० १५ १६५\n", account.output);
+        Path factorial = compile(Files.readString(Path.of("examples/factorial-objects.bhash")));
+        for (String input : List.of("5\n", "५\n")) {
+            var result = run(factorial, input);
+            assertEquals(0, result.exit);
+            assertEquals("० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १२०\n", result.output);
+        }
+        assertTrue(run(factorial, "0\n").output.endsWith("गुणनफल: १\n"));
+        assertTrue(run(factorial, "20\n").output.endsWith("गुणनफल: २४३२९०२००८१७६६४००००\n"));
+    }
+
+    @Test void objectCompositionChainedAccessIdentityAndReturningThisWork() throws Exception {
+        String source = """
+                वर्ग वस्तु {
+                    मान मूल्य: पूर्णांक = १;
+                    कार्य स्वयं() -> वस्तु { लौटाओ यह; }
+                    कार्य बढ़ाओ() -> शून्य { मूल्य = मूल्य + १; }
+                }
+                वर्ग डिब्बा {
+                    मान अंदर: वस्तु;
+                    निर्माता(अंदर: वस्तु) { यह.अंदर = अंदर; }
+                    कार्य लो() -> वस्तु { लौटाओ अंदर; }
+                }
+                कार्य मुख्य() -> शून्य {
+                    स्थिर पात्र: डिब्बा = नया डिब्बा(नया वस्तु());
+                    पात्र.लो().बढ़ाओ();
+                    पात्र.अंदर.मूल्य = पात्र.अंदर.मूल्य + ३;
+                    लिखो(पात्र.लो().स्वयं().मूल्य, पात्र.लो() == पात्र.अंदर,
+                        नया वस्तु() != पात्र.अंदर, पात्र.अंदर != रिक्त, रिक्त == रिक्त);
+                }
+                """;
+        var result = run(compile(source), "");
+        assertEquals(0, result.exit);
+        assertEquals("५ सत्य सत्य सत्य सत्य\n", result.output);
+    }
+
+    @Test void multiLevelOverridesBaseCallsAndSubtypeArgumentsWork() throws Exception {
+        String source = """
+                वर्ग प्रथम {
+                    संरक्षित निर्माता() {}
+                    संरक्षित कार्य बीज() -> पूर्णांक { लौटाओ १; }
+                    कार्य मानदो() -> पूर्णांक { लौटाओ यह.बीज(); }
+                }
+                वर्ग द्वितीय विस्तार प्रथम {
+                    अधिलेखन कार्य मानदो() -> पूर्णांक { लौटाओ आधार.मानदो() + २; }
+                    कार्य जांच(अन्य: द्वितीय) -> पूर्णांक { लौटाओ अन्य.बीज(); }
+                }
+                वर्ग तृतीय विस्तार द्वितीय {
+                    अधिलेखन कार्य मानदो() -> पूर्णांक { लौटाओ आधार.मानदो() + ४; }
+                }
+                वर्ग गुप्त {
+                    निजी मान रहस्य: पूर्णांक = ९;
+                    निजी कार्य छिपा() -> पूर्णांक { लौटाओ यह.रहस्य; }
+                    कार्य लो(अन्य: बालक) -> पूर्णांक { लौटाओ अन्य.रहस्य + अन्य.छिपा(); }
+                }
+                वर्ग बालक विस्तार गुप्त {}
+                कार्य बनाओ() -> प्रथम { लौटाओ नया तृतीय(); }
+                कार्य पढ़(वस्तु: प्रथम) -> पूर्णांक { लौटाओ वस्तु.मानदो(); }
+                कार्य मुख्य() -> शून्य {
+                    मान आधारवस्तु: प्रथम = नया द्वितीय();
+                    आधारवस्तु = बनाओ();
+                    लिखो(पढ़(आधारवस्तु), पढ़(नया द्वितीय()), आधारवस्तु == रिक्त, नया द्वितीय().जांच(नया तृतीय()), नया गुप्त().लो(नया बालक()));
+                }
+                """;
+        var result = run(compile(source), "");
+        assertEquals(0, result.exit);
+        assertEquals("७ ३ असत्य १ १८\n", result.output);
+    }
+
+    @Test void fieldDefaultsAndBaseFirstInitializationArePortable() throws Exception {
+        String source = """
+                वर्ग मूल { निर्माता() { लिखो("मूल"); } }
+                वर्ग पात्र विस्तार मूल {
+                    मान संख्या: पूर्णांक;
+                    मान दशांश: दशमलव;
+                    मान सही: तार्किक;
+                    मान नाम: पाठ;
+                    मान अन्य: मूल;
+                    स्थिर सीमा: पूर्णांक = ५ * २;
+                    निर्माता() {
+                        लिखो(यह.संख्या, यह.दशांश, यह.सही, यह.नाम, यह.अन्य == रिक्त, यह.सीमा);
+                    }
+                }
+                कार्य मुख्य() -> शून्य { नया पात्र(); }
+                """;
+        assertEquals("मूल\n० ०.० असत्य  सत्य १०\n", run(compile(source), "").output);
+    }
+
+    @Test void nullFieldAndMethodDereferencesFailCleanly() throws Exception {
+        String source = """
+                वर्ग वस्तु { मान संख्या: पूर्णांक; कार्य मानदो(मानक: पूर्णांक) -> पूर्णांक { लौटाओ मानक; } }
+                कार्य चिह्न() -> पूर्णांक { लिखो("दुष्प्रभाव"); लौटाओ १; }
+                कार्य मुख्य() -> शून्य {
+                    स्थिर वस्तु: वस्तु = रिक्त;
+                    यदि (पढ़ो() == ०) { वस्तु.संख्या = चिह्न(); }
+                    अन्यथा { लिखो(वस्तु.मानदो(चिह्न())); }
+                }
+                """;
+        Path program = compile(source);
+        for (String input : List.of("0\n", "1\n")) {
+            var result = run(program, input);
+            assertEquals(1, result.exit);
+            assertTrue(result.output.startsWith("भाष: रिक्त"), result.output);
+            assertFalse(result.output.contains("दुष्प्रभाव"));
+            assertFalse(result.output.contains("Exception"));
+        }
+    }
+
+    @Test void accessControlRejectsPrivateAndProtectedMembers() {
+        String prefix = "वर्ग मूल { निजी मान गुप्त: पूर्णांक; संरक्षित मान धन: पूर्णांक; "
+                + "निजी कार्य छिपा() -> पूर्णांक { लौटाओ १; } संरक्षित निर्माता() {} } ";
+        reject(prefix + "कार्य मुख्य() -> शून्य { नया मूल(); }", "Constructor is not accessible");
+        String members = "वर्ग वस्तु { निजी मान संख्या: पूर्णांक; निजी कार्य मानदो() -> पूर्णांक { लौटाओ १; } } ";
+        reject(members + "कार्य मुख्य() -> शून्य { लिखो(नया वस्तु().संख्या); }", "not accessible");
+        reject(members + "कार्य मुख्य() -> शून्य { नया वस्तु().मानदो(); }", "not accessible");
+        reject(prefix + "वर्ग बच्चा विस्तार मूल { कार्य जांच(अन्य: मूल) -> पूर्णांक { लौटाओ अन्य.धन; } } कार्य मुख्य() -> शून्य {}", "not accessible");
+        reject("वर्ग मूल { संरक्षित मान संख्या: पूर्णांक; } कार्य मुख्य() -> शून्य { लिखो(नया मूल().संख्या); }", "not accessible");
+    }
+
+    @Test void rejectsInvalidClassesOverridesAndObjectTypeAssignments() {
+        String main = " कार्य मुख्य() -> शून्य {}";
+        reject("वर्ग वस्तु {} वर्ग वस्तु {}" + main, "Duplicate class");
+        reject("वर्ग बच्चा विस्तार अज्ञात {}" + main, "Unknown base class");
+        reject("वर्ग प्रथम विस्तार द्वितीय {} वर्ग द्वितीय विस्तार प्रथम {}" + main, "cycle");
+        reject("वर्ग वस्तु { मान संख्या: पूर्णांक; मान संख्या: पूर्णांक; }" + main, "Duplicate or hidden");
+        reject("वर्ग मूल { मान संख्या: पूर्णांक; } वर्ग बच्चा विस्तार मूल { मान संख्या: पूर्णांक; }" + main, "hidden");
+        reject("वर्ग वस्तु { अधिलेखन कार्य जांच() -> शून्य {} }" + main, "Override requires");
+        reject("वर्ग मूल { कार्य जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { कार्य जांच() -> शून्य {} }" + main, "अधिलेखन");
+        reject("वर्ग मूल { कार्य जांच() -> पूर्णांक { लौटाओ १; } } वर्ग बच्चा विस्तार मूल { अधिलेखन कार्य जांच() -> पाठ { लौटाओ \"एक\"; } }" + main, "preserve");
+        reject("वर्ग मूल { कार्य जांच(संख्या: पूर्णांक) -> शून्य {} } वर्ग बच्चा विस्तार मूल { अधिलेखन कार्य जांच(संख्या: पाठ) -> शून्य {} }" + main, "preserve");
+        reject("वर्ग मूल { निजी कार्य जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { अधिलेखन कार्य जांच() -> शून्य {} }" + main, "non-private");
+        reject("वर्ग मूल { कार्य जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { निजी अधिलेखन कार्य जांच() -> शून्य {} }" + main, "narrow access");
+        reject("वर्ग वस्तु { निर्माता() {} निर्माता(संख्या: पूर्णांक) {} }" + main, "one constructor");
+        reject("वर्ग मूल { निर्माता(संख्या: पूर्णांक) {} } वर्ग बच्चा विस्तार मूल {}" + main, "argument count");
+        reject("वर्ग मूल { निजी निर्माता() {} } वर्ग बच्चा विस्तार मूल {}" + main, "Base constructor");
+        reject("कार्य मुख्य() -> शून्य { स्थिर वस्तु: अज्ञात = रिक्त; }", "Unknown type");
+        reject("कार्य मुख्य() -> शून्य { नया अज्ञात(); }", "Unknown class");
+        reject("वर्ग मूल {} वर्ग बच्चा विस्तार मूल {} कार्य मुख्य() -> शून्य { स्थिर वस्तु: बच्चा = नया मूल(); }", "Expected");
+        reject("वर्ग प्रथम {} वर्ग द्वितीय {} कार्य मुख्य() -> शून्य { लिखो(नया प्रथम() == नया द्वितीय()); }", "unrelated");
+        reject("वर्ग वस्तु {} कार्य मुख्य() -> शून्य { लिखो(नया वस्तु()); }", "primitive fields");
+        reject("वर्ग वस्तु {} कार्य मुख्य() -> शून्य { नया वस्तु().अज्ञात(); }", "Undefined method");
+        reject("कार्य मुख्य() -> शून्य { मान संख्या: पूर्णांक = १; संख्या.अज्ञात(); }", "class instance");
+        reject("वर्ग वस्तु {} कार्य मुख्य() -> शून्य { नया वस्तु() = नया वस्तु(); }", "Assignment requires");
+    }
+
+    @Test void rejectsUnsafeConstructorsAndNonconstantFieldInitializers() {
+        String main = " कार्य मुख्य() -> शून्य {}";
+        reject("वर्ग वस्तु { स्थिर सीमा: पूर्णांक; }" + main, "requires an initializer");
+        reject("वर्ग वस्तु { मान संख्या: पूर्णांक = पढ़ो(); }" + main, "constant expressions");
+        reject("वर्ग वस्तु { मान अन्य: वस्तु = नया वस्तु(); }" + main, "constant expressions");
+        reject("वर्ग वस्तु { मान संख्या: पूर्णांक = यह.संख्या; }" + main, "Instance access");
+        reject("वर्ग वस्तु { स्थिर सीमा: पूर्णांक = १; निर्माता() { यह.सीमा = २; } }" + main, "immutable");
+        reject("वर्ग वस्तु { निर्माता() { जांच(); } कार्य जांच() -> शून्य {} }" + main, "Constructors cannot call");
+        reject("वर्ग वस्तु { निर्माता() { स्थिर स्वयं: वस्तु = यह; } }" + main, "cannot escape");
+        reject("वर्ग वस्तु { निर्माता() : आधार() {} }" + main, "requires a parent");
+        reject("वर्ग मूल { निर्माता(संख्या: पूर्णांक) {} } वर्ग बच्चा विस्तार मूल { मान संख्या: पूर्णांक; निर्माता() : आधार(यह.संख्या) {} }" + main, "Instance access");
+        reject("कार्य मुख्य() -> शून्य { लिखो(यह); }", "Instance access");
+        reject("वर्ग वस्तु { कार्य जांच() -> शून्य { आधार.जांच(); } }" + main, "parent class");
+    }
+
 }

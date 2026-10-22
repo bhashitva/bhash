@@ -55,6 +55,11 @@ final class BhashRuntime {
         return left % right;
     }
     static boolean truth(boolean value) { return value; }
+    static <T> T instance(T value) {
+        if (value == null) throw new Failure("रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।");
+        return value;
+    }
+    static boolean same(Object left, Object right) { return left == right; }
     static void discard(Object value) {}
     static void report(String message) { ERRORS.println("भाष: " + message); }
 }

@@ -60,6 +60,25 @@ known-file check permit rebuilding compiler-owned output folders while rejecting
 unrelated files, folders and symlinks. Existing compiler output is preserved on
 build failure. Do not remove the marker if you want to rebuild into that directory.
 
+## Objects on both managed targets
+
+The shared emitter first registers class types, links single inheritance and rejects
+cycles, then collects fields, constructor signatures and virtual method slots in
+base-first order. Member names are normalized like existing local/function names.
+Type checking handles related reference types, null, member access and visibility.
+Overrides reuse the inherited slot name; Java virtual dispatch and C# virtual/override
+methods implement the same Bhash behavior. Private members and hiding rules are
+checked before host compilation.
+
+Bhash classes lower to synthetic nested host classes; no user-provided identifier is
+inserted as a host class or member name. JVM packaging includes every generated nested
+class; CLR classes are included in the managed assembly. Constructors emit base
+initialization first, then field initializers, then the body. Constructor escape and
+current-instance method calls are restricted to avoid partially initialized virtual
+objects. Runtime helpers provide reference identity and consistent null errors.
+
+See [the object model](objects.md) for exact language rules and current limitations.
+
 ## Target status
 
 | Target | Status | Route |

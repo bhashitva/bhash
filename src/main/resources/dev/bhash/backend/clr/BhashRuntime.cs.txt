@@ -95,6 +95,11 @@ internal static class BhashRuntime {
         return left == long.MinValue && right == -1 ? 0 : left % right;
     }
     internal static bool truth(bool value) => value;
+    internal static T instance<T>(T value) where T : class {
+        if (value == null) throw new Failure("रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।");
+        return value;
+    }
+    internal static bool same(object left, object right) => ReferenceEquals(left, right);
     internal static void discard(object value) {}
     internal static void report(string message) => Errors.WriteLine("भाष: " + message);
 }
