@@ -33,6 +33,29 @@ compile('semantics', `
     }
     अन्यथा { जबतक (सत्य) {} }
 }`);
+// A rebuild succeeds, but failed source/builds and edited output preserve prior assets.
+const semanticsSource = fs.readFileSync(path.join(root, 'semantics.bhash'), 'utf8');
+compile('semantics', semanticsSource);
+const outputIndex = path.join(root, 'semantics/index.html');
+const originalIndex = fs.readFileSync(outputIndex, 'utf8');
+function rejectedBuild(source) {
+    const file = path.join(root, 'rejected.bhash');
+    fs.writeFileSync(file, source);
+    const result = spawnSync('java', ['-jar', jar, 'compile', file, '--target', 'wasm-browser', '-o', path.join(root, 'semantics')], { encoding: 'utf8', timeout: 660000 });
+    assert.notEqual(result.status, 0);
+    assert.equal(fs.readFileSync(outputIndex, 'utf8'), originalIndex);
+}
+rejectedBuild('कार्य');
+const note = path.join(root, 'semantics/_framework/notes.txt');
+fs.writeFileSync(note, 'keep me');
+rejectedBuild(semanticsSource);
+assert.equal(fs.readFileSync(note, 'utf8'), 'keep me');
+fs.unlinkSync(note);
+fs.appendFileSync(outputIndex, '<!-- user edit -->');
+const edited = spawnSync('java', ['-jar', jar, 'compile', path.join(root, 'semantics.bhash'), '--target', 'wasm-browser', '-o', path.join(root, 'semantics')], { encoding: 'utf8', timeout: 60000 });
+assert.notEqual(edited.status, 0);
+assert.equal(fs.readFileSync(outputIndex, 'utf8'), originalIndex + '<!-- user edit -->');
+fs.writeFileSync(outputIndex, originalIndex);
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm' };
 const server = http.createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
@@ -57,7 +80,7 @@ const server = http.createServer((request, response) => {
             await page.goto(`${base}/${name}/`);
             await page.locator('#input').fill(input);
             await page.locator('#run').click();
-            await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('Finished'), { timeout: 60000 });
+            await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('Finished'), null, { timeout: 60000 });
             assert.equal(await page.locator('#status').textContent(), `Finished (exit ${expectedExit})`);
             assert.equal((await page.locator('#output').textContent()).replaceAll('\r\n', '\n'), expectedOutput);
             const errors = await page.locator('#errors').textContent();
