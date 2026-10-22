@@ -1,0 +1,15 @@
+using System.Runtime.InteropServices.JavaScript;
+using System.Runtime.Versioning;
+
+[SupportedOSPlatform("browser")]
+public static partial class BhashBrowser {
+    [JSExport]
+    public static int Run(string input) {
+        BhashRuntime.reset(input);
+        return BhashProgram.Main(System.Array.Empty<string>());
+    }
+    [JSExport]
+    public static string Output() => BhashRuntime.output();
+    [JSExport]
+    public static string Errors() => BhashRuntime.errors();
+}

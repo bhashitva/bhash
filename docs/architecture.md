@@ -79,20 +79,33 @@ objects. Runtime helpers provide reference identity and consistent null errors.
 
 See [the object model](objects.md) for exact language rules and current limitations.
 
+## Implemented browser WebAssembly pipeline
+
+`WasmCompiler` reuses the CLR emitter and conditional runtime I/O adapters. It
+publishes a .NET 10 WebAssembly SDK project with a JavaScript-exported host and
+packages all static assets. A module worker loads the runtime for each execution;
+input is a pre-supplied string and output/errors are returned as strings when the
+program finishes. Terminating the worker stops execution. AOT and native relinking
+are disabled; this is a managed-runtime bundle rather than a WASI module.
+
+Staging preserves previous output on build failure. A SHA-256 asset manifest rejects
+replacement of output with added or modified files. See [browser target](wasm-browser.md).
+
 ## Target status
 
 | Target | Status | Route |
 | --- | --- | --- |
 | JVM | Implemented | Bhash → checked Java → JVM bytecode → executable JAR |
 | .NET CLR | Implemented | Bhash → checked C# → .NET 10 managed DLL + deployment metadata |
-| WASM | Planned | Proposed LLVM lowering with WASI runtime |
+| Browser WASM | Implemented | Bhash → checked C# → .NET 10 WebAssembly runtime bundle |
+| WASI | Planned | Standalone command-line WebAssembly runtime/backend |
 | x86-64 | Planned | Proposed LLVM assembly/object emission, initially Linux System V ABI |
 | ARM64 / AArch64 | Planned | Proposed LLVM assembly/object emission, initially Linux AAPCS64 |
 
 ANTLR generates the compiler's Java parser, not Bhash's application backends.
 LLVM remains a proposal and is not a dependency. CLR uses the .NET SDK/C# compiler and its own runtime helpers. It does not depend
 on LLVM.
-32-bit architectures, browser WASM and other native OS/ABI combinations are separate
+32-bit architectures, WASI and other native OS/ABI combinations are separate
 extensions. Native assembly still needs assembling/linking and a target runtime.
 
 Next, extract a source-located typed AST and shared control-flow IR from the current

@@ -5,9 +5,24 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 internal static class BhashRuntime {
+#if BHASH_BROWSER
+    private static TextReader Input = new StringReader("");
+    private static StringWriter Output = new StringWriter(CultureInfo.InvariantCulture);
+    private static StringWriter Errors = new StringWriter(CultureInfo.InvariantCulture);
+    internal static void reset(string input) {
+        Input.Dispose(); Output.Dispose(); Errors.Dispose();
+        Input = new StringReader(input);
+        Output = new StringWriter(CultureInfo.InvariantCulture);
+        Errors = new StringWriter(CultureInfo.InvariantCulture);
+    }
+    internal static string output() => Output.ToString();
+    internal static string errors() => Errors.ToString();
+#else
     private static readonly StreamReader Input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false, true), false);
     private static readonly StreamWriter Output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true };
     private static readonly StreamWriter Errors = new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false)) { AutoFlush = true };
+
+#endif
 
     internal sealed class Failure : Exception {
         internal Failure(string message) : base(message) {}

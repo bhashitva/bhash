@@ -4,6 +4,7 @@ import dev.bhash.backend.Target;
 import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.jvm.JvmCompiler;
 import dev.bhash.backend.clr.ClrCompiler;
+import dev.bhash.backend.wasm.WasmCompiler;
 import dev.bhash.frontend.Frontend;
 import dev.bhash.parser.BhashParser;
 import java.io.IOException;
@@ -20,7 +21,7 @@ public final class Main {
         if (args.length == 1 && args[0].equals("targets")) {
             for (var target : Target.values()) {
                 out.println(target.name().toLowerCase(java.util.Locale.ROOT) + ": "
-                        + target.description() + ((target == Target.JVM || target == Target.CLR) ? " [implemented]" : " [planned]"));
+                        + target.description() + ((target == Target.JVM || target == Target.CLR || target == Target.WASM) ? " [implemented]" : " [planned]"));
             }
             return 0;
         }
@@ -50,7 +51,7 @@ public final class Main {
 
     private static int usage(PrintStream err) {
         err.println("Usage: java -jar bhash-compiler.jar check|parse <file.bhash>");
-        err.println("       java -jar bhash-compiler.jar compile <file.bhash> [-o <output>] [--target jvm|clr]");
+        err.println("       java -jar bhash-compiler.jar compile <file.bhash> [-o <output>] [--target jvm|clr|wasm-browser]");
         err.println("       java -jar bhash-compiler.jar run <file.bhash> [--target jvm|clr]");
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
@@ -74,7 +75,8 @@ public final class Main {
                 target = switch (args[++i]) {
                     case "jvm" -> Target.JVM;
                     case "clr" -> Target.CLR;
-                    default -> throw new IllegalArgumentException("Only jvm and clr targets are implemented.");
+                    case "wasm-browser", "wasm" -> Target.WASM;
+                    default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm).");
                 };
             } else throw new IllegalArgumentException("Invalid or incomplete option: " + args[i]);
         }
@@ -82,7 +84,7 @@ public final class Main {
             String filename = source.getFileName().toString();
             int dot = filename.lastIndexOf('.');
             String stem = dot > 0 ? filename.substring(0, dot) : filename;
-            output = source.resolveSibling(stem + (target == Target.JVM ? ".jar" : "-clr"));
+            output = source.resolveSibling(stem + (target == Target.JVM ? ".jar" : target == Target.CLR ? "-clr" : "-web"));
         }
         return new Options(source, output, target);
     }
@@ -90,6 +92,7 @@ public final class Main {
     private static void build(Options options) throws IOException, CompilationException {
         String source = Files.readString(options.source, StandardCharsets.UTF_8);
         if (options.target == Target.JVM) new JvmCompiler().compile(options.source.toString(), source, options.output);
+        else if (options.target == Target.WASM) new WasmCompiler().compile(options.source.toString(), source, options.output);
         else new ClrCompiler().compile(options.source.toString(), source, options.output);
     }
 
@@ -98,7 +101,7 @@ public final class Main {
             var options = options(args, true);
             Path input = options.source.toAbsolutePath().normalize();
             Path output = options.output.toAbsolutePath().normalize();
-            if (input.equals(output) || (options.target == Target.CLR && input.startsWith(output))
+            if (input.equals(output) || (options.target != Target.JVM && input.startsWith(output))
                     || (Files.exists(output) && Files.isSameFile(input, output))) {
                 err.println("Output must not overwrite the Bhash source file or its containing directory.");
                 return 2;
@@ -107,6 +110,9 @@ public final class Main {
             if (options.target == Target.JVM) {
                 out.println("Compiled JVM program: " + options.output);
                 out.println("Run: java -jar \"" + options.output + "\"");
+            } else if (options.target == Target.WASM) {
+                out.println("Compiled browser WebAssembly program: " + options.output);
+                out.println("Serve this directory over HTTP, then open index.html (see docs/wasm-browser.md).");
             } else {
                 Path assembly = options.output.resolve("BhashProgram.dll");
                 out.println("Compiled CLR program: " + assembly);
@@ -130,6 +136,10 @@ public final class Main {
         Process process = null;
         try {
             var requested = options(args, false);
+            if (requested.target == Target.WASM) {
+                err.println("Browser programs use compile --target wasm-browser; serve the output over HTTP and open index.html.");
+                return 2;
+            }
             temporary = Files.createTempDirectory("bhash-run-");
             Path output = temporary.resolve(requested.target == Target.JVM ? "program.jar" : "clr");
             var options = new Options(requested.source, output, requested.target);

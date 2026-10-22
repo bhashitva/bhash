@@ -1,8 +1,8 @@
 # Bhash / भाष
 
 A Devanagari-first programming language with a compiler written in Java.
-Bhash source (`.bhash`) compiles to a **JVM executable JAR** or a **.NET CLR managed assembly**.
-Both targets support the same console factorial source.
+Bhash source (`.bhash`) compiles to a **JVM executable JAR**, a **.NET CLR managed assembly**, or a **browser WebAssembly application**.
+All three targets support the same factorial source.
 
 ## Try the interactive factorial program
 
@@ -35,7 +35,7 @@ The generated JAR requires **Java 17+ only**. It includes its small console runt
 and does not need Maven, the Bhash compiler or ANTLR to run. Building Bhash programs
 requires a full JDK because this backend lowers checked Bhash to Java source and
 uses the JDK compiler to produce JVM bytecode. It is a compiler, not a parse-tree
-interpreter. CLR output is also implemented (see below); WASM and native output remain planned.
+interpreter. CLR and browser WebAssembly output are also implemented (see below); native output remains planned.
 
 On Windows, if Devanagari input is garbled, run `chcp 65001` before starting Java
 and use a font with Devanagari support.
@@ -172,3 +172,15 @@ is absent; set `BHASH_REQUIRE_CLR=true` to make missing SDK support a test failu
 CI always sets this requirement. Generated sources, classes, JARs and CLR deployment folders remain build products
 in `target/`. See [CLR details](docs/clr-target.md) for runtime and output behavior.
 No open-source license has been selected yet.
+
+### Browser WebAssembly
+
+Build a browser application using the .NET 10 WebAssembly runtime:
+
+```sh
+dotnet workload install wasm-tools
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/factorial-objects.bhash --target wasm-browser -o target/factorial-web
+python -m http.server 8000 --directory target/factorial-web
+```
+
+Open <http://localhost:8000>, enter `५`, and click **Run / चलाएँ** to see `गुणनफल: १२०`. Classes and inheritance are supported. Input is supplied before execution; runs can be stopped and repeated. See [browser target documentation](docs/wasm-browser.md) for prerequisites, deployment and testing.

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bhash · भाष</title>
+<style>
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { max-width: 52rem; margin: 3rem auto; padding: 0 1.2rem; line-height: 1.6; }
+h1 { margin-bottom: 0; } textarea, pre { box-sizing: border-box; width: 100%; padding: 1rem; border: 1px solid #888; border-radius: .5rem; font: inherit; }
+textarea { min-height: 7rem; } pre { min-height: 4rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+button { padding: .65rem 1.4rem; margin: .7rem .5rem .7rem 0; font: inherit; cursor: pointer; }
+#errors { color: light-dark(#a11212, #ffaaaa); } #status { display: inline-block; }
+</style>
+</head>
+<body>
+<h1>Bhash <span lang="hi">भाष</span></h1>
+<p>Your compiled Bhash program, running locally in your browser.</p>
+<form>
+<label for="input">Program input — one integer per line</label>
+<p>Enter all input before running. Both 0–9 and ०–९ are accepted.</p>
+<textarea id="input" spellcheck="false" placeholder="५"></textarea>
+<div><button id="run" type="submit">Run / चलाएँ</button><button id="stop" type="button" disabled>Stop</button><span id="status" role="status">Ready</span></div>
+</form>
+<h2>Output</h2><pre id="output" aria-live="polite"></pre>
+<h2>Errors</h2><pre id="errors" aria-live="polite"></pre>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

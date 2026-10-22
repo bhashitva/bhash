@@ -10,3 +10,5 @@ target/
 BhashProgram.deps.json
 BhashProgram.runtimeconfig.json
 .bhash-clr-output
+
+node_modules/

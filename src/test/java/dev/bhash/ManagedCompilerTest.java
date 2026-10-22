@@ -250,7 +250,7 @@ abstract class ManagedCompilerTest {
         assertEquals(0, Main.run(new String[]{"compile", source.toString(), "--target", clr() ? "clr" : "jvm", "-o", custom.toString()}, out, err));
         assertEquals("१२०\n", run(clr() ? custom.resolve("BhashProgram.dll") : custom, "").output);
         assertEquals(2, Main.run(new String[]{"compile", source.getRoot().toString()}, out, err));
-        assertEquals(2, Main.run(new String[]{"compile", source.toString(), "--target", "wasm"}, out, err));
+        assertEquals(2, Main.run(new String[]{"compile", source.toString(), "--target", "wasi"}, out, err));
         assertEquals(2, Main.run(new String[]{"compile", source.toString(), "-o"}, out, err));
         assertEquals(2, Main.run(new String[]{"compile", source.toString(), "--unknown"}, out, err));
         assertEquals(0, Main.run(new String[]{"targets"}, out, err));
