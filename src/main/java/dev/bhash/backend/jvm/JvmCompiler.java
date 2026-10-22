@@ -1,6 +1,9 @@
 package dev.bhash.backend.jvm;
 
 import dev.bhash.frontend.Frontend;
+import dev.bhash.backend.CompilationException;
+import dev.bhash.backend.ManagedEmitter;
+import dev.bhash.backend.Target;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -14,7 +17,7 @@ public final class JvmCompiler {
     public void compile(String sourceName, String source, Path output) throws IOException, CompilationException {
         var result = Frontend.parse(sourceName, source.startsWith("\uFEFF") ? source.substring(1) : source);
         if (!result.valid()) throw new CompilationException(String.join("\n", result.diagnostics().stream().map(Object::toString).toList()));
-        String java = JavaEmitter.emit(sourceName, result.tree());
+        String java = ManagedEmitter.emit(sourceName, result.tree(), Target.JVM);
         var compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) throw new CompilationException("JVM compilation requires a full JDK 17 or newer (not a JRE).");
         Path temporary = Files.createTempDirectory("bhash-jvm-");

@@ -1,4 +1,4 @@
-package dev.bhash.backend.jvm;
+package dev.bhash.backend;
 
 import dev.bhash.frontend.Identifiers;
 import dev.bhash.parser.BhashBaseVisitor;
@@ -7,8 +7,8 @@ import java.math.BigInteger;
 import java.util.*;
 import org.antlr.v4.runtime.ParserRuleContext;
 
-/** Type-checks the v0.1 core and lowers it to Java. User names never become Java names. */
-final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
+/** Shared semantic checking and source lowering for JVM and CLR. User names are mangled. */
+public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> {
     enum Type {
         INT("long", "पूर्णांक"), REAL("double", "दशमलव"),
         BOOL("boolean", "तार्किक"), TEXT("String", "पाठ"), VOID("void", "शून्य");
@@ -24,6 +24,7 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
     private static final BigInteger MIN = BigInteger.valueOf(Long.MIN_VALUE);
     private static final BigInteger MAX = BigInteger.valueOf(Long.MAX_VALUE);
     private final String sourceName;
+    private final Target target;
     private final Map<String, Function> functions = new LinkedHashMap<>();
     private final Deque<Map<String, Binding>> scopes = new ArrayDeque<>();
     private final StringBuilder output = new StringBuilder();
@@ -35,10 +36,11 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
         Invalid(String message) { super(message); }
     }
 
-    private JavaEmitter(String sourceName) { this.sourceName = sourceName; }
+    private ManagedEmitter(String sourceName, Target target) { this.sourceName = sourceName; this.target = target; }
 
-    static String emit(String sourceName, ProgramContext program) throws CompilationException {
-        try { return new JavaEmitter(sourceName).program(program); }
+    public static String emit(String sourceName, ProgramContext program, Target target) throws CompilationException {
+        if (target != Target.JVM && target != Target.CLR) throw new IllegalArgumentException("Not a managed target");
+        try { return new ManagedEmitter(sourceName, target).program(program); }
         catch (Invalid error) { throw new CompilationException(error.getMessage()); }
     }
 
@@ -49,6 +51,12 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
 
     private Type type(String spelling) {
         return Arrays.stream(Type.values()).filter(t -> t.bhash.equals(spelling)).findFirst().orElseThrow();
+    }
+
+    private String typeName(Type type) {
+        if (target == Target.CLR && type == Type.BOOL) return "bool";
+        if (target == Target.CLR && type == Type.TEXT) return "string";
+        return type.java;
     }
 
     private String program(ProgramContext program) {
@@ -66,10 +74,17 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
         var main = functions.get(Identifiers.key("मुख्य"));
         if (main == null || main.result != Type.VOID || !main.parameters.isEmpty())
             throw error(program, "Executable requires exactly one कार्य मुख्य() -> शून्य.");
-        output.append("public final class BhashProgram {\n");
-        output.append("public static void main(String[] args) { try { ").append(main.java)
-                .append("(); } catch (BhashRuntime.Failure | ArithmeticException e) {")
-                .append(" BhashRuntime.report(e.getMessage()); System.exit(1); } }\n");
+        if (target == Target.JVM) {
+            output.append("public final class BhashProgram {\n");
+            output.append("public static void main(String[] args) { try { ").append(main.java)
+                    .append("(); } catch (BhashRuntime.Failure | ArithmeticException e) {")
+                    .append(" BhashRuntime.report(e.getMessage()); System.exit(1); } }\n");
+        } else {
+            output.append("using System;\ninternal static class BhashProgram {\n");
+            output.append("public static int Main(string[] args) { try { ").append(main.java)
+                    .append("(); return 0; } catch (Exception e) when (e is BhashRuntime.Failure || e is ArithmeticException) {")
+                    .append(" BhashRuntime.report(e.Message); return 1; } }\n");
+        }
         for (var declaration : program.functionDecl()) emitFunction(declaration);
         return output.append("}\n").toString();
     }
@@ -78,13 +93,13 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
         var function = functions.get(Identifiers.key(declaration.IDENTIFIER().getText()));
         returnType = function.result;
         scopes.push(new HashMap<>());
-        output.append("static ").append(function.result.java).append(' ').append(function.java).append('(');
+        output.append("static ").append(typeName(function.result)).append(' ').append(function.java).append('(');
         if (declaration.parameters() != null) {
             int index = 0;
             for (var parameter : declaration.parameters().parameter()) {
                 if (index > 0) output.append(',');
                 var binding = declare(parameter, parameter.IDENTIFIER().getText(), function.parameters.get(index++), false);
-                output.append("final ").append(binding.type.java).append(' ').append(binding.java);
+                output.append(target == Target.JVM ? "final " : "").append(typeName(binding.type)).append(' ').append(binding.java);
             }
         }
         output.append(") {\n");
@@ -141,7 +156,7 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
             var declaredType = type(declaration.valueType().getText());
             require(declaration, declaredType, value.type);
             var binding = declare(declaration, declaration.IDENTIFIER().getText(), declaredType, declaration.LET() != null);
-            output.append(binding.mutable ? "" : "final ").append(declaredType.java).append(' ')
+            output.append(binding.mutable || target == Target.CLR ? "" : "final ").append(typeName(declaredType)).append(' ')
                     .append(binding.java).append('=').append(value.java).append(";\n");
         } else if (statement.assignment() != null) {
             var assignment = statement.assignment();
@@ -241,11 +256,15 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
                 default -> numeric(ctx, type);
             }
             if ((operator.equals("==") || operator.equals("!=")) && result.type == Type.TEXT) {
-                java = (operator.equals("!=") ? "!" : "") + "java.util.Objects.equals(" + result.java + "," + right.java + ")";
+                String equality = target == Target.JVM ? "java.util.Objects.equals(" : "string.Equals(";
+                java = (operator.equals("!=") ? "!" : "") + equality + result.java + "," + right.java
+                        + (target == Target.JVM ? ")" : ",StringComparison.Ordinal)");
             } else if ((operator.equals("/") || operator.equals("%")) && result.type == Type.INT) {
                 // A helper gives constant-zero division the same runtime behavior as dynamic division.
                 java = "BhashRuntime." + (operator.equals("/") ? "divide" : "remainder") + "(" + result.java + "," + right.java + ")";
             } else java = "(" + result.java + " " + operator + " " + right.java + ")";
+            if (target == Target.CLR && type == Type.INT && Set.of("+", "-", "*").contains(operator))
+                java = "unchecked(" + java + ")";
             result = new Expr(type, java);
         }
         return result;
@@ -260,7 +279,9 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
         var value = visit(ctx.unary());
         if (op.equals("!")) require(ctx, Type.BOOL, value.type);
         else numeric(ctx, value.type);
-        return new Expr(value.type, "(" + op + value.java + ")");
+        String code = "(" + op + "(" + value.java + "))";
+        if (target == Target.CLR && value.type == Type.INT) code = "unchecked(" + code + ")";
+        return new Expr(value.type, code);
     }
 
     @Override public Expr visitPrimary(PrimaryContext ctx) {
@@ -326,6 +347,8 @@ final class JavaEmitter extends BhashBaseVisitor<JavaEmitter.Expr> {
             codepoints.add(Integer.toString(cp));
             count++;
         }
-        return new Expr(Type.TEXT, "new String(new int[]{" + codepoints + "},0," + count + ")");
+        return new Expr(Type.TEXT, target == Target.JVM
+                ? "new String(new int[]{" + codepoints + "},0," + count + ")"
+                : "BhashRuntime.text(new int[]{" + codepoints + "})");
     }
 }

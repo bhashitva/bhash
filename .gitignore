@@ -5,3 +5,8 @@ target/
 *.class
 *.jar
 .DS_Store
+*-clr/
+*.dll
+BhashProgram.deps.json
+BhashProgram.runtimeconfig.json
+.bhash-clr-output

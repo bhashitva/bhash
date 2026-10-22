@@ -1,11 +1,15 @@
-# JVM compiler validation
+# Managed compiler validation
 
-The JVM implementation is tested by compiling Bhash source to standalone JARs
-and executing them in separate Java processes with bytecode verification enabled.
+The JVM implementation is tested by compiling Bhash source to standalone JVM JARs and CLR assemblies
+and executing them in separate Java/.NET processes (with bytecode verification enabled on the JVM).
 There is no compiler/ANTLR classpath when running the generated programs.
 
-Current local checks: all 28 JUnit tests pass (15 frontend tests and 13 JVM/CLI
-test groups), plus `scripts/smoke_test.py` against the packaged compiler.
+Local validation: all 43 JUnit tests passed, with no skips, plus the packaged
+compiler/JVM/CLR smoke checks.
+
+The common execution/semantic/CLI test corpus runs for each managed backend,
+with extra CLR tests for output preservation and directory ownership. JVM tests
+require a JDK; CLR tests require the .NET 10 SDK. CI requires both backends.
 
 Coverage includes:
 
@@ -20,7 +24,8 @@ Coverage includes:
 - CLI output/source protection, executable JAR contents and failed-compile preservation.
 
 GitHub Actions runs `mvn verify` and packaged compiler/application smoke tests
-on both Windows and Linux, and uploads compiler and factorial JAR artifacts.
+on both Windows and Linux, and uploads the compiler JAR, factorial JVM JAR and
+factorial CLR deployment folder as downloadable artifacts.
 See the repository's Actions page for current CI results.
 
-The CLR, WASM and native targets are not implemented or tested.
+WASM and native targets are not implemented or tested.

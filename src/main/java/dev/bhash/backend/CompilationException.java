@@ -1,4 +1,4 @@
-package dev.bhash.backend.jvm;
+package dev.bhash.backend;
 
 /** A source-located Bhash diagnostic, or a compiler/toolchain failure. */
 public final class CompilationException extends Exception {

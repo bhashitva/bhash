@@ -1,14 +1,15 @@
 # Implementation roadmap
 
-## Completed: syntax and first executable JVM backend
+## Completed: syntax and executable JVM and CLR backends
 
 - ANTLR grammar, Java parser, CLI and syntax diagnostics.
 - Function signature collection, normalized symbol resolution and lexical scopes.
 - Type checking, entry-point and argument validation, immutable bindings,
   return/control-flow checks, literal decoding and range validation.
-- Java lowering and executable JVM JAR generation, including its console runtime.
+- Shared managed semantic checker, Java lowering and executable JVM JAR generation.
+- C# lowering, .NET 10 CLR DLL/deployment metadata generation and console runtime.
 - `पढ़ो()` integer console input, UTF-8 output, interactive factorial example.
-- Frontend tests plus independent-process JVM execution and error-case tests.
+- Frontend tests plus independent-process JVM/CLR execution and error-case tests.
 
 ## Next: frontend structure and developer experience
 
@@ -30,14 +31,15 @@
 - WASM/WASI runtime, memory and I/O support; execute using a chosen WASI engine.
 - Match JVM behavior on overflow, division, Unicode, errors and evaluation order.
 
-## CLR
+## CLR follow-ups
 
-- Select CIL emitter/assembler toolchain and managed runtime integration.
-- Implement metadata, entry wrapper, runtime helpers and executable packaging.
-- Run the common conformance corpus under a supported .NET runtime.
+- Additional target-framework and deployment options, including self-contained publishing.
+- Debug/source mapping and runtime Bhash stack traces.
+- Exact cross-target binary64 decimal rendering; current JVM and .NET runtimes can
+  choose different shortest last-digit spellings for some double values.
 
 ## Later language growth
 
 Modules, arrays/records, arbitrary-precision arithmetic, standard library, debugger
 support, editor tooling, package management and FFI. Changes require a spec update,
-examples and tests. Generated code and compiled JARs remain build products.
+examples and tests. Generated code, JVM JARs and CLR deployment folders remain build products.

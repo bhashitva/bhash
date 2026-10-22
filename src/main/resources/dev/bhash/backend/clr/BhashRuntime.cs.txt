@@ -1,0 +1,100 @@
+using System;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+
+internal static class BhashRuntime {
+    private static readonly StreamReader Input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false, true), false);
+    private static readonly StreamWriter Output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true };
+    private static readonly StreamWriter Errors = new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false)) { AutoFlush = true };
+
+    internal sealed class Failure : Exception {
+        internal Failure(string message) : base(message) {}
+    }
+
+    internal static long readInteger() {
+        string input;
+        try { input = Input.ReadLine(); }
+        catch (Exception error) when (error is IOException || error is DecoderFallbackException) {
+            throw new Failure("कंसोल से UTF-8 इनपुट पढ़ा नहीं जा सका।");
+        }
+        if (input == null) throw new Failure("इनपुट समाप्त: एक पूर्णांक अपेक्षित था।");
+        int start = 0, end = input.Length;
+        while (start < end && whitespace(input[start])) start++;
+        while (end > start && whitespace(input[end - 1])) end--;
+        string value = input.Substring(start, end - start);
+        if (!Regex.IsMatch(value, @"\A[+-]?(?:[0-9]+|[०-९]+)\z", RegexOptions.CultureInvariant))
+            throw new Failure("अमान्य इनपुट: एक पंक्ति में एक पूर्णांक लिखें (0-9 या ०-९)।");
+        var ascii = new StringBuilder();
+        foreach (char c in value) ascii.Append(c >= '०' && c <= '९' ? (char)('0' + c - '०') : c);
+        if (!long.TryParse(ascii.ToString(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long number))
+            throw new Failure("पूर्णांक 64-बिट सीमा से बाहर है।");
+        return number;
+    }
+
+    // Match Java Character.isWhitespace / String.strip, including its nonbreaking-space exclusions.
+    private static bool whitespace(char c) => (c >= '\t' && c <= '\r') || (c >= '\u001c' && c <= ' ')
+        || c == '\u1680' || (c >= '\u2000' && c <= '\u2006') || (c >= '\u2008' && c <= '\u200a')
+        || c == '\u2028' || c == '\u2029' || c == '\u205f' || c == '\u3000';
+
+    internal static void print(params object[] values) {
+        for (int i = 0; i < values.Length; i++) {
+            if (i > 0) Output.Write(' ');
+            object value = values[i];
+            if (value is long number) Output.Write(devanagari(number.ToString(CultureInfo.InvariantCulture)));
+            else if (value is bool flag) Output.Write(flag ? "सत्य" : "असत्य");
+            else if (value is double real) Output.Write(devanagari(realText(real)));
+            else Output.Write(value);
+        }
+        Output.WriteLine();
+    }
+
+    private static string devanagari(string ascii) {
+        var result = new StringBuilder();
+        foreach (char c in ascii) result.Append(c >= '0' && c <= '9' ? (char)('०' + c - '0') : c);
+        return result.ToString();
+    }
+
+    // Normalize .NET round-trip formatting to Bhash's decimal/exponent presentation.
+    // Some shortest representations still differ from Java 17 in their last digits.
+    private static string realText(double number) {
+        if (double.IsNaN(number)) return "NaN";
+        if (double.IsPositiveInfinity(number)) return "Infinity";
+        if (double.IsNegativeInfinity(number)) return "-Infinity";
+        if (number == 0) return BitConverter.DoubleToInt64Bits(number) < 0 ? "-0.0" : "0.0";
+        string raw = Math.Abs(number).ToString("R", CultureInfo.InvariantCulture);
+        int exponent = 0, e = raw.IndexOf('E');
+        if (e >= 0) { exponent = int.Parse(raw.Substring(e + 1), CultureInfo.InvariantCulture); raw = raw.Substring(0, e); }
+        int dot = raw.IndexOf('.');
+        int position = (dot < 0 ? raw.Length : dot) + exponent;
+        string digits = raw.Replace(".", "");
+        while (digits.Length > 1 && digits[0] == '0') { digits = digits.Substring(1); position--; }
+        digits = digits.TrimEnd('0');
+        int power = position - 1;
+        string result;
+        if (power >= 7 || power < -3)
+            result = digits[0] + "." + (digits.Length > 1 ? digits.Substring(1) : "0") + "E" + power.ToString(CultureInfo.InvariantCulture);
+        else if (position <= 0) result = "0." + new string('0', -position) + digits;
+        else if (position >= digits.Length) result = digits + new string('0', position - digits.Length) + ".0";
+        else result = digits.Insert(position, ".");
+        return number < 0 ? "-" + result : result;
+    }
+
+    internal static string text(int[] scalars) {
+        var result = new StringBuilder();
+        foreach (int cp in scalars) result.Append(char.ConvertFromUtf32(cp));
+        return result.ToString();
+    }
+    internal static long divide(long left, long right) {
+        if (right == 0) throw new Failure("शून्य से भाग देना संभव नहीं है।");
+        return left == long.MinValue && right == -1 ? long.MinValue : left / right;
+    }
+    internal static long remainder(long left, long right) {
+        if (right == 0) throw new Failure("शून्य से शेषफल निकालना संभव नहीं है।");
+        return left == long.MinValue && right == -1 ? 0 : left % right;
+    }
+    internal static bool truth(bool value) => value;
+    internal static void discard(object value) {}
+    internal static void report(string message) => Errors.WriteLine("भाष: " + message);
+}

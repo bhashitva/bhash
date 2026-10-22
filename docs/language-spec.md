@@ -1,8 +1,9 @@
 # Bhash / भाष — v0.1 language definition (draft)
 
-Status: v0.1 core implemented on the JVM, open to revision. `Bhash.g4` defines
+Status: v0.1 core implemented on JVM and .NET 10 CLR, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
-syntax-only command. JVM output is produced through checked Java source lowering.
+syntax-only command. JVM output uses checked Java source lowering; CLR output
+uses checked C# source lowering. Both targets share one semantic checker.
 
 ## 1. Source and lexical rules
 
@@ -143,8 +144,11 @@ single space, then appends a newline and flushes stdout. `लिखो();` print
 line. Output is UTF-8. Integers use Devanagari digits; booleans use `सत्य` /
 `असत्य`. Reals use Java 17 `Double.toString` formatting with digits replaced by
 Devanagari digits; punctuation, exponent markers, `NaN` and `Infinity` are retained.
-Text is printed unchanged. This formatting contract must be matched by future
-backends. Prompts should be printed before calling `पढ़ो()`.
+Text is printed unchanged. CLR uses .NET invariant round-trip formatting with the
+same Devanagari digit, decimal-point and exponent presentation. Some binary64
+values have different shortest decimal spellings under .NET and Java 17 (for
+example values near 10^23); exact last-digit cross-target real display parity is
+not yet guaranteed. Integer, boolean and text display match across both targets. Prompts should be printed before calling `पढ़ो()`.
 
 The factorial sample validates 0–20 before computing with signed 64-bit integers.
 Other integer arithmetic retains wrapping behavior; there is no arbitrary-precision

@@ -12,8 +12,8 @@
 6. Package generated classes and the small runtime into an executable JAR with a
    `BhashProgram` entry point. Stage the output before replacing its destination.
 
-`JavaEmitter` currently combines semantic checking and Java lowering over ANTLR
-contexts. This is a working first backend, not the final target-independent AST/IR.
+`ManagedEmitter` currently combines semantic checking and Java lowering over ANTLR
+contexts for both managed targets. This is a working first backend, not the final target-independent AST/IR.
 `JvmCompiler` handles the JDK invocation, packaging and temporary-file cleanup.
 The compiler requires a full JDK 17+; generated applications require Java 17+ only.
 They contain no ANTLR dependency and no generated Java source.
@@ -38,19 +38,41 @@ resource limits and optimization are future work. Return analysis treats all loo
 as potentially executing zero iterations. JVM method/class size and recursion-stack
 limits still apply.
 
+## Implemented CLR pipeline
+
+`ManagedEmitter` shares signature collection, normalized name resolution, type
+checking, scope and flow validation with JVM. Its CLR lowering emits C# using
+synthetic names, ordinal text equality and explicit `unchecked` integer arithmetic.
+Runtime helpers preserve signed MIN/-1 division/remainder behavior, avoiding CLR's
+native overflow trap for that special case. Strings are constructed from validated
+Unicode scalars; console streams use strict UTF-8.
+
+`ClrCompiler` writes an isolated C# project, invokes the .NET 10 SDK's
+`dotnet publish`, and installs a DLL, dependency manifest and runtime configuration.
+The project has no NuGet dependencies and clears external package feeds; installed
+SDK reference packs are required. Builds use a timeout and disable build servers.
+Outputs are framework-dependent: .NET 10 runtime is needed to execute them; Java
+and the SDK are not needed on the deployment machine. Use `BHASH_DOTNET` for a
+custom host path. The `run --target clr` command forwards console I/O and exit status.
+
+CLR outputs are staged and installed only after a successful build. A marker and
+known-file check permit rebuilding compiler-owned output folders while rejecting
+unrelated files, folders and symlinks. Existing compiler output is preserved on
+build failure. Do not remove the marker if you want to rebuild into that directory.
+
 ## Target status
 
 | Target | Status | Route |
 | --- | --- | --- |
 | JVM | Implemented | Bhash → checked Java → JVM bytecode → executable JAR |
-| .NET CLR | Planned | CIL emission and selected .NET assembly toolchain |
+| .NET CLR | Implemented | Bhash → checked C# → .NET 10 managed DLL + deployment metadata |
 | WASM | Planned | Proposed LLVM lowering with WASI runtime |
 | x86-64 | Planned | Proposed LLVM assembly/object emission, initially Linux System V ABI |
 | ARM64 / AArch64 | Planned | Proposed LLVM assembly/object emission, initially Linux AAPCS64 |
 
 ANTLR generates the compiler's Java parser, not Bhash's application backends.
-LLVM remains a proposal and is not a dependency. Managed CLR output requires its
-own emitter/runtime; it does not follow automatically from native LLVM support.
+LLVM remains a proposal and is not a dependency. CLR uses the .NET SDK/C# compiler and its own runtime helpers. It does not depend
+on LLVM.
 32-bit architectures, browser WASM and other native OS/ABI combinations are separate
 extensions. Native assembly still needs assembling/linking and a target runtime.
 
