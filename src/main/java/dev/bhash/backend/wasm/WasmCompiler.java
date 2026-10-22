@@ -32,7 +32,6 @@ public final class WasmCompiler {
                 <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
                 <WasmEnableHotReload>false</WasmEnableHotReload>
                 <WasmBuildNative>false</WasmBuildNative>
-                <RunAOTCompilation>false</RunAOTCompilation>
               </PropertyGroup>
             </Project>
             """;

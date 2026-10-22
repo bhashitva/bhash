@@ -32,5 +32,6 @@ jobs:
             target/bhash-compiler-0.1.0-SNAPSHOT.jar
             target/browser-tests/
             target/browser-tests.png
+            target/browser-factorial.png
           include-hidden-files: true
           if-no-files-found: error

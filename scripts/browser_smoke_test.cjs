@@ -87,6 +87,8 @@ const server = http.createServer((request, response) => {
             if (errorContains) assert.ok(errors.includes(errorContains), errors);
             else assert.equal(errors, '');
             assert.deepEqual(pageErrors, []);
+            if (name === 'factorial-objects' && input === '५')
+                await page.screenshot({ path: 'target/browser-factorial.png', fullPage: true });
             console.log(`PASS ${name} ${JSON.stringify(input)}`);
         }
         const prompt = '० से २० तक एक पूर्णांक लिखें:\n';
