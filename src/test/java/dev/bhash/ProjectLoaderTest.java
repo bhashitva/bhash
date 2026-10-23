@@ -5,6 +5,7 @@ import dev.bhash.cli.Main;
 import dev.bhash.frontend.ProjectLoader;
 import java.io.*;
 import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,9 +49,9 @@ class ProjectLoaderTest {
     @Test void projectCliCompilesUsingManifestNameAndRejectsSourceOverwrite() throws Exception {
         project("name=sample");
         Path source = write("src/मुख्य.bhash","कार्य मुख्य() -> शून्य {}");
-        var bytes = new ByteArrayOutputStream(); var sink = new PrintStream(bytes);
-        assertEquals(0,Main.run(new String[]{"check",directory.toString()},sink,sink),bytes.toString());
-        assertEquals(0,Main.run(new String[]{"compile",directory.toString()},sink,sink),bytes.toString());
+        var bytes = new ByteArrayOutputStream(); var sink = new PrintStream(bytes,true,StandardCharsets.UTF_8);
+        assertEquals(0,Main.run(new String[]{"check",directory.toString()},sink,sink),bytes.toString(StandardCharsets.UTF_8));
+        assertEquals(0,Main.run(new String[]{"compile",directory.toString()},sink,sink),bytes.toString(StandardCharsets.UTF_8));
         assertTrue(Files.isRegularFile(directory.resolve("build/sample.jar")));
         assertEquals(2,Main.run(new String[]{"parse",directory.toString()},sink,sink));
         assertEquals(2,Main.run(new String[]{"compile",directory.toString(),"-o",source.toString()},sink,sink));
@@ -60,9 +61,9 @@ class ProjectLoaderTest {
     }
     @Test void projectSyntaxCheckFindsErrorsInOtherFolders() throws Exception {
         project(""); write("src/a/क.bhash","कार्य मुख्य() -> शून्य {}"); write("src/b/ख.bhash","वर्ग");
-        var bytes = new ByteArrayOutputStream(); var sink = new PrintStream(bytes);
+        var bytes = new ByteArrayOutputStream(); var sink = new PrintStream(bytes,true,StandardCharsets.UTF_8);
         assertEquals(1,Main.run(new String[]{"check",directory.toString()},sink,sink));
-        assertTrue(bytes.toString().contains("ख.bhash"),bytes.toString());
+        assertTrue(bytes.toString(StandardCharsets.UTF_8).contains("ख.bhash"),bytes.toString(StandardCharsets.UTF_8));
     }
     @Test void outputProtectionAlsoCoversResolvedParentSymlinks() throws Exception {
         project(""); Path source = write("src/मुख्य.bhash","कार्य मुख्य() -> शून्य {}");
