@@ -81,7 +81,13 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private Type returnType;
     private ClassInfo currentClass;
     private boolean fieldInitializer, baseArguments, constructorBody, currentStatic;
-    private int variableId, loopDepth, methodId, fieldId;
+    private int variableId, loopDepth, methodId, fieldId, switchId;
+    private static final class BreakTarget {
+        final String label;
+        boolean used;
+        BreakTarget(String label) { this.label=label; }
+    }
+    private final Deque<BreakTarget> breakTargets = new ArrayDeque<>();
 
     // Visitor APIs cannot throw checked exceptions; unwrap this at the public boundary.
     private static final class Invalid extends RuntimeException {
@@ -492,9 +498,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return null;
     }
 
-    private EnumSet<Flow> statements(BlockContext block) {
+    private EnumSet<Flow> statements(BlockContext block) { return statements(block.statement()); }
+
+    private EnumSet<Flow> statements(List<StatementContext> statements) {
         var result = EnumSet.of(Flow.NORMAL);
-        for (var statement : block.statement()) {
+        for (var statement : statements) {
             if (!result.remove(Flow.NORMAL)) throw error(statement, "Unreachable statement.");
             result.addAll(statement(statement));
         }
@@ -529,13 +537,17 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             output.append(destination.java).append('=').append(value.java).append(";\n");
         } else if (statement.ifStatement() != null) {
             return ifStatement(statement.ifStatement());
+        } else if (statement.switchStatement() != null) {
+            return switchStatement(statement.switchStatement());
         } else if (statement.whileStatement() != null) {
             var loop = statement.whileStatement();
             var condition = visit(loop.expression());
             require(loop, Type.BOOL, condition.type);
             output.append("while (BhashRuntime.truth(").append(condition.java).append(")) ");
             loopDepth++;
+            breakTargets.push(new BreakTarget(null));
             var body = block(loop.block());
+            breakTargets.pop();
             loopDepth--;
             var flow = EnumSet.of(Flow.NORMAL); // Conservative: loops may execute zero times.
             if (body.contains(Flow.RETURN)) flow.add(Flow.RETURN);
@@ -548,9 +560,17 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             output.append("return").append(value == null ? "" : " " + value.java).append(";\n");
             return EnumSet.of(Flow.RETURN);
         } else if (statement.BREAK() != null || statement.CONTINUE() != null) {
-            if (loopDepth == 0) throw error(statement, "Loop control is only valid inside a loop.");
             boolean isBreak = statement.BREAK() != null;
-            output.append(isBreak ? "break;\n" : "continue;\n");
+            if (isBreak) {
+                if (breakTargets.isEmpty()) throw error(statement,"Loop control विराम is only valid inside a loop or चयन.");
+                var destination=breakTargets.peek();
+                destination.used=true;
+                if (destination.label==null) output.append("break;\n");
+                else output.append(target==Target.JVM?"break ":"goto ").append(destination.label).append(";\n");
+            } else {
+                if (loopDepth==0) throw error(statement,"Loop control जारी is only valid inside a loop.");
+                output.append("continue;\n");
+            }
             return EnumSet.of(isBreak ? Flow.BREAK : Flow.CONTINUE);
         } else if (statement.PRINT() != null) {
             var args = arguments(statement.arguments());
@@ -567,6 +587,83 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             output.append(value.type == Type.VOID ? value.java : "BhashRuntime.discard(" + value.java + ")").append(";\n");
         }
         return EnumSet.of(Flow.NORMAL);
+    }
+
+    private EnumSet<Flow> switchStatement(SwitchStatementContext statement) {
+        Expr selector=visit(statement.expression());
+        if (selector.type!=Type.INT && selector.type!=Type.TEXT && selector.type!=Type.BOOL)
+            throw error(statement,"चयन requires पूर्णांक, पाठ or तार्किक.");
+        var labels=new IdentityHashMap<SwitchSectionContext,List<Expr>>();
+        var seen=new HashSet<String>();
+        SwitchSectionContext fallback=null;
+        for (var section:statement.switchSection()) {
+            if (section.DEFAULT()!=null) {
+                if (fallback!=null) throw error(section,"Duplicate शेष section.");
+                fallback=section;
+            } else {
+                var values=new ArrayList<Expr>();
+                for (var label:section.caseValue()) {
+                    Expr value;
+                    String key;
+                    if (label.INTEGER_LITERAL()!=null) {
+                        value=integer(label,digits(label.getText()));
+                        key=value.java;
+                    } else if (label.STRING_LITERAL()!=null) {
+                        String decoded=decodeString(label,label.getText());
+                        value=textLiteral(label,decoded);
+                        key=decoded;
+                    } else {
+                        key=label.TRUE()!=null?"true":"false";
+                        value=new Expr(Type.BOOL,key);
+                    }
+                    require(label,selector.type,value.type);
+                    if (!seen.add(key)) throw error(label,"Duplicate विकल्प value.");
+                    values.add(value);
+                }
+                labels.put(section,values);
+            }
+        }
+        String id="s"+switchId++;
+        var destination=new BreakTarget("end_"+id);
+        if (target==Target.JVM) output.append(destination.label).append(": ");
+        output.append("{\n").append(target==Target.JVM?"final ":"").append(typeName(selector.type)).append(' ')
+                .append(id).append('=').append(selector.java).append(";\n");
+        breakTargets.push(destination);
+        var flow=EnumSet.noneOf(Flow.class);
+        boolean first=true;
+        for (var section:statement.switchSection()) {
+            if (section.DEFAULT()!=null) continue;
+            if (!first) output.append("else ");
+            first=false;
+            output.append("if (");
+            var conditions=new ArrayList<String>();
+            for (Expr label:labels.get(section)) {
+                conditions.add(selector.type==Type.TEXT
+                        ? (target==Target.JVM?"java.util.Objects.equals(":"string.Equals(")+id+","+label.java
+                            +(target==Target.JVM?")":",StringComparison.Ordinal)")
+                        : "("+id+" == "+label.java+")");
+            }
+            output.append(String.join(" || ",conditions)).append(") ");
+            flow.addAll(switchBody(section));
+        }
+        if (fallback!=null) {
+            if (!first) output.append("else ");
+            flow.addAll(switchBody(fallback));
+        } else flow.add(Flow.NORMAL);
+        breakTargets.pop();
+        output.append("}\n");
+        if (target==Target.CLR && destination.used) output.append(destination.label).append(": ;\n");
+        if (flow.remove(Flow.BREAK)) flow.add(Flow.NORMAL);
+        return flow;
+    }
+
+    private EnumSet<Flow> switchBody(SwitchSectionContext section) {
+        scopes.push(new HashMap<>());
+        output.append("{\n");
+        var flow=statements(section.statement());
+        output.append("}\n");
+        scopes.pop();
+        return flow;
     }
 
     private EnumSet<Flow> ifStatement(IfStatementContext statement) {
@@ -775,8 +872,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return result.toString();
     }
 
-    private Expr string(PrimaryContext ctx) {
-        String raw = ctx.getText();
+    private Expr string(PrimaryContext ctx) { return textLiteral(ctx,decodeString(ctx,ctx.getText())); }
+
+    private String decodeString(ParserRuleContext ctx,String raw) {
         var decoded = new StringBuilder();
         for (int i = 1; i < raw.length() - 1; i++) {
             char c = raw.charAt(i);
@@ -791,7 +889,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 default -> throw error(ctx, "Invalid string escape.");
             }
         }
-        String value = decoded.toString();
+        return decoded.toString();
+    }
+
+    private Expr textLiteral(ParserRuleContext ctx,String value) {
         var codepoints = new StringJoiner(",");
         int count = 0;
         for (int cp : value.codePoints().toArray()) {

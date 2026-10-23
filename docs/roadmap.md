@@ -5,6 +5,7 @@
 - ANTLR grammar, Java parser, CLI and syntax diagnostics.
 - Function signature collection, normalized symbol resolution and lexical scopes.
 - Interfaces, explicit generic types/global functions, overload resolution and static members.
+- Selection statements with typed literal cases, grouped labels, default, scopes and nested loop control.
 - Classes, constructors, typed fields, member methods, single inheritance, access
   control, explicit overrides, virtual dispatch, object references and null checks.
 - Type checking, entry-point and argument validation, immutable bindings,

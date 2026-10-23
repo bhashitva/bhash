@@ -4,7 +4,7 @@ The JVM implementation is tested by compiling Bhash source to standalone JVM JAR
 and executing them in separate Java/.NET processes (with bytecode verification enabled on the JVM).
 There is no compiler/ANTLR classpath when running the generated programs.
 
-Local validation: all 81 JUnit tests passed with no skips, plus targeted private-member
+Local validation: all 93 JUnit tests passed with no skips, plus targeted private-member
 access checks. The suite includes frontend tests and a shared JVM/CLR execution corpus, including
 objects and inheritance, plus the packaged compiler/application smoke checks.
 
@@ -33,7 +33,7 @@ factorial CLR deployment folder as downloadable artifacts.
 See the repository's Actions page for current CI results.
 
 The browser WebAssembly workflow installs .NET 10 `wasm-tools` and Chromium,
-builds six application bundles, and executes `scripts/browser_smoke_test.cjs`.
+builds eight application bundles, and executes `scripts/browser_smoke_test.cjs`.
 It checks procedural/object factorial (including exact 20!), input validation,
 objects and virtual dispatch, null/division errors, 64-bit boundaries/overflow,
 text rendering, reruns, Stop and output replacement safeguards. It uploads the
@@ -42,4 +42,8 @@ The shared JVM/CLR suite also covers interface inheritance/implementation, gener
 interfaces and global functions, nested specializations, invariant type arguments, generic
 inheritance, constructor/function/method overloads, ambiguity, static storage/access and
 invalid contracts and static initializer errors. The packaged and Chromium checks execute the combined v0.3 example.
+Selection tests cover grouped labels, no fall-through, a default in any position, full-width
+integers, ordinal Unicode text, booleans, once-only selector evaluation, independent scopes,
+nested break/continue behavior, generic bodies, duplicate/invalid labels and return-path
+analysis. Packaged and browser checks run the console example and browser control-flow fixture.
 Standalone WASI and native targets remain unimplemented.

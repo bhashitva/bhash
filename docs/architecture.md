@@ -107,6 +107,15 @@ lower to host static members with Bhash access and receiver checks.
 
 See [v0.3 rules](contracts-generics.md) for supported generic forms and remaining limits.
 
+## Selection lowering
+
+The checker validates literal labels and rejects duplicate decoded values. Selection lowers
+to a once-evaluated temporary plus an if/else chain, supporting 64-bit integers without Java's
+native switch restrictions. Java uses a labeled block and CLR uses an exit label for selection
+breaks. A break-target stack distinguishes loops from selections; native continue statements
+still target the enclosing loop. Each section has a separate scope and contributes to shared
+return/reachability analysis. See [selection rules](switch.md).
+
 ## Target status
 
 | Target | Status | Route |

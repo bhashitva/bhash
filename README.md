@@ -198,3 +198,18 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/contracts-generi
 ```
 
 See the [complete example](examples/contracts-generics.bhash) and [v0.3 rules and limitations](docs/contracts-generics.md).
+
+### Selection statements
+
+Use `चयन`, `विकल्प` and `शेष` to select by integer, text or boolean value. Sections do not
+fall through; consecutive labels can share a body. `विराम` exits the nearest selection or loop.
+
+```text
+चयन (संख्या) {
+    विकल्प १: लिखो("एक");
+    विकल्प २: लिखो("दो");
+    शेष: लिखो("अन्य");
+}
+```
+
+See [the runnable example](examples/switch-console.bhash) and [v0.4 selection rules](docs/switch.md).

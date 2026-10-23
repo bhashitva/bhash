@@ -14,17 +14,17 @@ function compile(name, source) {
     const build = spawnSync('java', ['-jar', jar, 'compile', file, '--target', 'wasm-browser', '-o', path.join(root, name)], { encoding: 'utf8', timeout: 660000 });
     assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}\n${build.error || ''}`);
 }
-for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics'])
+for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics', 'switch-console'])
     compile(name, fs.readFileSync(`examples/${name}.bhash`, 'utf8'));
 compile('semantics', `
 वर्ग आधारवर्ग { कार्य मूल्य() -> पूर्णांक { लौटाओ १; } }
 वर्ग उपवर्ग विस्तार आधारवर्ग { अधिलेखन कार्य मूल्य() -> पूर्णांक { लौटाओ २; } }
 कार्य मुख्य() -> शून्य {
-    स्थिर विकल्प: पूर्णांक = पढ़ो();
-    यदि (विकल्प == ०) { लिखो(पढ़ो()); लिखो(पढ़ो()); }
-    अन्यथा यदि (विकल्प == १) { स्थिर शून्यवस्तु: आधारवर्ग = रिक्त; लिखो(शून्यवस्तु.मूल्य()); }
-    अन्यथा यदि (विकल्प == २) { लिखो(१ / पढ़ो()); }
-    अन्यथा यदि (विकल्प == ३) {
+    स्थिर संकेत: पूर्णांक = पढ़ो();
+    यदि (संकेत == ०) { लिखो(पढ़ो()); लिखो(पढ़ो()); }
+    अन्यथा यदि (संकेत == १) { स्थिर शून्यवस्तु: आधारवर्ग = रिक्त; लिखो(शून्यवस्तु.मूल्य()); }
+    अन्यथा यदि (संकेत == २) { लिखो(१ / पढ़ो()); }
+    अन्यथा यदि (संकेत == ३) {
         स्थिर न्यून: पूर्णांक = -९२२३३७२०३६८५४७७५८०८;
         स्थिर अधिक: पूर्णांक = ९२२३३७२०३६८५४७७५८०७;
         लिखो(न्यून / -१, न्यून % -१, अधिक + १);
@@ -57,6 +57,33 @@ const edited = spawnSync('java', ['-jar', jar, 'compile', path.join(root, 'seman
 assert.notEqual(edited.status, 0);
 assert.equal(fs.readFileSync(outputIndex, 'utf8'), originalIndex + '<!-- user edit -->');
 fs.writeFileSync(outputIndex, originalIndex);
+compile('switch-semantics', `
+वर्ग गिनक { साझा मान गिनती: पूर्णांक = ०; साझा कार्य लो() -> पूर्णांक { गिनती = गिनती + १; लौटाओ २; } }
+कार्य सीमा(संख्या: पूर्णांक) -> पूर्णांक {
+    चयन (संख्या) {
+        शेष: लौटाओ ०;
+        विकल्प -९२२३३७२०३६८५४७७५८०८: लौटाओ १;
+        विकल्प ९२२३३७२०३६८५४७७५८०७: लौटाओ २;
+    }
+}
+कार्य मुख्य() -> शून्य {
+    लिखो(सीमा(-९२२३३७२०३६८५४७७५८०८), सीमा(९२२३३७२०३६८५४७७५८०७));
+    चयन (गिनक.लो()) { विकल्प १: लिखो("गलत"); विकल्प २: लिखो("मिला"); शेष: लिखो("गलत"); }
+    लिखो(गिनक.गिनती);
+    चयन ("😀") { विकल्प "😀": लिखो("यूनिकोड"); }
+    चयन (सत्य) { विकल्प असत्य: लिखो("गलत"); विकल्प सत्य: लिखो("सत्य"); }
+    मान संख्या: पूर्णांक = ०;
+    जबतक (संख्या < ३) {
+        संख्या = संख्या + १;
+        चयन (संख्या) {
+            विकल्प १: जारी;
+            विकल्प २: चयन (०) { शेष: विराम; } लिखो("भीतर"); विराम;
+            शेष: जबतक (सत्य) { विराम; } लिखो("शेष");
+        }
+        लिखो(संख्या);
+    }
+}
+`);
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm' };
 const server = http.createServer((request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
@@ -102,6 +129,10 @@ const server = http.createServer((request, response) => {
         }
         await run('static-error', '', '', 1, 'शून्य से भाग');
         await run('objects', '', 'मनोज १५० १५ १६५\n');
+        for (const [input, expected] of [['0', 'शून्य\n० मिला\n'], ['१', 'एक या दो\n१ या २ मिला\n'], ['2', 'एक या दो\n१ या २ मिला\n'], ['9', 'अन्य संख्या\nदूसरा मान मिला\n']])
+            await run('switch-console', input, 'एक पूर्णांक लिखें:\n' + expected);
+        await run('switch-semantics', '', '१ २\nमिला\n१\nयूनिकोड\nसत्य\nभीतर\n२\nशेष\n३\n');
+
         await run('contracts-generics', '', 'पूर्णांक: २१\nपाठ: नमस्ते\nपात्र ४२ ३.०\n१ १ १००\n');
         await run('semantics', '0\n९२२३३७२०३६८५४७७५८०७\n-9223372036854775808', '९२२३३७२०३६८५४७७५८०७\n-९२२३३७२०३६८५४७७५८०८\n');
         await run('semantics', '1', '', 1, 'रिक्त वस्तु');

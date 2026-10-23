@@ -38,6 +38,7 @@ assert "भाष:" in errors, errors
 for target in ("jvm", "clr"):
     for example, expected, stdin in [
         ("objects", "मनोज १५० १५ १६५\n", ""),
+        ("switch-console", "एक पूर्णांक लिखें:\nएक या दो\n१ या २ मिला\n", "१\n"),
         ("contracts-generics", "पूर्णांक: २१\nपाठ: नमस्ते\nपात्र ४२ ३.०\n१ १ १००\n", ""),
         ("factorial-objects", "० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १२०\n", "५\n"),
     ]:

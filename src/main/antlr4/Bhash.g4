@@ -1,4 +1,4 @@
-// Bhash (भाष) v0.3 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
+// Bhash (भाष) v0.4 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
@@ -24,6 +24,7 @@ statement
     | assignment
     | ifStatement
     | whileStatement
+    | switchStatement
     | RETURN expression? SEMI
     | BREAK SEMI
     | CONTINUE SEMI
@@ -35,6 +36,9 @@ variableDecl : (LET | CONST) IDENTIFIER COLON valueType ASSIGN expression SEMI ;
 assignment : postfix ASSIGN expression SEMI ;
 ifStatement : IF LPAREN expression RPAREN block (ELSE (ifStatement | block))? ;
 whileStatement : WHILE LPAREN expression RPAREN block ;
+switchStatement : SWITCH LPAREN expression RPAREN LBRACE switchSection* RBRACE ;
+switchSection : (CASE caseValue COLON)+ statement* | DEFAULT COLON statement* ;
+caseValue : (PLUS | MINUS)? INTEGER_LITERAL | STRING_LITERAL | TRUE | FALSE ;
 arguments : expression (COMMA expression)* ;
 
 // Layered rules make precedence and left associativity explicit.
@@ -83,6 +87,9 @@ CONST : 'स्थिर' ;
 IF : 'यदि' ;
 ELSE : 'अन्यथा' ;
 WHILE : 'जबतक' ;
+SWITCH : 'चयन' ;
+CASE : 'विकल्प' ;
+DEFAULT : 'शेष' ;
 RETURN : 'लौटाओ' ;
 BREAK : 'विराम' ;
 CONTINUE : 'जारी' ;

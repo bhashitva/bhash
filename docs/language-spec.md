@@ -1,6 +1,6 @@
-# Bhash / भाष — v0.3 language definition
+# Bhash / भाष — v0.4 language definition
 
-Status: v0.3 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
+Status: v0.4 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
 uses checked C# source lowering. The browser target reuses CLR lowering with the
@@ -44,6 +44,7 @@ is supplied before execution; see [browser target](wasm-browser.md).
 | `मान` | Mutable binding | `मान गिनती: पूर्णांक = ०;` |
 | `स्थिर` | Immutable binding | `स्थिर सीमा: पूर्णांक = १०;` |
 | `यदि` / `अन्यथा` | If / else | `यदि (सत्य) { ... } अन्यथा { ... }` |
+| `चयन` / `विकल्प` / `शेष` | Selection / case / default | `चयन (संख्या) { विकल्प १: ... शेष: ... }` |
 | `जबतक` | While | `जबतक (गिनती < सीमा) { ... }` |
 | `लौटाओ` | Return | `लौटाओ परिणाम;` |
 | `विराम` / `जारी` | Break / continue | `विराम;` |
@@ -89,8 +90,8 @@ Blocks introduce lexical scopes. Duplicate names within one scope, including
 parameters in a function's outermost body scope, are errors. A nested block may
 shadow an outer binding. A variable is not in scope within its own initializer.
 
-Conditions must be `तार्किक`; integers are not truthy. `विराम` and `जारी`
-are legal only within loops and affect the innermost loop. A void function may
+Conditions must be `तार्किक`; integers are not truthy. `विराम` exits the nearest
+loop or selection. `जारी` is legal only within a loop and continues the innermost loop. A void function may
 fall through or use `लौटाओ;`. A value-returning function must return a compatible
 value on every reachable path. Analysis conservatively assumes a loop can execute
 zero times, even for a literal true condition. Code after an unconditional return,
@@ -188,7 +189,14 @@ methods and constructors can overload by their parameter type lists. All targets
 same overload resolution, specialization and interface-validation rules.
 See [the v0.3 specification](contracts-generics.md) for exact syntax and limits.
 
-## 9. Deferred design questions
+## 9. Selection statements
+
+`चयन (expression) { विकल्प literal: statements शेष: statements }` supports integer,
+text and boolean selectors. The selector evaluates once; sections have independent scopes
+and do not fall through. Consecutive case labels may share a body. `विराम` exits the
+nearest loop or selection; `जारी` continues the enclosing loop. See [selection rules](switch.md).
+
+## 10. Deferred design questions
 
 Confirm vocabulary; choose exact real formatting; define module/import syntax;
 design arrays, records and generic member methods; choose error/exception behavior beyond arithmetic

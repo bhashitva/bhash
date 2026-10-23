@@ -32,6 +32,9 @@ jobs:
             target/bhash-compiler-0.1.0-SNAPSHOT.jar
             target/factorial-console.jar
             target/factorial-clr/
+            target/switch-console.jar
+            target/switch-console-clr/
+            examples/switch-console.bhash
             target/contracts-generics.jar
             target/contracts-generics-clr/
             examples/contracts-generics.bhash
