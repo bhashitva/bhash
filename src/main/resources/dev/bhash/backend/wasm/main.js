@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 const form = document.querySelector('form');
 const run = document.querySelector('#run');
 const stop = document.querySelector('#stop');

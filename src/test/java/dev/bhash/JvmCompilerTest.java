@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package dev.bhash;
 
 import dev.bhash.backend.Target;

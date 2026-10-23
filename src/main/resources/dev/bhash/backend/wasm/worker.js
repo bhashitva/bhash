@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 import { dotnet } from './_framework/dotnet.js';
 
 self.onmessage = async ({ data }) => {

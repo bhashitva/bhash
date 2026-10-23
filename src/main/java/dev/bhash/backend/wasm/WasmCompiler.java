@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
 package dev.bhash.backend.wasm;
 
 import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.Target;
+import dev.bhash.backend.Licensing;
 import dev.bhash.backend.clr.ClrCompiler;
 import dev.bhash.frontend.Frontend;
 import java.io.IOException;
@@ -90,6 +92,7 @@ public final class WasmCompiler {
             }
             for (String asset : List.of("index.html", "main.js", "worker.js"))
                 resource("/dev/bhash/backend/wasm/" + asset, stage.resolve(asset));
+            Licensing.copyTo(stage);
             Files.writeString(stage.resolve(MARKER), manifest(stage), StandardCharsets.UTF_8);
             install(stage, destination);
         } finally {

@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: Apache-2.0
 package dev.bhash.backend.jvm;
 
 import dev.bhash.frontend.Frontend;
 import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.Target;
+import dev.bhash.backend.Licensing;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -53,6 +55,7 @@ public final class JvmCompiler {
             manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, "BhashProgram");
             try (var jar = new JarOutputStream(Files.newOutputStream(stagedJar), manifest);
                  var paths = Files.walk(classes)) {
+                Licensing.addToJar(jar);
                 for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
                     var entry = new JarEntry(classes.relativize(file).toString().replace('\\', '/'));
                     entry.setTime(0);

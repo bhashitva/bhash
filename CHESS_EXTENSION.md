@@ -13,6 +13,6 @@ The generated `target/bhash-compiler-0.1.0-SNAPSHOT.jar` can build the chess
 library and its console/protocol entry points. A prebuilt compiler JAR is included
 in the local delivery. It is not needed to run the already compiled chess apps.
 
-The upstream compiler has no selected open-source license as of the baseline;
-this delivery does not assign one. Third-party ANTLR licensing is documented
-separately in `THIRD_PARTY_NOTICES.md`.
+Bhash and this text extension are now licensed under Apache 2.0; see `LICENSE`
+and `LICENSING.md`. Third-party ANTLR licensing remains documented separately
+in `THIRD_PARTY_NOTICES.md`.

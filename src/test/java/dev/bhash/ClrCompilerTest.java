@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package dev.bhash;
 
 import dev.bhash.backend.CompilationException;
@@ -52,4 +53,21 @@ class ClrCompilerTest extends ManagedCompilerTest {
         assertThrows(java.io.IOException.class, () -> compiler.compile("test.bhash", source, managed));
         assertEquals("also keep me", Files.readString(managed.resolve("notes.txt")));
     }
+    @Test void legacyOutputsUpgradeAndPreservePreviouslyUnrelatedLicenseFiles() throws Exception {
+        var compiler=new ClrCompiler();
+        Path output=directory.resolve("legacy");
+        String source="कार्य मुख्य() -> शून्य {}";
+        compiler.compile("test.bhash",source,output);
+        for (String name:dev.bhash.backend.Licensing.APPLICATION_FILES) Files.delete(output.resolve(name));
+        Files.writeString(output.resolve(".bhash-clr-output"),"Bhash CLR output v1\n");
+        Files.writeString(output.resolve("LICENSE"),"user-owned license");
+        assertThrows(java.io.IOException.class,()->compiler.compile("test.bhash",source,output));
+        assertEquals("user-owned license",Files.readString(output.resolve("LICENSE")));
+        Files.delete(output.resolve("LICENSE"));
+        compiler.compile("test.bhash",source,output);
+        assertEquals("Bhash CLR output v2\n",Files.readString(output.resolve(".bhash-clr-output")));
+        for (String name:dev.bhash.backend.Licensing.APPLICATION_FILES)
+            assertEquals(Files.readString(Path.of(name)),Files.readString(output.resolve(name)));
+    }
+
 }

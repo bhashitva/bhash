@@ -29,6 +29,10 @@ jobs:
         with:
           name: bhash-managed-${{ matrix.os }}
           path: |
+            LICENSE
+            NOTICE
+            LICENSING.md
+            THIRD_PARTY_NOTICES.md
             target/bhash-compiler-0.1.0-SNAPSHOT.jar
             target/factorial-console.jar
             target/factorial-clr/

@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
 package dev.bhash.backend.clr;
 
 import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.Target;
+import dev.bhash.backend.Licensing;
 import dev.bhash.frontend.Frontend;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -13,8 +15,15 @@ import java.util.concurrent.TimeUnit;
 /** Bhash -> checked C# -> .NET 10 managed DLL and deployment metadata. */
 public final class ClrCompiler {
     private static final String MARKER = ".bhash-clr-output";
-    private static final String STAMP = "Bhash CLR output v1\n";
-    private static final Set<String> FILES = Set.of("BhashProgram.dll", "BhashProgram.deps.json", "BhashProgram.runtimeconfig.json", MARKER);
+    private static final String STAMP = "Bhash CLR output v2\n";
+    private static final String LEGACY_STAMP = "Bhash CLR output v1\n";
+    private static final Set<String> LEGACY_FILES = Set.of("BhashProgram.dll", "BhashProgram.deps.json", "BhashProgram.runtimeconfig.json", MARKER);
+    private static final Set<String> FILES;
+    static {
+        var files = new HashSet<>(LEGACY_FILES);
+        files.addAll(Licensing.APPLICATION_FILES);
+        FILES = Set.copyOf(files);
+    }
     private static final String PROJECT = """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
@@ -80,6 +89,7 @@ public final class ClrCompiler {
                 Thread.currentThread().interrupt();
                 throw new IOException("CLR compilation interrupted.", interrupted);
             } finally { if (process.isAlive()) process.destroyForcibly(); }
+            Licensing.copyTo(stage);
             for (String name : FILES) {
                 if (!name.equals(MARKER) && !Files.isRegularFile(stage.resolve(name)))
                     throw new CompilationException("CLR backend did not produce " + name);
@@ -96,12 +106,15 @@ public final class ClrCompiler {
         if (destination.getParent() == null || Files.isSymbolicLink(destination))
             throw new IOException("CLR output must be a new directory or a Bhash-managed output directory.");
         if (!Files.exists(destination)) return;
-        if (!Files.isDirectory(destination) || !Files.isRegularFile(destination.resolve(MARKER), LinkOption.NOFOLLOW_LINKS)
-                || !Files.readString(destination.resolve(MARKER), StandardCharsets.UTF_8).equals(STAMP))
+        if (!Files.isDirectory(destination) || !Files.isRegularFile(destination.resolve(MARKER), LinkOption.NOFOLLOW_LINKS))
             throw new IOException("Refusing to replace a directory not created by the Bhash CLR compiler: " + destination);
+        String stamp=Files.readString(destination.resolve(MARKER), StandardCharsets.UTF_8);
+        if (!stamp.equals(STAMP) && !stamp.equals(LEGACY_STAMP))
+            throw new IOException("Refusing to replace a directory not created by the Bhash CLR compiler: " + destination);
+        Set<String> allowed=stamp.equals(LEGACY_STAMP)?LEGACY_FILES:FILES;
         try (var entries = Files.list(destination)) {
             for (Path entry : entries.toList()) {
-                if (!FILES.contains(entry.getFileName().toString()) || !Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS))
+                if (!allowed.contains(entry.getFileName().toString()) || !Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS))
                     throw new IOException("CLR output contains unrelated files; choose a new output directory: " + destination);
             }
         }

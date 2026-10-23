@@ -42,3 +42,6 @@ npm install --no-save --package-lock=false playwright@1.56.1
 npx playwright install chromium
 node scripts/browser_smoke_test.cjs
 ```
+
+Published bundles include Bhash `LICENSE`, `NOTICE` and `LICENSING.md` files. Preserve
+these and applicable platform notices when redistributing; see [licensing](../LICENSING.md).

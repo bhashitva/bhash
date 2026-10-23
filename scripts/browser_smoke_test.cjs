@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /* Run after Maven packaging, with .NET 10 + wasm-tools and playwright installed. */
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
@@ -13,6 +14,8 @@ function compile(name, source) {
     fs.writeFileSync(file, source);
     const build = spawnSync('java', ['-jar', jar, 'compile', file, '--target', 'wasm-browser', '-o', path.join(root, name)], { encoding: 'utf8', timeout: 660000 });
     assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}\n${build.error || ''}`);
+    for (const file of ['LICENSE', 'NOTICE', 'LICENSING.md'])
+        assert.equal(fs.readFileSync(path.join(root, name, file), 'utf8'), fs.readFileSync(file, 'utf8'));
 }
 for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics', 'switch-console'])
     compile(name, fs.readFileSync(`examples/${name}.bhash`, 'utf8'));

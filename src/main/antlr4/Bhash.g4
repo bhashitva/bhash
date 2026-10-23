@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // Bhash (भाष) v0.4 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.

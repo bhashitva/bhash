@@ -66,3 +66,7 @@ parity, additional .NET versions and native/self-contained deployment are future
 The same backend test corpus and packaged factorial checks run under .NET and
 Java on Windows and Linux in GitHub Actions. CLR tests skip locally when SDK 10
 is absent; `BHASH_REQUIRE_CLR=true` makes missing SDK support fail as it does in CI.
+
+Generated output also includes `LICENSE`, `NOTICE` and `LICENSING.md` for embedded Bhash code.
+The v2 ownership marker permits rebuilding earlier v1 outputs only when they contain no
+extra files; user-added licensing files in an older output are preserved by refusing replacement.

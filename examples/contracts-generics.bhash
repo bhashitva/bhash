@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 // अनुबंध + generics + overloads + static members.
 अनुबंध प्रदाता<त> {
     कार्य लो() -> त;

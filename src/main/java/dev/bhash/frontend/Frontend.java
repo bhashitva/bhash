@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package dev.bhash.frontend;
 
 import dev.bhash.parser.BhashLexer;

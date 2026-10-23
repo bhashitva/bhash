@@ -22,7 +22,7 @@
 - Extract a source-located typed AST from combined semantic checking/Java lowering.
 - Improve diagnostic codes, multiple-error recovery and runtime source mapping.
 - Expand standard input support beyond integers; design explicit numeric conversions.
-- Choose an open-source license and contribution policy.
+- Maintain Apache 2.0 licensing, contribution guidance and third-party notices.
 
 ## Shared IR and portability
 

@@ -5,6 +5,14 @@
   <artifactId>bhash-compiler</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <name>Bhash (भाष) Compiler</name>
+  <url>https://github.com/bhashitva/bhash</url>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -19,6 +27,17 @@
     </dependency>
   </dependencies>
   <build>
+    <resources>
+      <resource><directory>src/main/resources</directory></resource>
+      <resource>
+        <directory>${project.basedir}</directory>
+        <targetPath>META-INF/bhash</targetPath>
+        <includes>
+          <include>LICENSE</include><include>NOTICE</include>
+          <include>LICENSING.md</include><include>THIRD_PARTY_NOTICES.md</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.antlr</groupId><artifactId>antlr4-maven-plugin</artifactId><version>${antlr.version}</version>

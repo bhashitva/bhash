@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Exercise the packaged compiler and both managed targets on Windows and Linux."""
 from pathlib import Path
 import os
@@ -48,3 +49,19 @@ for target in ("jvm", "clr"):
         output, errors = invoke(command, stdin)
         assert output == expected and not errors, (example, target, output, errors)
 print("Packaged JVM/CLR compiler, console factorial, objects, inheritance and virtual dispatch passed.")
+
+# Compiler and application distributions must retain Bhash licensing material.
+import zipfile
+license_files = ("LICENSE", "NOTICE", "LICENSING.md")
+with zipfile.ZipFile(compiler) as archive:
+    for name in (*license_files, "THIRD_PARTY_NOTICES.md"):
+        assert archive.read("META-INF/bhash/" + name) == Path(name).read_bytes(), name
+    assert archive.read("META-INF/LICENSE-antlr.txt") == Path("src/main/resources/META-INF/LICENSE-antlr.txt").read_bytes()
+for application in [program, *(Path("target") / (name + ".jar") for name in ("objects", "factorial-objects", "switch-console", "contracts-generics"))]:
+    with zipfile.ZipFile(application) as archive:
+        for name in license_files:
+            assert archive.read("META-INF/bhash/" + name) == Path(name).read_bytes(), (application, name)
+for folder in [clr, *(Path("target") / (name + "-clr") for name in ("objects", "factorial-objects", "switch-console", "contracts-generics"))]:
+    for name in license_files:
+        assert (folder / name).read_bytes() == Path(name).read_bytes(), (folder, name)
+print("Compiler and generated JVM/CLR applications include license and attribution notices.")

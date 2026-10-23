@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package dev.bhash.backend;
 
 /** JVM, CLR and browser WebAssembly output are implemented; other targets remain planned. */
