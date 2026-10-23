@@ -2,6 +2,8 @@
 package dev.bhash.backend;
 
 import dev.bhash.frontend.Identifiers;
+import dev.bhash.frontend.SourceFile;
+import dev.bhash.frontend.LocatedToken;
 import dev.bhash.parser.BhashBaseVisitor;
 import dev.bhash.parser.BhashParser.*;
 import java.math.BigInteger;
@@ -99,12 +101,22 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     public static String emit(String sourceName, ProgramContext program, Target target) throws CompilationException {
         if (target != Target.JVM && target != Target.CLR) throw new IllegalArgumentException("Not a managed target");
-        try { return new ManagedEmitter(sourceName, target).program(GenericExpander.expand(sourceName, program)); }
-        catch (Invalid error) { throw new CompilationException(error.getMessage()); }
+        return emitResolved(sourceName, ProjectResolver.resolveTrees(List.of(program)), target);
+    }
+
+    public static String emit(List<SourceFile> sources, Target target) throws CompilationException {
+        if (target != Target.JVM && target != Target.CLR) throw new IllegalArgumentException("Not a managed target");
+        return emitResolved(sources.isEmpty() ? "project" : sources.get(0).name(), ProjectResolver.resolve(sources), target);
+    }
+
+    private static String emitResolved(String sourceName, ProjectResolver.Resolution resolution, Target target) throws CompilationException {
+        try { return new ManagedEmitter(sourceName, target).program(GenericExpander.expand(sourceName, resolution.tree())); }
+        catch (Invalid error) { throw new CompilationException(resolution.describe(error.getMessage())); }
+        catch (CompilationException error) { throw new CompilationException(resolution.describe(error.getMessage())); }
     }
 
     private Invalid error(ParserRuleContext at, String message) {
-        return new Invalid(sourceName + ":" + at.getStart().getLine() + ":"
+        return new Invalid(LocatedToken.source(at.getStart(), sourceName) + ":" + at.getStart().getLine() + ":"
                 + (at.getStart().getCharPositionInLine() + 1) + ": " + message);
     }
 

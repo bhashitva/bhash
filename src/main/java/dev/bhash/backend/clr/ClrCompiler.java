@@ -5,7 +5,7 @@ import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.Target;
 import dev.bhash.backend.Licensing;
-import dev.bhash.frontend.Frontend;
+import dev.bhash.frontend.SourceFile;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -50,9 +50,11 @@ public final class ClrCompiler {
     }
 
     public void compile(String sourceName, String source, Path output) throws IOException, CompilationException {
-        var parsed = Frontend.parse(sourceName, source.startsWith("\uFEFF") ? source.substring(1) : source);
-        if (!parsed.valid()) throw new CompilationException(String.join("\n", parsed.diagnostics().stream().map(Object::toString).toList()));
-        String code = ManagedEmitter.emit(sourceName, parsed.tree(), Target.CLR);
+        compile(List.of(new SourceFile(sourceName,source)),output);
+    }
+
+    public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
+        String code = ManagedEmitter.emit(sources, Target.CLR);
         Path destination = output.toAbsolutePath().normalize();
         validateDestination(destination);
         Files.createDirectories(destination.getParent());

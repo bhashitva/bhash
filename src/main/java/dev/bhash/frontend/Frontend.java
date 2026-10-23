@@ -30,6 +30,16 @@ public final class Frontend {
             }
         };
         var lexer = new BhashLexer(CharStreams.fromString(source, sourceName));
+        lexer.setTokenFactory(new CommonTokenFactory() {
+            @Override public CommonToken create(org.antlr.v4.runtime.misc.Pair<TokenSource, CharStream> pair,
+                    int type, String text, int channel, int start, int stop, int line, int column) {
+                var token = new LocatedToken(pair, type, channel, start, stop);
+                token.setLine(line);
+                token.setCharPositionInLine(column);
+                if (text != null) token.setText(text);
+                return token;
+            }
+        });
         lexer.removeErrorListeners();
         lexer.addErrorListener(listener);
         var parser = new BhashParser(new CommonTokenStream(lexer));

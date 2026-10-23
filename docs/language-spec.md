@@ -1,6 +1,6 @@
-# Bhash / भाष — v0.4 language definition
+# Bhash / भाष — v0.5 language definition
 
-Status: v0.4 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
+Status: v0.5 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
 uses checked C# source lowering. The browser target reuses CLR lowering with the
@@ -38,6 +38,8 @@ is supplied before execution; see [browser target](wasm-browser.md).
 
 | Spelling | Role | Example |
 | --- | --- | --- |
+| `संकुल` | Package declaration | `संकुल संस्था.गणित;` |
+| `आयात` / `उपनाम` | Import / import alias | `आयात संस्था.गणित.गणक उपनाम गणना;` |
 | `कार्य` | Function declaration | `कार्य जोड़(...) -> पूर्णांक { ... }` |
 | `अनुबंध` / `पालन` | Interface / implementation | `वर्ग क पालन ख { ... }` |
 | `साझा` | Static member | `साझा मान गिनती: पूर्णांक = ०;` |
@@ -72,9 +74,15 @@ arithmetic; revisit the name if exact decimal becomes a language requirement.
 }
 ```
 
-A compilation unit contains top-level functions, class declarations and interface declarations. No top-level
-executable statements, imports, globals or nested class declarations are supported. Executables must define exactly one
-`मुख्य()` returning `शून्य`. Empty source is syntactically valid but is not a
+A compilation unit has an optional `संकुल` declaration, then zero or more `आयात`
+declarations, then top-level functions, classes and interfaces. Project builds collect
+all source files from `bhash.project` source roots. Top-level declarations are
+package-private unless marked `सार्वजनिक`; imports are scoped to their file.
+Qualified names and `उपनाम` aliases resolve cross-file references. See the
+[project and package rules](projects-packages.md) for source discovery, resolution,
+visibility and commands. No top-level executable statements, globals or nested
+class declarations are supported. Executables must define exactly one
+`मुख्य()` returning `शून्य` across the whole project. Empty source is syntactically valid but is not a
 valid executable. Functions may overload by parameter types; return-type-only overloads are rejected. Classes have their own
 member scopes, described in [Objects and inheritance](objects.md). Forward calls
 and recursion are permitted; collect function signatures before resolving bodies.

@@ -7,10 +7,10 @@ import dev.bhash.backend.jvm.JvmCompiler;
 import dev.bhash.backend.clr.ClrCompiler;
 import dev.bhash.backend.wasm.WasmCompiler;
 import dev.bhash.frontend.Frontend;
+import dev.bhash.frontend.ProjectLoader;
 import dev.bhash.parser.BhashParser;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -30,7 +30,23 @@ public final class Main {
         if (args.length >= 2 && args[0].equals("run")) return execute(args, err);
         if (args.length != 2 || !(args[0].equals("check") || args[0].equals("parse"))) return usage(err);
         try {
-            var source = Files.readString(Path.of(args[1]), StandardCharsets.UTF_8);
+            var project = ProjectLoader.load(Path.of(args[1]));
+            if (args[0].equals("check")) {
+                boolean valid = true;
+                for (var file : project.sources()) {
+                    var parsed = file.parse();
+                    parsed.diagnostics().forEach(err::println);
+                    valid &= parsed.valid();
+                }
+                if (valid) out.println("Syntax OK: " + args[1] + " (" + project.sources().size() + " file(s))");
+                return valid ? 0 : 1;
+            }
+            if (project.sources().size()!=1 || Files.isDirectory(Path.of(args[1]))
+                    || Path.of(args[1]).getFileName().toString().equals(ProjectLoader.MANIFEST)) {
+                err.println("parse accepts one .bhash source file; use check for project syntax.");
+                return 2;
+            }
+            var source = project.sources().get(0).text();
             // A UTF-8 BOM is allowed only at the beginning of a file.
             if (source.startsWith("\uFEFF")) source = source.substring(1);
             var result = Frontend.parse(args[1], source);
@@ -38,11 +54,7 @@ public final class Main {
                 result.diagnostics().forEach(err::println);
                 return 1;
             }
-            if (args[0].equals("parse")) {
-                out.println(result.tree().toStringTree(java.util.Arrays.asList(BhashParser.ruleNames)));
-            } else {
-                out.println("Syntax OK: " + args[1]);
-            }
+            out.println(result.tree().toStringTree(java.util.Arrays.asList(BhashParser.ruleNames)));
             return 0;
         } catch (IOException | java.nio.file.InvalidPathException exception) {
             err.println(args[1] + ": " + exception.getMessage());
@@ -51,9 +63,10 @@ public final class Main {
     }
 
     private static int usage(PrintStream err) {
-        err.println("Usage: java -jar bhash-compiler.jar check|parse <file.bhash>");
-        err.println("       java -jar bhash-compiler.jar compile <file.bhash> [-o <output>] [--target jvm|clr|wasm-browser]");
-        err.println("       java -jar bhash-compiler.jar run <file.bhash> [--target jvm|clr]");
+        err.println("Usage: java -jar bhash-compiler.jar check <file.bhash|project-directory|bhash.project>");
+        err.println("       java -jar bhash-compiler.jar parse <file.bhash>");
+        err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser]");
+        err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr]");
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
         err.println("check validates syntax only; compile/run also validate names, types and control flow.");
@@ -81,20 +94,22 @@ public final class Main {
                 };
             } else throw new IllegalArgumentException("Invalid or incomplete option: " + args[i]);
         }
-        if (output == null) {
-            String filename = source.getFileName().toString();
-            int dot = filename.lastIndexOf('.');
-            String stem = dot > 0 ? filename.substring(0, dot) : filename;
-            output = source.resolveSibling(stem + (target == Target.JVM ? ".jar" : target == Target.CLR ? "-clr" : "-web"));
+        if (output == null && allowOutput) {
+            var project = ProjectLoader.load(source);
+            String suffix = target == Target.JVM ? ".jar" : target == Target.CLR ? "-clr" : "-web";
+            output = ProjectLoader.manifest(source).getFileName().toString().equals(ProjectLoader.MANIFEST)
+                    ? project.root().resolve("build").resolve(project.name() + suffix)
+                    : source.resolveSibling(project.name() + suffix);
         }
         return new Options(source, output, target);
     }
 
     private static void build(Options options) throws IOException, CompilationException {
-        String source = Files.readString(options.source, StandardCharsets.UTF_8);
-        if (options.target == Target.JVM) new JvmCompiler().compile(options.source.toString(), source, options.output);
-        else if (options.target == Target.WASM) new WasmCompiler().compile(options.source.toString(), source, options.output);
-        else new ClrCompiler().compile(options.source.toString(), source, options.output);
+        var project = ProjectLoader.load(options.source);
+        project.protectOutput(options.output,options.target != Target.JVM);
+        if (options.target == Target.JVM) new JvmCompiler().compile(project.sources(), options.output);
+        else if (options.target == Target.WASM) new WasmCompiler().compile(project.sources(), options.output);
+        else new ClrCompiler().compile(project.sources(), options.output);
     }
 
     private static int compile(String[] args, PrintStream out, PrintStream err) {

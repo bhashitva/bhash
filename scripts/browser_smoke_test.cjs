@@ -9,14 +9,18 @@ const { chromium } = require('playwright');
 const root = path.resolve('target/browser-tests');
 fs.mkdirSync(root, { recursive: true });
 const jar = path.resolve('target/bhash-compiler-0.1.0-SNAPSHOT.jar');
-function compile(name, source) {
-    const file = path.join(root, `${name}.bhash`);
-    fs.writeFileSync(file, source);
+function build(name, file) {
     const build = spawnSync('java', ['-jar', jar, 'compile', file, '--target', 'wasm-browser', '-o', path.join(root, name)], { encoding: 'utf8', timeout: 660000 });
     assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}\n${build.error || ''}`);
     for (const file of ['LICENSE', 'NOTICE', 'LICENSING.md'])
         assert.equal(fs.readFileSync(path.join(root, name, file), 'utf8'), fs.readFileSync(file, 'utf8'));
 }
+function compile(name, source) {
+    const file = path.join(root, `${name}.bhash`);
+    fs.writeFileSync(file, source);
+    build(name, file);
+}
+build('multi-file', path.resolve('examples/multi-file'));
 for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics', 'switch-console'])
     compile(name, fs.readFileSync(`examples/${name}.bhash`, 'utf8'));
 compile('semantics', `
@@ -131,6 +135,8 @@ const server = http.createServer((request, response) => {
                 await run(name, input, prompt, 1, 'भाष:');
         }
         await run('static-error', '', '', 1, 'शून्य से भाग');
+        await run('multi-file', '५', '० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १२०\nसत्य १\nसंख्या ठीक\n');
+        await run('multi-file', '0', '० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १\nसत्य १\nसंख्या ठीक\n');
         await run('objects', '', 'मनोज १५० १५ १६५\n');
         for (const [input, expected] of [['0', 'शून्य\n० मिला\n'], ['१', 'एक या दो\n१ या २ मिला\n'], ['2', 'एक या दो\n१ या २ मिला\n'], ['9', 'अन्य संख्या\nदूसरा मान मिला\n']])
             await run('switch-console', input, 'एक पूर्णांक लिखें:\n' + expected);

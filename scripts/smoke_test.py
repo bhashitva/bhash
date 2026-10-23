@@ -48,6 +48,18 @@ for target in ("jvm", "clr"):
         command = ["java", "-Xverify:all", "-jar", str(output_path)] if target == "jvm" else [dotnet, str(output_path / "BhashProgram.dll")]
         output, errors = invoke(command, stdin)
         assert output == expected and not errors, (example, target, output, errors)
+# Build the same seven-file project with each backend through the public CLI.
+for target in ("jvm", "clr"):
+    output_path = Path("target") / ("multi-file.jar" if target == "jvm" else "multi-file-clr")
+    invoke(["java", "-jar", str(compiler), "compile", "examples/multi-file/bhash.project", "--target", target, "-o", str(output_path)])
+    command = ["java", "-Xverify:all", "-jar", str(output_path)] if target == "jvm" else [dotnet, str(output_path / "BhashProgram.dll")]
+    output, errors = invoke(command, "५\n")
+    assert output == "० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १२०\nसत्य १\nसंख्या ठीक\n" and not errors, (target, output, errors)
+    command = ["java", "-jar", str(compiler), "run", "examples/multi-file", "--target", target]
+    output, errors = invoke(command, "0\n")
+    assert output == "० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १\nसत्य १\nसंख्या ठीक\n" and not errors, (target, output, errors)
+print("Multi-file projects, packages, imports, generics, overloads and shared references passed on JVM/CLR.")
+
 print("Packaged JVM/CLR compiler, console factorial, objects, inheritance and virtual dispatch passed.")
 
 # Compiler and application distributions must retain Bhash licensing material.

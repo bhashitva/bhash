@@ -12,3 +12,6 @@ BhashProgram.runtimeconfig.json
 .bhash-clr-output
 
 node_modules/
+
+# Default multi-file project output directories.
+build/

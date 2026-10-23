@@ -2,14 +2,19 @@
 
 ## Implemented JVM pipeline
 
-1. Decode UTF-8, accept an optional leading BOM, then lex/parse with ANTLR.
-2. Collect function signatures and reject duplicate or reserved names.
-3. Resolve NFC-normalized names in lexical scopes; validate types, entry point,
+1. Discover project sources with `ProjectLoader` (or accept one file), decode UTF-8,
+   accept an optional leading BOM in each file, then independently lex/parse with ANTLR.
+2. `ProjectResolver` collects package-qualified declarations, validates file-local
+   imports and package visibility, and resolves type/function references. A combined
+   declaration tree retains original source tokens; files are not concatenated before parsing.
+3. Specialize used generic types/functions across the resolved project with `GenericExpander`.
+4. Collect function signatures and reject duplicate or reserved names.
+5. Resolve NFC-normalized names in lexical scopes; validate types, entry point,
    arguments, bindings, returns, loops and literal values.
-4. Lower expressions and statements to Java, using synthetic Java identifiers.
-5. Use the JDK `JavaCompiler` API with `--release 17`, annotation processing disabled,
+6. Lower expressions and statements to Java, using synthetic Java identifiers.
+7. Use the JDK `JavaCompiler` API with `--release 17`, annotation processing disabled,
    and an isolated classpath to produce bytecode.
-6. Package generated classes and the small runtime into an executable JAR with a
+8. Package generated classes and the small runtime into an executable JAR with a
    `BhashProgram` entry point. Stage the output before replacing its destination.
 
 `ManagedEmitter` currently combines semantic checking and Java lowering over ANTLR
@@ -21,6 +26,28 @@ They contain no ANTLR dependency and no generated Java source.
 `run` compiles a temporary JAR, starts a separate Java process with inherited
 console streams, forwards its exit status and removes the JAR afterwards.
 Programs are ordinary applications with the current user's permissions, not sandboxed.
+
+## Project resolution and source locations
+
+`SourceFile` represents one independently parsed unit. Backend compiler APIs accept
+an ordered list of units as well as the existing single-source arguments. All three
+backends call the same `ManagedEmitter` project entry point. The resolver gives each
+package-qualified type/function an internal identity, rewrites only resolved symbolic
+references, and combines lowered declarations into one program for the existing checker.
+It does not treat imports as textual includes or execute imported files.
+
+Class/member names and lexical bindings remain in their existing scopes. Type parameters
+shadow imported type names; local bindings and inherited members shadow imported expression
+names. Explicit imports resolve types or full function overload groups and validate visibility
+before body checking. Overload groups must use uniform package visibility.
+
+`LocatedToken` retains the originating token source and coordinates through both package
+resolution and generic specialization. Diagnostic formatting recovers the actual defining
+file rather than reporting a merged/generated file. Internal package names are translated
+back to qualified Bhash names in semantic error messages. Host names are still synthetic;
+this introduces no stable binary library ABI or incremental compilation format.
+
+See [projects and packages](projects-packages.md) for the manifest and language contract.
 
 ## Semantic and runtime behavior
 

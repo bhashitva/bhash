@@ -17,6 +17,55 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class ManagedCompilerTest {
+    @Test void multiFileProjectRunsWithImportsGenericsOverloadsAndSharedObjectIdentity() throws Exception {
+        var sources = dev.bhash.frontend.ProjectLoader.load(Path.of("examples/multi-file")).sources();
+        Path output = directory.resolve(clr() ? "project-clr" : "project.jar");
+        if (clr()) new ClrCompiler().compile(sources,output);
+        else new JvmCompiler().compile(sources,output);
+        Path executable = clr() ? output.resolve("BhashProgram.dll") : output;
+        for (var item : Map.of("५", "१२०", "0", "१", "20", "२४३२९०२००८१७६६४००००").entrySet()) {
+            var result = run(executable,item.getKey());
+            assertEquals(0,result.exit);
+            assertEquals("० से २० तक एक पूर्णांक लिखें:\nगुणनफल: " + item.getValue() + "\nसत्य १\nसंख्या ठीक\n",result.output);
+        }
+    }
+    @Test void closedGenericTypesShareIdentityAndStaticStorageAcrossFilesAndAliases() throws Exception {
+        var sources = List.of(new dev.bhash.frontend.SourceFile("box.bhash","""
+                संकुल पुस्तक;
+                सार्वजनिक वर्ग पात्र<त> {
+                    साझा मान गिनती: पूर्णांक = ०;
+                    निर्माता() { गिनती = गिनती + १; }
+                }
+                """),new dev.bhash.frontend.SourceFile("factory.bhash","""
+                संकुल पुस्तक;
+                सार्वजनिक कार्य बनाओ() -> पात्र<पूर्णांक> { लौटाओ नया पात्र<पूर्णांक>(); }
+                """),new dev.bhash.frontend.SourceFile("app.bhash","""
+                आयात पुस्तक.पात्र उपनाम डिब्बा;
+                आयात पुस्तक.बनाओ;
+                कार्य मुख्य() -> शून्य {
+                    स्थिर क: डिब्बा<पूर्णांक> = बनाओ();
+                    स्थिर ख: पुस्तक.पात्र<पूर्णांक> = नया डिब्बा<पूर्णांक>();
+                    स्थिर ग: डिब्बा<पूर्णांक> = क;
+                    लिखो(डिब्बा<पूर्णांक>.गिनती, क == ग, क == ख);
+                }
+                """));
+        Path output = directory.resolve(clr() ? "generic-project-clr" : "generic-project.jar");
+        if (clr()) new ClrCompiler().compile(sources,output);
+        else new JvmCompiler().compile(sources,output);
+        var result = run(clr() ? output.resolve("BhashProgram.dll") : output,"");
+        assertEquals(0,result.exit);
+        assertEquals("२ सत्य असत्य\n",result.output);
+    }
+    @Test void crossFileTypeErrorsFailBeforeInvokingTheTargetToolchain() {
+        var sources = List.of(new dev.bhash.frontend.SourceFile("types.bhash","वर्ग वस्तु {}"),
+                new dev.bhash.frontend.SourceFile("main.bhash","कार्य मुख्य() -> शून्य { स्थिर क: वस्तु = १; }"));
+        var error = assertThrows(CompilationException.class,()-> {
+            if (clr()) new ClrCompiler().compile(sources,directory.resolve("bad-clr"));
+            else new JvmCompiler().compile(sources,directory.resolve("bad.jar"));
+        });
+        assertTrue(error.getMessage().startsWith("main.bhash:1:"),error.getMessage());
+        assertTrue(error.getMessage().contains("Expected"),error.getMessage());
+    }
     @Test void unicodeScalarTextOperationsAndAsciiNumericSerialization() throws Exception {
         var result = run(body("""
                 स्थिर पाठ्य: पाठ = पाठपढ़ो();

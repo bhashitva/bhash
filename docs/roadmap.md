@@ -4,6 +4,8 @@
 
 - ANTLR grammar, Java parser, CLI and syntax diagnostics.
 - Function signature collection, normalized symbol resolution and lexical scopes.
+- Multi-file executable projects, packages, file-local imports/aliases, public exports,
+  qualified references and cross-file checking on all three implemented targets.
 - Interfaces, explicit generic types/global functions, overload resolution and static members.
 - Selection statements with typed literal cases, grouped labels, default, scopes and nested loop control.
 - Classes, constructors, typed fields, member methods, single inheritance, access
@@ -23,6 +25,12 @@
 - Improve diagnostic codes, multiple-error recovery and runtime source mapping.
 - Expand standard input support beyond integers; design explicit numeric conversions.
 - Maintain Apache 2.0 licensing, contribution guidance and third-party notices.
+
+## Project and library follow-ups
+
+- Versioned portable Bhash source dependencies and reproducible dependency lockfiles.
+- Incremental compilation, stable exported signatures and separately compiled libraries.
+- Explicit target-specific Java JAR and .NET assembly/NuGet interoperability.
 
 ## Shared IR and portability
 
@@ -47,6 +55,6 @@
 ## Later language growth
 
 Abstract/final members, generic member methods, constraints/inference, constructor-assigned
-immutable fields, modules, arrays/records, arbitrary-precision arithmetic, standard
-library, debugger support, editor tooling, package management and FFI. Changes require a spec update,
+immutable fields, arrays/records, arbitrary-precision arithmetic, standard
+library, debugger support, editor tooling, dependency package management and FFI. Changes require a spec update,
 examples and tests. Generated code, JVM JARs, CLR deployment folders and browser bundles remain build products.

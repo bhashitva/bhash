@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-// Bhash (भाष) v0.4 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
+// Bhash (भाष) v0.5 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
 
-program : (functionDecl | classDecl | interfaceDecl)* EOF ;
+program : packageDecl? importDecl* (PUBLIC? (functionDecl | classDecl | interfaceDecl))* EOF ;
+packageDecl : PACKAGE qualifiedName SEMI ;
+importDecl : IMPORT qualifiedName (AS IDENTIFIER)? SEMI ;
+qualifiedName : IDENTIFIER (DOT IDENTIFIER)* ;
 classDecl : CLASS IDENTIFIER typeParameters? (EXTENDS valueType)? (IMPLEMENTS typeList)? LBRACE classMember* RBRACE ;
 interfaceDecl : INTERFACE IDENTIFIER typeParameters? (EXTENDS typeList)? LBRACE functionDecl* RBRACE ;
 typeParameters : LT IDENTIFIER (COMMA IDENTIFIER)* GT ;
@@ -18,7 +21,8 @@ functionDecl : FUNCTION IDENTIFIER typeParameters? LPAREN parameters? RPAREN ARR
 parameters : parameter (COMMA parameter)* ;
 parameter : IDENTIFIER COLON valueType ;
 returnType : valueType | VOID ;
-valueType : INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | IDENTIFIER typeArguments? ;
+valueType : INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | IDENTIFIER typeQualifier* typeArguments? ;
+typeQualifier : DOT IDENTIFIER ;
 block : LBRACE statement* RBRACE ;
 statement
     : variableDecl
@@ -52,7 +56,7 @@ additive : multiplicative ((PLUS | MINUS) multiplicative)* ;
 multiplicative : unary ((STAR | SLASH | PERCENT) unary)* ;
 unary : (NOT | MINUS | PLUS) unary | postfix ;
 postfix : primary postfixPart* ;
-postfixPart : DOT IDENTIFIER (LPAREN arguments? RPAREN)? ;
+postfixPart : DOT IDENTIFIER typeArguments? (LPAREN arguments? RPAREN)? ;
 primary
     : INTEGER_LITERAL
     | REAL_LITERAL
@@ -68,6 +72,9 @@ primary
     ;
 
 // Reserve keywords before IDENTIFIER; longer names still use longest match.
+PACKAGE : 'संकुल' ;
+IMPORT : 'आयात' ;
+AS : 'उपनाम' ;
 FUNCTION : 'कार्य' ;
 CLASS : 'वर्ग' ;
 INTERFACE : 'अनुबंध' ;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.bhash.backend.jvm;
 
-import dev.bhash.frontend.Frontend;
+import dev.bhash.frontend.SourceFile;
 import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.Target;
@@ -17,9 +17,11 @@ import javax.tools.*;
 /** Bhash -> checked Java -> Java 17 bytecode -> self-contained executable JAR. */
 public final class JvmCompiler {
     public void compile(String sourceName, String source, Path output) throws IOException, CompilationException {
-        var result = Frontend.parse(sourceName, source.startsWith("\uFEFF") ? source.substring(1) : source);
-        if (!result.valid()) throw new CompilationException(String.join("\n", result.diagnostics().stream().map(Object::toString).toList()));
-        String java = ManagedEmitter.emit(sourceName, result.tree(), Target.JVM);
+        compile(List.of(new SourceFile(sourceName,source)),output);
+    }
+
+    public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
+        String java = ManagedEmitter.emit(sources, Target.JVM);
         var compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) throw new CompilationException("JVM compilation requires a full JDK 17 or newer (not a JRE).");
         Path temporary = Files.createTempDirectory("bhash-jvm-");

@@ -3,6 +3,7 @@ package dev.bhash.backend;
 
 import dev.bhash.frontend.Frontend;
 import dev.bhash.frontend.Identifiers;
+import dev.bhash.frontend.LocatedToken;
 import dev.bhash.parser.BhashParser.*;
 import java.util.*;
 import org.antlr.v4.runtime.*;
@@ -26,7 +27,7 @@ final class GenericExpander {
         return new GenericExpander(source).program(program);
     }
     private CompilationException error(ParserRuleContext at, String message) {
-        return new CompilationException(source + ":" + at.start.getLine() + ":" + (at.start.getCharPositionInLine()+1) + ": " + message);
+        return new CompilationException(LocatedToken.source(at.start, source) + ":" + at.start.getLine() + ":" + (at.start.getCharPositionInLine()+1) + ": " + message);
     }
     private void collectNames(ParseTree tree) {
         if (tree instanceof TerminalNode terminal) names.add(Identifiers.key(terminal.getText()));
@@ -121,9 +122,6 @@ final class GenericExpander {
         } else for (int i=0;i<node.getChildCount();i++) render(node.getChild(i),subst,renamed,replacement);
     }
     private void remap(ParseTree node) {
-        if (node instanceof TerminalNode t && t.getSymbol() instanceof CommonToken token) {
-            var origin=origins.floorEntry(token.getStartIndex());
-            if (origin!=null) { token.setLine(origin.getValue().getLine()); token.setCharPositionInLine(origin.getValue().getCharPositionInLine()); }
-        } else for (int i=0;i<node.getChildCount();i++) remap(node.getChild(i));
+        ProjectResolver.remap(node,origins);
     }
 }

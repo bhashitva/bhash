@@ -76,6 +76,34 @@ There are no NuGet package dependencies. The .NET 10 SDK/reference packs must be
 installed locally. Use `BHASH_DOTNET` to specify a dotnet executable outside PATH.
 By default the CLI continues to target JVM; select CLR with `--target clr`.
 
+## Multi-file projects and packages
+
+Create `bhash.project` in your project directory:
+
+```properties
+name=my-application
+sources=src,shared
+```
+
+Use `संकुल` to declare a package, `आयात` to import a type or function, and optional
+`उपनाम` aliases to distinguish names. Mark top-level declarations `सार्वजनिक` when
+another package needs them. Files in the same package resolve each other's declarations
+automatically. Classes, interfaces, inheritance, generics, overloads and static members
+are checked across the whole project on **JVM, CLR and browser WebAssembly**.
+
+The [seven-file factorial example](examples/multi-file/) is ready to run:
+
+```bash
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/multi-file
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/multi-file --target clr
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/multi-file --target wasm-browser -o target/multi-file-web
+```
+
+Serve browser output over HTTP as described in [the browser guide](docs/wasm-browser.md).
+See [project commands and v0.5 package rules](docs/projects-packages.md) for details.
+Existing single-file commands continue to work. External library distribution and
+Java/.NET library interoperability remain planned.
+
 ## The program
 
 ```text

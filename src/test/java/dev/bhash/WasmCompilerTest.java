@@ -20,6 +20,15 @@ class WasmCompilerTest {
         assertFalse(error.getMessage().isBlank());
         assertFalse(Files.exists(directory.resolve("web")));
     }
+    @Test void crossFileTypeMismatchIsRejectedBeforeBrowserPublishing() {
+        var sources = java.util.List.of(
+                new dev.bhash.frontend.SourceFile("types.bhash","संकुल पुस्तक; सार्वजनिक वर्ग वस्तु {}"),
+                new dev.bhash.frontend.SourceFile("app.bhash","आयात पुस्तक.वस्तु; कार्य मुख्य() -> शून्य { स्थिर क: वस्तु = १; }"));
+        var error = assertThrows(CompilationException.class,()->new WasmCompiler().compile(sources,directory.resolve("web")));
+        assertTrue(error.getMessage().startsWith("app.bhash:1:"),error.getMessage());
+        assertTrue(error.getMessage().contains("Expected पुस्तक.वस्तु"),error.getMessage());
+        assertFalse(Files.exists(directory.resolve("web")));
+    }
     @Test void refusesUnmanagedOutputAndSourceDirectories() throws Exception {
         var compiler = new WasmCompiler();
         Files.writeString(directory.resolve("notes.txt"), "keep");
