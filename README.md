@@ -174,24 +174,6 @@ checks on Windows and Linux. CLR integration tests are skipped locally if .NET 1
 is absent; set `BHASH_REQUIRE_CLR=true` to make missing SDK support a test failure.
 CI always sets this requirement. Generated sources, classes, JARs and CLR deployment folders remain build products
 in `target/`. See [CLR details](docs/clr-target.md) for runtime and output behavior.
-## License
-
-Bhash is licensed under the **[Apache License, Version 2.0](LICENSE)**. This includes
-its compiler, grammar, runtime helpers and examples. You choose the license for
-applications you write in Bhash; included Bhash runtime/support code retains its
-Apache license and notices. See [licensing details](LICENSING.md), [project attribution](NOTICE),
-[third-party notices](THIRD_PARTY_NOTICES.md) and [contribution guidelines](CONTRIBUTING.md).
-
-## Support Bhash
-
-Bhash is a project of **[Nij Bhasha Sanstha, Inc.](https://bhashitva.org/)**, which works
-to make knowledge and tools accessible in Indic languages. Help support Bhash's
-open-source compiler development through the **Knowledge Without Language Barriers** campaign:
-
-**[Donate through Zeffy](https://www.zeffy.com/en-US/donation-form/knowledge-without-language-barriers)**
-
-Donations are voluntary; Bhash remains available under Apache 2.0 regardless of whether you donate.
-
 ### Browser WebAssembly
 
 Build a browser application using the .NET 10 WebAssembly runtime:
@@ -232,3 +214,21 @@ fall through; consecutive labels can share a body. `विराम` exits the n
 ```
 
 See [the runnable example](examples/switch-console.bhash) and [v0.4 selection rules](docs/switch.md).
+
+## License
+
+Bhash is licensed under the **[Apache License, Version 2.0](LICENSE)**. This includes
+its compiler, grammar, runtime helpers and examples. You choose the license for
+applications you write in Bhash; included Bhash runtime/support code retains its
+Apache license and notices. See [licensing details](LICENSING.md), [project attribution](NOTICE),
+[third-party notices](THIRD_PARTY_NOTICES.md) and [contribution guidelines](CONTRIBUTING.md).
+
+## Support Bhash
+
+Bhash is a project of **[Nij Bhasha Sanstha, Inc.](https://bhashitva.org/)**, which works
+to make knowledge and tools accessible in Indic languages. Help support Bhash's
+open-source compiler development through the **Knowledge Without Language Barriers** campaign:
+
+**[Donate through Zeffy](https://www.zeffy.com/en-US/donation-form/knowledge-without-language-barriers)**
+
+Donations are voluntary; Bhash remains available under Apache 2.0 regardless of whether you donate.
