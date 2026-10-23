@@ -91,6 +91,22 @@ are disabled; this is a managed-runtime bundle rather than a WASI module.
 Staging preserves previous output on build failure. A SHA-256 asset manifest rejects
 replacement of output with added or modified files. See [browser target](wasm-browser.md).
 
+## Interfaces, generics, overloads and static storage
+
+`GenericExpander` specializes used generic classes, interfaces and global functions before
+semantic checking, preserving original token locations for diagnostics. Repeated closed types
+share their specialization; an expansion limit rejects recursively growing templates. Each
+specialization has distinct static storage on all targets, including primitive arguments.
+
+`ManagedEmitter` registers interfaces and class contracts, orders inheritance, and validates
+complete public instance implementations. Stable slots keyed by source method name and concrete
+parameter types align interface calls, inherited overloads and virtual overrides across targets.
+Overload selection is performed in Bhash using compile-time types; constructors receive explicitly
+cast arguments so host-language overload rules cannot change the selection. Static fields/methods
+lower to host static members with Bhash access and receiver checks.
+
+See [v0.3 rules](contracts-generics.md) for supported generic forms and remaining limits.
+
 ## Target status
 
 | Target | Status | Route |

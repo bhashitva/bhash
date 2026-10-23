@@ -14,7 +14,7 @@ function compile(name, source) {
     const build = spawnSync('java', ['-jar', jar, 'compile', file, '--target', 'wasm-browser', '-o', path.join(root, name)], { encoding: 'utf8', timeout: 660000 });
     assert.equal(build.status, 0, `${build.stdout}\n${build.stderr}\n${build.error || ''}`);
 }
-for (const name of ['factorial-console', 'factorial-objects', 'objects'])
+for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics'])
     compile(name, fs.readFileSync(`examples/${name}.bhash`, 'utf8'));
 compile('semantics', `
 वर्ग आधारवर्ग { कार्य मूल्य() -> पूर्णांक { लौटाओ १; } }
@@ -100,6 +100,7 @@ const server = http.createServer((request, response) => {
                 await run(name, input, prompt, 1, 'भाष:');
         }
         await run('objects', '', 'मनोज १५० १५ १६५\n');
+        await run('contracts-generics', '', 'पूर्णांक: २१\nपाठ: नमस्ते\nपात्र ४२ ३.०\n१ १ १००\n');
         await run('semantics', '0\n९२२३३७२०३६८५४७७५८०७\n-9223372036854775808', '९२२३३७२०३६८५४७७५८०७\n-९२२३३७२०३६८५४७७५८०८\n');
         await run('semantics', '1', '', 1, 'रिक्त वस्तु');
         await run('semantics', '2\n0', '', 1, 'शून्य से भाग');

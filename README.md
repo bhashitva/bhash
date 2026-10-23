@@ -184,3 +184,17 @@ python -m http.server 8000 --directory target/factorial-web
 ```
 
 Open <http://localhost:8000>, enter `५`, and click **Run / चलाएँ** to see `गुणनफल: १२०`. Classes and inheritance are supported. Input is supplied before execution; runs can be stopped and repeated. See [browser target documentation](docs/wasm-browser.md) for prerequisites, deployment and testing.
+
+### Interfaces, generics, overloads and static members
+
+The v0.3 language adds `अनुबंध` (interface), `पालन` (implementation) and `साझा` (static).
+Generic classes/interfaces and global functions use explicit type arguments, such as
+`पात्र<पूर्णांक>` and `पहचान<पाठ>("नमस्ते")`. Functions, methods and constructors can overload
+by parameter types. The same features work on JVM, CLR and browser WebAssembly.
+
+```sh
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/contracts-generics.bhash
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/contracts-generics.bhash --target clr
+```
+
+See the [complete example](examples/contracts-generics.bhash) and [v0.3 rules and limitations](docs/contracts-generics.md).

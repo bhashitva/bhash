@@ -66,8 +66,8 @@ mutation, base calls and inheritance with a small account model.
 ```
 
 - Members and constructors are public by default; access modifiers are optional.
-- Each class has at most one constructor. Without one, a public zero-argument
-  constructor is synthesized. Constructors are not inherited or overloaded.
+- Classes may overload constructors by parameter types. Without any declaration, a public zero-argument
+  constructor is synthesized. Constructors are not inherited.
 - A derived constructor can write `निर्माता(...) : आधार(...) { ... }`. If omitted,
   the base initializer is `आधार()`; its argument count and access must be valid.
 - The base constructor finishes first, then the current class's fields initialize
@@ -94,7 +94,7 @@ mutation, base calls and inheritance with a small account model.
   named implicitly or through `यह`.
 - Public/protected methods dispatch virtually. An inherited method must be
   overridden explicitly with `अधिलेखन`, preserving parameter and return types
-  exactly and without reducing visibility. Overloading is not supported.
+  exactly and without reducing visibility. Additional parameter signatures may overload a method.
 - `आधार.कार्यनाम(...)` directly invokes the parent implementation; `यह.कार्यनाम(...)`
   uses normal virtual dispatch. Both can access inherited members when permitted.
 - Private members are accessible only within their declaring class. Protected
@@ -102,8 +102,8 @@ mutation, base calls and inheritance with a small account model.
   instance requires a receiver of that subclass type (or a further subtype).
 - Private constructors can be used only inside their declaring class; protected
   constructors can additionally be invoked by a derived base initializer.
-- Member names cannot hide inherited fields or methods. Private methods cannot be
-  overridden. Cycles, unknown parents, duplicate classes and invalid signatures
+- Fields cannot hide inherited members. Methods may add overloads, but inherited
+  signatures require explicit overrides. Private methods cannot be overridden. Cycles, unknown parents, duplicate classes and invalid signatures
   produce Bhash source-located diagnostics.
 - Member names and class names follow the existing NFC identifier normalization.
 
@@ -135,6 +135,5 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/objects.bhash --
 java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/factorial-objects.bhash --target clr
 ```
 
-Interfaces, abstract/final classes, static members, generics, overloaded methods
-or constructors, casts, properties, arrays and JavaScript-style dynamic fields
-remain separate future extensions.
+Interfaces, generics, overloads and static members are specified in [v0.3 extensions](contracts-generics.md).
+Abstract/final classes, casts, properties, arrays and JavaScript-style dynamic fields remain future extensions.

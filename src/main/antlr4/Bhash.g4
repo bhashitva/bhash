@@ -1,19 +1,23 @@
-// Bhash (भाष) v0.2 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
+// Bhash (भाष) v0.3 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
 
-program : (functionDecl | classDecl)* EOF ;
-classDecl : CLASS IDENTIFIER (EXTENDS IDENTIFIER)? LBRACE classMember* RBRACE ;
-classMember : visibility? (fieldDecl | constructorDecl | OVERRIDE? functionDecl) ;
+program : (functionDecl | classDecl | interfaceDecl)* EOF ;
+classDecl : CLASS IDENTIFIER typeParameters? (EXTENDS valueType)? (IMPLEMENTS typeList)? LBRACE classMember* RBRACE ;
+interfaceDecl : INTERFACE IDENTIFIER typeParameters? (EXTENDS typeList)? LBRACE functionDecl* RBRACE ;
+typeParameters : LT IDENTIFIER (COMMA IDENTIFIER)* GT ;
+typeArguments : LT valueType (COMMA valueType)* GT ;
+typeList : valueType (COMMA valueType)* ;
+classMember : visibility? STATIC? (fieldDecl | constructorDecl | OVERRIDE? functionDecl) ;
 visibility : PUBLIC | PRIVATE | PROTECTED ;
 fieldDecl : (LET | CONST) IDENTIFIER COLON valueType (ASSIGN expression)? SEMI ;
 constructorDecl : CONSTRUCTOR LPAREN parameters? RPAREN (COLON BASE LPAREN arguments? RPAREN)? block ;
-functionDecl : FUNCTION IDENTIFIER LPAREN parameters? RPAREN ARROW returnType block ;
+functionDecl : FUNCTION IDENTIFIER typeParameters? LPAREN parameters? RPAREN ARROW returnType (block | SEMI) ;
 parameters : parameter (COMMA parameter)* ;
 parameter : IDENTIFIER COLON valueType ;
 returnType : valueType | VOID ;
-valueType : INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | IDENTIFIER ;
+valueType : INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | IDENTIFIER typeArguments? ;
 block : LBRACE statement* RBRACE ;
 statement
     : variableDecl
@@ -53,14 +57,17 @@ primary
     | NULL
     | THIS
     | BASE
-    | NEW IDENTIFIER LPAREN arguments? RPAREN
-    | IDENTIFIER (LPAREN arguments? RPAREN)?
+    | NEW valueType LPAREN arguments? RPAREN
+    | IDENTIFIER typeArguments? (LPAREN arguments? RPAREN)?
     | LPAREN expression RPAREN
     ;
 
 // Reserve keywords before IDENTIFIER; longer names still use longest match.
 FUNCTION : 'कार्य' ;
 CLASS : 'वर्ग' ;
+INTERFACE : 'अनुबंध' ;
+IMPLEMENTS : 'पालन' ;
+STATIC : 'साझा' ;
 EXTENDS : 'विस्तार' ;
 CONSTRUCTOR : 'निर्माता' ;
 NEW : 'नया' ;

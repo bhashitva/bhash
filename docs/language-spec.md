@@ -1,6 +1,6 @@
-# Bhash / भाष — v0.2 language definition
+# Bhash / भाष — v0.3 language definition
 
-Status: v0.2 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
+Status: v0.3 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
 uses checked C# source lowering. The browser target reuses CLR lowering with the
@@ -23,7 +23,7 @@ is supplied before execution; see [browser target](wasm-browser.md).
 - Numeric literals use ASCII digits (`123`) or Devanagari digits (`१२३`).
   A single literal cannot mix scripts. Different literals in one file may use either.
 - Integers are decimal digits. Real literals require digits on both sides of `.`:
-  `१२.५`, `12.5`. No exponent, radix prefix or digit separator in v0.2.
+  `१२.५`, `12.5`. No exponent, radix prefix or digit separator in v0.3.
 - String literals use double quotes and allow arbitrary Unicode text. Escapes:
   `\"`, `\\`, `\n`, `\r`, `\t`, and `\uXXXX` with four hexadecimal digits.
   Literal newlines in strings are forbidden. The semantic literal decoder
@@ -39,6 +39,8 @@ is supplied before execution; see [browser target](wasm-browser.md).
 | Spelling | Role | Example |
 | --- | --- | --- |
 | `कार्य` | Function declaration | `कार्य जोड़(...) -> पूर्णांक { ... }` |
+| `अनुबंध` / `पालन` | Interface / implementation | `वर्ग क पालन ख { ... }` |
+| `साझा` | Static member | `साझा मान गिनती: पूर्णांक = ०;` |
 | `मान` | Mutable binding | `मान गिनती: पूर्णांक = ०;` |
 | `स्थिर` | Immutable binding | `स्थिर सीमा: पूर्णांक = १०;` |
 | `यदि` / `अन्यथा` | If / else | `यदि (सत्य) { ... } अन्यथा { ... }` |
@@ -69,10 +71,10 @@ arithmetic; revisit the name if exact decimal becomes a language requirement.
 }
 ```
 
-A compilation unit contains top-level functions and class declarations. No top-level
+A compilation unit contains top-level functions, class declarations and interface declarations. No top-level
 executable statements, imports, globals or nested class declarations are supported. Executables must define exactly one
 `मुख्य()` returning `शून्य`. Empty source is syntactically valid but is not a
-valid executable. Top-level function names must be unique; no overloading. Classes have their own
+valid executable. Functions may overload by parameter types; return-type-only overloads are rejected. Classes have their own
 member scopes, described in [Objects and inheritance](objects.md). Forward calls
 and recursion are permitted; collect function signatures before resolving bodies.
 All parameters and return types are explicit. Parameters are immutable bindings.
@@ -111,7 +113,7 @@ Precedence, highest to lowest; binary operators associate left to right:
 | 7 | `&&` | Short-circuit AND |
 | 8 | `||` | Short-circuit OR |
 
-- No implicit integer/real conversion in v0.2. Numeric binary operands must have
+- No implicit integer/real conversion in v0.3. Numeric binary operands must have
   the same type; conversion functions can be designed later.
 - Integer range: −2^63 through 2^63−1. Out-of-range literals are compile-time
   errors. The constant checker handles unary minus before range validation
@@ -177,10 +179,19 @@ and `स्थिर` are reused for members. `स्थिर` denotes immutabi
 All detailed syntax, initialization order, constructor-safety constraints and access
 rules are specified in [Objects and inheritance](objects.md).
 
-## 8. Deferred design questions
+## 8. Interfaces, generics, overloads and static members
+
+`अनुबंध` declares an interface; classes use `पालन` to implement one or more contracts.
+`साझा` marks static fields/methods. Classes, interfaces and global functions support explicit
+type parameters and arguments (`पात्र<पूर्णांक>`, `पहचान<पाठ>("नमस्ते")`). Functions,
+methods and constructors can overload by their parameter type lists. All targets use the
+same overload resolution, specialization and interface-validation rules.
+See [the v0.3 specification](contracts-generics.md) for exact syntax and limits.
+
+## 9. Deferred design questions
 
 Confirm vocabulary; choose exact real formatting; define module/import syntax;
-design arrays, records, interfaces and generics; choose error/exception behavior beyond arithmetic
+design arrays, records and generic member methods; choose error/exception behavior beyond arithmetic
 traps; settle WASI vs browser environments and native OS/ABI support; define
 foreign-function interfaces separately for each platform. Do not grow the grammar
 to cover these until their semantics and tests are agreed.

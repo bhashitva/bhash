@@ -4,7 +4,7 @@ The JVM implementation is tested by compiling Bhash source to standalone JVM JAR
 and executing them in separate Java/.NET processes (with bytecode verification enabled on the JVM).
 There is no compiler/ANTLR classpath when running the generated programs.
 
-Local validation: all 64 JUnit tests passed with no skips, plus targeted private-member
+Local validation: all 79 JUnit tests passed with no skips, plus targeted private-member
 access checks. The suite includes frontend tests and a shared JVM/CLR execution corpus, including
 objects and inheritance, plus the packaged compiler/application smoke checks.
 
@@ -33,9 +33,13 @@ factorial CLR deployment folder as downloadable artifacts.
 See the repository's Actions page for current CI results.
 
 The browser WebAssembly workflow installs .NET 10 `wasm-tools` and Chromium,
-builds four application bundles, and executes `scripts/browser_smoke_test.cjs`.
+builds five application bundles, and executes `scripts/browser_smoke_test.cjs`.
 It checks procedural/object factorial (including exact 20!), input validation,
 objects and virtual dispatch, null/division errors, 64-bit boundaries/overflow,
 text rendering, reruns, Stop and output replacement safeguards. It uploads the
 compiler, browser bundles and screenshots. See [browser target](wasm-browser.md).
+The shared JVM/CLR suite also covers interface inheritance/implementation, generic classes,
+interfaces and global functions, nested specializations, invariant type arguments, generic
+inheritance, constructor/function/method overloads, ambiguity, static storage/access and
+invalid contracts. The packaged and Chromium checks execute the combined v0.3 example.
 Standalone WASI and native targets remain unimplemented.
