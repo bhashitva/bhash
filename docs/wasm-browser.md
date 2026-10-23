@@ -31,7 +31,7 @@ Generated output has a `.bhash-wasm-output` asset manifest. Rebuilds replace onl
 
 ## Verification
 
-The browser workflow builds the compiler and five browser applications, then executes Chromium tests covering both factorial programs, Devanagari input, 20!, input errors, EOF, constructors/inheritance, virtual dispatch, null errors, division, signed arithmetic, exact 64-bit values, text rendering, reruns and stop. The combined v0.3 example also exercises generic
+The browser workflow builds the compiler and six browser applications, then executes Chromium tests covering both factorial programs, Devanagari input, 20!, input errors, EOF, constructors/inheritance, virtual dispatch, null errors, division, signed arithmetic, exact 64-bit values, text rendering, reruns and stop. The combined v0.3 example also exercises generic
 interfaces/classes/functions, overloads and static members. Its artifact includes runnable bundles and the compiler JAR.
 
 To run locally after `mvn package`:

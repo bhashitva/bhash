@@ -134,13 +134,16 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (target == Target.JVM) {
             output.append("public final class BhashProgram {\n");
             output.append("public static void main(String[] args) { try { ").append(main.java)
-                    .append("(); } catch (BhashRuntime.Failure | ArithmeticException e) {")
-                    .append(" BhashRuntime.report(e.getMessage()); System.exit(1); } }\n");
+                    .append("(); } catch (RuntimeException | ExceptionInInitializerError e) { Throwable f=bhashFailure(e);")
+                    .append(" if (!(f instanceof BhashRuntime.Failure || f instanceof ArithmeticException)) throw e;")
+                    .append(" BhashRuntime.report(f.getMessage()); System.exit(1); } }\n");
+            output.append("private static Throwable bhashFailure(Throwable e) { while(e instanceof ExceptionInInitializerError && e.getCause()!=null) e=e.getCause(); return e; }\n");
         } else {
             output.append("using System;\ninternal static class BhashProgram {\n");
             output.append("public static int Main(string[] args) { try { ").append(main.java)
-                    .append("(); return 0; } catch (Exception e) when (e is BhashRuntime.Failure || e is ArithmeticException) {")
-                    .append(" BhashRuntime.report(e.Message); return 1; } }\n");
+                    .append("(); return 0; } catch (Exception e) when (bhashFailure(e) is BhashRuntime.Failure || bhashFailure(e) is ArithmeticException) {")
+                    .append(" BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n");
+            output.append("private static Exception bhashFailure(Exception e) { while(e is TypeInitializationException && e.InnerException!=null) e=e.InnerException; return e; }\n");
         }
         for (var overloads : functions.values()) for (var function : overloads) if (function.declaration!=null) emitFunction(function);
         for (ClassInfo definition : classOrder) emitClass(definition);
@@ -429,6 +432,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             output.append(";\n");
             if (!field.shared) initializers.put(field, value.java);
         }
+        if (target==Target.CLR && definition.fields.values().stream().anyMatch(f->f.shared))
+            output.append("static ").append(definition.java).append("() {}\n");
         currentStatic=false;
         for (Constructor constructor:definition.constructors) emitConstructor(definition,constructor,initializers);
         for (var overloads:definition.methods.values()) for (Function method:overloads) emitFunction(method);

@@ -530,4 +530,14 @@ abstract class ManagedCompilerTest {
         reject("वर्ग पात्र<त> { कार्य लो() -> पूर्णांक { लौटाओ \"गलत\"; } } कार्य मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); }","Expected");
     }
 
+    @Test void staticInitializerFailuresReportBhashDiagnostics() throws Exception {
+        var result=run(compile("""
+            वर्ग गलत { साझा मान संख्या: पूर्णांक = १ / ०; }
+            कार्य मुख्य() -> शून्य { लिखो(गलत.संख्या); }
+            """),"");
+        assertEquals(1,result.exit);
+        assertTrue(result.output.startsWith("भाष: शून्य से भाग"),result.output);
+        assertFalse(result.output.contains("Exception"),result.output);
+    }
+
 }

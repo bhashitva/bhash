@@ -116,7 +116,8 @@ parameter can still be used to access its instance members.
 
 Static methods do not dispatch virtually and cannot be overridden or hidden with the same
 signature. Visibility checks still apply. Static fields use the existing defaults and constant-only
-initializer rule; immutable fields still require initializers. Static constructors are deferred.
+initializer rule; immutable fields still require initializers. Arithmetic failures in static initializers produce the usual Bhash diagnostic and exit status 1.
+User-defined static constructors are deferred.
 
 ## Running the example
 

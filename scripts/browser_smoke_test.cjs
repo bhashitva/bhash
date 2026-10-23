@@ -34,6 +34,7 @@ compile('semantics', `
     अन्यथा { जबतक (सत्य) {} }
 }`);
 // A rebuild succeeds, but failed source/builds and edited output preserve prior assets.
+compile('static-error', 'वर्ग गलत { साझा मान संख्या: पूर्णांक = १ / ०; } कार्य मुख्य() -> शून्य { लिखो(गलत.संख्या); }');
 const semanticsSource = fs.readFileSync(path.join(root, 'semantics.bhash'), 'utf8');
 compile('semantics', semanticsSource);
 const outputIndex = path.join(root, 'semantics/index.html');
@@ -99,6 +100,7 @@ const server = http.createServer((request, response) => {
             for (const input of ['', '1२', 'abc', '9223372036854775808'])
                 await run(name, input, prompt, 1, 'भाष:');
         }
+        await run('static-error', '', '', 1, 'शून्य से भाग');
         await run('objects', '', 'मनोज १५० १५ १६५\n');
         await run('contracts-generics', '', 'पूर्णांक: २१\nपाठ: नमस्ते\nपात्र ४२ ३.०\n१ १ १००\n');
         await run('semantics', '0\n९२२३३७२०३६८५४७७५८०७\n-9223372036854775808', '९२२३३७२०३६८५४७७५८०७\n-९२२३३७२०३६८५४७७५८०८\n');
