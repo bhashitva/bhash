@@ -124,10 +124,17 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private String program(ProgramContext program) {
         collectClasses(program);
         functions.put(Identifiers.key("पढ़ो"), new ArrayList<>(List.of(new Function("BhashRuntime.readInteger", Type.INT, List.of(), null, Access.PUBLIC, false, null, true))));
+        functions.put(Identifiers.key("पाठपढ़ो"), new ArrayList<>(List.of(new Function("BhashRuntime.readText", Type.TEXT, List.of(), null, Access.PUBLIC, false, null, true))));
+        functions.put(Identifiers.key("लंबाई"), new ArrayList<>(List.of(new Function("BhashRuntime.length", Type.INT, List.of(Type.TEXT), null, Access.PUBLIC, false, null, true))));
+        functions.put(Identifiers.key("अंश"), new ArrayList<>(List.of(new Function("BhashRuntime.slice", Type.TEXT, List.of(Type.TEXT,Type.INT,Type.INT), null, Access.PUBLIC, false, null, true))));
+        functions.put(Identifiers.key("अंकपाठ"), new ArrayList<>(List.of(new Function("BhashRuntime.integerText", Type.TEXT, List.of(Type.INT), null, Access.PUBLIC, false, null, true))));
+        functions.put(Identifiers.key("पूर्णांकपाठ"), new ArrayList<>(List.of(new Function("BhashRuntime.parseInteger", Type.INT, List.of(Type.TEXT), null, Access.PUBLIC, false, null, true))));
+        functions.put(Identifiers.key("बड़ाअक्षर"), new ArrayList<>(List.of(new Function("BhashRuntime.upper", Type.TEXT, List.of(Type.TEXT), null, Access.PUBLIC, false, null, true))));
+        functions.put(Identifiers.key("त्रुटि"), new ArrayList<>(List.of(new Function("BhashRuntime.fail", Type.VOID, List.of(Type.TEXT), null, Access.PUBLIC, false, null, true))));
         int globalId=0;
         for (var declaration : program.functionDecl()) {
             String name = Identifiers.key(declaration.IDENTIFIER().getText());
-            if (name.equals(Identifiers.key("पढ़ो"))) throw error(declaration,"Duplicate or reserved function: पढ़ो");
+            if (functions.containsKey(name) && functions.get(name).get(0).declaration == null) throw error(declaration,"Duplicate or reserved function: पढ़ो");
             if (declaration.block()==null) throw error(declaration,"A function requires a body.");
             var function = new Function("f" + globalId++, type(declaration.returnType()), parameters(declaration.parameters()),
                     null, Access.PUBLIC, false, declaration, true);
@@ -722,6 +729,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 case "==", "!=" -> { type = Type.BOOL; }
                 case "<", "<=", ">", ">=" -> { numeric(ctx, type); type = Type.BOOL; }
                 case "%" -> require(ctx, Type.INT, type);
+                case "+" -> { if (type != Type.TEXT) numeric(ctx, type); }
                 default -> numeric(ctx, type);
             }
             if ((operator.equals("==") || operator.equals("!=")) && result.type == Type.TEXT) {

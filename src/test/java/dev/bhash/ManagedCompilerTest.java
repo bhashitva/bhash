@@ -16,6 +16,28 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class ManagedCompilerTest {
+    @Test void unicodeScalarTextOperationsAndAsciiNumericSerialization() throws Exception {
+        var result = run(body("""
+                स्थिर पाठ्य: पाठ = पाठपढ़ो();
+                लिखो(पाठ्य + "!");
+                लिखो(लंबाई(पाठ्य), अंश(पाठ्य, १, २));
+                लिखो(अंकपाठ(-४२), पूर्णांकपाठ("५२"), बड़ाअक्षर("e2"), बड़ाअक्षर("aßé"));
+                """), "a😀क\n");
+        assertEquals(0, result.exit);
+        assertEquals("a😀क!\n३ 😀\n-42 ५२ E2 Aßé\n", result.output);
+    }
+
+    @Test void textOperationsRejectInvalidRangesNumbersEofAndReservedNames() throws Exception {
+        for (String statement : List.of("लिखो(अंश(\"😀\", ०, २));", "लिखो(पूर्णांकपाठ(\"1२\"));",
+                "लिखो(पूर्णांकपाठ(\"9223372036854775808\"));", "लिखो(पाठपढ़ो());", "त्रुटि(\"test\");")) {
+            var result = run(body(statement), "");
+            assertEquals(1, result.exit);
+            assertTrue(result.output.startsWith("भाष:"), result.output);
+            assertFalse(result.output.contains("Exception"), result.output);
+        }
+        assertThrows(CompilationException.class, () -> compile("कार्य लंबाई() -> पूर्णांक { लौटाओ १; } कार्य मुख्य() -> शून्य {}"));
+        assertThrows(CompilationException.class, () -> body("लिखो(\"a\" + १);"));
+    }
     protected final Target target;
     protected ManagedCompilerTest(Target target) { this.target = target; }
     protected boolean clr() { return target == Target.CLR; }

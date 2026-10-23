@@ -28,6 +28,32 @@ final class BhashRuntime {
         catch (NumberFormatException error) { throw new Failure("पूर्णांक 64-बिट सीमा से बाहर है।"); }
     }
 
+    static String readText() {
+        try {
+            String value = INPUT.readLine();
+            if (value == null) throw new Failure("इनपुट समाप्त: पाठ अपेक्षित था।");
+            return value;
+        } catch (IOException e) { throw new Failure("UTF-8 पाठ पढ़ा नहीं जा सका।"); }
+    }
+    static long length(String value) { return value.codePointCount(0, value.length()); }
+    static String slice(String value, long start, long end) {
+        long count = length(value);
+        if (start < 0 || end < start || end > count) throw new Failure("पाठ अंश सीमा से बाहर है।");
+        return value.substring(value.offsetByCodePoints(0, (int)start), value.offsetByCodePoints(0, (int)end));
+    }
+    static String integerText(long value) { return Long.toString(value); }
+    static long parseInteger(String value) {
+        if (!value.matches("[+-]?(?:[0-9]+|[०-९]+)")) throw new Failure("अमान्य पूर्णांक पाठ।");
+        try { return Long.parseLong(value); }
+        catch (NumberFormatException e) { throw new Failure("पूर्णांक 64-बिट सीमा से बाहर है।"); }
+    }
+    static String upper(String value) {
+        var result = new StringBuilder();
+        value.codePoints().forEach(cp -> result.appendCodePoint(cp >= 'a' && cp <= 'z' ? cp - 32 : cp));
+        return result.toString();
+    }
+    static void fail(String message) { throw new Failure(message); }
+
     static void print(Object... values) {
         for (int i = 0; i < values.length; i++) {
             if (i > 0) OUTPUT.print(' ');
