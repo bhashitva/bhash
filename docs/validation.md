@@ -4,9 +4,9 @@ The JVM implementation is tested by compiling Bhash source to standalone JVM JAR
 and executing them in separate Java/.NET processes (with bytecode verification enabled on the JVM).
 There is no compiler/ANTLR classpath when running the generated programs.
 
-Local validation: all 93 JUnit tests passed with no skips, plus targeted private-member
-access checks. The suite includes frontend tests and a shared JVM/CLR execution corpus, including
-objects and inheritance, plus the packaged compiler/application smoke checks.
+The v0.5 suite contains 129 JUnit tests, including project source discovery, package/import
+resolution, frontend checks and a shared JVM/CLR execution corpus. Packaged compiler/application
+smoke checks separately exercise the public CLI. CI runs the suite on Linux and Windows.
 
 The common execution/semantic/CLI test corpus runs for each managed backend,
 with extra CLR tests for output preservation and directory ownership. JVM tests
@@ -26,14 +26,21 @@ Coverage includes:
 - Signed integer boundaries, wrapping overflow, division/remainder edge cases,
   operator precedence, real arithmetic, Unicode text and value equality.
 - CLI output/source protection, executable JAR contents and failed-compile preservation.
+- Multi-folder projects, source roots, deterministic discovery, UTF-8/BOM handling,
+  manifest validation and protection of every input file.
+- File-local imports/aliases, qualified references, package visibility, duplicate names,
+  NFC package names, lexical shadowing and defining-file diagnostic locations.
+- Cross-file inheritance, generic interfaces/functions/containers, split overload groups,
+  invariant type identities and shared static storage across aliases and source files.
 
 GitHub Actions runs `mvn verify` and packaged compiler/application smoke tests
 on both Windows and Linux, and uploads the compiler JAR, factorial JVM JAR and
-factorial CLR deployment folder as downloadable artifacts.
+factorial CLR deployment folder, plus multi-file JVM/CLR applications and their sources,
+as downloadable artifacts.
 See the repository's Actions page for current CI results.
 
 The browser WebAssembly workflow installs .NET 10 `wasm-tools` and Chromium,
-builds eight application bundles, and executes `scripts/browser_smoke_test.cjs`.
+builds nine application bundles, and executes `scripts/browser_smoke_test.cjs`.
 It checks procedural/object factorial (including exact 20!), input validation,
 objects and virtual dispatch, null/division errors, 64-bit boundaries/overflow,
 text rendering, reruns, Stop and output replacement safeguards. It uploads the
@@ -46,4 +53,7 @@ Selection tests cover grouped labels, no fall-through, a default in any position
 integers, ordinal Unicode text, booleans, once-only selector evaluation, independent scopes,
 nested break/continue behavior, generic bodies, duplicate/invalid labels and return-path
 analysis. Packaged and browser checks run the console example and browser control-flow fixture.
+The browser corpus also executes the seven-file factorial project, covering package imports,
+inheritance, generic interface/container identity, function overloads split between files and
+qualified static access. See [project commands](projects-packages.md).
 Standalone WASI and native targets remain unimplemented.

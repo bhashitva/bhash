@@ -235,6 +235,14 @@ public final class ProjectResolver {
         Token first = p.IDENTIFIER().getSymbol();
         String name = key(first.getText());
         if (bound(scopes,members,name,p.LPAREN()!=null)) return;
+        // A visible short type name is a receiver, even if a root package has the same spelling.
+        if (p.LPAREN()==null && !typeParameters.contains(name)) {
+            Symbol receiver = lookup(unit,name,Kind.TYPE,first);
+            if (receiver!=null) {
+                unit.replacements.put(first.getTokenIndex(),receiver.lowered);
+                return;
+            }
+        }
         // A qualified type receiver or function call consumes only its symbolic prefix, leaving member access intact.
         if (p.LPAREN()==null && p.typeArguments()==null && !postfix.postfixPart().isEmpty()) {
             String path = name;

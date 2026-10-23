@@ -122,7 +122,8 @@ Duplicate aliases/imports and imports conflicting with another declaration in
 the current package are errors. An alias cannot replace a built-in or `मुख्य`.
 Within type annotations, type parameters take precedence over imported type names.
 Within expressions, local bindings and members take precedence over imported
-names, matching existing lexical shadowing rules.
+names, matching existing lexical shadowing rules. A visible short type name also
+takes precedence over an equally named root package in a static receiver expression.
 
 Qualified references need no import:
 

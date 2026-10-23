@@ -121,6 +121,15 @@ class ProjectResolverTest {
                 कार्य मुख्य() -> शून्य { लिखो(नया उपभोक्ता().जांच(), पहचान<पूर्णांक>(०)); }
                 """)));
     }
+    @Test void importedTypeReceiversTakePrecedenceOverEquallyNamedRootPackages() throws Exception {
+        assertNotNull(emit(files("""
+                संकुल पुस्तक;
+                सार्वजनिक वर्ग वस्तु { साझा कार्य लो() -> पूर्णांक { लौटाओ १; } }
+                """, "संकुल वस्तु; सार्वजनिक कार्य लो() -> पाठ { लौटाओ \"गलत\"; }", """
+                आयात पुस्तक.वस्तु;
+                कार्य मुख्य() -> शून्य { स्थिर उत्तर: पूर्णांक = वस्तु.लो(); लिखो(उत्तर); }
+                """)));
+    }
     @Test void packageTypesRemainDistinctInAssignmentsAndOverloads() {
         String message = reject("Expected पहला.वस्तु, found दूसरा.वस्तु",
                 "संकुल पहला; सार्वजनिक वर्ग वस्तु {}", "संकुल दूसरा; सार्वजनिक वर्ग वस्तु {}",

@@ -27,8 +27,9 @@ still requires a syntactic return path after calling it.
 
 Implemented in `ManagedEmitter.java` and both managed runtime templates.
 The browser target inherits the CLR implementation; only JVM and CLR execution
-have been validated for this extension. Arrays, modules, Unicode case folding
-and host-language interop remain outside this change.
+have been validated for this extension. Arrays, Unicode case folding and host-language
+interop remain outside this text-operations change. Multi-file projects and packages
+are implemented separately in [v0.5](projects-packages.md).
 
 Tests in `ManagedCompilerTest` exercise Unicode supplementary characters,
 ASCII case behavior, input, script validation, overflow, bounds, EOF, explicit
