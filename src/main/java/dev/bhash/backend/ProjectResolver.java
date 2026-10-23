@@ -23,6 +23,7 @@ public final class ProjectResolver {
             pkg = tree.packageDecl() == null ? "" : key(tree.packageDecl().qualifiedName().getText());
         }
     }
+    private record Members(Set<String> fields, Set<String> methods) {}
     private record Symbol(String full, String lowered, Kind kind, boolean exported, Unit unit, ParserRuleContext declaration) {}
     private final List<Unit> units = new ArrayList<>();
     private final Map<String,Symbol> types = new LinkedHashMap<>(), functions = new LinkedHashMap<>();
@@ -78,7 +79,7 @@ public final class ProjectResolver {
         var combined = new ProgramContext(null, -1);
         combined.start = trees.get(0).start;
         for (var unit : units) {
-            walk(unit.tree, unit, new ArrayDeque<>(), Set.of(), Set.of());
+            walk(unit.tree, unit, new ArrayDeque<>(), Set.of(), new Members(Set.of(),Set.of()));
             var lowered = lower(unit);
             for (int i=0;i<lowered.getChildCount();i++) {
                 ParseTree child = lowered.getChild(i);
@@ -160,30 +161,36 @@ public final class ProjectResolver {
         for (var part : type.typeQualifier()) name.append('.').append(part.IDENTIFIER().getText());
         return name.toString();
     }
-    private Set<String> members(Unit unit, ParserRuleContext declaration, Set<ParserRuleContext> seen) throws CompilationException {
-        var names = new HashSet<String>();
-        if (!seen.add(declaration)) return names;
+    private Members members(Unit unit, ParserRuleContext declaration, Set<ParserRuleContext> seen) throws CompilationException {
+        var fields = new HashSet<String>();
+        var methods = new HashSet<String>();
+        var result = new Members(fields,methods);
+        if (!seen.add(declaration)) return result;
         List<ValueTypeContext> parents = new ArrayList<>();
         if (declaration instanceof ClassDeclContext c) {
             for (var m : c.classMember()) {
-                if (m.fieldDecl()!=null) names.add(key(m.fieldDecl().IDENTIFIER().getText()));
-                if (m.functionDecl()!=null) names.add(key(m.functionDecl().IDENTIFIER().getText()));
+                if (m.fieldDecl()!=null) fields.add(key(m.fieldDecl().IDENTIFIER().getText()));
+                if (m.functionDecl()!=null) methods.add(key(m.functionDecl().IDENTIFIER().getText()));
             }
             if (c.valueType()!=null) parents.add(c.valueType());
         } else if (declaration instanceof InterfaceDeclContext c) {
-            for (var f : c.functionDecl()) names.add(key(f.IDENTIFIER().getText()));
+            for (var f : c.functionDecl()) methods.add(key(f.IDENTIFIER().getText()));
             if (c.typeList()!=null) parents.addAll(c.typeList().valueType());
         }
         for (var parent : parents) if (parent.IDENTIFIER()!=null) {
             Symbol base = lookup(unit,typeSpelling(parent),Kind.TYPE,parent.start);
-            if (base!=null) names.addAll(members(base.unit,base.declaration,seen));
+            if (base!=null) {
+                var inherited = members(base.unit,base.declaration,seen);
+                fields.addAll(inherited.fields); methods.addAll(inherited.methods);
+            }
         }
-        return names;
+        return result;
     }
-    private boolean bound(Deque<Set<String>> scopes, Set<String> members, String name) {
-        return members.contains(name) || scopes.stream().anyMatch(s -> s.contains(name));
+    private boolean bound(Deque<Set<String>> scopes, Members members, String name, boolean call) {
+        return members.fields.contains(name) || call && members.methods.contains(name)
+                || scopes.stream().anyMatch(s -> s.contains(name));
     }
-    private void walk(ParseTree node, Unit unit, Deque<Set<String>> scopes, Set<String> typeParameters, Set<String> members) throws CompilationException {
+    private void walk(ParseTree node, Unit unit, Deque<Set<String>> scopes, Set<String> typeParameters, Members members) throws CompilationException {
         if (node instanceof PackageDeclContext || node instanceof ImportDeclContext || node instanceof TypeParametersContext) return;
         if (node instanceof ClassDeclContext c) {
             typeParameters = parameters(c.typeParameters(),typeParameters);
@@ -221,13 +228,13 @@ public final class ProjectResolver {
         if (block) scopes.pop();
         if (callable) scopes.pop();
     }
-    private void resolvePostfix(PostfixContext postfix, Unit unit, Deque<Set<String>> scopes, Set<String> members,
+    private void resolvePostfix(PostfixContext postfix, Unit unit, Deque<Set<String>> scopes, Members members,
             Set<String> typeParameters) throws CompilationException {
         var p = postfix.primary();
         if (p.IDENTIFIER()==null) return;
         Token first = p.IDENTIFIER().getSymbol();
         String name = key(first.getText());
-        if (bound(scopes,members,name)) return;
+        if (bound(scopes,members,name,p.LPAREN()!=null)) return;
         // A qualified type receiver or function call consumes only its symbolic prefix, leaving member access intact.
         if (p.LPAREN()==null && p.typeArguments()==null && !postfix.postfixPart().isEmpty()) {
             String path = name;
@@ -246,7 +253,7 @@ public final class ProjectResolver {
             }
         }
         Symbol symbol = lookup(unit,name,p.LPAREN()==null ? Kind.TYPE : Kind.FUNCTION,first);
-        if (symbol!=null && !typeParameters.contains(name)) unit.replacements.put(first.getTokenIndex(),symbol.lowered);
+        if (symbol!=null && (p.LPAREN()!=null || !typeParameters.contains(name))) unit.replacements.put(first.getTokenIndex(),symbol.lowered);
         else if (name.equals(key("मुख्य")) && p.LPAREN()!=null) throw error(first,"Undefined function in this package: मुख्य");
     }
     private void replace(Unit unit, Token first, Token last, String text) {

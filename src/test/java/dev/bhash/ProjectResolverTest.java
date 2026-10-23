@@ -105,6 +105,22 @@ class ProjectResolverTest {
                 }
                 """)));
     }
+    @Test void methodNamesDoNotShadowTypeReceiversAndTypeParametersDoNotShadowFunctionCalls() throws Exception {
+        assertNotNull(emit(files("""
+                संकुल पुस्तक;
+                सार्वजनिक वर्ग वस्तु { साझा कार्य लो() -> पूर्णांक { लौटाओ १; } }
+                """, """
+                संकुल ऐप;
+                आयात पुस्तक.वस्तु;
+                वर्ग उपभोक्ता {
+                    कार्य वस्तु() -> पूर्णांक { लौटाओ २; }
+                    कार्य जांच() -> पूर्णांक { लौटाओ वस्तु.लो(); }
+                }
+                कार्य त() -> पूर्णांक { लौटाओ ४; }
+                कार्य पहचान<त>(मूल्य: त) -> पूर्णांक { लौटाओ त(); }
+                कार्य मुख्य() -> शून्य { लिखो(नया उपभोक्ता().जांच(), पहचान<पूर्णांक>(०)); }
+                """)));
+    }
     @Test void packageTypesRemainDistinctInAssignmentsAndOverloads() {
         String message = reject("Expected पहला.वस्तु, found दूसरा.वस्तु",
                 "संकुल पहला; सार्वजनिक वर्ग वस्तु {}", "संकुल दूसरा; सार्वजनिक वर्ग वस्तु {}",
