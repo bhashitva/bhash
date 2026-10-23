@@ -53,6 +53,36 @@ internal static class BhashRuntime {
         || c == '\u1680' || (c >= '\u2000' && c <= '\u2006') || (c >= '\u2008' && c <= '\u200a')
         || c == '\u2028' || c == '\u2029' || c == '\u205f' || c == '\u3000';
 
+    internal static string readText() {
+        try { return Input.ReadLine() ?? throw new Failure("इनपुट समाप्त: पाठ अपेक्षित था।"); }
+        catch (Exception e) when (e is IOException || e is DecoderFallbackException) { throw new Failure("UTF-8 पाठ पढ़ा नहीं जा सका।"); }
+    }
+    internal static long length(string value) {
+        long count = 0; foreach (var rune in value.EnumerateRunes()) count++; return count;
+    }
+    internal static string slice(string value, long start, long end) {
+        if (start < 0 || end < start || end > length(value)) throw new Failure("पाठ अंश सीमा से बाहर है।");
+        var result = new StringBuilder(); long i = 0;
+        foreach (var rune in value.EnumerateRunes()) { if (i >= start && i < end) result.Append(rune.ToString()); i++; }
+        return result.ToString();
+    }
+    internal static string integerText(long value) => value.ToString(CultureInfo.InvariantCulture);
+    internal static long parseInteger(string value) {
+        if (!Regex.IsMatch(value, @"\A[+-]?(?:[0-9]+|[०-९]+)\z", RegexOptions.CultureInvariant)) throw new Failure("अमान्य पूर्णांक पाठ।");
+        var ascii = new StringBuilder();
+        foreach (char c in value) ascii.Append(c >= '०' && c <= '९' ? (char)('0' + c - '०') : c);
+        if (!long.TryParse(ascii.ToString(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long number)) throw new Failure("पूर्णांक 64-बिट सीमा से बाहर है।");
+        return number;
+    }
+    internal static string upper(string value) {
+        var result = new StringBuilder();
+        foreach (var rune in value.EnumerateRunes()) {
+            int cp = rune.Value; result.Append(char.ConvertFromUtf32(cp >= 'a' && cp <= 'z' ? cp - 32 : cp));
+        }
+        return result.ToString();
+    }
+    internal static void fail(string message) { throw new Failure(message); }
+
     internal static void print(params object[] values) {
         for (int i = 0; i < values.Length; i++) {
             if (i > 0) Output.Write(' ');
