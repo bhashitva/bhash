@@ -191,11 +191,13 @@ abstract class ManagedCompilerTest {
                 System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
         var command = clr() ? new ProcessBuilder(ClrCompiler.executable(), jar.toString())
                 : new ProcessBuilder(java, "-Xverify:all", "-jar", jar.toString());
-        var process = command.redirectErrorStream(true).start();
+        // Drain output directly to a file: waiting on a full pipe deadlocks on Windows.
+        Path capture = directory.resolve("output-" + next++ + ".txt");
+        var process = command.redirectErrorStream(true).redirectOutput(capture.toFile()).start();
         try {
             try (var stdin = process.getOutputStream()) { stdin.write(input.getBytes(StandardCharsets.UTF_8)); }
             assertTrue(process.waitFor(10, TimeUnit.SECONDS), "Generated program timed out");
-            return new Execution(process.exitValue(), new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n"));
+            return new Execution(process.exitValue(), Files.readString(capture, StandardCharsets.UTF_8).replace("\r\n", "\n"));
         } finally { process.destroyForcibly(); }
     }
 
