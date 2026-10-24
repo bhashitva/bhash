@@ -83,9 +83,23 @@ class FrontendTest {
     @Test void multiplicationBindsMoreTightlyThanAddition() {
         var expression = parseBody("लिखो(१ + २ * ३);").tree().functionDecl(0)
                 .block().statement(0).arguments().expression(0).logicalOr().logicalAnd(0)
-                .equality(0).comparison(0).additive(0);
+                .bitwiseOr(0).bitwiseXor(0).bitwiseAnd(0).equality(0).comparison(0).shift(0).additive(0);
         assertEquals(2, expression.multiplicative().size());
         assertEquals(2, expression.multiplicative(1).unary().size());
+    }
+    @Test void shiftSyntaxCoexistsWithComparisonsAndNestedGenericClosingAngles() {
+        for (String expression : new String[]{"१<<२", "८>>१", "-१>>>१", "१<<२<५", "८>>१>=४", "क < ख >> १", "क < ख >>> १", "क < ख << १", "~१ & ३ | ४ ^ २"})
+            assertTrue(parseBody("लिखो("+expression+");").valid(),expression);
+        var parsed = Frontend.parse("nested.bhash","""
+                वर्ग पात्र<त> { मान मूल्य: त; }
+                कार्य मुख्य() -> शून्य {
+                    स्थिर क: पात्र<पात्र<पात्र<पूर्णांक>>> = नया पात्र<पात्र<पात्र<पूर्णांक>>>();
+                    लिखो(८>>>१);
+                }
+                """);
+        assertTrue(parsed.valid(),parsed.diagnostics().toString());
+        for (String expression : new String[]{"१ < < २", "८ > > १", "८ >/*gap*/>१", "८ > > > १", "१ <<", "८ >>>> १"})
+            assertFalse(parseBody("लिखो("+expression+");").valid(),expression);
     }
     @Test void normalizationUnifiesEquivalentIdentifierSpellings() {
         assertEquals(Identifiers.key("क़दम"), Identifiers.key("क़दम"));

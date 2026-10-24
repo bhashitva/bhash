@@ -109,6 +109,7 @@ final class GenericExpander {
     }
     private void render(ParseTree node, Map<String,String> subst, Token renamed, String replacement) throws CompilationException {
         if (node instanceof TypeParametersContext) return;
+        if (node instanceof ShiftOperatorContext operator) { append(operator.getText(),operator.start); return; }
         if (node instanceof ValueTypeContext t) { append(type(t,subst),t.start); return; }
         if (node instanceof PrimaryContext p && p.typeArguments()!=null) {
             String name=instantiate(p.LPAREN()==null?types:functions,p.IDENTIFIER().getText(),p.typeArguments(),subst);

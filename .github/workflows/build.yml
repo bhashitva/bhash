@@ -34,6 +34,9 @@ jobs:
             LICENSING.md
             THIRD_PARTY_NOTICES.md
             target/bhash-compiler-0.1.0-SNAPSHOT.jar
+            target/bitboards.jar
+            target/bitboards-clr/
+            examples/bitboards.bhash
             target/multi-file.jar
             target/multi-file-clr/
             examples/multi-file/

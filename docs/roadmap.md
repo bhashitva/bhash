@@ -8,6 +8,8 @@
   qualified references and cross-file checking on all three implemented targets.
 - Interfaces, explicit generic types/global functions, overload resolution and static members.
 - Selection statements with typed literal cases, grouped labels, default, scopes and nested loop control.
+- Integer bitwise AND/OR/XOR/complement and three portable 64-bit shifts, including
+  generic syntax compatibility and a chess bitboard example.
 - Classes, constructors, typed fields, member methods, single inheritance, access
   control, explicit overrides, virtual dispatch, object references and null checks.
 - Type checking, entry-point and argument validation, immutable bindings,

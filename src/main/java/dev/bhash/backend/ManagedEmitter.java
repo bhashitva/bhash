@@ -716,6 +716,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     @Override public Expr visitExpression(ExpressionContext ctx) { return visit(ctx.logicalOr()); }
     @Override public Expr visitLogicalOr(LogicalOrContext ctx) { return binary(ctx); }
     @Override public Expr visitLogicalAnd(LogicalAndContext ctx) { return binary(ctx); }
+    @Override public Expr visitBitwiseOr(BitwiseOrContext ctx) { return binary(ctx); }
+    @Override public Expr visitBitwiseXor(BitwiseXorContext ctx) { return binary(ctx); }
+    @Override public Expr visitBitwiseAnd(BitwiseAndContext ctx) { return binary(ctx); }
+    @Override public Expr visitShift(ShiftContext ctx) { return binary(ctx); }
     @Override public Expr visitEquality(EqualityContext ctx) { return binary(ctx); }
     @Override public Expr visitComparison(ComparisonContext ctx) { return binary(ctx); }
     @Override public Expr visitAdditive(AdditiveContext ctx) { return binary(ctx); }
@@ -741,7 +745,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 case "&&", "||" -> { require(ctx, Type.BOOL, type); type = Type.BOOL; }
                 case "==", "!=" -> { type = Type.BOOL; }
                 case "<", "<=", ">", ">=" -> { numeric(ctx, type); type = Type.BOOL; }
-                case "%" -> require(ctx, Type.INT, type);
+                case "%", "&", "|", "^", "<<", ">>", ">>>" -> require(ctx, Type.INT, type);
                 case "+" -> { if (type != Type.TEXT) numeric(ctx, type); }
                 default -> numeric(ctx, type);
             }
@@ -752,6 +756,13 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             } else if ((operator.equals("/") || operator.equals("%")) && result.type == Type.INT) {
                 // A helper gives constant-zero division the same runtime behavior as dynamic division.
                 java = "BhashRuntime." + (operator.equals("/") ? "divide" : "remainder") + "(" + result.java + "," + right.java + ")";
+            } else if (Set.of("<<", ">>", ">>>").contains(operator)) {
+                String helper = switch (operator) {
+                    case "<<" -> "shiftLeft";
+                    case ">>" -> "shiftRight";
+                    default -> "shiftUnsigned";
+                };
+                java = "BhashRuntime." + helper + "(" + result.java + "," + right.java + ")";
             } else java = "(" + result.java + " " + operator + " " + right.java + ")";
             if (target == Target.CLR && type == Type.INT && Set.of("+", "-", "*").contains(operator))
                 java = "unchecked(" + java + ")";
@@ -768,6 +779,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (op.equals("-") && magnitude.matches("[0-9०-९]+")) return integer(ctx, "-" + digits(magnitude));
         var value = visit(ctx.unary());
         if (op.equals("!")) require(ctx, Type.BOOL, value.type);
+        else if (op.equals("~")) require(ctx, Type.INT, value.type);
         else numeric(ctx, value.type);
         String code = "(" + op + "(" + value.java + "))";
         if (target == Target.CLR && value.type == Type.INT) code = "unchecked(" + code + ")";

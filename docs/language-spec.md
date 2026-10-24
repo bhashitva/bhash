@@ -1,6 +1,6 @@
-# Bhash / भाष — v0.5 language definition
+# Bhash / भाष — v0.6 language definition
 
-Status: v0.5 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
+Status: v0.6 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
 uses checked C# source lowering. The browser target reuses CLR lowering with the
@@ -114,13 +114,17 @@ Precedence, highest to lowest; binary operators associate left to right:
 | Level | Operators | Meaning |
 | --- | --- | --- |
 | 1 | `(...)`, named function calls | Grouping / invocation |
-| 2 | `!`, unary `-`, unary `+` | Boolean negation / numeric sign |
+| 2 | `!`, `~`, unary `-`, unary `+` | Boolean negation / bitwise complement / numeric sign |
 | 3 | `*`, `/`, `%` | Multiply / divide / remainder |
 | 4 | `+`, `-` | Add / subtract |
-| 5 | `<`, `<=`, `>`, `>=` | Numeric comparison |
-| 6 | `==`, `!=` | Value equality |
-| 7 | `&&` | Short-circuit AND |
-| 8 | `||` | Short-circuit OR |
+| 5 | `<<`, `>>`, `>>>` | Left / arithmetic right / logical right shift |
+| 6 | `<`, `<=`, `>`, `>=` | Numeric comparison |
+| 7 | `==`, `!=` | Value equality |
+| 8 | `&` | Bitwise AND |
+| 9 | `^` | Bitwise XOR |
+| 10 | `\|` | Bitwise OR |
+| 11 | `&&` | Short-circuit AND |
+| 12 | `\|\|` | Short-circuit OR |
 
 - No implicit integer/real conversion in v0.3. Numeric binary operands must have
   the same type; conversion functions can be designed later.
@@ -130,6 +134,12 @@ Precedence, highest to lowest; binary operators associate left to right:
 - Integer arithmetic wraps in two's complement. Integer division truncates
   toward zero; remainder has the dividend's sign. Division/remainder by zero
   terminates with a runtime error. MIN / −1 yields MIN; MIN % −1 yields zero.
+- `&`, `|`, `^`, `~`, `<<`, `>>` and `>>>` accept integers only. Bitwise results
+  preserve 64-bit two's-complement representation. Shift distance is `count & 63`,
+  including negative and wide counts. `>>` sign-extends; `>>>` zero-fills, while
+  retaining a signed result (a zero-distance shift preserves its input).
+  Shift characters must be adjacent. Nested generic closers remain supported.
+  See [bitwise rules and the bitboard example](bitwise.md).
 - Real operations use binary64; division by zero and NaN follow IEEE 754.
   `%` is integer-only. Native backends must avoid unsafe fast-math assumptions.
 - `&&` and `||` evaluate the right operand only when needed. Other operands

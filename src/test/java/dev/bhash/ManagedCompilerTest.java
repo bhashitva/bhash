@@ -17,6 +17,83 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class ManagedCompilerTest {
+    @Test void bitboardExamplePreservesAll64BitsAndRunsOnBothManagedTargets() throws Exception {
+        var result = run(compile(Files.readString(Path.of("examples/bitboards.bhash"))),"");
+        assertEquals(0,result.exit);
+        assertEquals("-९२२३३७२०३६८५४७७५८०७\nसत्य सत्य\n२\n१ १\n-१ -१ ९२२३३७२०३६८५४७७५८०७\n१ २\n",result.output);
+    }
+    @Test void shiftsMaskWideAndNegativeCountsAndMatch64BitReferenceValues() throws Exception {
+        var source = new StringBuilder("कार्य जांच(मानक: पूर्णांक, गिनती: पूर्णांक) -> शून्य { लिखो(मानक << गिनती, मानक >> गिनती, मानक >>> गिनती, मानक & गिनती, मानक | गिनती, मानक ^ गिनती, ~मानक); } कार्य मुख्य() -> शून्य {");
+        var expected = new StringBuilder();
+        for (long value : new long[]{0,1,-1,Long.MIN_VALUE,Long.MAX_VALUE,0x0123456789abcdefL}) {
+            for (long count : new long[]{0,1,31,32,63,64,65,-1,-64,Long.MAX_VALUE,Long.MIN_VALUE}) {
+                source.append("जांच(").append(value).append(',').append(count).append(");");
+                int distance = (int)(count & 63);
+                expected.append(value << distance).append(' ').append(value >> distance).append(' ').append(value >>> distance)
+                        .append(' ').append(value & count).append(' ').append(value | count).append(' ').append(value ^ count)
+                        .append(' ').append(~value).append('\n');
+            }
+        }
+        source.append('}');
+        var result = run(compile(source.toString()),"");
+        assertEquals(0,result.exit);
+        assertEquals(devanagari(expected.toString()),result.output);
+    }
+    private static String devanagari(String ascii) {
+        var text = new StringBuilder();
+        for (char c : ascii.toCharArray()) text.append(c>='0' && c<='9' ? (char)('०'+c-'0') : c);
+        return text.toString();
+    }
+    @Test void bitwisePrecedenceAssociativityAndEagerEvaluationArePortable() throws Exception {
+        var result = run(compile("""
+                कार्य अंक(मानक: पूर्णांक) -> पूर्णांक { लिखो(मानक); लौटाओ मानक; }
+                कार्य मुख्य() -> शून्य {
+                    लिखो(१ | २ ^ ३ & १, १ + १ << २ + १, ३२ >> १ >> २, ~१ + ३ * २);
+                    लिखो((३ & १) == १ && (४ | १) == ५, १ << २ < ५, ८ >> १ == ४);
+                    लिखो(० & अंक(१), -१ | अंक(२), ० ^ अंक(३));
+                    लिखो(अंक(३) << अंक(१));
+                    लिखो(१ << ६३ >>> ६३, -१ >>> ६४, १ << -१);
+                    स्थिर क: पूर्णांक = ०;
+                    स्थिर ख: पूर्णांक = ८;
+                    लिखो(क < ख >> १, क < ख >>> १, क < ख << १);
+                }
+                """),"");
+        assertEquals(0,result.exit);
+        assertEquals("३ १६ ४ ४\nसत्य सत्य सत्य\n१\n२\n३\n० -१ ३\n३\n१\n६\n१ -१ -९२२३३७२०३६८५४७७५८०८\nसत्य सत्य सत्य\n",result.output);
+    }
+    @Test void bitwiseOperatorsWorkAcrossFilesGenericExpansionAndNestedGenericClosers() throws Exception {
+        var sources = List.of(new dev.bhash.frontend.SourceFile("bits.bhash","""
+                संकुल बिट;
+                सार्वजनिक वर्ग पात्र<त> {
+                    साझा स्थिर उच्च: पूर्णांक = १ << ६३;
+                    साझा कार्य लो() -> पूर्णांक { लौटाओ उच्च >>> ६३; }
+                }
+                सार्वजनिक कार्य सरकाओ<त>(मानक: त) -> त { लौटाओ मानक << १; }
+                """),new dev.bhash.frontend.SourceFile("main.bhash","""
+                आयात बिट.पात्र;
+                आयात बिट.सरकाओ;
+                कार्य मुख्य() -> शून्य {
+                    स्थिर वस्तु: पात्र<पात्र<पूर्णांक>> = नया पात्र<पात्र<पूर्णांक>>();
+                    लिखो(पात्र<पात्र<पूर्णांक>>.लो(), सरकाओ<पूर्णांक>(३));
+                    लिखो(बिट.पात्र<पात्र<पूर्णांक>>.उच्च >> ६३);
+                }
+                """));
+        Path output = directory.resolve(clr() ? "bitwise-project-clr" : "bitwise-project.jar");
+        if (clr()) new ClrCompiler().compile(sources,output); else new JvmCompiler().compile(sources,output);
+        var result = run(clr() ? output.resolve("BhashProgram.dll") : output,"");
+        assertEquals(0,result.exit);
+        assertEquals("१ ६\n-१\n",result.output);
+    }
+    @Test void bitwiseOperatorsRejectBooleansRealsTextReferencesAndWrongGenericArguments() {
+        for (String operator : List.of("&","|","^","<<",">>",">>>")) {
+            for (String operands : List.of("सत्य OP असत्य","१.० OP २.०","१ OP सत्य","१ OP १.०","\"अ\" OP \"ब\"","रिक्त OP रिक्त"))
+                reject("कार्य मुख्य() -> शून्य { लिखो("+operands.replace("OP",operator)+"); }","Expected");
+        }
+        for (String operand : List.of("सत्य","१.०","\"अ\"","रिक्त"))
+            reject("कार्य मुख्य() -> शून्य { लिखो(~"+operand+"); }","Expected");
+        reject("कार्य मुख्य() -> शून्य { लिखो(१ & १ == १); }","Expected");
+        reject("कार्य गलत<त>(मानक: त) -> त { लौटाओ मानक << १; } कार्य मुख्य() -> शून्य { गलत<पाठ>(\"अ\"); }","Expected");
+    }
     @Test void multiFileProjectRunsWithImportsGenericsOverloadsAndSharedObjectIdentity() throws Exception {
         var sources = dev.bhash.frontend.ProjectLoader.load(Path.of("examples/multi-file")).sources();
         Path output = directory.resolve(clr() ? "project-clr" : "project.jar");

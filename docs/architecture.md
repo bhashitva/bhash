@@ -143,6 +143,21 @@ breaks. A break-target stack distinguishes loops from selections; native continu
 still target the enclosing loop. Each section has a separate scope and contributes to shared
 return/reachability analysis. See [selection rules](switch.md).
 
+## Bitwise lowering
+
+Integer-only bitwise AND, OR, XOR and complement lower to host 64-bit integer
+operations. Shift helpers mask the original 64-bit count with 63 before narrowing
+it, explicitly implementing left shift, sign-preserving right shift and zero-fill
+right shift. CLR zero-fill uses an unchecked `ulong` reinterpretation and converts
+back to signed `long`, including at distance zero. Browser WASM uses the same CLR
+runtime helpers. Helper calls preserve once-only left-to-right operand evaluation.
+
+ANTLR retains individual `<` and `>` tokens so nested generic closing brackets do
+not turn into shift tokens. A parser rule checks that the characters of expression
+shifts are contiguous. Both package lowering and generic expansion render a shift
+operator as one joined spelling before reparsing. Source-token remapping continues
+to preserve the originating filename and coordinates. See [bitwise rules](bitwise.md).
+
 ## Target status
 
 | Target | Status | Route |

@@ -104,6 +104,23 @@ See [project commands and v0.5 package rules](docs/projects-packages.md) for det
 Existing single-file commands continue to work. External library distribution and
 Java/.NET library interoperability remain planned.
 
+## Bitwise operations and chess bitboards
+
+Bhash v0.6 supports `&`, `|`, `^`, `~`, `<<`, `>>` and `>>>` on 64-bit
+`पूर्णांक` values across JVM, CLR and browser WebAssembly. Right shift `>>`
+preserves the sign; `>>>` fills with zeroes. Shift counts use their low six bits.
+
+After pulling the changes, rebuild the compiler to update the JAR:
+
+```bash
+git pull --ff-only
+mvn clean package -DskipTests
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/bitboards.bhash
+```
+
+See [operator rules and examples](docs/bitwise.md) for precedence, shift counts,
+generic parsing and CLR/browser commands.
+
 ## The program
 
 ```text

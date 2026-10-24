@@ -279,6 +279,11 @@ public final class ProjectResolver {
     }
     private void render(ParseTree node, Unit unit, StringBuilder text, NavigableMap<Integer,Token> origins) throws CompilationException {
         if (node instanceof PackageDeclContext || node instanceof ImportDeclContext) return;
+        if (node instanceof ShiftOperatorContext operator) {
+            origins.put(text.length(),operator.start);
+            text.append(operator.getText()).append(' ');
+            return;
+        }
         if (node instanceof TerminalNode t) {
             Token token = t.getSymbol();
             if (token.getType()==Token.EOF || unit.removed.contains(token.getTokenIndex())) return;

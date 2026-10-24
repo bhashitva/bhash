@@ -1,8 +1,33 @@
 // SPDX-License-Identifier: Apache-2.0
-// Bhash (भाष) v0.5 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
+// Bhash (भाष) v0.6 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
+
+@parser::members {
+    // Keep angle brackets separate for nested generics, but require contiguous shift characters.
+    private boolean adjacentShift(int count) {
+        for (int i = 1; i < count; i++)
+            if (_input.LT(i).getStopIndex() + 1 != _input.LT(i + 1).getStartIndex()) return false;
+        return true;
+    }
+    // Expression type arguments must lead to a call or static receiver. Otherwise
+    // a < b >> count is a comparison with a shift, rather than a<b> > count.
+    private boolean genericPrimaryAhead() {
+        if (_input.LA(1) != LT) return false;
+        int depth = 0;
+        for (int i = 1; ; i++) {
+            int token = _input.LA(i);
+            if (token == EOF) return false;
+            if (token == LT) depth++;
+            else if (token == GT) {
+                if (--depth == 0) return _input.LA(i + 1) == LPAREN || _input.LA(i + 1) == DOT;
+            } else if (token != IDENTIFIER && token != COMMA && token != DOT
+                    && token != INT_TYPE && token != REAL_TYPE && token != BOOL_TYPE && token != TEXT_TYPE)
+                return false;
+        }
+    }
+}
 
 program : packageDecl? importDecl* (PUBLIC? (functionDecl | classDecl | interfaceDecl))* EOF ;
 packageDecl : PACKAGE qualifiedName SEMI ;
@@ -49,14 +74,23 @@ arguments : expression (COMMA expression)* ;
 // Layered rules make precedence and left associativity explicit.
 expression : logicalOr ;
 logicalOr : logicalAnd (OR logicalAnd)* ;
-logicalAnd : equality (AND equality)* ;
+logicalAnd : bitwiseOr (AND bitwiseOr)* ;
+bitwiseOr : bitwiseXor (BIT_OR bitwiseXor)* ;
+bitwiseXor : bitwiseAnd (BIT_XOR bitwiseAnd)* ;
+bitwiseAnd : equality (BIT_AND equality)* ;
 equality : comparison ((EQ | NE) comparison)* ;
-comparison : additive ((LT | LE | GT | GE) additive)* ;
+comparison : shift ((LT | LE | GT | GE) shift)* ;
+shift : additive (shiftOperator additive)* ;
+shiftOperator
+    : {adjacentShift(2)}? LT LT
+    | {adjacentShift(3)}? GT GT GT
+    | {adjacentShift(2)}? GT GT
+    ;
 additive : multiplicative ((PLUS | MINUS) multiplicative)* ;
 multiplicative : unary ((STAR | SLASH | PERCENT) unary)* ;
-unary : (NOT | MINUS | PLUS) unary | postfix ;
+unary : (NOT | BIT_NOT | MINUS | PLUS) unary | postfix ;
 postfix : primary postfixPart* ;
-postfixPart : DOT IDENTIFIER typeArguments? (LPAREN arguments? RPAREN)? ;
+postfixPart : DOT IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)? ;
 primary
     : INTEGER_LITERAL
     | REAL_LITERAL
@@ -67,7 +101,7 @@ primary
     | THIS
     | BASE
     | NEW valueType LPAREN arguments? RPAREN
-    | IDENTIFIER typeArguments? (LPAREN arguments? RPAREN)?
+    | IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)?
     | LPAREN expression RPAREN
     ;
 
@@ -113,6 +147,7 @@ FALSE : 'असत्य' ;
 ARROW : '->' ;
 EQ : '==' ; NE : '!=' ; LE : '<=' ; GE : '>=' ;
 AND : '&&' ; OR : '||' ; NOT : '!' ;
+BIT_AND : '&' ; BIT_OR : '|' ; BIT_XOR : '^' ; BIT_NOT : '~' ;
 LT : '<' ; GT : '>' ; ASSIGN : '=' ;
 PLUS : '+' ; MINUS : '-' ; STAR : '*' ; SLASH : '/' ; PERCENT : '%' ;
 LPAREN : '(' ; RPAREN : ')' ; LBRACE : '{' ; RBRACE : '}' ;

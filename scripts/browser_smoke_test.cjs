@@ -21,8 +21,40 @@ function compile(name, source) {
     build(name, file);
 }
 build('multi-file', path.resolve('examples/multi-file'));
-for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics', 'switch-console'])
+for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics', 'switch-console', 'bitboards'])
     compile(name, fs.readFileSync(`examples/${name}.bhash`, 'utf8'));
+// A separate BigInt reference models the Bhash 64-bit contract, including zero-distance >>>.
+const bitwiseValues = [0n, 1n, -1n, -(1n << 63n), (1n << 63n) - 1n, 0x0123456789abcdefn];
+const bitwiseCounts = [0n, 1n, 31n, 32n, 63n, 64n, 65n, -1n, -64n, (1n << 63n) - 1n, -(1n << 63n)];
+const bitwiseCalls = [];
+let bitwiseExpected = '३ १६ ४ ४\nसत्य सत्य सत्य\n१\n२\n३\n० -१ ३\n३\n१\n६\n';
+for (const value of bitwiseValues) for (const count of bitwiseCounts) {
+    bitwiseCalls.push(`जांच(${value},${count});`);
+    const distance = count & 63n;
+    const result = [BigInt.asIntN(64, value << distance), value >> distance,
+        BigInt.asIntN(64, BigInt.asUintN(64, value) >> distance), value & count, value | count, value ^ count, ~value];
+    bitwiseExpected += result.map(String).join(' ').replace(/[0-9]/g, c => '०१२३४५६७८९'[Number(c)]) + '\n';
+}
+bitwiseExpected += '१ ६\nसत्य सत्य सत्य\n';
+compile('bitwise-semantics', `
+वर्ग पात्र<त> { साझा कार्य लो() -> पूर्णांक { लौटाओ १ << ६३ >>> ६३; } }
+कार्य दोगुना<त>(मानक: त) -> त { लौटाओ मानक << १; }
+कार्य अंक(मानक: पूर्णांक) -> पूर्णांक { लिखो(मानक); लौटाओ मानक; }
+कार्य जांच(मानक: पूर्णांक, गिनती: पूर्णांक) -> शून्य {
+    लिखो(मानक << गिनती, मानक >> गिनती, मानक >>> गिनती, मानक & गिनती, मानक | गिनती, मानक ^ गिनती, ~मानक);
+}
+कार्य मुख्य() -> शून्य {
+    लिखो(१ | २ ^ ३ & १, १ + १ << २ + १, ३२ >> १ >> २, ~१ + ३ * २);
+    लिखो((३ & १) == १ && (४ | १) == ५, १ << २ < ५, ८ >> १ == ४);
+    लिखो(० & अंक(१), -१ | अंक(२), ० ^ अंक(३));
+    लिखो(अंक(३) << अंक(१));
+    ${bitwiseCalls.join('\n')}
+    लिखो(पात्र<पात्र<पूर्णांक>>.लो(), दोगुना<पूर्णांक>(३));
+    स्थिर क: पूर्णांक = ०;
+    स्थिर ख: पूर्णांक = ८;
+    लिखो(क < ख >> १, क < ख >>> १, क < ख << १);
+}
+`);
 compile('semantics', `
 वर्ग आधारवर्ग { कार्य मूल्य() -> पूर्णांक { लौटाओ १; } }
 वर्ग उपवर्ग विस्तार आधारवर्ग { अधिलेखन कार्य मूल्य() -> पूर्णांक { लौटाओ २; } }
@@ -54,6 +86,8 @@ function rejectedBuild(source) {
     assert.equal(fs.readFileSync(outputIndex, 'utf8'), originalIndex);
 }
 rejectedBuild('कार्य');
+for (const expression of ['सत्य & असत्य', '१ << सत्य', '~१.०'])
+    rejectedBuild(`कार्य मुख्य() -> शून्य { लिखो(${expression}); }`);
 const note = path.join(root, 'semantics/_framework/notes.txt');
 fs.writeFileSync(note, 'keep me');
 rejectedBuild(semanticsSource);
@@ -134,6 +168,8 @@ const server = http.createServer((request, response) => {
             for (const input of ['', '1२', 'abc', '9223372036854775808'])
                 await run(name, input, prompt, 1, 'भाष:');
         }
+        await run('bitboards', '', '-९२२३३७२०३६८५४७७५८०७\nसत्य सत्य\n२\n१ १\n-१ -१ ९२२३३७२०३६८५४७७५८०७\n१ २\n');
+        await run('bitwise-semantics', '', bitwiseExpected);
         await run('static-error', '', '', 1, 'शून्य से भाग');
         await run('multi-file', '५', '० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १२०\nसत्य १\nसंख्या ठीक\n');
         await run('multi-file', '0', '० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १\nसत्य १\nसंख्या ठीक\n');

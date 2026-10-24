@@ -38,6 +38,7 @@ _, errors = invoke(["java", "-jar", str(compiler), "run", "examples/factorial-co
 assert "भाष:" in errors, errors
 for target in ("jvm", "clr"):
     for example, expected, stdin in [
+        ("bitboards", "-९२२३३७२०३६८५४७७५८०७\nसत्य सत्य\n२\n१ १\n-१ -१ ९२२३३७२०३६८५४७७५८०७\n१ २\n", ""),
         ("objects", "मनोज १५० १५ १६५\n", ""),
         ("switch-console", "एक पूर्णांक लिखें:\nएक या दो\n१ या २ मिला\n", "१\n"),
         ("contracts-generics", "पूर्णांक: २१\nपाठ: नमस्ते\nपात्र ४२ ३.०\n१ १ १००\n", ""),

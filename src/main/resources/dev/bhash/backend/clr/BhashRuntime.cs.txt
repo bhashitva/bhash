@@ -132,6 +132,11 @@ internal static class BhashRuntime {
         foreach (int cp in scalars) result.Append(char.ConvertFromUtf32(cp));
         return result.ToString();
     }
+    // Explicit unsigned reinterpretation gives zero-fill right shifts on every CLR target.
+    internal static long shiftLeft(long value, long count) => unchecked(value << (int)(count & 63L));
+    internal static long shiftRight(long value, long count) => value >> (int)(count & 63L);
+    internal static long shiftUnsigned(long value, long count) => unchecked((long)((ulong)value >> (int)(count & 63L)));
+
     internal static long divide(long left, long right) {
         if (right == 0) throw new Failure("शून्य से भाग देना संभव नहीं है।");
         return left == long.MinValue && right == -1 ? long.MinValue : left / right;

@@ -73,6 +73,11 @@ final class BhashRuntime {
         return result.toString();
     }
 
+    // Mask a 64-bit Bhash count before narrowing it to the host shift-count type.
+    static long shiftLeft(long value, long count) { return value << (int)(count & 63L); }
+    static long shiftRight(long value, long count) { return value >> (int)(count & 63L); }
+    static long shiftUnsigned(long value, long count) { return value >>> (int)(count & 63L); }
+
     static long divide(long left, long right) {
         if (right == 0) throw new Failure("शून्य से भाग देना संभव नहीं है।");
         return left / right;

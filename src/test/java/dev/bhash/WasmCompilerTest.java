@@ -29,6 +29,15 @@ class WasmCompilerTest {
         assertTrue(error.getMessage().contains("Expected पुस्तक.वस्तु"),error.getMessage());
         assertFalse(Files.exists(directory.resolve("web")));
     }
+    @Test void invalidBitwiseOperandsFailBeforeBrowserPublishing() {
+        for (String expression : new String[]{"सत्य & असत्य", "सत्य | असत्य", "सत्य ^ असत्य", "१ << सत्य", "१ >> १.०", "१ >>> \"अ\"", "~रिक्त"}) {
+            var error = assertThrows(CompilationException.class,()->new WasmCompiler().compile("bits.bhash",
+                    "कार्य मुख्य() -> शून्य { लिखो("+expression+"); }",directory.resolve("web")));
+            assertTrue(error.getMessage().contains("Expected"),error.getMessage());
+            assertTrue(error.getMessage().startsWith("bits.bhash:1:"),error.getMessage());
+        }
+        assertFalse(Files.exists(directory.resolve("web")));
+    }
     @Test void refusesUnmanagedOutputAndSourceDirectories() throws Exception {
         var compiler = new WasmCompiler();
         Files.writeString(directory.resolve("notes.txt"), "keep");
