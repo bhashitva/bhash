@@ -25,6 +25,7 @@ jobs:
           docker exec playground curl -fsS http://localhost:8080/api/health
           docker exec playground sh -c 'test "$(id -u)" = 10001'
           docker exec playground sh -c 'mkdir -p /tmp/test; printf "कार्य मुख्य() -> शून्य { लिखो(१); }" > /tmp/test/main.bhash; java -jar /opt/bhash/compiler.jar compile /tmp/test/main.bhash --target wasm-browser -o /tmp/test/web'
+          docker exec playground sh -c 'printf "कार्य मुख्य() -> शून्य { लिखो(अज्ञात); }" > /tmp/test/invalid.bhash; if java -jar /opt/bhash/compiler.jar compile /tmp/test/invalid.bhash --target wasm-browser -o /tmp/test/invalid-web > /tmp/test/diagnostic.txt 2>&1; then exit 1; fi; grep -F "अज्ञात" /tmp/test/diagnostic.txt'
       - name: Container logs
         if: always()
         run: docker logs playground || true
