@@ -23,7 +23,7 @@ final class SourceIndex {
     final Map<Integer,String> typeReferences = new HashMap<>(), importReferences = new HashMap<>();
 
     SourceIndex(SourceFile source) {
-        uri = java.nio.file.Path.of(source.name()).toUri().toString();
+        uri = java.nio.file.Path.of(source.name()).toUri().toASCIIString();
         text = source.text(); coordinates = new TextCoordinates(text);
         var parsed = source.parse();
         var tree = parsed.tree();

@@ -143,7 +143,7 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
                 var projectDiagnostics=new LinkedHashMap<String,List<Diagnostic>>();
                 var indexes=new LinkedHashMap<String,SourceIndex>();boolean syntaxValid=true;
                 for(var source:project.sources()) {
-                    String uri=Path.of(source.name()).toUri().toString();var parsed=source.parse();var coords=new TextCoordinates(source.text());
+                    String uri=Path.of(source.name()).toUri().toASCIIString();var parsed=source.parse();var coords=new TextCoordinates(source.text());
                     var list=projectDiagnostics.computeIfAbsent(uri,k->new ArrayList<>());
                     for(var error:parsed.diagnostics())list.add(error(coords.diagnostic(error.line(),error.column()),error.message()));
                     syntaxValid &= parsed.valid();
@@ -153,7 +153,7 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
                 catch(CompilationException invalid){semanticErrors(invalid.getMessage(),project.sources(),projectDiagnostics,input);}
                 fresh.put(input,new ProjectState(input,project.sources(),indexes,projectDiagnostics));diagnostics.putAll(projectDiagnostics);
             } catch(IOException | IllegalArgumentException error) {
-                diagnostics.computeIfAbsent(input.toUri().toString(),k->new ArrayList<>()).add(error(new Range(new Position(0,0),new Position(0,0)),error.getMessage()));
+                diagnostics.computeIfAbsent(input.toUri().toASCIIString(),k->new ArrayList<>()).add(error(new Range(new Position(0,0),new Position(0,0)),error.getMessage()));
             } catch(RuntimeException error) {log("Analysis failed for "+input+": "+error);}
         }
         if(version!=revision.get())return;
@@ -167,9 +167,9 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
             boolean located=false;
             for(var source:sources)if(line.startsWith(source.name()+":")) {
                 var matcher=java.util.regex.Pattern.compile("^(\\d+):(\\d+): (.*)$").matcher(line.substring(source.name().length()+1));
-                if(matcher.matches()) {var coords=new TextCoordinates(source.text());diagnostics.computeIfAbsent(Path.of(source.name()).toUri().toString(),k->new ArrayList<>()).add(error(coords.diagnostic(Integer.parseInt(matcher.group(1)),Integer.parseInt(matcher.group(2))),matcher.group(3)));located=true;break;}
+                if(matcher.matches()) {var coords=new TextCoordinates(source.text());diagnostics.computeIfAbsent(Path.of(source.name()).toUri().toASCIIString(),k->new ArrayList<>()).add(error(coords.diagnostic(Integer.parseInt(matcher.group(1)),Integer.parseInt(matcher.group(2))),matcher.group(3)));located=true;break;}
             }
-            if(!located)diagnostics.computeIfAbsent(fallback.toUri().toString(),k->new ArrayList<>()).add(error(new Range(new Position(0,0),new Position(0,0)),line));
+            if(!located)diagnostics.computeIfAbsent(fallback.toUri().toASCIIString(),k->new ArrayList<>()).add(error(new Range(new Position(0,0),new Position(0,0)),line));
         }
     }
     private static Diagnostic error(Range range,String message) {var d=new Diagnostic(range,message,DiagnosticSeverity.Error,"bhash");return d;}
@@ -178,28 +178,28 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
         // A request after an edit observes that edit, even before the debounce timer fires.
         if(pending!=null&&!pending.isDone()){pending.cancel(false);analyze(revision.get(),false);}
         Path file=path(uri);if(file==null)return null;
-        return projects.values().stream().filter(p->p.indexes.containsKey(file.toUri().toString())).findFirst().orElse(null);
+        return projects.values().stream().filter(p->p.indexes.containsKey(file.toUri().toASCIIString())).findFirst().orElse(null);
     }
     @org.eclipse.lsp4j.jsonrpc.services.JsonRequest("bhash/projectInput")
     public CompletableFuture<String> projectInput(TextDocumentIdentifier document) {
         return submit(()->{Path file=path(document.getUri());return file==null?null:input(file).toString();});
     }
     @Override public CompletableFuture<Either<List<CompletionItem>,CompletionList>> completion(CompletionParams params) {
-        return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toString());
+        return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
             return Either.forLeft(index==null?List.of():index.completions(params.getPosition(),project.indexes.values()));});
     }
     @Override public CompletableFuture<Either<List<? extends Location>,List<? extends LocationLink>>> definition(DefinitionParams params) {
-        return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toString());
+        return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
             return Either.forLeft(index==null?List.of():index.resolve(params.getPosition(),project.indexes.values()).stream().map(SourceIndex.Symbol::location).toList());});
     }
     @Override public CompletableFuture<Hover> hover(HoverParams params) {
-        return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toString());if(index==null)return null;
+        return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());if(index==null)return null;
             var symbols=index.resolve(params.getPosition(),project.indexes.values());if(symbols.isEmpty())return null;
             String text=String.join("\n\n",symbols.stream().map(s->"```bhash\n"+(s.detail().isBlank()?s.name():s.detail())+"\n```\n\n"+s.qualified()).distinct().toList());
             return new Hover(new MarkupContent(MarkupKind.MARKDOWN,text));});
     }
     @Override public CompletableFuture<List<Either<SymbolInformation,DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
-        return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toString());
+        return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
             return index==null?List.of():index.outline.stream().map(s->Either.<SymbolInformation,DocumentSymbol>forRight(s)).toList();});
     }
     @Override public CompletableFuture<Either<List<? extends SymbolInformation>,List<? extends WorkspaceSymbol>>> symbol(WorkspaceSymbolParams params) {
