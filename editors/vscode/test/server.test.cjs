@@ -35,6 +35,9 @@ test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode position
     lsp.send('textDocument/didOpen',{textDocument:{...document,languageId:'bhash',version:1,text:program}});
     const diagnostic=async(file,version,predicate)=>lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&m.params.uri===uri(file)&&(version===undefined||m.params.version===version)&&predicate(m.params.diagnostics));
     await diagnostic(main,1,ds=>ds.length===0);
+    assert.equal(await lsp.request('bhash/projectInput',document),path.join(a,'bhash.project'));
+    const outside=path.join(a,'outside.bhash');await fs.writeFile(outside,'वर्ग अलग {}');
+    assert.equal(await lsp.request('bhash/projectInput',{uri:uri(outside)}),outside);
     const defs=await lsp.request('textDocument/definition',{textDocument:document,position:position(program,'दो(३)')});
     assert.equal(defs.length,1);assert.equal(defs[0].uri,uri(lib));assert.equal(defs[0].range.start.line,2);
     const completion=await lsp.request('textDocument/completion',{textDocument:document,position:position(program,'दो(३)')});

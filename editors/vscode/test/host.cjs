@@ -6,8 +6,9 @@ exports.run=async()=>{
     const document=await vscode.workspace.openTextDocument(uri);await vscode.window.showTextDocument(document);
     assert.equal(document.languageId,'bhash');const extension=vscode.extensions.getExtension('bhashitva.bhash');assert.ok(extension);await extension.activate();
     const position=new vscode.Position(2,document.lineAt(2).text.indexOf("दोहरा"));
-    const completion=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,position),list=>list?.items?.some(i=>String(typeof i.label==='string'?i.label:i.label.label).startsWith('स्थिर')),'compiler keyword completion');
-    assert.ok(completion.items.some(i=>i.label==='दोहरा'));
+    const label=item=>typeof item.label==='string'?item.label:item.label.label;
+    const completion=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,position),list=>list?.items?.some(i=>label(i)==='दोहरा'),'compiler keyword completion');
+    assert.ok(completion.items.some(i=>label(i).startsWith('स्थिर')));
     const definition=await vscode.commands.executeCommand('vscode.executeDefinitionProvider',uri,position);
     assert.ok(definition.some(location=>location.uri?.fsPath===path.join(workspace,'src','math.bhash')),'cross-file definition');
     const outline=await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider',uri);assert.ok(outline.some(symbol=>symbol.name==='मुख्य'));

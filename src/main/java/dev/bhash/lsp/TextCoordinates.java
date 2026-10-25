@@ -31,6 +31,7 @@ final class TextCoordinates {
         int start = offset(new Position(Math.max(0,line - 1),0));
         int end = text.indexOf('\n',start);
         if (end < 0) end = text.length();
+        if (end > start && text.charAt(end - 1) == '\r') end--;
         int index = text.offsetByCodePoints(start,Math.min(Math.max(0,column - 1),text.codePointCount(start,end)));
         // The parser strips a leading BOM before counting the first line.
         if (line == 1 && text.startsWith("\uFEFF") && index < end) index++;

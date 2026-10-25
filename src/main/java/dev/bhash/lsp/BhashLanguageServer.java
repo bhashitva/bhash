@@ -129,7 +129,8 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
         if(shutdown || version!=revision.get())return;
         var inputs=new LinkedHashSet<Path>();var diagnostics=new LinkedHashMap<String,List<Diagnostic>>();
         if(discover || needsDiscovery)try{inputs.addAll(discover());}catch(IOException e){log("Workspace discovery: "+e.getMessage());}
-        inputs.addAll(projects.keySet());for(Path file:buffers.keySet())inputs.add(input(file));
+        for(Path existing:projects.keySet())inputs.add(input(existing));
+        for(Path file:buffers.keySet())inputs.add(input(file));
         var overlays=new HashMap<Path,String>();buffers.forEach((p,b)->overlays.put(p,b.text));
         var fresh=new LinkedHashMap<Path,ProjectState>();
         for(Path input:inputs) {
