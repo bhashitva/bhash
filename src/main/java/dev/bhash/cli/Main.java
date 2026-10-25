@@ -16,7 +16,13 @@ import java.nio.file.Path;
 
 public final class Main {
     private Main() {}
-    public static void main(String[] args) { System.exit(run(args, System.out, System.err)); }
+    public static void main(String[] args) {
+        if (args.length == 1 && args[0].equals("language-server")) {
+            dev.bhash.lsp.BhashLanguageServer.main(args);
+            return;
+        }
+        System.exit(run(args, System.out, System.err));
+    }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
         if (args.length == 1 && args[0].equals("targets")) {
@@ -68,6 +74,7 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser]");
         err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr]");
         err.println("       java -jar bhash-compiler.jar targets");
+        err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
         err.println("check validates syntax only; compile/run also validate names, types and control flow.");
         return 2;

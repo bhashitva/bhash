@@ -1,0 +1,37 @@
+name: Bhash VS Code extension
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  extension:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      - run: npm run build --prefix editors/vscode
+      - run: npm test --prefix editors/vscode
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:integration --prefix editors/vscode
+      - if: runner.os == 'Windows'
+        run: npm run test:integration --prefix editors/vscode
+      - run: npm run package --prefix editors/vscode
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bhash-vscode-${{ runner.os }}
+          path: target/bhash-vscode-0.1.0.vsix
+          if-no-files-found: error

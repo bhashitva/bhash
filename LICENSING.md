@@ -26,7 +26,11 @@ for your own application code.
 Third-party code is not relicensed by this project. The compiler includes the ANTLR
 4.13.2 runtime under BSD-3-Clause; its copyright and full terms are preserved in
 [THIRD_PARTY_NOTICES.md](https://github.com/bhashitva/bhash/blob/main/THIRD_PARTY_NOTICES.md) and `META-INF/LICENSE-antlr.txt`.
-Generated Bhash applications do not include ANTLR.
+The compiler/language server also includes Eclipse LSP4J and JSON-RPC 0.24.0
+under the Eclipse Distribution License 1.0 (BSD-3-Clause) option and Gson 2.13.2
+under Apache-2.0. Their notices are in THIRD_PARTY_NOTICES.md. Generated Bhash
+applications do not include ANTLR, LSP4J or Gson. The VS Code extension bundles
+MIT-licensed Microsoft language client libraries with their own notices.
 
 Java/.NET SDKs, runtime distributions and other platform components retain their
 own licenses. Browser WebAssembly bundles include the .NET runtime; preserve the

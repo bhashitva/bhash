@@ -1,0 +1,229 @@
+{
+  "name": "bhash",
+  "displayName": "Bhash (भाष)",
+  "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
+  "version": "0.1.0",
+  "publisher": "bhashitva",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bhashitva/bhash.git",
+    "directory": "editors/vscode"
+  },
+  "homepage": "https://github.com/bhashitva/bhash/tree/main/editors/vscode",
+  "bugs": {
+    "url": "https://github.com/bhashitva/bhash/issues"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "bhash",
+    "Devanagari",
+    "Hindi",
+    "Indic"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:bhash",
+    "onLanguage:bhash-project",
+    "workspaceContains:**/bhash.project",
+    "onTaskType:bhash"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Highlighting and snippets work in Restricted Mode. Trust is required for the Java language server and build/run commands.",
+      "restrictedConfigurations": [
+        "bhash.javaPath",
+        "bhash.compilerPath"
+      ]
+    },
+    "virtualWorkspaces": {
+      "supported": "limited",
+      "description": "Highlighting and snippets are available. Analysis and tasks require files on disk in the local or remote extension host."
+    }
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "bhash",
+        "aliases": [
+          "Bhash",
+          "भाष"
+        ],
+        "extensions": [
+          ".bhash"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "bhash-project",
+        "aliases": [
+          "Bhash Project"
+        ],
+        "filenames": [
+          "bhash.project"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bhash",
+        "scopeName": "source.bhash",
+        "path": "./syntaxes/bhash.tmLanguage.json"
+      },
+      {
+        "language": "bhash-project",
+        "scopeName": "source.bhash-project",
+        "path": "./syntaxes/project.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "bhash",
+        "path": "./snippets/bhash.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "bhash.newProject",
+        "title": "Bhash: New Project"
+      },
+      {
+        "command": "bhash.build",
+        "title": "Bhash: Build Project or File"
+      },
+      {
+        "command": "bhash.run",
+        "title": "Bhash: Run Project or File"
+      },
+      {
+        "command": "bhash.restartServer",
+        "title": "Bhash: Restart Language Server"
+      },
+      {
+        "command": "bhash.openPlayground",
+        "title": "Bhash: Open Browser Playground"
+      }
+    ],
+    "configuration": {
+      "title": "Bhash",
+      "properties": {
+        "bhash.javaPath": {
+          "type": "string",
+          "default": "java",
+          "scope": "machine",
+          "description": "Java 17+ executable on the extension host. A full JDK is required to build/run JVM programs."
+        },
+        "bhash.compilerPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional absolute compiler JAR path. Leave empty to use the compiler bundled with this extension."
+        },
+        "bhash.target": {
+          "type": "string",
+          "enum": [
+            "jvm",
+            "clr",
+            "wasm-browser"
+          ],
+          "default": "jvm",
+          "description": "Default target for build tasks. CLR and browser builds require .NET 10; browser builds also require wasm-tools."
+        },
+        "bhash.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Language server protocol trace in the Bhash output channel. Verbose tracing can include source text."
+        }
+      }
+    },
+    "taskDefinitions": [
+      {
+        "type": "bhash",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "enum": [
+              "build",
+              "run"
+            ]
+          },
+          "project": {
+            "type": "string",
+            "description": "Project directory, bhash.project, or .bhash file, relative to the workspace folder."
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "jvm",
+              "clr",
+              "wasm-browser"
+            ]
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "bhash",
+        "owner": "bhash-build",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+): (.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "message": 4
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "[bhash]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.wordSeparators": "`~!@#$%^&*()-=+[{]}\\|;:'\",.<>/?",
+        "editor.quickSuggestions": {
+          "other": "on",
+          "comments": "off",
+          "strings": "off"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.cjs",
+    "test:integration": "node test/run.cjs",
+    "package": "npm run build && vsce package --no-dependencies -o ../../target/bhash-vscode-0.1.0.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "@types/vscode": "1.95.0",
+    "@vscode/test-electron": "2.5.2",
+    "@vscode/vsce": "3.6.2",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3",
+    "vscode-textmate": "9.2.0",
+    "vscode-oniguruma": "2.0.1"
+  }
+}

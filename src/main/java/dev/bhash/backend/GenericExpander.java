@@ -20,7 +20,7 @@ final class GenericExpander {
     private final String source;
     private final StringBuilder text = new StringBuilder();
     private final NavigableMap<Integer,Token> origins = new TreeMap<>();
-    private int next;
+    private int next, renderedCodePoints;
     private GenericExpander(String source) { this.source = source; }
 
     static ProgramContext expand(String source, ProgramContext program) throws CompilationException {
@@ -119,8 +119,8 @@ final class GenericExpander {
         return result+"[]".repeat(type.arraySuffix().size());
     }
     private void append(String value, Token origin) {
-        origins.put(text.length(),origin);
-        text.append(value).append(' ');
+        origins.put(renderedCodePoints,origin);
+        text.append(value).append(' ');renderedCodePoints+=value.codePointCount(0,value.length())+1;
     }
     private void render(ParseTree node, Map<String,String> subst, Token renamed, String replacement) throws CompilationException {
         if (node instanceof TypeParametersContext) return;

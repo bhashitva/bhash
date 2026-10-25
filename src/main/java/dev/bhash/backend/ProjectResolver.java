@@ -18,6 +18,7 @@ public final class ProjectResolver {
         final Map<String,String> imports = new HashMap<>();
         final Map<Integer,String> replacements = new HashMap<>();
         final Set<Integer> removed = new HashSet<>();
+        int renderedCodePoints;
         Unit(ProgramContext tree) {
             this.tree = tree;
             pkg = tree.packageDecl() == null ? "" : key(tree.packageDecl().qualifiedName().getText());
@@ -315,16 +316,18 @@ public final class ProjectResolver {
     private void render(ParseTree node, Unit unit, StringBuilder text, NavigableMap<Integer,Token> origins) throws CompilationException {
         if (node instanceof PackageDeclContext || node instanceof ImportDeclContext) return;
         if (node instanceof ShiftOperatorContext operator) {
-            origins.put(text.length(),operator.start);
-            text.append(operator.getText()).append(' ');
+            origins.put(unit.renderedCodePoints,operator.start);
+            String value=operator.getText();
+            text.append(value).append(' ');unit.renderedCodePoints+=value.codePointCount(0,value.length())+1;
             return;
         }
         if (node instanceof TerminalNode t) {
             Token token = t.getSymbol();
             if (token.getType()==Token.EOF || unit.removed.contains(token.getTokenIndex())) return;
             if (token.getType()==BhashParser.PUBLIC && t.getParent() instanceof ProgramContext) return;
-            origins.put(text.length(),token);
-            text.append(unit.replacements.getOrDefault(token.getTokenIndex(),token.getText())).append(' ');
+            origins.put(unit.renderedCodePoints,token);
+            String value=unit.replacements.getOrDefault(token.getTokenIndex(),token.getText());
+            text.append(value).append(' ');unit.renderedCodePoints+=value.codePointCount(0,value.length())+1;
         } else {
             if (node instanceof PostfixPartContext part && part.typeArguments()!=null
                     && !unit.removed.contains(part.IDENTIFIER().getSymbol().getTokenIndex()))

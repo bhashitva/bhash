@@ -1,0 +1,1 @@
+{"name":"Bhash Project","scopeName":"source.bhash-project","patterns":[{"name":"comment.line.number-sign.bhash-project","match":"^\\s*[#!].*$"},{"name":"keyword.other.bhash-project","match":"^\\s*(?:name|sources)(?=\\s*[:=])"},{"name":"keyword.operator.assignment.bhash-project","match":"[:=]"}]}

@@ -1,0 +1,18 @@
+{
+  "Main function": {"prefix": ["main", "मुख्य"], "body": ["कार्य मुख्य() -> शून्य {", "    ${0:लिखो(\"नमस्ते, दुनिया!\");}", "}"], "description": "Program entry point · मुख्य"},
+  "Function": {"prefix": ["function", "कार्य"], "body": ["कार्य ${1:नाम}(${2:अंक: पूर्णांक}) -> ${3:शून्य} {", "    $0", "}"], "description": "Typed function"},
+  "Class": {"prefix": ["class", "वर्ग"], "body": ["सार्वजनिक वर्ग ${1:नाम} {", "    सार्वजनिक निर्माता() {", "        $0", "    }", "}"], "description": "Public class with constructor"},
+  "Interface": {"prefix": ["interface", "अनुबंध"], "body": ["सार्वजनिक अनुबंध ${1:नाम} {", "    कार्य ${2:करो}() -> ${3:शून्य};", "}"], "description": "Interface declaration"},
+  "Record": {"prefix": ["record", "अभिलेख"], "body": "सार्वजनिक अभिलेख ${1:बिंदु}(${2:अ: पूर्णांक, ब: पूर्णांक});", "description": "Immutable record"},
+  "Enum": {"prefix": ["enum", "परिगणना"], "body": ["परिगणना ${1:स्थिति} { ${2:लंबित, तैयार} }"], "description": "Enumeration"},
+  "Constant": {"prefix": ["const", "स्थिर"], "body": "स्थिर ${1:नाम}: ${2:पूर्णांक} = ${3:०};", "description": "Typed constant"},
+  "Variable": {"prefix": ["let", "मान"], "body": "मान ${1:नाम}: ${2:पूर्णांक} = ${3:०};", "description": "Mutable local"},
+  "Conditional": {"prefix": ["if", "यदि"], "body": ["यदि (${1:सत्य}) {", "    $0", "}"], "description": "Conditional block"},
+  "Collection iteration": {"prefix": ["foreach", "प्रत्येक"], "body": ["प्रत्येक (${1:अंक}: ${2:पूर्णांक} में ${3:सूची}) {", "    $0", "}"], "description": "Typed collection iteration"},
+  "Exception handling": {"prefix": ["try", "प्रयास"], "body": ["प्रयास {", "    $1", "} पकड़ो (${2:त्रुटि}: अपवाद) {", "    लिखो(${2:त्रुटि}.संदेश);", "} अंततः {", "    $0", "}"], "description": "Try/catch/finally"},
+  "Switch": {"prefix": ["switch", "चयन"], "body": ["चयन (${1:अंक}) {", "    विकल्प ${2:१}:", "        $3", "        विराम;", "    शेष:", "        $0", "}"], "description": "Switch with default"},
+  "Package": {"prefix": ["package", "संकुल"], "body": "संकुल ${1:उदाहरण};", "description": "Compilation unit package"},
+  "Import": {"prefix": ["import", "आयात"], "body": "आयात ${1:उदाहरण.वर्ग};", "description": "Import a public declaration"},
+  "Static method": {"prefix": ["static", "साझा"], "body": ["सार्वजनिक साझा कार्य ${1:नाम}() -> ${2:शून्य} {", "    $0", "}"], "description": "Static class member"},
+  "Print": {"prefix": ["print", "लिखो"], "body": "लिखो($0);", "description": "Print a line"}
+}

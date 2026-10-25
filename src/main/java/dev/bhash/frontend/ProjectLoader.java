@@ -38,12 +38,15 @@ public final class ProjectLoader {
     public static Path manifest(Path input) {
         return Files.isDirectory(input) ? input.resolve(MANIFEST) : input;
     }
-    public static Project load(Path requested) throws IOException {
+    public static Project load(Path requested) throws IOException { return load(requested, Map.of()); }
+
+    /** Editor buffers replace disk text; new unsaved files inside source roots participate without disk writes. */
+    public static Project load(Path requested, Map<Path,String> overlays) throws IOException {
         Path input = manifest(requested).toAbsolutePath().normalize();
-        if (!Files.isRegularFile(input)) throw new IOException("Source file or project manifest does not exist: " + input);
+        if (!Files.isRegularFile(input) && !overlays.containsKey(input)) throw new IOException("Source file or project manifest does not exist: " + input);
         Path root = input.getParent();
         if (!input.getFileName().toString().equals(MANIFEST)) {
-            var source = new SourceFile(input.toString(),Files.readString(input,StandardCharsets.UTF_8));
+            var source = new SourceFile(input.toString(),read(input,overlays));
             return new Project(input,root,stem(input),List.of(),List.of(input),List.of(source));
         }
         var properties = new Properties() {
@@ -52,7 +55,7 @@ public final class ProjectLoader {
                 return super.put(key,value);
             }
         };
-        try { properties.load(new StringReader(Files.readString(input,StandardCharsets.UTF_8))); }
+        try { properties.load(new StringReader(read(input,overlays))); }
         catch (IllegalArgumentException invalid) { throw new IOException(input + ": " + invalid.getMessage(),invalid); }
         for (String key : properties.stringPropertyNames()) if (!Set.of("name","sources").contains(key))
             throw new IOException(input + ": Unknown project property: " + key);
@@ -78,10 +81,23 @@ public final class ProjectLoader {
                 }
             }
         }
+        for (Path path : overlays.keySet()) {
+            path = path.toAbsolutePath().normalize();
+            if (!path.getFileName().toString().endsWith(".bhash") || files.contains(path)) continue;
+            for (Path sourceRoot : roots) if (path.startsWith(sourceRoot)) {
+                if (!physical(path).startsWith(root.toRealPath())) throw new IOException("Editor source escapes project: " + path);
+                files.add(path);
+                break;
+            }
+        }
         if (files.isEmpty()) throw new IOException(input + ": Project contains no .bhash source files.");
         var sources = new ArrayList<SourceFile>();
-        for (Path path : files) sources.add(new SourceFile(path.toString(),Files.readString(path,StandardCharsets.UTF_8)));
+        for (Path path : files) sources.add(new SourceFile(path.toString(),read(path,overlays)));
         return new Project(input,root,name,List.copyOf(roots),List.copyOf(files),List.copyOf(sources));
+    }
+    private static String read(Path path, Map<Path,String> overlays) throws IOException {
+        String text = overlays.get(path);
+        return text != null ? text : Files.readString(path,StandardCharsets.UTF_8);
     }
     private static String stem(Path path) {
         String name = path.getFileName().toString();

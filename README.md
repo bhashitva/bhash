@@ -361,3 +361,11 @@ The Docker Compose pilot is configured for an unused Ubuntu 24.04 VPS with
 2 vCPUs and 8 GB RAM. See [VPS deployment and operating limits](deploy/playground/README.md).
 This is a self-hosted deployment package; it is not automatically installed on
 Hostinger when the repository is updated.
+
+## Visual Studio Code
+
+The [Bhash VS Code extension](editors/vscode/README.md) provides syntax highlighting,
+Devanagari/English snippets, compiler-backed multi-file diagnostics, completion,
+outline, declaration navigation, and JVM/CLR/browser build tasks. Install the VSIX
+from a successful **Bhash VS Code extension** Actions build. Java 17+ is required;
+the packaged extension includes its compiler and does not require Maven.

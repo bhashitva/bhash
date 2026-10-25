@@ -130,8 +130,16 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return emitResolved(sources.isEmpty() ? "project" : sources.get(0).name(), ProjectResolver.resolve(sources), target);
     }
 
+    /** Whole-project semantic analysis without a toolchain, output files, or a required executable entry point. */
+    public static void check(List<SourceFile> sources) throws CompilationException {
+        emitResolved(sources.isEmpty() ? "project" : sources.get(0).name(), ProjectResolver.resolve(sources), Target.JVM, false);
+    }
+
     private static String emitResolved(String sourceName, ProjectResolver.Resolution resolution, Target target) throws CompilationException {
-        try { return new ManagedEmitter(sourceName, target).program(GenericExpander.expand(sourceName, resolution.tree())); }
+        return emitResolved(sourceName, resolution, target, true);
+    }
+    private static String emitResolved(String sourceName, ProjectResolver.Resolution resolution, Target target, boolean requireEntry) throws CompilationException {
+        try { return new ManagedEmitter(sourceName, target).program(GenericExpander.expand(sourceName, resolution.tree()), requireEntry); }
         catch (Invalid error) { throw new CompilationException(resolution.describe(error.getMessage())); }
         catch (CompilationException error) { throw new CompilationException(resolution.describe(error.getMessage())); }
     }
@@ -180,7 +188,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return type.java;
     }
 
-    private String program(ProgramContext program) {
+    private String program(ProgramContext program, boolean requireEntry) {
         collectClasses(program);
         functions.put(Identifiers.key("पढ़ो"), new ArrayList<>(List.of(new Function("BhashRuntime.readInteger", Type.INT, List.of(), null, Access.PUBLIC, false, null, true))));
         functions.put(Identifiers.key("पाठपढ़ो"), new ArrayList<>(List.of(new Function("BhashRuntime.readText", Type.TEXT, List.of(), null, Access.PUBLIC, false, null, true))));
@@ -202,11 +210,12 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             addFunction(functions, name, function, declaration);
         }
         var entries = functions.get(Identifiers.key("मुख्य"));
-        if (entries == null || entries.size()!=1 || entries.get(0).result != Type.VOID || !entries.get(0).parameters.isEmpty())
+        if (entries == null && requireEntry || entries != null && (entries.size()!=1 || entries.get(0).result != Type.VOID || !entries.get(0).parameters.isEmpty()))
             throw error(program, "Executable requires exactly one कार्य मुख्य() -> शून्य.");
-        var main=entries.get(0);
+        var main=entries == null ? null : entries.get(0);
         if (target == Target.JVM) {
             output.append("public final class BhashProgram {\n");
+            if (main != null)
             output.append("public static void main(String[] args) { try { ").append(main.java)
                     .append("(); } catch (RuntimeException | ExceptionInInitializerError e) { Throwable f=bhashFailure(e);")
                     .append(" if (!(f instanceof BhashRuntime.BException || f instanceof ArithmeticException)) throw e;")

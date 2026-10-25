@@ -21,3 +21,14 @@ playground/node_modules/
 playground/dist/
 playground/.openai/
 deploy/playground/.env
+
+# VS Code extension generated distribution
+editors/vscode/dist/
+editors/vscode/server/
+editors/vscode/.vscode-test/
+editors/vscode/LICENSE
+editors/vscode/NOTICE
+editors/vscode/LICENSING.md
+editors/vscode/THIRD_PARTY_NOTICES.md
+editors/vscode/THIRD_PARTY_CLIENT_NOTICES.txt
+*.vsix
