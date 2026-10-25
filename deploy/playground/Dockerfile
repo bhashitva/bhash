@@ -35,6 +35,7 @@ RUN mkdir -p /data /opt/nuget /tmp/warm \
     && useradd --uid 10001 --create-home --home-dir /home/bhash bhash \
     && chown -R 10001:10001 /data
 COPY --chmod=755 deploy/playground/entrypoint.sh /opt/bhash/entrypoint.sh
+ENV XDG_RUNTIME_DIR=/tmp/bhash-runtime XDG_DATA_HOME=/data/user-data
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD curl --fail --silent http://127.0.0.1:8080/api/health || exit 1

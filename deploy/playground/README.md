@@ -13,6 +13,8 @@ install anything on the VPS or create DNS records.
   editing and a home-screen manifest. Compilation requires a connection.
 - Java HTTP API; one compilation child process and up to four queued jobs.
 - Java 17 + .NET 10 + wasm-tools are installed in the container image.
+- The non-root runtime has a private writable XDG runtime directory and data
+  directory for current .NET named synchronization and NuGet migration state.
 - SDK dependencies are warmed during image build. Runtime compilation uses only
   local packages, with outbound networking disabled for the compiler container.
 - Caddy serves HTTPS at `play.bhashitva.org` and isolates artifacts at
