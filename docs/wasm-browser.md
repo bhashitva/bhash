@@ -45,3 +45,20 @@ node scripts/browser_smoke_test.cjs
 
 Published bundles include Bhash `LICENSE`, `NOTICE` and `LICENSING.md` files. Preserve
 these and applicable platform notices when redistributing; see [licensing](../LICENSING.md).
+
+## Self-hosted interactive playground
+
+The [playground package](../deploy/playground/README.md) adds an editable,
+mobile-friendly UI and an asynchronous compilation API around this backend.
+Statement mode supplies the entry function automatically. The API compiles on
+the server and the resulting program runs in an isolated browser worker.
+
+Browser output is capped at 65,536 UTF-16 code units and errors at 8,192 to bound
+common print loops. Reaching the output limit raises a Bhash failure. This limit
+applies to browser bundles; console JVM/CLR output is unchanged. Output remains
+buffered until completion. The playground adds a 15-second execution timeout
+and a separate 90-second runtime-load deadline; it does not provide live stdin.
+
+`BHASH_WASM_OFFLINE=true` disables NuGet package sources during publication.
+Matching SDK/workload/reference packages must already be installed/restored.
+The deployment image warms those dependencies before disabling runtime egress.

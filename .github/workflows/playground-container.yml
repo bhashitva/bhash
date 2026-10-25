@@ -1,0 +1,30 @@
+name: Bhash playground container checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/playground/Dockerfile
+          load: true
+          tags: bhash-playground:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Validate Compose and rootless offline container
+        run: |
+          PLAY_DOMAIN=play.example.org RUN_DOMAIN=run.example.org ACME_EMAIL=test@example.org docker compose config --quiet
+          docker run -d --name playground --read-only --tmpfs /tmp:rw,size=2g,uid=10001,gid=10001 -e BHASH_ORIGIN=http://localhost:8080 -e BHASH_RUN_ORIGIN=http://127.0.0.1:8080 --network none --mount type=volume,target=/data bhash-playground:test
+          for attempt in $(seq 1 60); do docker exec playground curl -fsS http://localhost:8080/api/health && break || sleep 2; done
+          docker exec playground curl -fsS http://localhost:8080/api/health
+          docker exec playground sh -c 'test "$(id -u)" = 10001'
+          docker exec playground sh -c 'mkdir -p /tmp/test; printf "कार्य मुख्य() -> शून्य { लिखो(१); }" > /tmp/test/main.bhash; java -jar /opt/bhash/compiler.jar compile /tmp/test/main.bhash --target wasm-browser -o /tmp/test/web'
+      - name: Container logs
+        if: always()
+        run: docker logs playground || true

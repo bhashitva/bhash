@@ -348,3 +348,16 @@ open-source compiler development through the **Knowledge Without Language Barrie
 **[Donate through Zeffy](https://www.zeffy.com/en-US/donation-form/knowledge-without-language-barriers)**
 
 Donations are voluntary; Bhash remains available under Apache 2.0 regardless of whether you donate.
+
+## Self-hosted browser playground
+
+A mobile-friendly CodeMirror editor and queued compilation API are included.
+Visitors can write a statement, click **चलाएँ**, and run the compiled .NET
+WebAssembly program without installing Java or .NET. Local drafts, snippets,
+examples, file exchange and offline editing are supported. First runs need a
+runtime download, and new compilation needs a network connection.
+
+The Docker Compose pilot is configured for an unused Ubuntu 24.04 VPS with
+2 vCPUs and 8 GB RAM. See [VPS deployment and operating limits](deploy/playground/README.md).
+This is a self-hosted deployment package; it is not automatically installed on
+Hostinger when the repository is updated.

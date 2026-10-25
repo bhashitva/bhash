@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#122f34"><meta name="description" content="Write and run Bhash in your browser. No installation. भाष में अपना पहला कार्यक्रम लिखें।">
+<link rel="icon" href="./icon.svg" type="image/svg+xml"><link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./style.css">
+<title>भाष · Playground</title><script src="./app.js" type="module"></script>
+</head>
+<body>
+<header class="masthead"><a class="brand" href="/" aria-label="Bhash Playground"><span class="brand-mark">भा</span><span>भाष <small>PLAYGROUND</small></span></a><nav><a href="https://github.com/bhashitva/bhash" target="_blank" rel="noreferrer">GitHub ↗</a><a href="https://github.com/bhashitva/bhash/blob/main/docs/language-spec.md" target="_blank" rel="noreferrer">भाषा सीखें ↗</a></nav></header>
+<main>
+<section class="intro"><div><p class="eyebrow">YOUR IDEAS. YOUR LANGUAGE.</p><h1>पहली पंक्ति से शुरू करें<span>Start with a line of your own.</span></h1><p class="subtitle">Write in Devanagari. Run in your browser. Nothing to install.</p></div><div class="intro-badge"><span class="status-dot"></span> Java · .NET · WebAssembly</div></section>
+<section class="workspace" aria-label="Code workspace">
+<div class="workspace-bar"><div class="file-label"><span class="file-dot"></span> playground.bhash <span id="saved" aria-live="polite">LOCAL DRAFT</span></div><div class="actions"><button id="stop" disabled>■ रोकें</button><button id="run" class="primary" disabled>▶ चलाएँ <small>Run</small></button></div></div>
+<div class="settings"><label>उदाहरण <select id="example"><option value="hello">पहला कार्यक्रम · Hello</option><option value="factorial">गुणनफल · Factorial</option><option value="collections">सूची · Lists</option><option value="types">अभिलेख · Records</option></select></label><label>लेखन <select id="mode"><option value="scratch">सरल · Statements</option><option value="program">पूरा कार्यक्रम · Full program</option></select></label><div class="file-actions"><button id="share" title="Copy a link containing this source">लिंक</button><button id="download">डाउनलोड</button><label class="upload-label">खोलें<input id="upload" type="file" accept=".bhash,text/plain"></label></div></div>
+<div class="panes"><section class="code-pane" aria-label="Source editor"><div id="editor"></div><div class="symbol-bar" aria-label="Insert punctuation"><button data-insert="{ }">{ }</button><button data-insert="( )">( )</button><button data-insert="[ ]">[ ]</button><button data-insert=";">;</button><button data-insert=":">:</button><button data-insert="->">→</button><button data-insert="    ">⇥</button><button data-insert='लिखो("");'>लिखो</button><button data-insert="स्थिर ">स्थिर</button></div><p class="editor-note">Ctrl / ⌘ + Enter to run · Ctrl + Space for suggestions</p></section>
+<aside class="result-pane"><div class="tabs" role="tablist" aria-label="Execution panels"><button id="output-tab" class="selected" role="tab" aria-selected="true" aria-controls="output-panel">आउटपुट <span>Output</span></button><button id="input-tab" role="tab" aria-selected="false" aria-controls="input-panel">इनपुट <span>Input</span></button></div><section id="output-panel" role="tabpanel" aria-labelledby="output-tab"><div class="result-heading"><span class="status-dot" id="indicator"></span><span id="status" role="status">Connecting to compiler…</span></div><pre id="output" aria-label="Program output">यहाँ आपका आउटपुट दिखेगा।
+Your program’s output appears here.</pre><pre id="errors" role="alert"></pre><p id="execution-note">First run downloads the .NET WebAssembly runtime. Editing is always available.</p></section><section id="input-panel" role="tabpanel" aria-labelledby="input-tab" hidden><label for="stdin">पढ़ो() के लिए एक मान प्रति पंक्ति<br><span>Enter input before running, one value per line.</span></label><textarea id="stdin" rows="10" maxlength="16384" placeholder="५"></textarea><p>Input is read when the program runs. Live console prompts are not available yet.</p></section></aside></div>
+<div class="workspace-footer"><span id="position">Ln 1, Col 1</span><span>UTF-8 · Bhash · <span id="network">Online compilation</span></span></div>
+</section>
+<section class="below"><p><strong>आपकी भाषा, आपकी रचना।</strong> Built by Nij Bhasha Sanstha to make knowledge work accessible.</p><p>Drafts stay in this browser. Run sends code to the compilation service.<br>Shared links contain source; avoid including private information.</p></section>
+</main><footer><a href="https://bhashitva.org">bhashitva.org ↗</a><span><a href="./LICENSE">Apache 2.0</a> · <a href="./THIRD_PARTY_LICENSES.txt">Editor licenses</a></span></footer>
+<div id="runner-slot" hidden></div>
+</body></html>

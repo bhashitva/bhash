@@ -15,3 +15,9 @@ node_modules/
 
 # Default multi-file project output directories.
 build/
+
+# Self-hosted playground
+playground/node_modules/
+playground/dist/
+playground/.openai/
+deploy/playground/.env

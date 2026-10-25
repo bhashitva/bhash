@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: Apache-2.0
+name: bhash-playground
+services:
+  service:
+    build:
+      context: .
+      dockerfile: deploy/playground/Dockerfile
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 1.5
+    mem_limit: 5g
+    memswap_limit: 5g
+    pids_limit: 512
+    tmpfs:
+      - /tmp:rw,nosuid,size=2g,uid=10001,gid=10001,mode=1777
+    volumes:
+      - compiler-data:/data
+    environment:
+      BHASH_ORIGIN: https://${PLAY_DOMAIN:?Set PLAY_DOMAIN}
+      BHASH_RUN_ORIGIN: https://${RUN_DOMAIN:?Set RUN_DOMAIN}
+      BHASH_TRUST_PROXY: "true"
+      BHASH_BUILD_TIMEOUT: "180"
+    networks: [compiler]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    mem_limit: 256m
+    cpus: 0.25
+    environment:
+      PLAY_DOMAIN: ${PLAY_DOMAIN:?Set PLAY_DOMAIN}
+      RUN_DOMAIN: ${RUN_DOMAIN:?Set RUN_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+    volumes:
+      - ./deploy/playground/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [public, compiler]
+    depends_on:
+      service: {condition: service_healthy}
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+networks:
+  public: {}
+  compiler: {internal: true}
+volumes:
+  compiler-data: {}
+  caddy-data: {}
+  caddy-config: {}

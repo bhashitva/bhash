@@ -53,7 +53,8 @@ public final class WasmCompiler {
             Files.writeString(work.resolve("Program.cs"), code, StandardCharsets.UTF_8);
             Files.writeString(work.resolve("BhashProgram.csproj"), PROJECT, StandardCharsets.UTF_8);
             // Runtime packs may need restoring; ignore machine/user NuGet configuration.
-            Files.writeString(work.resolve("NuGet.Config"), """
+            Files.writeString(work.resolve("NuGet.Config"), Boolean.parseBoolean(System.getenv("BHASH_WASM_OFFLINE"))
+                    ? "<configuration><packageSources><clear /></packageSources></configuration>" : """
                     <configuration><packageSources><clear />
                     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
                     </packageSources></configuration>
