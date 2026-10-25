@@ -153,4 +153,132 @@ internal static class BhashRuntime {
     internal static bool same(object left, object right) => ReferenceEquals(left, right);
     internal static void discard(object value) {}
     internal static void report(string message) => Errors.WriteLine("भाष: " + message);
+    private static int collectionIndex(long index,int size,bool end) {
+        if (index<0 || (end?index>size:index>=size)) throw new Failure("संग्रह सूचकांक सीमा से बाहर है।");
+        return (int)index;
+    }
+    private static int collectionLength(long length) {
+        if (length<0 || length>int.MaxValue) throw new Failure("सरणी की लंबाई सीमा से बाहर है।");
+        return (int)length;
+    }
+    internal static void checkSizes(params long[] dimensions) { foreach (long dimension in dimensions) collectionLength(dimension); }
+    private static void collectionVersion(long expected,long actual) {
+        if (expected!=actual) throw new Failure("पुनरावृत्ति के दौरान संग्रह का आकार बदला गया।");
+    }
+    private static bool collectionSame(object a,object b) {
+        if (ReferenceEquals(a,b)) return true;
+        if (a is double x && b is double y) return x==y || double.IsNaN(x) && double.IsNaN(y);
+        if (a is string text && b is string other) return string.Equals(text,other,StringComparison.Ordinal);
+        if (a is long || a is bool) return a.Equals(b);
+        return false;
+    }
+    private static int collectionHash(object value) {
+        if (value is double d) {
+            long bits=d==0.0?0L:double.IsNaN(d)?0x7ff8000000000000L:BitConverter.DoubleToInt64Bits(d);
+            return unchecked((int)(bits^(bits>>32)));
+        }
+        if (value is string text) { int hash=0; foreach(char c in text) hash=unchecked(31*hash+c); return hash; }
+        if (value is long number) return unchecked((int)(number^(number>>32)));
+        if (value is bool flag) return flag?1231:1237;
+        return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
+    }
+    private sealed class BKey<T> {
+        internal readonly T value;
+        internal BKey(T value) { if ((object)value==null) throw new Failure("मानचित्र की कुंजी रिक्त नहीं हो सकती।"); this.value=value; }
+        public override bool Equals(object other) => other is BKey<T> key && collectionSame(value,key.value);
+        public override int GetHashCode() => collectionHash(value);
+    }
+    internal abstract class BSeq<T> : System.Collections.Generic.IEnumerable<T> {
+        internal abstract long size();
+        internal abstract T get(long index);
+        internal abstract void set(long index,T value);
+        internal virtual long version() => 0;
+        internal bool empty() => size()==0;
+        internal bool contains(T value) { foreach (T item in this) if (collectionSame(item,value)) return true; return false; }
+        public System.Collections.Generic.IEnumerator<T> GetEnumerator() {
+            long expected=version(),position=0;
+            while (true) {
+                collectionVersion(expected,version());
+                if (position>=size()) yield break;
+                yield return get(position++);
+            }
+        }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+    internal sealed class BArray<T> : BSeq<T> {
+        private readonly T[] items;
+        internal BArray(long size,Func<T> initializer) {
+            items=new T[collectionLength(size)]; for (int i=0;i<items.Length;i++) items[i]=initializer();
+        }
+        internal BArray(long size,T value) { items=new T[collectionLength(size)]; Array.Fill(items,value); }
+        internal BArray(T[] values) { items=(T[])values.Clone(); }
+        internal override long size() => items.Length;
+        internal override T get(long index) => items[collectionIndex(index,items.Length,false)];
+        internal override void set(long index,T value) { items[collectionIndex(index,items.Length,false)]=value; }
+    }
+    internal sealed class BList<T> : BSeq<T> {
+        private readonly System.Collections.Generic.List<T> items=new System.Collections.Generic.List<T>();
+        private long stamp;
+        internal override long version() => stamp;
+        internal override long size() => items.Count;
+        internal override T get(long index) => items[collectionIndex(index,items.Count,false)];
+        internal override void set(long index,T value) { items[collectionIndex(index,items.Count,false)]=value; }
+        internal void add(T value) { items.Add(value); stamp++; }
+        internal void insert(long index,T value) { items.Insert(collectionIndex(index,items.Count,true),value); stamp++; }
+        internal T remove(long index) { int at=collectionIndex(index,items.Count,false); T value=items[at]; items.RemoveAt(at); stamp++; return value; }
+        internal void clear() { if (items.Count!=0) { items.Clear(); stamp++; } }
+    }
+    internal sealed class BEntry<K,V> {
+        internal readonly K key; internal readonly V value;
+        internal BEntry(K key,V value) { this.key=key; this.value=value; }
+    }
+    internal sealed class BMap<K,V> : System.Collections.Generic.IEnumerable<K> {
+        private sealed class Cell {
+            internal V value; internal readonly System.Collections.Generic.LinkedListNode<BKey<K>> node;
+            internal Cell(V value,System.Collections.Generic.LinkedListNode<BKey<K>> node) { this.value=value; this.node=node; }
+        }
+        private readonly System.Collections.Generic.Dictionary<BKey<K>,Cell> items=new System.Collections.Generic.Dictionary<BKey<K>,Cell>();
+        private readonly System.Collections.Generic.LinkedList<BKey<K>> order=new System.Collections.Generic.LinkedList<BKey<K>>();
+        private long stamp;
+        internal long size() => items.Count;
+        internal bool empty() => items.Count==0;
+        internal bool contains(K key) => items.ContainsKey(new BKey<K>(key));
+        internal V get(K key) {
+            if (!items.TryGetValue(new BKey<K>(key),out Cell cell)) throw new Failure("मानचित्र में कुंजी नहीं मिली।");
+            return cell.value;
+        }
+        internal V getOr(K key,V fallback) => items.TryGetValue(new BKey<K>(key),out Cell cell)?cell.value:fallback;
+        internal void set(K key,V value) {
+            var wrapped=new BKey<K>(key);
+            if (items.TryGetValue(wrapped,out Cell cell)) { cell.value=value; return; }
+            var node=order.AddLast(wrapped); items.Add(wrapped,new Cell(value,node)); stamp++;
+        }
+        internal bool remove(K key) {
+            var wrapped=new BKey<K>(key);
+            if (!items.TryGetValue(wrapped,out Cell cell)) return false;
+            items.Remove(wrapped); order.Remove(cell.node); stamp++; return true;
+        }
+        internal void clear() { if (items.Count!=0) { items.Clear(); order.Clear(); stamp++; } }
+        internal System.Collections.Generic.IEnumerable<BEntry<K,V>> entries() {
+            long expected=stamp; var node=order.First;
+            while (true) {
+                collectionVersion(expected,stamp);
+                if (node==null) yield break;
+                var key=node.Value; node=node.Next;
+                yield return new BEntry<K,V>(key.value,items[key].value);
+            }
+        }
+        public System.Collections.Generic.IEnumerator<K> GetEnumerator() { foreach (var entry in entries()) yield return entry.key; }
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+        internal BList<K> keys() { var result=new BList<K>(); foreach(K key in this) result.add(key); return result; }
+        internal BList<V> values() { var result=new BList<V>(); foreach(var entry in entries()) result.add(entry.value); return result; }
+    }
+    internal static BArray<T> array<T>(long size,Func<T> initializer) => new BArray<T>(size,initializer);
+    internal static BArray<T> arrayFilled<T>(long size,T value) => new BArray<T>(size,value);
+    internal static BArray<T> arrayOf<T>(params T[] values) => new BArray<T>(values);
+    internal static BList<T> listOf<T>(params T[] values) { var result=new BList<T>(); foreach(T value in values) result.add(value); return result; }
+    internal static BEntry<K,V> entry<K,V>(K key,V value) => new BEntry<K,V>(key,value);
+    internal static BMap<K,V> mapOf<K,V>(params BEntry<K,V>[] entries) {
+        var result=new BMap<K,V>(); foreach(var entry in entries) result.set(entry.key,entry.value); return result;
+    }
 }

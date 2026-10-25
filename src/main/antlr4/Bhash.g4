@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Bhash (भाष) v0.6 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
+// Bhash (भाष) v0.7 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
@@ -23,7 +23,8 @@ grammar Bhash;
             else if (token == GT) {
                 if (--depth == 0) return _input.LA(i + 1) == LPAREN || _input.LA(i + 1) == DOT;
             } else if (token != IDENTIFIER && token != COMMA && token != DOT
-                    && token != INT_TYPE && token != REAL_TYPE && token != BOOL_TYPE && token != TEXT_TYPE)
+                    && token != INT_TYPE && token != REAL_TYPE && token != BOOL_TYPE && token != TEXT_TYPE
+                    && token != LBRACK && token != RBRACK)
                 return false;
         }
     }
@@ -46,7 +47,11 @@ functionDecl : FUNCTION IDENTIFIER typeParameters? LPAREN parameters? RPAREN ARR
 parameters : parameter (COMMA parameter)* ;
 parameter : IDENTIFIER COLON valueType ;
 returnType : valueType | VOID ;
-valueType : INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | IDENTIFIER typeQualifier* typeArguments? ;
+valueType : (INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | IDENTIFIER typeQualifier* typeArguments?) arraySuffix* ;
+arraySuffix : LBRACK RBRACK ;
+arrayDimension : LBRACK expression RBRACK ;
+collectionInitializer : LBRACE (mapEntry (COMMA mapEntry)* | arguments)? RBRACE ;
+mapEntry : expression COLON expression ;
 typeQualifier : DOT IDENTIFIER ;
 block : LBRACE statement* RBRACE ;
 statement
@@ -54,6 +59,7 @@ statement
     | assignment
     | ifStatement
     | whileStatement
+    | foreachStatement
     | switchStatement
     | RETURN expression? SEMI
     | BREAK SEMI
@@ -65,6 +71,7 @@ statement
 variableDecl : (LET | CONST) IDENTIFIER COLON valueType ASSIGN expression SEMI ;
 assignment : postfix ASSIGN expression SEMI ;
 ifStatement : IF LPAREN expression RPAREN block (ELSE (ifStatement | block))? ;
+foreachStatement : FOREACH LPAREN parameter (COMMA parameter)? IN expression RPAREN block ;
 whileStatement : WHILE LPAREN expression RPAREN block ;
 switchStatement : SWITCH LPAREN expression RPAREN LBRACE switchSection* RBRACE ;
 switchSection : (CASE caseValue COLON)+ statement* | DEFAULT COLON statement* ;
@@ -90,7 +97,7 @@ additive : multiplicative ((PLUS | MINUS) multiplicative)* ;
 multiplicative : unary ((STAR | SLASH | PERCENT) unary)* ;
 unary : (NOT | BIT_NOT | MINUS | PLUS) unary | postfix ;
 postfix : primary postfixPart* ;
-postfixPart : DOT IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)? ;
+postfixPart : DOT IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)? | LBRACK expression RBRACK ;
 primary
     : INTEGER_LITERAL
     | REAL_LITERAL
@@ -100,7 +107,7 @@ primary
     | NULL
     | THIS
     | BASE
-    | NEW valueType LPAREN arguments? RPAREN
+    | NEW valueType (LPAREN arguments? RPAREN | arrayDimension+ arraySuffix* | collectionInitializer)
     | IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)?
     | LPAREN expression RPAREN
     ;
@@ -129,6 +136,8 @@ CONST : 'स्थिर' ;
 IF : 'यदि' ;
 ELSE : 'अन्यथा' ;
 WHILE : 'जबतक' ;
+FOREACH : 'प्रत्येक' ;
+IN : 'में' ;
 SWITCH : 'चयन' ;
 CASE : 'विकल्प' ;
 DEFAULT : 'शेष' ;
@@ -153,6 +162,7 @@ PLUS : '+' ; MINUS : '-' ; STAR : '*' ; SLASH : '/' ; PERCENT : '%' ;
 LPAREN : '(' ; RPAREN : ')' ; LBRACE : '{' ; RBRACE : '}' ;
 COLON : ':' ; COMMA : ',' ; SEMI : ';' ;
 DOT : '.' ;
+LBRACK : '[' ; RBRACK : ']' ;
 
 // Each numeric literal uses one digit script; signs are unary operators.
 REAL_LITERAL : ASCII_DIGIT+ '.' ASCII_DIGIT+ | DEV_DIGIT+ '.' DEV_DIGIT+ ;

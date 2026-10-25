@@ -12,18 +12,28 @@ import org.antlr.v4.runtime.ParserRuleContext;
 
 /** Shared semantic checking and source lowering for JVM and CLR. User names are mangled. */
 public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> {
+    enum CollectionKind { ARRAY, LIST, MAP }
+    record CollectionKey(CollectionKind kind,List<Type> arguments) {}
+    record ArrayFactory(String name,String code) {}
     static final class Type {
         static final Type INT = new Type("long", "पूर्णांक"), REAL = new Type("double", "दशमलव"),
                 BOOL = new Type("boolean", "तार्किक"), TEXT = new Type("String", "पाठ"),
                 VOID = new Type("void", "शून्य"), NULL = new Type("", "रिक्त");
         final String java, bhash;
         final ClassInfo object;
-        Type(String java, String bhash) { this(java, bhash, null); }
-        Type(String java, String bhash, ClassInfo object) { this.java = java; this.bhash = bhash; this.object = object; }
+        final CollectionKind collection;
+        final List<Type> arguments;
+        Type(String java, String bhash) { this(java,bhash,(ClassInfo)null); }
+        Type(String java, String bhash, ClassInfo object) {
+            this.java=java; this.bhash=bhash; this.object=object; this.collection=null; this.arguments=List.of();
+        }
+        Type(String java,String bhash,CollectionKind collection,List<Type> arguments) {
+            this.java=java; this.bhash=bhash; this.object=null; this.collection=collection; this.arguments=arguments;
+        }
         static Type[] values() { return new Type[]{INT, REAL, BOOL, TEXT, VOID}; }
-        boolean reference() { return object != null || this == NULL; }
+        boolean reference() { return object != null || collection != null || this == NULL; }
     }
-    record Location(boolean mutable) {}
+    record Location(boolean mutable,String setter) { Location(boolean mutable) { this(mutable,null); } }
     record Expr(Type type, String java, boolean call, Location location, boolean base, boolean typeReceiver) {
         Expr(Type type, String java, boolean call, Location location, boolean base) { this(type,java,call,location,base,false); }
         Expr(Type type, String java) { this(type, java, false, null, false); }
@@ -53,7 +63,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         }
     }
     record Field(String java, Type type, boolean mutable, Access access, ClassInfo owner, FieldDeclContext declaration, boolean shared) {}
-    record Constructor(List<Type> parameters, Access access, ConstructorDeclContext declaration) {}
+    record Constructor(List<Type> parameters, Access access, ConstructorDeclContext declaration,String tag) {}
     static final class Function {
         final String java;
         final Type result;
@@ -79,12 +89,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private final Map<String,String> slots = new LinkedHashMap<>();
     private final Map<String, ClassInfo> classes = new LinkedHashMap<>();
     private final List<ClassInfo> classOrder = new ArrayList<>();
+    private final Map<CollectionKey,Type> collectionTypes = new HashMap<>();
+    private final Map<String,ArrayFactory> arrayFactories = new LinkedHashMap<>();
     private final Deque<Map<String, Binding>> scopes = new ArrayDeque<>();
     private final StringBuilder output = new StringBuilder();
     private Type returnType;
     private ClassInfo currentClass;
     private boolean fieldInitializer, baseArguments, constructorBody, currentStatic;
-    private int variableId, loopDepth, methodId, fieldId, switchId;
+    private int variableId, loopDepth, methodId, fieldId, switchId, constructorId;
     private static final class BreakTarget {
         final String label;
         boolean used;
@@ -121,14 +133,35 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private Type type(ParserRuleContext at) {
-        String spelling = at.getText();
-        for (Type primitive : Type.values()) if (primitive.bhash.equals(spelling)) return primitive;
-        ClassInfo found = classes.get(Identifiers.key(spelling));
-        if (found == null) throw error(at, "Unknown type: " + spelling);
-        return found.type;
+        if (at instanceof ReturnTypeContext result) return result.VOID()!=null?Type.VOID:type(result.valueType());
+        if (!(at instanceof ValueTypeContext value)) throw error(at,"Expected a value type.");
+        Type result;
+        if (value.IDENTIFIER()==null) {
+            String spelling=value.getChild(0).getText();
+            result=Arrays.stream(Type.values()).filter(t->t.bhash.equals(spelling)).findFirst().orElseThrow();
+        } else {
+            String name=Identifiers.key(value.IDENTIFIER().getText());
+            if (CollectionTypes.builtin(name)) {
+                int arity=CollectionTypes.ARITY.get(name);
+                if (value.typeArguments()==null || value.typeArguments().valueType().size()!=arity)
+                    throw error(at,"Wrong type argument count for "+name);
+                var args=value.typeArguments().valueType().stream().map(this::type).toList();
+                result=collection(name.equals("सरणी")?CollectionKind.ARRAY:name.equals("सूची")?CollectionKind.LIST:CollectionKind.MAP,args);
+            } else {
+                var found=classes.get(name);
+                if (found==null) throw error(at,"Unknown type: "+value.getText());
+                result=found.type;
+            }
+        }
+        for (var ignored:value.arraySuffix()) result=array(result);
+        return result;
     }
 
     private String typeName(Type type) {
+        if (type.collection!=null) {
+            String name=switch(type.collection) { case ARRAY -> "BArray"; case LIST -> "BList"; case MAP -> "BMap"; };
+            return "BhashRuntime."+name+"<"+String.join(",",type.arguments.stream().map(this::genericTypeName).toList())+">";
+        }
         if (target == Target.CLR && type == Type.BOOL) return "bool";
         if (target == Target.CLR && type == Type.TEXT) return "string";
         return type.java;
@@ -173,6 +206,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         }
         for (var overloads : functions.values()) for (var function : overloads) if (function.declaration!=null) emitFunction(function);
         for (ClassInfo definition : classOrder) emitClass(definition);
+        for (int i=0;i<constructorId;i++) output.append(target==Target.JVM?"public static final class ":"public sealed class ").append("CtorTag").append(i).append(" {}\n");
+        for (var factory:arrayFactories.values()) output.append(factory.code.replace("() ->",target==Target.JVM?"() ->":"() =>"));
         return output.append("}\n").toString();
     }
 
@@ -282,7 +317,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     var declaration = member.constructorDecl();
                     var signature=parameters(declaration.parameters());
                     if (definition.constructors.stream().anyMatch(c->c.parameters.equals(signature))) throw error(member,"Duplicate constructor signature.");
-                    definition.constructors.add(new Constructor(signature, access, declaration));
+                    definition.constructors.add(new Constructor(signature, access, declaration,"CtorTag"+constructorId++));
                 } else {
                     var declaration = member.functionDecl();
                     if (declaration.block()==null) throw error(declaration,"A class method requires a body.");
@@ -305,7 +340,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     addFunction(definition.methods,name,new Function(slot(name,signature),result,signature,definition,access,overriding,declaration,shared),member);
                 }
             }
-            if (definition.constructors.isEmpty()) definition.constructors.add(new Constructor(List.of(), Access.PUBLIC, null));
+            if (definition.constructors.isEmpty()) definition.constructors.add(new Constructor(List.of(), Access.PUBLIC, null,"CtorTag"+constructorId++));
         }
         for (ClassInfo definition:classOrder) if (!definition.isInterface()) validateContracts(definition);
     }
@@ -395,8 +430,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return String.join(",",parts);
     }
 
+    private String constructorCallArguments(List<Expr> args,Constructor constructor) {
+        String values=constructorArguments(args,constructor.parameters);
+        return values+(values.isEmpty()?"":",")+"(("+constructor.tag+")null)";
+    }
+
     private boolean compatible(Type expected, Type actual) {
-        return expected == actual || (expected.object != null && (actual == Type.NULL || subclass(actual.object, expected.object)));
+        return expected == actual || (expected.reference() && actual==Type.NULL)
+                || (expected.object != null && subclass(actual.object,expected.object));
     }
 
     private void checkAccess(ParserRuleContext at, ClassInfo owner, Access access, Expr receiver) {
@@ -442,8 +483,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         for (Field field : definition.fields.values()) {
             currentClass = definition; currentStatic=field.shared;
             Expr value;
-            if (field.declaration.expression() == null) value = new Expr(field.type,
-                    field.type == Type.TEXT ? "\"\"" : field.type == Type.BOOL ? "false" : field.type.object != null ? "null" : field.type == Type.REAL ? "0.0" : "0L");
+            if (field.declaration.expression() == null) value = new Expr(field.type,defaultValue(field.type));
             else {
                 fieldInitializer = true;
                 value = visit(field.declaration.expression());
@@ -475,7 +515,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         scopes.push(new HashMap<>());
         output.append(accessName(constructor.access)).append(' ').append(definition.java).append('(');
         emitParameters(declaration == null ? null : declaration.parameters(), constructor.parameters);
-        output.append(')');
+        if (!constructor.parameters.isEmpty()) output.append(',');
+        output.append(constructor.tag).append(" _constructorTag)");
         baseArguments = true;
         List<Expr> arguments = declaration == null ? List.of() : arguments(declaration.arguments());
         baseArguments = false;
@@ -485,10 +526,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             Constructor parent = selectConstructor(at,definition.parent,arguments);
             if (parent.access == Access.PRIVATE) throw error(at, "Base constructor is not accessible (private).");
             checkArguments(at, arguments, parent.parameters, "base constructor");
-            if (target == Target.CLR) output.append(" : base(").append(constructorArguments(arguments,parent.parameters)).append(')');
+            if (target == Target.CLR) output.append(" : base(").append(constructorCallArguments(arguments,parent)).append(')');
         }
         output.append(" {\n");
-        if (definition.parent != null && target == Target.JVM) output.append("super(").append(constructorArguments(arguments,selectConstructor(at,definition.parent,arguments).parameters)).append(");\n");
+        if (definition.parent != null && target == Target.JVM) output.append("super(").append(constructorCallArguments(arguments,selectConstructor(at,definition.parent,arguments))).append(");\n");
         for (var initializer : initializers.entrySet()) output.append("this.").append(initializer.getKey().java)
                 .append('=').append(initializer.getValue()).append(";\n");
         constructorBody = true;
@@ -554,11 +595,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (!destination.location.mutable) throw error(assignment, "Cannot assign to an immutable binding or field.");
             var value = visit(assignment.expression());
             require(assignment, destination.type, value.type);
-            output.append(destination.java).append('=').append(value.java).append(";\n");
+            if (destination.location.setter!=null) output.append(destination.location.setter).append(value.java).append(");\n");
+            else output.append(destination.java).append('=').append(value.java).append(";\n");
         } else if (statement.ifStatement() != null) {
             return ifStatement(statement.ifStatement());
         } else if (statement.switchStatement() != null) {
             return switchStatement(statement.switchStatement());
+        } else if (statement.foreachStatement()!=null) {
+            return foreachStatement(statement.foreachStatement());
         } else if (statement.whileStatement() != null) {
             var loop = statement.whileStatement();
             var condition = visit(loop.expression());
@@ -699,6 +743,156 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return flow;
     }
 
+    private Type collection(CollectionKind kind, List<Type> arguments) {
+        var key=new CollectionKey(kind,List.copyOf(arguments));
+        return collectionTypes.computeIfAbsent(key,k-> {
+            String name=kind==CollectionKind.ARRAY?arguments.get(0).bhash+"[]"
+                    :(kind==CollectionKind.LIST?"सूची":"मानचित्र")+"<"+String.join(",",arguments.stream().map(t->t.bhash).toList())+">";
+            return new Type(kind+":"+arguments.stream().map(t->t.java).toList(),name,kind,k.arguments);
+        });
+    }
+    private String genericTypeName(Type type) {
+        if (target==Target.JVM) {
+            if (type==Type.INT) return "Long";
+            if (type==Type.REAL) return "Double";
+            if (type==Type.BOOL) return "Boolean";
+        }
+        return typeName(type);
+    }
+    private String runtimeGeneric(String name,List<Type> arguments) {
+        String args=String.join(",",arguments.stream().map(this::genericTypeName).toList());
+        return target==Target.JVM?"BhashRuntime.<"+args+">"+name:"BhashRuntime."+name+"<"+args+">";
+    }
+    private String defaultValue(Type type) {
+        return type==Type.TEXT?"\"\"":type==Type.BOOL?"false":type.reference()?"null":type==Type.REAL?"0.0":"0L";
+    }
+    private Type array(Type element) { return collection(CollectionKind.ARRAY,List.of(element)); }
+    private Expr indexed(ParserRuleContext at,Expr source,Expr index) {
+        if (source.type.collection==null) throw error(at,"Indexing requires an array, list or map.");
+        Type key=source.type.collection==CollectionKind.MAP?source.type.arguments.get(0):Type.INT;
+        Type result=source.type.arguments.get(source.type.collection==CollectionKind.MAP?1:0);
+        require(at,key,index.type);
+        String receiver="BhashRuntime.instance("+source.java+")";
+        return new Expr(result,receiver+".get("+index.java+")",false,
+                new Location(true,receiver+".set("+index.java+","),false,false);
+    }
+    private Expr collectionCall(ParserRuleContext at,Expr source,String spelling,List<Expr> args) {
+        String name=Identifiers.key(spelling), method;
+        Type element=source.type.arguments.get(source.type.collection==CollectionKind.MAP?1:0), result;
+        boolean map=source.type.collection==CollectionKind.MAP, list=source.type.collection==CollectionKind.LIST;
+        Type key=map?source.type.arguments.get(0):Type.INT;
+        List<Type> signature;
+        if (name.equals(Identifiers.key("आकार")) || name.equals(Identifiers.key("लंबाई"))) { method="size"; result=Type.INT; signature=List.of(); }
+        else if (name.equals(Identifiers.key("खाली"))) { method="empty"; result=Type.BOOL; signature=List.of(); }
+        else if (name.equals(Identifiers.key("लो"))) {
+            method=map && args.size()==2?"getOr":"get"; result=element;
+            signature=map && args.size()==2?List.of(key,element):List.of(key);
+        } else if (name.equals(Identifiers.key("रखो"))) { method="set"; result=Type.VOID; signature=List.of(key,element); }
+        else if (name.equals(Identifiers.key("है"))) { method="contains"; result=Type.BOOL; signature=List.of(map?key:element); }
+        else if (name.equals(Identifiers.key("जोड़ो")) && list) { method="add"; result=Type.VOID; signature=List.of(element); }
+        else if (name.equals(Identifiers.key("डालो")) && list) { method="insert"; result=Type.VOID; signature=List.of(Type.INT,element); }
+        else if (name.equals(Identifiers.key("हटाओ")) && (map || list)) { method="remove"; result=map?Type.BOOL:element; signature=List.of(key); }
+        else if (name.equals(Identifiers.key("साफ़")) && (map || list)) { method="clear"; result=Type.VOID; signature=List.of(); }
+        else if (name.equals(Identifiers.key("कुंजियाँ")) && map) { method="keys"; result=collection(CollectionKind.LIST,List.of(key)); signature=List.of(); }
+        else if (name.equals(Identifiers.key("मूल्य")) && map) { method="values"; result=collection(CollectionKind.LIST,List.of(element)); signature=List.of(); }
+        else throw error(at,"Undefined collection method: "+spelling);
+        checkArguments(at,args,signature,spelling);
+        return new Expr(result,"BhashRuntime.instance("+source.java+")."+method+"("+constructorArguments(args,signature)+")",true);
+    }
+    private Expr newCollection(PrimaryContext ctx,Type type) {
+        var initializer=ctx.collectionInitializer();
+        if (initializer!=null) {
+            if (type.collection==null) throw error(ctx,"A collection initializer requires an array, list or map type.");
+            if (type.collection==CollectionKind.MAP) {
+                if (initializer.arguments()!=null) throw error(ctx,"Map initializers require key: value entries.");
+                var entries=new ArrayList<String>();
+                for (var entry:initializer.mapEntry()) {
+                    var key=visit(entry.expression(0)); var value=visit(entry.expression(1));
+                    var args=List.of(key,value);
+                    checkArguments(entry,args,type.arguments,"map entry");
+                    entries.add(runtimeGeneric("entry",type.arguments)+"("+constructorArguments(args,type.arguments)+")");
+                }
+                return new Expr(type,runtimeGeneric("mapOf",type.arguments)+"("+String.join(",",entries)+")",true);
+            }
+            if (!initializer.mapEntry().isEmpty()) throw error(ctx,"Array/list initializers contain values, not map entries.");
+            var args=arguments(initializer.arguments());
+            var signature=Collections.nCopies(args.size(),type.arguments.get(0));
+            checkArguments(ctx,args,signature,"collection initializer");
+            return new Expr(type,runtimeGeneric(type.collection==CollectionKind.ARRAY?"arrayOf":"listOf",type.arguments)
+                    +"("+constructorArguments(args,signature)+")",true);
+        }
+        if (!ctx.arrayDimension().isEmpty()) {
+            Type element=type;
+            for (var ignored:ctx.arraySuffix()) element=array(element);
+            var sizes=new ArrayList<Expr>();
+            for (var dimension:ctx.arrayDimension()) {
+                var size=visit(dimension.expression()); require(dimension,Type.INT,size.type); sizes.add(size);
+            }
+            return allocateArray(ctx,element,sizes);
+        }
+        if (type.collection==null) return null;
+        var args=arguments(ctx.arguments());
+        if (type.collection==CollectionKind.ARRAY) {
+            checkArguments(ctx,args,List.of(Type.INT),"array constructor");
+            return allocateArray(ctx,type.arguments.get(0),args);
+        }
+        checkArguments(ctx,args,List.of(),"collection constructor");
+        return new Expr(type,"new "+typeName(type)+"()",true);
+    }
+    private Expr allocateArray(ParserRuleContext at,Type element,List<Expr> sizes) {
+        Type result=element;
+        for (var ignored:sizes) result=array(result);
+        String key=result.java+":"+sizes.size();
+        var factory=arrayFactories.get(key);
+        if (factory==null) {
+            String name="arrayFactory"+arrayFactories.size();
+            var dimensions=new ArrayList<String>();
+            for (int i=0;i<sizes.size();i++) dimensions.add("long d"+i);
+            String code="private static "+typeName(result)+" "+name+"("+String.join(",",dimensions)+") {\nBhashRuntime.checkSizes("
+                    +String.join(",",java.util.stream.IntStream.range(0,sizes.size()).mapToObj(i->"d"+i).toList())+");\nreturn ";
+            code+=arrayAllocation(result,sizes.size(),0)+";\n}\n";
+            factory=new ArrayFactory(name,code); arrayFactories.put(key,factory);
+        }
+        return new Expr(result,factory.name+"("+join(sizes)+")",true);
+    }
+    private String arrayAllocation(Type array,int dimensions,int index) {
+        Type element=array.arguments.get(0);
+        if (index+1==dimensions) return runtimeGeneric("arrayFilled",List.of(element))+"(d"+index+","+defaultValue(element)+")";
+        return runtimeGeneric("array",List.of(element))+"(d"+index+", () -> "+arrayAllocation(element,dimensions,index+1)+")";
+    }
+    private EnumSet<Flow> foreachStatement(ForeachStatementContext loop) {
+        var source=visit(loop.expression());
+        if (source.type.collection==null) throw error(loop,"Collection iteration requires an array, list or map.");
+        boolean pair=loop.parameter().size()==2, map=source.type.collection==CollectionKind.MAP;
+        if (pair && !map) throw error(loop,"Two iteration bindings require a map.");
+        var types=source.type.arguments;
+        Type first=types.get(0);
+        var firstParam=loop.parameter(0);
+        Type firstBinding=type(firstParam.valueType());
+        require(firstParam,firstBinding,first);
+        Type secondBinding=pair?type(loop.parameter(1).valueType()):null;
+        if (pair) require(loop.parameter(1),secondBinding,types.get(1));
+        scopes.push(new HashMap<>());
+        var binding=declare(firstParam,firstParam.IDENTIFIER().getText(),firstBinding,false);
+        String item=pair?"entry"+variableId++:binding.java;
+        String itemType=pair?"BhashRuntime.BEntry<"+String.join(",",types.stream().map(this::genericTypeName).toList())+">":typeName(firstBinding);
+        output.append(target==Target.JVM?"for (final ":"foreach (").append(itemType).append(' ').append(item)
+                .append(target==Target.JVM?" : ":" in ").append("BhashRuntime.instance(").append(source.java).append(')')
+                .append(pair?".entries()":"").append(") {\n");
+        if (pair) {
+            var second=loop.parameter(1); var value=declare(second,second.IDENTIFIER().getText(),secondBinding,false);
+            output.append(target==Target.JVM?"final ":"").append(typeName(firstBinding)).append(' ').append(binding.java).append('=').append(item).append(".key;\n");
+            output.append(target==Target.JVM?"final ":"").append(typeName(value.type)).append(' ').append(value.java).append('=').append(item).append(".value;\n");
+        }
+        loopDepth++; breakTargets.push(new BreakTarget(null));
+        var body=block(loop.block());
+        breakTargets.pop(); loopDepth--; scopes.pop();
+        output.append("}\n");
+        var flow=EnumSet.of(Flow.NORMAL);
+        if (body.contains(Flow.RETURN)) flow.add(Flow.RETURN);
+        return flow;
+    }
+
     private List<Expr> arguments(ArgumentsContext args) {
         return args == null ? List.of() : args.expression().stream().map(this::visit).toList();
     }
@@ -804,6 +998,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private Expr readField(ParserRuleContext at, Expr object, String name) {
+        if (object.type.collection!=null) {
+            if (!Identifiers.key(name).equals(Identifiers.key("लंबाई")) && !Identifiers.key(name).equals(Identifiers.key("आकार")))
+                throw error(at,"Undefined collection property: "+name);
+            return new Expr(Type.INT,"BhashRuntime.instance("+object.java+").size()",new Location(false));
+        }
         Field field = field(object.type.object, name);
         if (field == null) throw error(at, "Undefined field: " + name);
         if (field.shared!=object.typeReceiver) throw error(at,field.shared?"Static member requires a type receiver.":"Instance member requires an instance receiver.");
@@ -812,6 +1011,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return new Expr(field.type, receiver + "." + field.java, new Location(field.mutable));
     }
     private Expr callMethod(ParserRuleContext at, Expr object, String name, List<Expr> arguments) {
+        if (object.type.collection!=null) return collectionCall(at,object,name,arguments);
         var candidates=methods(object.type.object,name);
         if (candidates.isEmpty()) throw error(at,"Undefined method: " + name);
         var matching=candidates.stream().filter(f->f.shared==object.typeReceiver).toList();
@@ -831,7 +1031,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (ctx.postfixPart().isEmpty() && constructorBody && value.java.equals("this"))
             throw error(ctx, "Constructors may use यह only as a direct field receiver; the new object cannot escape early.");
         for (var part : ctx.postfixPart()) {
-            if (value.type.object == null) throw error(part, "Member access requires a class instance.");
+            if (part.LBRACK()!=null) { value=indexed(part,value,visit(part.expression())); continue; }
+            if (value.type.object == null && value.type.collection==null) throw error(part, "Member access requires a class instance.");
             value = part.LPAREN() == null ? readField(part, value, part.IDENTIFIER().getText())
                     : callMethod(part, value, part.IDENTIFIER().getText(), arguments(part.arguments()));
         }
@@ -852,6 +1053,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (ctx.BASE() != null) return self(ctx, true);
         if (ctx.NEW() != null) {
             if (fieldInitializer) throw error(ctx, "Field initializers must be constant expressions, without calls or new objects.");
+            var constructedType=type(ctx.valueType());
+            var collectionValue=newCollection(ctx,constructedType);
+            if (collectionValue!=null) return collectionValue;
             var definition = classes.get(Identifiers.key(ctx.valueType().getText()));
             if (definition == null) throw error(ctx, "Unknown class: " + ctx.valueType().getText());
             if (definition.isInterface()) throw error(ctx,"Cannot construct an interface.");
@@ -859,7 +1063,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var constructor=selectConstructor(ctx,definition,arguments);
             if (constructor.access != Access.PUBLIC && currentClass != definition)
                 throw error(ctx, "Constructor is not accessible (" + accessName(constructor.access) + ").");
-            return new Expr(definition.type, "new " + definition.java + "(" + constructorArguments(arguments,constructor.parameters) + ")", true);
+            return new Expr(definition.type, "new " + definition.java + "(" + constructorCallArguments(arguments,constructor) + ")", true);
         }
         if (ctx.IDENTIFIER() != null) {
             String name = ctx.IDENTIFIER().getText();
@@ -886,6 +1090,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var function = functions.get(Identifiers.key(name));
             if (function == null) throw error(ctx, "Undefined function: " + name);
             var args = arguments(ctx.arguments());
+            if (Identifiers.key(name).equals(Identifiers.key("लंबाई")) && args.size()==1 && args.get(0).type.collection!=null)
+                return new Expr(Type.INT,"BhashRuntime.instance("+args.get(0).java+").size()",true);
             var chosen=select(ctx,function,args,name);
             return new Expr(chosen.result, chosen.java + "(" + join(args) + ")", true);
         }

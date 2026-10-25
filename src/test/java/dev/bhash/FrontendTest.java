@@ -101,6 +101,27 @@ class FrontendTest {
         for (String expression : new String[]{"१ < < २", "८ > > १", "८ >/*gap*/>१", "८ > > > १", "१ <<", "८ >>>> १"})
             assertFalse(parseBody("लिखो("+expression+");").valid(),expression);
     }
+    @Test void collectionSyntaxPreservesGenericAnglesArrayRanksAndComparisons() {
+        var result=Frontend.parse("arrays.bhash","""
+            कार्य लो<त>(आ: सूची<त[]>) -> मानचित्र<पाठ,त[]> { लौटाओ नया मानचित्र<पाठ,त[]>(); }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: पूर्णांक[][] = नया पूर्णांक[२][३];
+                स्थिर ख: सूची<पूर्णांक[]> = नया सूची<पूर्णांक[]>{नया पूर्णांक[]{१}};
+                प्रत्येक (अ: पूर्णांक[] में क) { लिखो(अ[०] << १); }
+                प्रत्येक (कुंजी: पाठ, मानक: पूर्णांक[] में लो<पूर्णांक>(ख)) { मानक[०] = २; }
+                स्थिर ग: पूर्णांक = ०;
+                लिखो(ग < क[०][०] >> १, ग < २);
+            }
+            """);
+        assertTrue(result.valid(),result.diagnostics().toString());
+        for (String body:new String[]{"स्थिर क: पूर्णांक[] = नया पूर्णांक[]{;", "प्रत्येक (क: पूर्णांक में) {}", "लिखो(क[]);"})
+            assertFalse(parseBody(body).valid());
+    }
+    @Test void iterationKeywordsAreReservedWhileLongerIdentifiersRemainValid() {
+        var lexer=new BhashLexer(CharStreams.fromString("प्रत्येक में प्रत्येकका मेंबर"));
+        for (int token:new int[]{BhashLexer.FOREACH,BhashLexer.IN,BhashLexer.IDENTIFIER,BhashLexer.IDENTIFIER})
+            assertEquals(token,lexer.nextToken().getType());
+    }
     @Test void normalizationUnifiesEquivalentIdentifierSpellings() {
         assertEquals(Identifiers.key("क़दम"), Identifiers.key("क़दम"));
     }

@@ -4,7 +4,7 @@ The JVM implementation is tested by compiling Bhash source to standalone JVM JAR
 and executing them in separate Java/.NET processes (with bytecode verification enabled on the JVM).
 There is no compiler/ANTLR classpath when running the generated programs.
 
-The v0.6 suite contains 141 JUnit tests, including project source discovery, package/import
+The v0.7 suite contains 168 JUnit tests, including project source discovery, package/import
 resolution, frontend checks and a shared JVM/CLR execution corpus. Packaged compiler/application
 smoke checks separately exercise the public CLI. CI runs the suite on Linux and Windows.
 
@@ -26,6 +26,12 @@ Coverage includes:
 - Signed integer boundaries, wrapping overflow, division/remainder edge cases,
   operator precedence, real arithmetic, Unicode text and value equality.
 - CLI output/source protection, executable JAR contents and failed-compile preservation.
+- Typed array defaults, rectangular/jagged allocation, indexing/evaluation order,
+  collection invariance, list operations, ordered map snapshots and structural-mutation checks.
+- Primitive/text/NaN/zero/identity map-key and membership behavior, null values,
+  generic collection interfaces/functions and constructor overloads across generic erasure.
+- Multi-file collection examples plus checked bounds, missing/null keys, null receivers,
+  immutable iteration bindings, source scopes and nested loop/selection control flow.
 - Integer-only bitwise operators, precedence, eager once-only evaluation, all 64 bits,
   masked negative/wide shift counts, generic bodies and nested generic closers.
   JVM/CLR execute a 66-case shift corpus; browser checks use a separate BigInt oracle.
@@ -43,7 +49,7 @@ as downloadable artifacts.
 See the repository's Actions page for current CI results.
 
 The browser WebAssembly workflow installs .NET 10 `wasm-tools` and Chromium,
-builds eleven application bundles, and executes `scripts/browser_smoke_test.cjs`.
+builds thirteen application bundles, and executes `scripts/browser_smoke_test.cjs`.
 It checks procedural/object factorial (including exact 20!), input validation,
 objects and virtual dispatch, null/division errors, 64-bit boundaries/overflow,
 text rendering, reruns, Stop and output replacement safeguards. It uploads the
@@ -61,4 +67,6 @@ inheritance, generic interface/container identity, function overloads split betw
 qualified static access. See [project commands](projects-packages.md).
 Browser checks also execute the bitboard example and bitwise boundary/evaluation fixture,
 and reject invalid operand types before publishing.
+The browser collection corpus runs the multi-file example, generic/array/ordered-map
+semantics and twelve runtime-error scenarios, including mutation during iteration.
 Standalone WASI and native targets remain unimplemented.

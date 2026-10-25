@@ -1,6 +1,6 @@
-# Bhash / भाष — v0.6 language definition
+# Bhash / भाष — v0.7 language definition
 
-Status: v0.6 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
+Status: v0.7 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
 uses checked C# source lowering. The browser target reuses CLR lowering with the
@@ -40,6 +40,7 @@ is supplied before execution; see [browser target](wasm-browser.md).
 | --- | --- | --- |
 | `संकुल` | Package declaration | `संकुल संस्था.गणित;` |
 | `आयात` / `उपनाम` | Import / import alias | `आयात संस्था.गणित.गणक उपनाम गणना;` |
+| `प्रत्येक` / `में` | Collection iteration | `प्रत्येक (अ: पूर्णांक में अंक) { ... }` |
 | `कार्य` | Function declaration | `कार्य जोड़(...) -> पूर्णांक { ... }` |
 | `अनुबंध` / `पालन` | Interface / implementation | `वर्ग क पालन ख { ... }` |
 | `साझा` | Static member | `साझा मान गिनती: पूर्णांक = ०;` |
@@ -214,10 +215,20 @@ text and boolean selectors. The selector evaluates once; sections have independe
 and do not fall through. Consecutive case labels may share a body. `विराम` exits the
 nearest loop or selection; `जारी` continues the enclosing loop. See [selection rules](switch.md).
 
-## 10. Deferred design questions
+## 10. Arrays, collections and iteration
 
-Confirm vocabulary; choose exact real formatting; define module/import syntax;
-design arrays, records and generic member methods; choose error/exception behavior beyond arithmetic
+`त[]` (also `सरणी<त>`) is an invariant fixed-length array. `सूची<त>` and
+`मानचित्र<क,व>` are predeclared invariant reference types. Collections support
+indexing, checked writes and typed initializers; lists grow and maps preserve
+insertion order. `प्रत्येक (element: type में source)` iterates elements or map
+keys, and a second typed binding iterates map values alongside their keys.
+See [v0.7 collection rules](collections.md) for APIs, equality, mutation checks,
+array dimensions, evaluation order and multi-file examples.
+
+## 11. Deferred design questions
+
+Confirm vocabulary; choose exact real formatting; extend dependency package distribution;
+design records and generic member methods; choose error/exception behavior beyond arithmetic
 traps; settle WASI vs browser environments and native OS/ABI support; define
 foreign-function interfaces separately for each platform. Do not grow the grammar
 to cover these until their semantics and tests are agreed.

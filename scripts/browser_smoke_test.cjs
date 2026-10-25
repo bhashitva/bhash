@@ -21,6 +21,8 @@ function compile(name, source) {
     build(name, file);
 }
 build('multi-file', path.resolve('examples/multi-file'));
+build('collections', path.resolve('examples/collections'));
+compile('collection-semantics', fs.readFileSync('src/test/resources/collections/browser.bhash', 'utf8'));
 for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics', 'switch-console', 'bitboards'])
     compile(name, fs.readFileSync(`examples/${name}.bhash`, 'utf8'));
 // A separate BigInt reference models the Bhash 64-bit contract, including zero-distance >>>.
@@ -88,6 +90,8 @@ function rejectedBuild(source) {
 rejectedBuild('कार्य');
 for (const expression of ['सत्य & असत्य', '१ << सत्य', '~१.०'])
     rejectedBuild(`कार्य मुख्य() -> शून्य { लिखो(${expression}); }`);
+for (const body of ['स्थिर क: पूर्णांक[] = नया पूर्णांक[]{सत्य};', 'प्रत्येक (क: पूर्णांक में १) {}'])
+    rejectedBuild(`कार्य मुख्य() -> शून्य { ${body} }`);
 const note = path.join(root, 'semantics/_framework/notes.txt');
 fs.writeFileSync(note, 'keep me');
 rejectedBuild(semanticsSource);
@@ -168,6 +172,10 @@ const server = http.createServer((request, response) => {
             for (const input of ['', '1२', 'abc', '9223372036854775808'])
                 await run(name, input, prompt, 1, 'भाष:');
         }
+        await run('collections', '', fs.readFileSync('examples/collections/expected.txt', 'utf8').replaceAll('\r\n', '\n'));
+        await run('collection-semantics', '0', '० ९\n१\n७\nक १\nख ३\nसत्य\n२ ७ ९\nठीक असत्य\n५ ३\n४\n');
+        for (let signal = 1; signal <= 12; signal++)
+            await run('collection-semantics', String(signal), '', 1, 'भाष:');
         await run('bitboards', '', '-९२२३३७२०३६८५४७७५८०७\nसत्य सत्य\n२\n१ १\n-१ -१ ९२२३३७२०३६८५४७७५८०७\n१ २\n');
         await run('bitwise-semantics', '', bitwiseExpected);
         await run('static-error', '', '', 1, 'शून्य से भाग');

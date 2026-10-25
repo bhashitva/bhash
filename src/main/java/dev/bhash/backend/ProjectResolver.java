@@ -97,6 +97,7 @@ public final class ProjectResolver {
     }
     private void register(Unit unit, ParserRuleContext declaration, Token name, Kind kind, boolean exported) throws CompilationException {
         String shortName = key(name.getText()), full = full(unit, shortName);
+        if (kind == Kind.TYPE && CollectionTypes.builtin(shortName)) throw error(name,"Reserved collection type: " + shortName);
         if (kind == Kind.FUNCTION && BUILTINS.contains(shortName)) {
             if (((FunctionDeclContext)declaration).typeParameters()!=null) throw error(name,"Reserved function cannot be generic: " + shortName);
             throw error(name, "Duplicate or reserved function: " + shortName);
@@ -127,7 +128,7 @@ public final class ProjectResolver {
             if (function != null) accessible(function, unit, declaration.start);
             String alias = declaration.IDENTIFIER() == null
                     ? name.substring(name.lastIndexOf('.')+1) : key(declaration.IDENTIFIER().getText());
-            if (BUILTINS.contains(alias) || alias.equals(key("मुख्य"))) throw error(declaration.start, "Reserved import name: " + alias);
+            if (BUILTINS.contains(alias) || CollectionTypes.builtin(alias) || alias.equals(key("मुख्य"))) throw error(declaration.start, "Reserved import name: " + alias);
             if (unit.imports.putIfAbsent(alias, name) != null) throw error(declaration.start, "Duplicate or ambiguous import: " + alias);
             for (var table : List.of(types, functions)) {
                 var local = table.get(full(unit, alias));
@@ -199,6 +200,16 @@ public final class ProjectResolver {
             typeParameters = parameters(c.typeParameters(),typeParameters);
             members = members(unit,c,new HashSet<>());
         }
+        if (node instanceof ForeachStatementContext loop) {
+            for (var parameter:loop.parameter()) walk(parameter.valueType(),unit,scopes,typeParameters,members);
+            walk(loop.expression(),unit,scopes,typeParameters,members);
+            var locals=new HashSet<String>();
+            for (var parameter:loop.parameter()) locals.add(key(parameter.IDENTIFIER().getText()));
+            scopes.push(locals);
+            walk(loop.block(),unit,scopes,typeParameters,members);
+            scopes.pop();
+            return;
+        }
         boolean callable = node instanceof FunctionDeclContext || node instanceof ConstructorDeclContext;
         if (callable) {
             ParametersContext params = node instanceof FunctionDeclContext f ? f.parameters() : ((ConstructorDeclContext)node).parameters();
@@ -211,7 +222,7 @@ public final class ProjectResolver {
         if (block) scopes.push(new HashSet<>());
         if (node instanceof ValueTypeContext type && type.IDENTIFIER()!=null) {
             String name = typeSpelling(type);
-            if (!(type.typeQualifier().isEmpty() && typeParameters.contains(key(name)))) {
+            if (!(type.typeQualifier().isEmpty() && (typeParameters.contains(key(name)) || CollectionTypes.builtin(name)))) {
                 Symbol symbol = lookup(unit,name,Kind.TYPE,type.start);
                 if (symbol == null) {
                     boolean base = type.getParent() instanceof ClassDeclContext c && c.valueType()==type;
@@ -249,6 +260,7 @@ public final class ProjectResolver {
             Symbol match = null;
             PostfixPartContext end = null;
             for (var part : postfix.postfixPart()) {
+                if (part.IDENTIFIER()==null) break;
                 path += "." + key(part.IDENTIFIER().getText());
                 Symbol candidate = (part.LPAREN()==null ? types : functions).get(path);
                 if (candidate!=null) { match=candidate; end=part; }

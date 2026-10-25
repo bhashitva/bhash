@@ -95,13 +95,27 @@ final class GenericExpander {
         return generated;
     }
     private String type(ValueTypeContext type, Map<String,String> subst) throws CompilationException {
-        if (type.IDENTIFIER()==null) return type.getText();
-        String name=Identifiers.key(type.IDENTIFIER().getText());
-        if (type.typeArguments()!=null) return instantiate(types,name,type.typeArguments(),subst);
-        if (subst.containsKey(name)) return subst.get(name);
-        if (types.containsKey(name)) throw error(type,"Generic type requires explicit type arguments: " + name);
-        if (!concreteTypes.contains(name)) throw error(type,"Unknown type: " + name);
-        return name;
+        String result;
+        if (type.IDENTIFIER()==null) result=type.getChild(0).getText();
+        else {
+            String name=Identifiers.key(type.IDENTIFIER().getText());
+            if (subst.containsKey(name)) {
+                if (type.typeArguments()!=null) throw error(type,"A type parameter cannot take type arguments: "+name);
+                result=subst.get(name);
+            } else if (CollectionTypes.builtin(name)) {
+                if (type.typeArguments()==null || type.typeArguments().valueType().size()!=CollectionTypes.ARITY.get(name))
+                    throw error(type,"Wrong type argument count for " + name);
+                var args=new ArrayList<String>();
+                for (var argument:type.typeArguments().valueType()) args.add(type(argument,subst));
+                result=name+"<"+String.join(",",args)+">";
+            } else if (type.typeArguments()!=null) result=instantiate(types,name,type.typeArguments(),subst);
+            else {
+                if (types.containsKey(name)) throw error(type,"Generic type requires explicit type arguments: " + name);
+                if (!concreteTypes.contains(name)) throw error(type,"Unknown type: " + name);
+                result=name;
+            }
+        }
+        return result+"[]".repeat(type.arraySuffix().size());
     }
     private void append(String value, Token origin) {
         origins.put(text.length(),origin);
@@ -112,6 +126,8 @@ final class GenericExpander {
         if (node instanceof ShiftOperatorContext operator) { append(operator.getText(),operator.start); return; }
         if (node instanceof ValueTypeContext t) { append(type(t,subst),t.start); return; }
         if (node instanceof PrimaryContext p && p.typeArguments()!=null) {
+            if (p.LPAREN()==null && CollectionTypes.builtin(p.IDENTIFIER().getText()))
+                throw error(p,"Collection types have no static members; construct them with नया.");
             String name=instantiate(p.LPAREN()==null?types:functions,p.IDENTIFIER().getText(),p.typeArguments(),subst);
             append(name,p.start);
             for (int i=2;i<p.getChildCount();i++) render(p.getChild(i),subst,renamed,replacement);

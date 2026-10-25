@@ -94,4 +94,135 @@ final class BhashRuntime {
     static boolean same(Object left, Object right) { return left == right; }
     static void discard(Object value) {}
     static void report(String message) { ERRORS.println("भाष: " + message); }
+    // Collection indices are Bhash integers; validate before narrowing to host indices.
+    private static int collectionIndex(long index,int size,boolean end) {
+        if (index<0 || (end?index>size:index>=size)) throw new Failure("संग्रह सूचकांक सीमा से बाहर है।");
+        return (int)index;
+    }
+    private static int collectionLength(long length) {
+        if (length<0 || length>Integer.MAX_VALUE) throw new Failure("सरणी की लंबाई सीमा से बाहर है।");
+        return (int)length;
+    }
+    static void checkSizes(long... dimensions) { for (long dimension:dimensions) collectionLength(dimension); }
+    private static void collectionVersion(long expected,long actual) {
+        if (expected!=actual) throw new Failure("पुनरावृत्ति के दौरान संग्रह का आकार बदला गया।");
+    }
+    private static boolean collectionSame(Object a,Object b) {
+        if (a==b) return true;
+        if (a instanceof Double x && b instanceof Double y)
+            return x.doubleValue()==y.doubleValue() || Double.isNaN(x) && Double.isNaN(y);
+        if (a instanceof String || a instanceof Long || a instanceof Boolean) return a.equals(b);
+        return false;
+    }
+    private static int collectionHash(Object value) {
+        if (value instanceof Double d) {
+            long bits=d==0.0?0L:Double.doubleToLongBits(d);
+            return (int)(bits^(bits>>>32));
+        }
+        if (value instanceof String || value instanceof Long || value instanceof Boolean) return value.hashCode();
+        return System.identityHashCode(value);
+    }
+    private static final class BKey<T> {
+        final T value;
+        BKey(T value) { if (value==null) throw new Failure("मानचित्र की कुंजी रिक्त नहीं हो सकती।"); this.value=value; }
+        @Override public boolean equals(Object other) { return other instanceof BKey<?> key && collectionSame(value,key.value); }
+        @Override public int hashCode() { return collectionHash(value); }
+    }
+    static abstract class BSeq<T> implements Iterable<T> {
+        abstract long size();
+        abstract T get(long index);
+        abstract void set(long index,T value);
+        long version() { return 0; }
+        boolean empty() { return size()==0; }
+        boolean contains(T value) { for (T item:this) if (collectionSame(item,value)) return true; return false; }
+        @Override public java.util.Iterator<T> iterator() {
+            final long expected=version();
+            return new java.util.Iterator<T>() {
+                long position;
+                public boolean hasNext() { collectionVersion(expected,version()); return position<size(); }
+                public T next() { if (!hasNext()) throw new java.util.NoSuchElementException(); return get(position++); }
+            };
+        }
+    }
+    static final class BArray<T> extends BSeq<T> {
+        private final Object[] items;
+        BArray(long size,java.util.function.Supplier<T> initializer) {
+            items=new Object[collectionLength(size)];
+            for (int i=0;i<items.length;i++) items[i]=initializer.get();
+        }
+        BArray(long size,T value) { items=new Object[collectionLength(size)]; java.util.Arrays.fill(items,value); }
+        BArray(T[] values) { items=values.clone(); }
+        long size() { return items.length; }
+        @SuppressWarnings("unchecked") T get(long index) { return (T)items[collectionIndex(index,items.length,false)]; }
+        void set(long index,T value) { items[collectionIndex(index,items.length,false)]=value; }
+    }
+    static final class BList<T> extends BSeq<T> {
+        private final java.util.ArrayList<T> items=new java.util.ArrayList<>();
+        private long stamp;
+        long version() { return stamp; }
+        long size() { return items.size(); }
+        T get(long index) { return items.get(collectionIndex(index,items.size(),false)); }
+        void set(long index,T value) { items.set(collectionIndex(index,items.size(),false),value); }
+        void add(T value) { items.add(value); stamp++; }
+        void insert(long index,T value) { items.add(collectionIndex(index,items.size(),true),value); stamp++; }
+        T remove(long index) { T result=items.remove(collectionIndex(index,items.size(),false)); stamp++; return result; }
+        void clear() { if (!items.isEmpty()) { items.clear(); stamp++; } }
+    }
+    static final class BEntry<K,V> {
+        final K key; final V value;
+        BEntry(K key,V value) { this.key=key; this.value=value; }
+    }
+    static final class BMap<K,V> implements Iterable<K> {
+        private final java.util.LinkedHashMap<BKey<K>,V> items=new java.util.LinkedHashMap<>();
+        private long stamp;
+        long size() { return items.size(); }
+        boolean empty() { return items.isEmpty(); }
+        boolean contains(K key) { return items.containsKey(new BKey<K>(key)); }
+        V get(K key) {
+            BKey<K> wrapped=new BKey<>(key);
+            if (!items.containsKey(wrapped)) throw new Failure("मानचित्र में कुंजी नहीं मिली।");
+            return items.get(wrapped);
+        }
+        V getOr(K key,V fallback) { BKey<K> wrapped=new BKey<>(key); return items.containsKey(wrapped)?items.get(wrapped):fallback; }
+        void set(K key,V value) {
+            BKey<K> wrapped=new BKey<>(key);
+            boolean exists=items.containsKey(wrapped); items.put(wrapped,value); if (!exists) stamp++;
+        }
+        boolean remove(K key) {
+            BKey<K> wrapped=new BKey<>(key);
+            if (!items.containsKey(wrapped)) return false;
+            items.remove(wrapped); stamp++; return true;
+        }
+        void clear() { if (!items.isEmpty()) { items.clear(); stamp++; } }
+        Iterable<BEntry<K,V>> entries() {
+            return () -> {
+                final long expected=stamp;
+                final var iterator=items.entrySet().iterator();
+                return new java.util.Iterator<BEntry<K,V>>() {
+                    public boolean hasNext() { collectionVersion(expected,stamp); return iterator.hasNext(); }
+                    public BEntry<K,V> next() {
+                        collectionVersion(expected,stamp); var entry=iterator.next();
+                        return new BEntry<>(entry.getKey().value,entry.getValue());
+                    }
+                };
+            };
+        }
+        @Override public java.util.Iterator<K> iterator() {
+            final var iterator=entries().iterator();
+            return new java.util.Iterator<K>() {
+                public boolean hasNext() { return iterator.hasNext(); }
+                public K next() { return iterator.next().key; }
+            };
+        }
+        BList<K> keys() { BList<K> result=new BList<>(); for (K key:this) result.add(key); return result; }
+        BList<V> values() { BList<V> result=new BList<>(); for (var entry:entries()) result.add(entry.value); return result; }
+    }
+    static <T> BArray<T> array(long size,java.util.function.Supplier<T> initializer) { return new BArray<T>(size,initializer); }
+    static <T> BArray<T> arrayFilled(long size,T value) { return new BArray<T>(size,value); }
+    @SafeVarargs static <T> BArray<T> arrayOf(T... values) { return new BArray<T>(values); }
+    @SafeVarargs static <T> BList<T> listOf(T... values) { BList<T> result=new BList<>(); for (T value:values) result.add(value); return result; }
+    static <K,V> BEntry<K,V> entry(K key,V value) { return new BEntry<>(key,value); }
+    @SafeVarargs static <K,V> BMap<K,V> mapOf(BEntry<K,V>... entries) {
+        BMap<K,V> result=new BMap<>(); for (var entry:entries) result.set(entry.key,entry.value); return result;
+    }
 }

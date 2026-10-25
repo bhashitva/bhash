@@ -158,6 +158,29 @@ shifts are contiguous. Both package lowering and generic expansion render a shif
 operator as one joined spelling before reparsing. Source-token remapping continues
 to preserve the originating filename and coordinates. See [bitwise rules](bitwise.md).
 
+## Arrays and native generic collections
+
+`CollectionTypes` identifies predeclared array/list/map names. `GenericExpander`
+preserves these constructors while specializing user templates, substituting array
+suffixes and nested collection arguments. The checker interns collection types and
+enforces invariant type identity; host generic arguments use boxed Java primitives
+and native CLR value types. `सरणी<T>` and `T[]` resolve to one array type.
+
+Index locations carry a setter expression so receivers, keys and assigned values
+are evaluated once in source order. Array factories evaluate all dimensions once,
+validate lengths before allocation, and create independent nested rows. Default
+primitive/text values are filled without allocating a separate boxed default per cell.
+Synthetic constructor tag types distinguish Bhash constructor overloads whose
+collection parameters erase to identical JVM signatures.
+
+Both runtime templates implement fixed arrays, growable lists and ordered hash maps.
+Map keys and membership share explicit primitive/text/identity equality with normalized
+floating-point zero and NaN behavior. Java uses a linked hash map; CLR combines a
+hash dictionary and linked insertion order. Iterators check structural versions and
+report portable Bhash errors. `प्रत्येक` lowers to host foreach with a once-evaluated
+source, typed immutable bindings, and the existing break/continue/return analysis.
+See [collections](collections.md) for the public language contract.
+
 ## Target status
 
 | Target | Status | Route |

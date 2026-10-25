@@ -38,6 +38,14 @@ class WasmCompilerTest {
         }
         assertFalse(Files.exists(directory.resolve("web")));
     }
+    @Test void invalidCollectionTypesFailBeforeBrowserPublishing() {
+        for (String body:new String[]{"स्थिर क: पूर्णांक[] = नया पूर्णांक[]{सत्य};", "स्थिर क: सूची<पाठ> = नया सूची<पूर्णांक>();", "प्रत्येक (क: पूर्णांक में १) {}"}) {
+            var error=assertThrows(CompilationException.class,()->new WasmCompiler().compile("collections.bhash",
+                    "कार्य मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
+            assertTrue(error.getMessage().startsWith("collections.bhash:1:"),error.getMessage());
+        }
+        assertFalse(Files.exists(directory.resolve("web")));
+    }
     @Test void refusesUnmanagedOutputAndSourceDirectories() throws Exception {
         var compiler = new WasmCompiler();
         Files.writeString(directory.resolve("notes.txt"), "keep");

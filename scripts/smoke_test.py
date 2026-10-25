@@ -59,6 +59,15 @@ for target in ("jvm", "clr"):
     command = ["java", "-jar", str(compiler), "run", "examples/multi-file", "--target", target]
     output, errors = invoke(command, "0\n")
     assert output == "० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १\nसत्य १\nसंख्या ठीक\n" and not errors, (target, output, errors)
+# Collection examples exercise typed arrays, lists/maps and generic interfaces across files.
+for target in ("jvm", "clr"):
+    output_path = Path("target") / ("collections.jar" if target == "jvm" else "collections-clr")
+    invoke(["java", "-jar", str(compiler), "compile", "examples/collections", "--target", target, "-o", str(output_path)])
+    command = ["java", "-Xverify:all", "-jar", str(output_path)] if target == "jvm" else [dotnet, str(output_path / "BhashProgram.dll")]
+    output, errors = invoke(command)
+    assert output == Path("examples/collections/expected.txt").read_text(encoding="utf-8") and not errors, (target, output, errors)
+print("Array, list/map and iteration project passed on JVM/CLR.")
+
 print("Multi-file projects, packages, imports, generics, overloads and shared references passed on JVM/CLR.")
 
 print("Packaged JVM/CLR compiler, console factorial, objects, inheritance and virtual dispatch passed.")

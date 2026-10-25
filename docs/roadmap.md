@@ -7,6 +7,8 @@
 - Multi-file executable projects, packages, file-local imports/aliases, public exports,
   qualified references and cross-file checking on all three implemented targets.
 - Interfaces, explicit generic types/global functions, overload resolution and static members.
+- Fixed and jagged arrays, indexing, generic growable lists, insertion-ordered maps,
+  portable key equality and collection iteration with structural-mutation checks.
 - Selection statements with typed literal cases, grouped labels, default, scopes and nested loop control.
 - Integer bitwise AND/OR/XOR/complement and three portable 64-bit shifts, including
   generic syntax compatibility and a chess bitboard example.
@@ -57,6 +59,6 @@
 ## Later language growth
 
 Abstract/final members, generic member methods, constraints/inference, constructor-assigned
-immutable fields, arrays/records, arbitrary-precision arithmetic, standard
+immutable fields, records, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, standard
 library, debugger support, editor tooling, dependency package management and FFI. Changes require a spec update,
 examples and tests. Generated code, JVM JARs, CLR deployment folders and browser bundles remain build products.

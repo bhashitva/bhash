@@ -121,6 +121,29 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/bitboards.bhash
 See [operator rules and examples](docs/bitwise.md) for precedence, shift counts,
 generic parsing and CLR/browser commands.
 
+## Arrays, lists, maps and iteration
+
+Bhash v0.7 adds zero-based arrays (`पूर्णांक[]`), generic lists (`सूची<त>`),
+insertion-ordered maps (`मानचित्र<क,व>`) and collection iteration:
+
+```text
+स्थिर अंक: सूची<पूर्णांक> = नया सूची<पूर्णांक>{१,२,३};
+अंक.जोड़ो(४);
+प्रत्येक (अ: पूर्णांक में अंक) { लिखो(अ); }
+```
+
+The same [multi-file collection example](examples/collections/) works on all three targets:
+
+```bash
+git pull --ff-only
+mvn clean package -DskipTests
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/collections
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/collections --target clr
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/collections --target wasm-browser -o target/collections-web
+```
+
+See [collection syntax, APIs and mutation rules](docs/collections.md).
+
 ## The program
 
 ```text
