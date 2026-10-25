@@ -212,3 +212,23 @@ constructor overload tags. Catch boundaries unwrap static initialization wrapper
 only for known Bhash exceptions. Finally may throw but cannot return or jump to an
 outer loop, keeping source semantics valid on both JVM and CLR (including browser
 .NET WebAssembly). Runtime stack traces and exception causes are not yet exposed.
+
+## Portable types and data
+
+The managed type graph includes byte/int32 primitives, general boxed values,
+enum definitions, sealed record definitions and packed buffers. Enum members
+lower to typed singleton instances; records lower to sealed classes with readonly
+fields and shared structural equality/hashing. Record constructors retain the
+existing constructor tags, including generic specializations.
+
+Collection wrappers carry invariant type descriptors on the object itself, so
+JVM erasure cannot let an incompatible list/map/array pass a runtime test or cast.
+Every collection allocation, nested array row and returned snapshot receives its
+canonical descriptor. CLR also validates these descriptors alongside native type
+checks. The approach needs no global object registry. Scalar boxing keeps byte,
+int32, int64, real, boolean and text distinct. Conversion and cast helpers raise
+Bhash failures with the same checked boundaries across runtimes.
+
+Packed buffers use native byte arrays with unsigned Bhash reads. Binary accesses
+explicitly assemble/disassemble bits; endianness never depends on the host. UTF-8
+decoders reject malformed bytes. The browser target reuses the CLR implementation.

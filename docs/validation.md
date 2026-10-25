@@ -4,7 +4,7 @@ The JVM implementation is tested by compiling Bhash source to standalone JVM JAR
 and executing them in separate Java/.NET processes (with bytecode verification enabled on the JVM).
 There is no compiler/ANTLR classpath when running the generated programs.
 
-The v0.8 suite contains 191 JUnit tests, including project source discovery, package/import
+The v0.9 suite contains 216 JUnit tests, including project source discovery, package/import
 resolution, frontend checks and a shared JVM/CLR execution corpus. Packaged compiler/application
 smoke checks separately exercise the public CLI. CI runs the suite on Linux and Windows.
 
@@ -13,6 +13,10 @@ with extra CLR tests for output preservation and directory ownership. JVM tests
 require a JDK; CLR tests require the .NET 10 SDK. CI requires both backends.
 
 Coverage includes:
+
+- Checked numeric boundaries, exact scalar boxing/unboxing, primitive promotion,
+  enum codes/switches, generic record equality/hashing, reified collection tests/casts,
+  byte buffer bounds/copies/endian I/O, strict UTF-8 and cross-file generic type examples.
 
 - Exception subtyping, catch order/scopes, custom constructor messages, identity,
   rethrow, catchable runtime/static-initialization failures, finally on return/loop
@@ -53,7 +57,7 @@ as downloadable artifacts.
 See the repository's Actions page for current CI results.
 
 The browser WebAssembly workflow installs .NET 10 `wasm-tools` and Chromium,
-builds fifteen application bundles, and executes `scripts/browser_smoke_test.cjs`.
+builds seventeen application bundles, and executes `scripts/browser_smoke_test.cjs`.
 It checks procedural/object factorial (including exact 20!), input validation,
 objects and virtual dispatch, null/division errors, 64-bit boundaries/overflow,
 text rendering, reruns, Stop and output replacement safeguards. It uploads the
@@ -77,4 +81,6 @@ The browser exception corpus checks custom subtypes, identity/rethrow, runtime a
 initialization failures, generic functions, cleanup across return/break/continue, cleanup
 exception replacement and uncaught exception reporting. The factorial example checks
 valid input, domain errors and handled malformed input.
+The type corpus executes the multi-file example plus an independent browser fixture
+covering every new type feature and sixteen uncaught conversion/cast/buffer failures.
 Standalone WASI and native targets remain unimplemented.

@@ -1,6 +1,6 @@
-# Bhash / भाष — v0.8 language definition
+# Bhash / भाष — v0.9 language definition
 
-Status: v0.8 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
+Status: v0.9 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
 uses checked C# source lowering. The browser target reuses CLR lowering with the
@@ -56,6 +56,11 @@ is supplied before execution; see [browser target](wasm-browser.md).
 | `विराम` / `जारी` | Break / continue | `विराम;` |
 | `लिखो` | Console output statement | `लिखो("उत्तर", परिणाम);` |
 | `पढ़ो` | Predeclared integer input function | `स्थिर संख्या: पूर्णांक = पढ़ो();` |
+| `बाइट` / `लघुपूर्णांक` | Unsigned 8-bit / signed 32-bit | `परिवर्तित<बाइट>(२५५)` |
+| `परिगणना` / `अभिलेख` | Enum / immutable record | `अभिलेख बिंदु(अ: पूर्णांक);` |
+| `सर्ववस्तु` | General boxed/reference value | `स्थिर क: सर्ववस्तु = १;` |
+| `परिवर्तित` / `प्रकारहै` / `सुरक्षितरूप` | Convert/cast / type test / safe reference cast | `प्रकारहै<बिंदु>(क)` |
+| `बाइटबफ़र` | Packed mutable byte sequence | `नया बाइटबफ़र(८)` |
 | `पूर्णांक` | Signed 64-bit integer | `४२` |
 | `दशमलव` | IEEE 754 binary64 floating-point | `३.१४` |
 | `तार्किक` | Boolean | `सत्य`, `असत्य` |
@@ -109,7 +114,8 @@ value on every reachable path. Analysis conservatively assumes a loop can execut
 zero times, even for a literal true condition. Code after an unconditional return,
 break or continue is rejected as unreachable. Only function calls may be standalone expression
 statements, although the grammar intentionally accepts a wider expression here.
-Assignments are statements, not expressions; assignment targets are names only.
+Assignments are statements, not expressions; targets may be mutable bindings, fields
+or checked collection indices.
 
 ## 5. Operators and portable behavior
 
@@ -130,8 +136,9 @@ Precedence, highest to lowest; binary operators associate left to right:
 | 11 | `&&` | Short-circuit AND |
 | 12 | `\|\|` | Short-circuit OR |
 
-- No implicit integer/real conversion in v0.3. Numeric binary operands must have
-  the same type; conversion functions can be designed later.
+- Integer/real mixing requires `परिवर्तित<T>(value)`. `बाइट` and `लघुपूर्णांक`
+  operands promote to `पूर्णांक` in integer expressions; assignment/argument
+  conversions remain explicit. See [conversion rules](types-conversions.md).
 - Integer range: −2^63 through 2^63−1. Out-of-range literals are compile-time
   errors. The constant checker handles unary minus before range validation
   so that the minimum signed integer can be expressed.
@@ -238,9 +245,25 @@ Exceptions are unchecked. Finally executes across normal and abrupt completion;
 control cannot return or jump out of finally. See [exception semantics](exceptions.md)
 for subtype matching, scopes, replacement exceptions and host limitations.
 
-## 12. Deferred design questions
+## 12. Types, conversions and binary data
+
+`बाइट` is unsigned 8-bit and `लघुपूर्णांक` is signed 32-bit. Explicit numeric
+conversions are checked; fractional-to-integer conversions truncate toward zero.
+Small integral expression operands promote to `पूर्णांक`; assignments and
+arguments still require explicit conversion. `सर्ववस्तु` stores boxed scalars
+and references while preserving runtime type identity. `प्रकारहै<T>`,
+`परिवर्तित<T>` and `सुरक्षितरूप<T>` implement tests, checked conversions/casts
+and nullable reference casts, including invariant generic collections.
+
+`परिगणना` introduces typed enum members/codes and named switch labels.
+`अभिलेख` introduces sealed immutable records with generic parameters,
+structural equality and hashing. `बाइटबफ़र` provides packed bytes, indexed
+access/iteration, binary64/signed-64 binary reads/writes with explicit endianness,
+copying and strict UTF-8 encoding/decoding. See [complete type rules](types-conversions.md).
+
+## 13. Deferred design questions
 
 Confirm vocabulary; choose exact real formatting; extend dependency package distribution;
-design records and generic member methods; extend exception metadata and resource management; settle WASI vs browser environments and native OS/ABI support; define
+extend records and generic member methods; extend exception metadata and resource management; settle WASI vs browser environments and native OS/ABI support; define
 foreign-function interfaces separately for each platform. Do not grow the grammar
 to cover these until their semantics and tests are agreed.

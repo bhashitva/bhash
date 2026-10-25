@@ -11,7 +11,7 @@ import org.antlr.v4.runtime.tree.*;
 /** Resolves each file's lexical imports into a shared, whole-project symbol graph. */
 public final class ProjectResolver {
     private enum Kind { TYPE, FUNCTION }
-    private static final Set<String> BUILTINS = Set.of("पढ़ो", "पाठपढ़ो", "लंबाई", "अंश", "अंकपाठ", "पूर्णांकपाठ", "बड़ाअक्षर", "त्रुटि");
+    private static final Set<String> BUILTINS = Set.of("पढ़ो", "पाठपढ़ो", "लंबाई", "अंश", "अंकपाठ", "पूर्णांकपाठ", "बड़ाअक्षर", "त्रुटि", "यूटीएफ८बफ़र", "यूटीएफ८पाठ");
     private static final class Unit {
         final ProgramContext tree;
         final String pkg;
@@ -70,6 +70,7 @@ public final class ProjectResolver {
                 ParseTree child = unit.tree.getChild(i);
                 if (child instanceof TerminalNode t && t.getSymbol().getType() == BhashParser.PUBLIC) { exported = true; continue; }
                 if (child instanceof ClassDeclContext c) register(unit, c, c.IDENTIFIER().getSymbol(), Kind.TYPE, exported);
+                else if (child instanceof EnumDeclContext c) register(unit, c, c.IDENTIFIER().getSymbol(), Kind.TYPE, exported);
                 else if (child instanceof InterfaceDeclContext c) register(unit, c, c.IDENTIFIER().getSymbol(), Kind.TYPE, exported);
                 else if (child instanceof FunctionDeclContext f) register(unit, f, f.IDENTIFIER().getSymbol(), Kind.FUNCTION, exported);
                 exported = false;
@@ -178,6 +179,8 @@ public final class ProjectResolver {
             for (var f : c.functionDecl()) methods.add(key(f.IDENTIFIER().getText()));
             if (c.typeList()!=null) parents.addAll(c.typeList().valueType());
         }
+        if (declaration instanceof ClassDeclContext c && c.RECORD()!=null && c.parameters()!=null)
+            for (var parameter:c.parameters().parameter()) fields.add(key(parameter.IDENTIFIER().getText()));
         for (var parent : parents) if (parent.IDENTIFIER()!=null) {
             boolean shadowed=declaration instanceof ClassDeclContext c && c.typeParameters()!=null
                     && c.typeParameters().IDENTIFIER().stream().anyMatch(id->key(id.getText()).equals(key("अपवाद")));
@@ -244,6 +247,14 @@ public final class ProjectResolver {
                 replace(unit,type.IDENTIFIER().getSymbol(),type.typeQualifier().isEmpty() ? type.IDENTIFIER().getSymbol()
                         : type.typeQualifier(type.typeQualifier().size()-1).stop,symbol.lowered);
             }
+        }
+        if (node instanceof CaseValueContext label && label.qualifiedName()!=null) {
+            var ids=label.qualifiedName().IDENTIFIER();
+            if (ids.size()<2) throw error(label.start,"Enum case requires Type.Member.");
+            String path=String.join(".",ids.subList(0,ids.size()-1).stream().map(id->key(id.getText())).toList());
+            Symbol symbol=lookup(unit,path,Kind.TYPE,label.start);
+            if (symbol==null) throw error(label.start,"Unknown enum type: "+path);
+            replace(unit,ids.get(0).getSymbol(),ids.get(ids.size()-2).getSymbol(),symbol.lowered);
         }
         if (node instanceof PostfixContext postfix) resolvePostfix(postfix,unit,scopes,members,typeParameters);
         if (!(node instanceof TerminalNode)) for (int i=0;i<node.getChildCount();i++) walk(node.getChild(i),unit,scopes,typeParameters,members);

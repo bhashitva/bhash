@@ -168,6 +168,30 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/exceptions.b
 
 See [exception rules and cleanup behavior](docs/exceptions.md).
 
+## Types, conversions and binary data
+
+Bhash v0.9 adds checked numeric conversions, unsigned `बाइट`, signed 32-bit
+`लघुपूर्णांक`, packed `बाइटबफ़र`, enums (`परिगणना`), immutable generic records
+(`अभिलेख`), general values (`सर्ववस्तु`) and runtime type tests/casts.
+
+```text
+परिगणना स्थिति { लंबित, तैयार = ५ }
+अभिलेख बिंदु(अ: पूर्णांक, ब: पूर्णांक);
+कार्य मुख्य() -> शून्य {
+    स्थिर छोटा: बाइट = परिवर्तित<बाइट>(२५५);
+    स्थिर मूल: सर्ववस्तु = नया बिंदु(२,३);
+    लिखो(छोटा, प्रकारहै<बिंदु>(मूल), परिवर्तित<बिंदु>(मूल).अ);
+}
+```
+
+`परिवर्तित<T>(value)` performs checked conversion/casting; `प्रकारहै<T>(value)`
+tests runtime type, and `सुरक्षितरूप<T>(value)` returns null on a failed reference
+cast. Generic collection tests distinguish element types on every target.
+
+After rebuilding, run `examples/types` on JVM or CLR, or compile it with
+`--target wasm-browser`. See [type rules and buffer APIs](docs/types-conversions.md)
+and the [multi-file example](examples/types/).
+
 ## The program
 
 ```text

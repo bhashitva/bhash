@@ -94,3 +94,8 @@ counts occupied squares, toggles bit 0, and demonstrates both right shifts:
 Serve browser output over HTTP as described in [the browser guide](wasm-browser.md).
 JVM compilation requires a full JDK 17+; CLR/browser toolchain requirements are
 unchanged.
+
+As of v0.9, `बाइट` and `लघुपूर्णांक` operands promote to signed 64-bit
+`पूर्णांक` before bitwise operations. The existing 64-bit shift/complement
+semantics apply; explicitly narrow a result with `परिवर्तित<बाइट>` or
+`परिवर्तित<लघुपूर्णांक>` when storing it in a smaller type. Narrowing is checked.

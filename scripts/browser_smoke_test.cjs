@@ -20,6 +20,8 @@ function compile(name, source) {
     fs.writeFileSync(file, source);
     build(name, file);
 }
+build('types', path.resolve('examples/types'));
+compile('type-semantics', fs.readFileSync('src/test/resources/types/browser.bhash', 'utf8'));
 build('multi-file', path.resolve('examples/multi-file'));
 compile('exceptions', fs.readFileSync('examples/exceptions.bhash', 'utf8'));
 compile('exception-semantics', fs.readFileSync('src/test/resources/exceptions/browser.bhash', 'utf8'));
@@ -95,6 +97,8 @@ for (const expression of ['सत्य & असत्य', '१ << सत्य
 for (const body of ['स्थिर क: पूर्णांक[] = नया पूर्णांक[]{सत्य};', 'प्रत्येक (क: पूर्णांक में १) {}'])
     rejectedBuild(`कार्य मुख्य() -> शून्य { ${body} }`);
 for (const body of ['फेंको १;', 'फेंको;', 'प्रयास {} पकड़ो (क: पूर्णांक) {}', 'प्रयास {} अंततः { लौटाओ; }'])
+    rejectedBuild(`कार्य मुख्य() -> शून्य { ${body} }`);
+for (const body of ['स्थिर क: बाइट = १;', 'लिखो(सुरक्षितरूप<पूर्णांक>(१));'])
     rejectedBuild(`कार्य मुख्य() -> शून्य { ${body} }`);
 const note = path.join(root, 'semantics/_framework/notes.txt');
 fs.writeFileSync(note, 'keep me');
@@ -176,6 +180,9 @@ const server = http.createServer((request, response) => {
             for (const input of ['', '1२', 'abc', '9223372036854775808'])
                 await run(name, input, prompt, 1, 'भाष:');
         }
+        await run('types', '', fs.readFileSync('examples/types/expected.txt', 'utf8').replaceAll('\r\n', '\n'));
+        await run('type-semantics', '0', fs.readFileSync('src/test/resources/types/browser-expected.txt', 'utf8').replaceAll('\r\n', '\n'));
+        for (let signal = 1; signal <= 16; signal++) await run('type-semantics', String(signal), '', 1, 'भाष:');
         await run('exceptions', '५', '१२०\nकार्य समाप्त।\n');
         await run('exceptions', '-1', 'अमान्य अंक: ० से २० के बीच पूर्णांक लिखें।\nकार्य समाप्त।\n');
         await run('exceptions', 'abc', 'इनपुट त्रुटि: अमान्य इनपुट: एक पंक्ति में एक पूर्णांक लिखें (0-9 या ०-९)।\nकार्य समाप्त।\n');

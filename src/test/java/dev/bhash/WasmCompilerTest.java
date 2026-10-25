@@ -20,6 +20,14 @@ class WasmCompilerTest {
         }
         assertFalse(Files.exists(directory.resolve("web")));
     }
+    @Test void invalidTypeFeaturesFailBeforeBrowserPublishing() {
+        for (String body:new String[]{"स्थिर क: बाइट = १;", "लिखो(सुरक्षितरूप<पूर्णांक>(१));", "स्थिर ब: बाइटबफ़र = नया बाइटबफ़र(१); ब[०] = १;"}) {
+            var error=assertThrows(CompilationException.class,()->new WasmCompiler().compile("types.bhash",
+                    "कार्य मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
+            assertTrue(error.getMessage().startsWith("types.bhash:1:"),error.getMessage());
+        }
+        assertFalse(Files.exists(directory.resolve("web")));
+    }
     @Test void validatesLanguageBeforeStartingDotnet() {
         var compiler = new WasmCompiler();
         assertThrows(CompilationException.class, () -> compiler.compile("bad.bhash", "कार्य", directory.resolve("web")));

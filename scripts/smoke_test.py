@@ -59,6 +59,11 @@ for target in ("jvm", "clr"):
     command = ["java", "-jar", str(compiler), "run", "examples/multi-file", "--target", target]
     output, errors = invoke(command, "0\n")
     assert output == "० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १\nसत्य १\nसंख्या ठीक\n" and not errors, (target, output, errors)
+# Portable type features and binary buffers through the public project CLI.
+for target in ("jvm", "clr"):
+    output, errors = invoke(["java", "-jar", str(compiler), "run", "examples/types", "--target", target])
+    assert output == Path("examples/types/expected.txt").read_text(encoding="utf-8") and not errors, (target, output, errors)
+print("Numeric conversions, enums, records, type casts and byte buffers passed on JVM/CLR.")
 # Exceptions: custom types, runtime input errors and finally through the packaged CLI.
 for target in ("jvm", "clr"):
     for value, expected in [("५\n", "१२०\nकार्य समाप्त।\n"), ("-1\n", "अमान्य अंक: ० से २० के बीच पूर्णांक लिखें।\nकार्य समाप्त।\n")]:

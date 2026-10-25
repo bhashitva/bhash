@@ -9,6 +9,8 @@
 - Interfaces, explicit generic types/global functions, overload resolution and static members.
 - Fixed and jagged arrays, indexing, generic growable lists, insertion-ordered maps,
   portable key equality and collection iteration with structural-mutation checks.
+- Checked numeric conversions, 8-bit unsigned bytes, 32-bit integers, packed byte buffers,
+  UTF-8/binary I/O, typed enums, immutable generic records and reified runtime type tests/casts.
 - Typed exceptions, custom exception subclasses, ordered catch handlers, throw/rethrow
   and finally cleanup across all three managed targets.
 - Selection statements with typed literal cases, grouped labels, default, scopes and nested loop control.
@@ -29,7 +31,7 @@
 
 - Extract a source-located typed AST from combined semantic checking/Java lowering.
 - Improve diagnostic codes, multiple-error recovery and runtime source mapping.
-- Expand standard input support beyond integers; design explicit numeric conversions.
+- Expand standard input support beyond integers; extend numeric parsing and formatting.
 - Maintain Apache 2.0 licensing, contribution guidance and third-party notices.
 
 ## Project and library follow-ups
@@ -61,6 +63,6 @@
 ## Later language growth
 
 Abstract/final members, generic member methods, constraints/inference, constructor-assigned
-immutable fields, records, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, standard
+immutable fields, record bodies/patterns, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, standard
 library, debugger support, editor tooling, dependency package management and FFI. Changes require a spec update,
 examples and tests. Generated code, JVM JARs, CLR deployment folders and browser bundles remain build products.

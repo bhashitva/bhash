@@ -94,6 +94,7 @@ internal static class BhashRuntime {
             if (i > 0) Output.Write(' ');
             object value = values[i];
             if (value is long number) Output.Write(devanagari(number.ToString(CultureInfo.InvariantCulture)));
+            else if (value is int || value is byte) Output.Write(devanagari(Convert.ToString(value,CultureInfo.InvariantCulture)));
             else if (value is bool flag) Output.Write(flag ? "सत्य" : "असत्य");
             else if (value is double real) Output.Write(devanagari(realText(real)));
             else Output.Write(value);
@@ -155,7 +156,7 @@ internal static class BhashRuntime {
         if (value == null) throw new Failure("रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।");
         return value;
     }
-    internal static bool same(object left, object right) => ReferenceEquals(left, right);
+    internal static bool same(object left, object right) => collectionSame(left, right);
     internal static void discard(object value) {}
     internal static void report(string message) => Errors.WriteLine("भाष: " + message);
     private static int collectionIndex(long index,int size,bool end) {
@@ -174,7 +175,7 @@ internal static class BhashRuntime {
         if (ReferenceEquals(a,b)) return true;
         if (a is double x && b is double y) return x==y || double.IsNaN(x) && double.IsNaN(y);
         if (a is string text && b is string other) return string.Equals(text,other,StringComparison.Ordinal);
-        if (a is long || a is bool) return a.Equals(b);
+        if (a is long || a is int || a is byte || a is bool || a is BRecord) return a.Equals(b);
         return false;
     }
     private static int collectionHash(object value) {
@@ -185,6 +186,7 @@ internal static class BhashRuntime {
         if (value is string text) { int hash=0; foreach(char c in text) hash=unchecked(31*hash+c); return hash; }
         if (value is long number) return unchecked((int)(number^(number>>32)));
         if (value is bool flag) return flag?1231:1237;
+        if (value is int || value is byte || value is BRecord) return value.GetHashCode();
         return System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
     }
     private sealed class BKey<T> {
@@ -193,7 +195,7 @@ internal static class BhashRuntime {
         public override bool Equals(object other) => other is BKey<T> key && collectionSame(value,key.value);
         public override int GetHashCode() => collectionHash(value);
     }
-    internal abstract class BSeq<T> : System.Collections.Generic.IEnumerable<T> {
+    internal abstract class BSeq<T> : BTyped, System.Collections.Generic.IEnumerable<T> {
         internal abstract long size();
         internal abstract T get(long index);
         internal abstract void set(long index,T value);
@@ -237,7 +239,7 @@ internal static class BhashRuntime {
         internal readonly K key; internal readonly V value;
         internal BEntry(K key,V value) { this.key=key; this.value=value; }
     }
-    internal sealed class BMap<K,V> : System.Collections.Generic.IEnumerable<K> {
+    internal sealed class BMap<K,V> : BTyped, System.Collections.Generic.IEnumerable<K> {
         private sealed class Cell {
             internal V value; internal readonly System.Collections.Generic.LinkedListNode<BKey<K>> node;
             internal Cell(V value,System.Collections.Generic.LinkedListNode<BKey<K>> node) { this.value=value; this.node=node; }
@@ -286,4 +288,81 @@ internal static class BhashRuntime {
     internal static BMap<K,V> mapOf<K,V>(params BEntry<K,V>[] entries) {
         var result=new BMap<K,V>(); foreach(var entry in entries) result.set(entry.key,entry.value); return result;
     }
+    internal static long toLong(double value) {
+        if (!double.IsFinite(value) || value < -9223372036854775808.0 || value >= 9223372036854775808.0) throw new Failure("संख्यात्मक परिवर्तन सीमा से बाहर है।");
+        return (long)value;
+    }
+    internal static int toInt32(long value) {
+        if (value<int.MinValue || value>int.MaxValue) throw new Failure("लघुपूर्णांक परिवर्तन सीमा से बाहर है।");
+        return (int)value;
+    }
+    internal static byte toByte(long value) {
+        if (value<0 || value>255) throw new Failure("बाइट परिवर्तन सीमा से बाहर है।");
+        return (byte)value;
+    }
+    internal static double parseReal(string value) {
+        if (!Regex.IsMatch(value,@"\A[+-]?(?:[0-9]+(?:\.[0-9]+)?|[०-९]+(?:\.[०-९]+)?)\z",RegexOptions.CultureInvariant)) throw new Failure("अमान्य दशमलव पाठ।");
+        var ascii=new StringBuilder(); foreach(char c in value) ascii.Append(c>='०'&&c<='९'?(char)('0'+c-'०'):c);
+        if (!double.TryParse(ascii.ToString(),NumberStyles.AllowLeadingSign|NumberStyles.AllowDecimalPoint,CultureInfo.InvariantCulture,out double result) || !double.IsFinite(result))
+            throw new Failure("दशमलव परिवर्तन सीमा से बाहर है।");
+        return result;
+    }
+    internal static string scalarText(object value) => value is bool b?(b?"सत्य":"असत्य"):value is double real?realText(real):Convert.ToString(value,CultureInfo.InvariantCulture);
+    internal class BTyped { internal string typeTag; }
+    internal static T typed<T>(T value,string tag) where T:BTyped {
+        if(value!=null) { if(value.typeTag!=null && value.typeTag!=tag) throw new Failure("संग्रह प्रकार असंगत है।"); value.typeTag=tag; }
+        return value;
+    }
+    internal static bool isType(object value,string tag,Type type) => value!=null && type.IsInstanceOfType(value) && (tag.Length==0 || value is BTyped item && item.typeTag==tag);
+    internal static T checkedCast<T>(object value,string tag,Type type,bool nullable) {
+        if(value==null && nullable) return default(T);
+        if(!isType(value,tag,type)) throw new Failure("रनटाइम प्रकार परिवर्तन असफल हुआ।");
+        return (T)value;
+    }
+    internal static T safeCast<T>(object value,string tag,Type type) => isType(value,tag,type)?(T)value:default(T);
+    public abstract class BRecord {
+        protected abstract object[] dataFields();
+        public sealed override bool Equals(object other) {
+            if(other==null || other.GetType()!=GetType()) return false;
+            object[] a=dataFields(),b=((BRecord)other).dataFields();
+            for(int i=0;i<a.Length;i++) if(!collectionSame(a[i],b[i])) return false;
+            return true;
+        }
+        public sealed override int GetHashCode() { int hash=GetType().GetHashCode(); foreach(object item in dataFields()) hash=unchecked(31*hash+collectionHash(item)); return hash; }
+    }
+    internal sealed class BBuffer : BSeq<byte> {
+        internal readonly byte[] items;
+        internal BBuffer(long size) { items=new byte[collectionLength(size)]; }
+        internal BBuffer(byte[] data) { items=data; }
+        internal override long size() => items.Length;
+        internal override byte get(long index) => items[collectionIndex(index,items.Length,false)];
+        internal override void set(long index,byte value) { items[collectionIndex(index,items.Length,false)]=value; }
+        private int span(long offset) {
+            if(offset<0 || offset>items.Length-8L) throw new Failure("बाइटबफ़र सीमा से बाहर है।");
+            return (int)offset;
+        }
+        internal long readLong(long offset,bool big) {
+            int at=span(offset); ulong result=0;
+            for(int i=0;i<8;i++) result|=(ulong)items[at+i] << (8*(big?7-i:i));
+            return unchecked((long)result);
+        }
+        internal void writeLong(long offset,long value,bool big) {
+            int at=span(offset); for(int i=0;i<8;i++) items[at+i]=unchecked((byte)((ulong)value >> (8*(big?7-i:i))));
+        }
+        internal double readReal(long offset,bool big) => BitConverter.Int64BitsToDouble(readLong(offset,big));
+        internal void writeReal(long offset,double value,bool big) { writeLong(offset,BitConverter.DoubleToInt64Bits(value),big); }
+        internal void fill(byte value) { Array.Fill(items,value); }
+        internal BBuffer slice(long start,long end) {
+            if(start<0 || end<start || end>items.Length) throw new Failure("बाइटबफ़र सीमा से बाहर है।");
+            var result=new byte[(int)(end-start)]; Array.Copy(items,(int)start,result,0,result.Length); return new BBuffer(result);
+        }
+        internal BArray<byte> toArray() => new BArray<byte>(items);
+    }
+    internal static BBuffer bufferOf(params byte[] values) { var result=new BBuffer(values.LongLength); for(int i=0;i<values.Length;i++) result.set(i,values[i]); return result; }
+    internal static BBuffer encodeUtf8(string text) => new BBuffer(new UTF8Encoding(false,true).GetBytes(text));
+    internal static string decodeUtf8(BBuffer buffer) {
+        try { return new UTF8Encoding(false,true).GetString(instance(buffer).items); }
+        catch(DecoderFallbackException) { throw new Failure("अमान्य UTF-8 बाइटबफ़र।"); }
+    }
+
 }

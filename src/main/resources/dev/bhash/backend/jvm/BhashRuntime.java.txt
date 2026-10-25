@@ -50,7 +50,7 @@ final class BhashRuntime {
     static String integerText(long value) { return Long.toString(value); }
     static long parseInteger(String value) {
         if (!value.matches("[+-]?(?:[0-9]+|[०-९]+)")) throw new Failure("अमान्य पूर्णांक पाठ।");
-        try { return Long.parseLong(value); }
+        try { return Long.parseLong(asciiDigits(value)); }
         catch (NumberFormatException e) { throw new Failure("पूर्णांक 64-बिट सीमा से बाहर है।"); }
     }
     static String upper(String value) {
@@ -65,6 +65,7 @@ final class BhashRuntime {
             if (i > 0) OUTPUT.print(' ');
             Object value = values[i];
             if (value instanceof Long number) OUTPUT.print(devanagari(Long.toString(number)));
+            else if (value instanceof Integer || value instanceof Short) OUTPUT.print(devanagari(value.toString()));
             else if (value instanceof Boolean flag) OUTPUT.print(flag ? "सत्य" : "असत्य");
             else if (value instanceof Double number) OUTPUT.print(devanagari(Double.toString(number)));
             else OUTPUT.print(value);
@@ -96,7 +97,7 @@ final class BhashRuntime {
         if (value == null) throw new Failure("रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।");
         return value;
     }
-    static boolean same(Object left, Object right) { return left == right; }
+    static boolean same(Object left, Object right) { return collectionSame(left,right); }
     static void discard(Object value) {}
     static void report(String message) { ERRORS.println("भाष: " + message); }
     // Collection indices are Bhash integers; validate before narrowing to host indices.
@@ -116,7 +117,7 @@ final class BhashRuntime {
         if (a==b) return true;
         if (a instanceof Double x && b instanceof Double y)
             return x.doubleValue()==y.doubleValue() || Double.isNaN(x) && Double.isNaN(y);
-        if (a instanceof String || a instanceof Long || a instanceof Boolean) return a.equals(b);
+        if (a instanceof String || a instanceof Long || a instanceof Integer || a instanceof Short || a instanceof Boolean || a instanceof BRecord) return a.equals(b);
         return false;
     }
     private static int collectionHash(Object value) {
@@ -124,7 +125,7 @@ final class BhashRuntime {
             long bits=d==0.0?0L:Double.doubleToLongBits(d);
             return (int)(bits^(bits>>>32));
         }
-        if (value instanceof String || value instanceof Long || value instanceof Boolean) return value.hashCode();
+        if (value instanceof String || value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Boolean || value instanceof BRecord) return value.hashCode();
         return System.identityHashCode(value);
     }
     private static final class BKey<T> {
@@ -133,7 +134,7 @@ final class BhashRuntime {
         @Override public boolean equals(Object other) { return other instanceof BKey<?> key && collectionSame(value,key.value); }
         @Override public int hashCode() { return collectionHash(value); }
     }
-    static abstract class BSeq<T> implements Iterable<T> {
+    static abstract class BSeq<T> extends BTyped implements Iterable<T> {
         abstract long size();
         abstract T get(long index);
         abstract void set(long index,T value);
@@ -177,7 +178,7 @@ final class BhashRuntime {
         final K key; final V value;
         BEntry(K key,V value) { this.key=key; this.value=value; }
     }
-    static final class BMap<K,V> implements Iterable<K> {
+    static final class BMap<K,V> extends BTyped implements Iterable<K> {
         private final java.util.LinkedHashMap<BKey<K>,V> items=new java.util.LinkedHashMap<>();
         private long stamp;
         long size() { return items.size(); }
@@ -230,4 +231,94 @@ final class BhashRuntime {
     @SafeVarargs static <K,V> BMap<K,V> mapOf(BEntry<K,V>... entries) {
         BMap<K,V> result=new BMap<>(); for (var entry:entries) result.set(entry.key,entry.value); return result;
     }
+    private static String asciiDigits(String value) {
+        var result=new StringBuilder();
+        for(char c:value.toCharArray()) result.append(c>='०'&&c<='९'?(char)('0'+c-'०'):c);
+        return result.toString();
+    }
+    static long toLong(double value) {
+        if (!Double.isFinite(value) || value < -0x1.0p63 || value >= 0x1.0p63) throw new Failure("संख्यात्मक परिवर्तन सीमा से बाहर है।");
+        return (long)value;
+    }
+    static int toInt32(long value) {
+        if (value<Integer.MIN_VALUE || value>Integer.MAX_VALUE) throw new Failure("लघुपूर्णांक परिवर्तन सीमा से बाहर है।");
+        return (int)value;
+    }
+    static short toByte(long value) {
+        if (value<0 || value>255) throw new Failure("बाइट परिवर्तन सीमा से बाहर है।");
+        return (short)value;
+    }
+    static double parseReal(String value) {
+        if (!value.matches("[+-]?(?:[0-9]+(?:\\.[0-9]+)?|[०-९]+(?:\\.[०-९]+)?)")) throw new Failure("अमान्य दशमलव पाठ।");
+        StringBuilder ascii=new StringBuilder();
+        for(char c:value.toCharArray()) ascii.append(c>='०'&&c<='९'?(char)('0'+c-'०'):c);
+        double result=Double.parseDouble(ascii.toString());
+        if (!Double.isFinite(result)) throw new Failure("दशमलव परिवर्तन सीमा से बाहर है।");
+        return result;
+    }
+    static String scalarText(Object value) { return value instanceof Boolean b?(b?"सत्य":"असत्य"):String.valueOf(value); }
+    static class BTyped { private String typeTag; }
+    static <T extends BTyped> T typed(T value,String tag) {
+        if (value!=null) {
+            BTyped object=value;
+            if (object.typeTag!=null && !object.typeTag.equals(tag)) throw new Failure("संग्रह प्रकार असंगत है।");
+            object.typeTag=tag;
+        }
+        return value;
+    }
+    static boolean isType(Object value,String tag,Class<?> type) {
+        return value!=null && type.isInstance(value) && (tag.isEmpty() || value instanceof BTyped object && tag.equals(object.typeTag));
+    }
+    @SuppressWarnings("unchecked") static <T> T checkedCast(Object value,String tag,Class<?> type,boolean nullable) {
+        if (value==null && nullable) return null;
+        if (!isType(value,tag,type)) throw new Failure("रनटाइम प्रकार परिवर्तन असफल हुआ।");
+        return (T)value;
+    }
+    @SuppressWarnings("unchecked") static <T> T safeCast(Object value,String tag,Class<?> type) { return isType(value,tag,type)?(T)value:null; }
+    static abstract class BRecord {
+        protected abstract Object[] dataFields();
+        @Override public final boolean equals(Object other) {
+            if (other==null || other.getClass()!=getClass()) return false;
+            Object[] a=dataFields(),b=((BRecord)other).dataFields();
+            for(int i=0;i<a.length;i++) if (!collectionSame(a[i],b[i])) return false;
+            return true;
+        }
+        @Override public final int hashCode() { int hash=getClass().hashCode(); for(Object item:dataFields()) hash=31*hash+collectionHash(item); return hash; }
+    }
+    static final class BBuffer extends BSeq<Short> {
+        private final byte[] items;
+        BBuffer(long size) { items=new byte[collectionLength(size)]; }
+        private BBuffer(byte[] data) { items=data; }
+        long size() { return items.length; }
+        Short get(long index) { return (short)(items[collectionIndex(index,items.length,false)]&255); }
+        void set(long index,Short value) { items[collectionIndex(index,items.length,false)]=(byte)(short)value; }
+        private int span(long offset) {
+            if (offset<0 || offset>items.length-8L) throw new Failure("बाइटबफ़र सीमा से बाहर है।");
+            return (int)offset;
+        }
+        long readLong(long offset,boolean big) {
+            int at=span(offset); long result=0;
+            for(int i=0;i<8;i++) result|=(items[at+i]&255L) << (8*(big?7-i:i));
+            return result;
+        }
+        void writeLong(long offset,long value,boolean big) {
+            int at=span(offset); for(int i=0;i<8;i++) items[at+i]=(byte)(value >>> (8*(big?7-i:i)));
+        }
+        double readReal(long offset,boolean big) { return Double.longBitsToDouble(readLong(offset,big)); }
+        void writeReal(long offset,double value,boolean big) { writeLong(offset,Double.doubleToRawLongBits(value),big); }
+        void fill(short value) { java.util.Arrays.fill(items,(byte)value); }
+        BBuffer slice(long start,long end) {
+            if(start<0 || end<start || end>items.length) throw new Failure("बाइटबफ़र सीमा से बाहर है।");
+            return new BBuffer(java.util.Arrays.copyOfRange(items,(int)start,(int)end));
+        }
+        BArray<Short> toArray() { BArray<Short> result=new BArray<>(items.length,(short)0); for(int i=0;i<items.length;i++) result.set(i,get(i)); return result; }
+    }
+    static BBuffer bufferOf(short... values) { BBuffer result=new BBuffer(values.length); for(int i=0;i<values.length;i++) result.set(i,values[i]); return result; }
+    static BBuffer encodeUtf8(String text) { return new BBuffer(text.getBytes(StandardCharsets.UTF_8)); }
+    static String decodeUtf8(BBuffer buffer) {
+        try { return StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(instance(buffer).items)).toString(); }
+        catch(java.nio.charset.CharacterCodingException error) { throw new Failure("अमान्य UTF-8 बाइटबफ़र।"); }
+    }
+
 }

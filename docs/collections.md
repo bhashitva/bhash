@@ -200,3 +200,13 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/collections 
 
 See the [three-file example](../examples/collections/) and its [expected output](../examples/collections/expected.txt).
 Serve browser output over HTTP using the existing browser-target instructions.
+
+## Additional value types (v0.9)
+
+Arrays/lists/maps can contain `बाइट`, `लघुपूर्णांक`, enums, records and
+`सर्ववस्तु`. Byte and int32 scalars have value equality while remaining distinct
+boxed types in general collections. Records have structural equality/hashing;
+ordinary classes and collections retain reference identity. `बाइटबफ़र` is a
+separate packed byte sequence with indexing and iteration. Runtime tests and
+casts preserve invariant collection type arguments, including nested arrays and
+snapshots. See [types and conversions](types-conversions.md).

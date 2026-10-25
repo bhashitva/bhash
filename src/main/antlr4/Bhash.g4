@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Bhash (भाष) v0.8 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
+// Bhash (भाष) v0.9 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
@@ -24,17 +24,21 @@ grammar Bhash;
                 if (--depth == 0) return _input.LA(i + 1) == LPAREN || _input.LA(i + 1) == DOT;
             } else if (token != IDENTIFIER && token != COMMA && token != DOT
                     && token != INT_TYPE && token != REAL_TYPE && token != BOOL_TYPE && token != TEXT_TYPE
+                    && token != BYTE_TYPE && token != INT32_TYPE && token != OBJECT_TYPE && token != BUFFER_TYPE
                     && token != LBRACK && token != RBRACK)
                 return false;
         }
     }
 }
 
-program : packageDecl? importDecl* (PUBLIC? (functionDecl | classDecl | interfaceDecl))* EOF ;
+program : packageDecl? importDecl* (PUBLIC? (functionDecl | classDecl | interfaceDecl | enumDecl))* EOF ;
 packageDecl : PACKAGE qualifiedName SEMI ;
 importDecl : IMPORT qualifiedName (AS IDENTIFIER)? SEMI ;
 qualifiedName : IDENTIFIER (DOT IDENTIFIER)* ;
-classDecl : CLASS IDENTIFIER typeParameters? (EXTENDS valueType)? (IMPLEMENTS typeList)? LBRACE classMember* RBRACE ;
+classDecl : CLASS IDENTIFIER typeParameters? (EXTENDS valueType)? (IMPLEMENTS typeList)? LBRACE classMember* RBRACE
+    | RECORD IDENTIFIER typeParameters? LPAREN parameters? RPAREN SEMI ;
+enumDecl : ENUM IDENTIFIER LBRACE enumMember (COMMA enumMember)* COMMA? RBRACE ;
+enumMember : IDENTIFIER (ASSIGN (PLUS | MINUS)? INTEGER_LITERAL)? ;
 interfaceDecl : INTERFACE IDENTIFIER typeParameters? (EXTENDS typeList)? LBRACE functionDecl* RBRACE ;
 typeParameters : LT IDENTIFIER (COMMA IDENTIFIER)* GT ;
 typeArguments : LT valueType (COMMA valueType)* GT ;
@@ -47,7 +51,7 @@ functionDecl : FUNCTION IDENTIFIER typeParameters? LPAREN parameters? RPAREN ARR
 parameters : parameter (COMMA parameter)* ;
 parameter : IDENTIFIER COLON valueType ;
 returnType : valueType | VOID ;
-valueType : (INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | IDENTIFIER typeQualifier* typeArguments?) arraySuffix* ;
+valueType : (INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | BYTE_TYPE | INT32_TYPE | OBJECT_TYPE | BUFFER_TYPE | IDENTIFIER typeQualifier* typeArguments?) arraySuffix* ;
 arraySuffix : LBRACK RBRACK ;
 arrayDimension : LBRACK expression RBRACK ;
 collectionInitializer : LBRACE (mapEntry (COMMA mapEntry)* | arguments)? RBRACE ;
@@ -79,7 +83,7 @@ foreachStatement : FOREACH LPAREN parameter (COMMA parameter)? IN expression RPA
 whileStatement : WHILE LPAREN expression RPAREN block ;
 switchStatement : SWITCH LPAREN expression RPAREN LBRACE switchSection* RBRACE ;
 switchSection : (CASE caseValue COLON)+ statement* | DEFAULT COLON statement* ;
-caseValue : (PLUS | MINUS)? INTEGER_LITERAL | STRING_LITERAL | TRUE | FALSE ;
+caseValue : (PLUS | MINUS)? INTEGER_LITERAL | STRING_LITERAL | TRUE | FALSE | qualifiedName ;
 arguments : expression (COMMA expression)* ;
 
 // Layered rules make precedence and left associativity explicit.
@@ -111,6 +115,7 @@ primary
     | NULL
     | THIS
     | BASE
+    | (CONVERT | TYPE_TEST | SAFE_CAST) LT valueType GT LPAREN expression RPAREN
     | NEW valueType (LPAREN arguments? RPAREN | arrayDimension+ arraySuffix* | collectionInitializer)
     | IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)?
     | LPAREN expression RPAREN
@@ -122,6 +127,11 @@ IMPORT : 'आयात' ;
 AS : 'उपनाम' ;
 FUNCTION : 'कार्य' ;
 CLASS : 'वर्ग' ;
+RECORD : 'अभिलेख' ;
+ENUM : 'परिगणना' ;
+CONVERT : 'परिवर्तित' ;
+TYPE_TEST : 'प्रकारहै' ;
+SAFE_CAST : 'सुरक्षितरूप' ;
 INTERFACE : 'अनुबंध' ;
 IMPLEMENTS : 'पालन' ;
 STATIC : 'साझा' ;
@@ -154,6 +164,10 @@ BREAK : 'विराम' ;
 CONTINUE : 'जारी' ;
 PRINT : 'लिखो' ;
 INT_TYPE : 'पूर्णांक' ;
+BYTE_TYPE : 'बाइट' ;
+INT32_TYPE : 'लघुपूर्णांक' ;
+OBJECT_TYPE : 'सर्ववस्तु' ;
+BUFFER_TYPE : 'बाइटबफ़र' ;
 REAL_TYPE : 'दशमलव' ;
 BOOL_TYPE : 'तार्किक' ;
 TEXT_TYPE : 'पाठ' ;

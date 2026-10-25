@@ -14,6 +14,30 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FrontendTest {
+    @Test void parsesEnumsRecordsBuffersAndTypeIntrinsics() {
+        var result=Frontend.parse("types.bhash","""
+            परिगणना रंग { लाल, हरा = ५, नीला, }
+            अभिलेख जोड़ा<त>(क: त, ख: त);
+            कार्य मुख्य() -> शून्य {
+                स्थिर ब: बाइट = परिवर्तित<बाइट>(२५५);
+                स्थिर ल: लघुपूर्णांक = परिवर्तित<लघुपूर्णांक>(२);
+                स्थिर क: सर्ववस्तु = नया जोड़ा<बाइट>(ब,ब);
+                लिखो(प्रकारहै<जोड़ा<बाइट>>(क), सुरक्षितरूप<जोड़ा<बाइट>>(क).क);
+                स्थिर बफ: बाइटबफ़र = नया बाइटबफ़र(८);
+                चयन (रंग.हरा) { विकल्प रंग.लाल: शेष: }
+            }
+            """);
+        assertTrue(result.valid(),()->result.diagnostics().toString());
+    }
+    @Test void typeKeywordsPreserveExistingCalculationNamesAndRejectMalformedForms() {
+        var lexer=new BhashLexer(CharStreams.fromString("परिगणना अभिलेख परिवर्तित प्रकारहै सुरक्षितरूप बाइट लघुपूर्णांक सर्ववस्तु बाइटबफ़र गणना"));
+        for(int token:new int[]{BhashLexer.ENUM,BhashLexer.RECORD,BhashLexer.CONVERT,BhashLexer.TYPE_TEST,BhashLexer.SAFE_CAST,BhashLexer.BYTE_TYPE,BhashLexer.INT32_TYPE,BhashLexer.OBJECT_TYPE,BhashLexer.BUFFER_TYPE,BhashLexer.IDENTIFIER})
+            assertEquals(token,lexer.nextToken().getType());
+        assertFalse(parseBody("लिखो(परिवर्तित<>(१));").valid());
+        assertFalse(parseBody("लिखो(प्रकारहै<पूर्णांक>());").valid());
+        assertFalse(Frontend.parse("bad","परिगणना रंग {} कार्य मुख्य() -> शून्य {}").valid());
+    }
+
     @Test void parsesExceptionFormsAndRejectsIncompleteTry() {
         for (String body:new String[]{"प्रयास {} पकड़ो (क: अपवाद) {}", "प्रयास {} अंततः {}", "प्रयास { फेंको नया अपवाद(); } पकड़ो (क: अपवाद) { फेंको; } अंततः {}"})
             assertTrue(parseBody(body).valid(),body);
