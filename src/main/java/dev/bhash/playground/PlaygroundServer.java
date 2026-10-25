@@ -233,7 +233,19 @@ public final class PlaygroundServer implements AutoCloseable {
     }
     private static void clearManaged(Path root) throws IOException {try(var paths=Files.list(root)){for(Path path:paths.toList())if(ID.matcher(path.getFileName().toString()).matches())remove(path);}}
     private static void remove(Path root) {if(!Files.exists(root))return;try(var paths=Files.walk(root)){for(Path path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}catch(IOException error){System.err.println("Could not remove transient playground build");}}
-    @Override public void close(){server.stop(0);builds.shutdownNow();cleanup.shutdownNow();http.shutdownNow();}
+    @Override public void close() {
+        server.stop(0);builds.shutdownNow();cleanup.shutdownNow();http.shutdownNow();
+        // Wait for in-flight compiler cleanup before returning data-directory ownership to the caller.
+        // Windows cannot remove output directories while a worker still has their files open.
+        boolean interrupted=Thread.interrupted();long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+        try {
+            for(var executor:List.of(builds,cleanup,http))while(!executor.isTerminated()) {
+                long remaining=deadline-System.nanoTime();if(remaining<=0)break;
+                try {executor.awaitTermination(remaining,TimeUnit.NANOSECONDS);}
+                catch(InterruptedException ignored){interrupted=true;}
+            }
+        } finally {if(interrupted)Thread.currentThread().interrupt();}
+    }
     private static String env(String key,String fallback){return System.getenv().getOrDefault(key,fallback);}
     public static void main(String[] args) throws Exception {
         var config=new Settings(Path.of(env("BHASH_COMPILER_JAR","target/bhash-compiler-0.1.0-SNAPSHOT.jar")),Path.of(env("BHASH_DATA","target/playground-data")),Path.of(env("BHASH_WEB","playground/dist")),env("BHASH_BIND","127.0.0.1"),Integer.parseInt(env("PORT","8080")),URI.create(env("BHASH_ORIGIN","http://localhost:8080")),URI.create(env("BHASH_RUN_ORIGIN","http://127.0.0.1:8080")),Integer.parseInt(env("BHASH_BUILD_TIMEOUT","180")),8,10,Boolean.parseBoolean(env("BHASH_TRUST_PROXY","false")));

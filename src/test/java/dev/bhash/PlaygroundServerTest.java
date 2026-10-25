@@ -75,6 +75,18 @@ class PlaygroundServerTest {
         Path other=directory.resolve("second");Files.createDirectories(other);directory=other;
         try(var app=create((file,out)->output(out),1)) {app.start();assertEquals(202,post(app,form("लिखो(१);","scratch")).statusCode());assertEquals(429,post(app,form("लिखो(२);","scratch")).statusCode());}
     }
+    @Test void closeWaitsForCompilerCleanup() throws Exception {
+        var entered=new CountDownLatch(1);var cleaned=new java.util.concurrent.atomic.AtomicBoolean();
+        try(var app=create((file,out)->{
+            entered.countDown();
+            try {new CountDownLatch(1).await();}
+            finally {Thread.sleep(50);cleaned.set(true);}
+        },100)) {
+            app.start();assertEquals(202,post(app,form("लिखो(१);","scratch")).statusCode());
+            assertTrue(entered.await(2,TimeUnit.SECONDS));
+        }
+        assertTrue(cleaned.get(),"close returned while the compiler was still cleaning up");
+    }
     public static class SleepingCompiler {
         public static void main(String[] args) throws Exception {
             if(args.length>0 && args[0].equals("child")) { Thread.sleep(60000); return; }
