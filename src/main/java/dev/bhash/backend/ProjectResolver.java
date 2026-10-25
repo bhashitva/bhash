@@ -179,6 +179,12 @@ public final class ProjectResolver {
             if (c.typeList()!=null) parents.addAll(c.typeList().valueType());
         }
         for (var parent : parents) if (parent.IDENTIFIER()!=null) {
+            boolean shadowed=declaration instanceof ClassDeclContext c && c.typeParameters()!=null
+                    && c.typeParameters().IDENTIFIER().stream().anyMatch(id->key(id.getText()).equals(key("अपवाद")));
+            if (key(typeSpelling(parent)).equals(key("अपवाद")) && !shadowed) {
+                fields.add(key("संदेश"));
+                continue;
+            }
             Symbol base = lookup(unit,typeSpelling(parent),Kind.TYPE,parent.start);
             if (base!=null) {
                 var inherited = members(base.unit,base.declaration,seen);
