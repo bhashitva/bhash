@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Fix Linux/WSL browser output permissions so a separate HTTP-server user can read generated WASM bundles.
+
 ## 0.1.0
 
 Initial VS Code extension: Devanagari highlighting/snippets; local Java LSP with

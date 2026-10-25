@@ -19,6 +19,20 @@ Open <http://localhost:8000>, enter `५` and select **Run / चलाएँ**. 
 
 The entire output directory is deployable static content. Serve JavaScript as `text/javascript` and WASM as `application/wasm`. Use HTTP locally or HTTPS remotely; opening `index.html` through `file://` does not work. Blazor, a backend server and cross-origin isolation headers are not required by this single-threaded target.
 
+On Linux/WSL, generated browser directories have mode `0755` and files have mode
+`0644`, so a separate HTTP-server user can read the bundle. Build as your normal
+user, without `sudo`; output belongs to the account running the compiler. In
+VS Code Remote WSL, launch VS Code from a normal-user terminal (`code .`). If an
+earlier root build left your project's `build` directory owned by root, run the
+following once from the project root, as your normal user:
+
+```sh
+sudo chown -R "$(id -un):$(id -gn)" build
+```
+
+Parent directories must also permit the server account to traverse them. The
+compiler only sets permissions within its generated output directory.
+
 ## Input, output and execution
 
 Supply all input before running, with one integer per line for each `पढ़ो()` call. ASCII and Devanagari digits follow the same validation as JVM/CLR. Exhausted input produces the existing Bhash EOF diagnostic; it does not wait for more input.

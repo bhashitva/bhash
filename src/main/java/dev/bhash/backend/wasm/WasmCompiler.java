@@ -10,6 +10,8 @@ import dev.bhash.frontend.SourceFile;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -145,8 +147,21 @@ public final class WasmCompiler {
             throw new IOException("Refusing to replace unmanaged or modified browser output; choose a new directory: " + destination);
     }
 
-    private static void install(Path stage, Path destination) throws IOException {
+    static void install(Path stage, Path destination) throws IOException {
         validateDestination(destination);
+        // Temp directories default to 0700 on Linux. Publish static assets with
+        // read/traverse access for the HTTP server, including under a strict umask.
+        // Windows retains its inherited ACLs; never change the private build workspace.
+        if (Files.getFileAttributeView(stage, PosixFileAttributeView.class) != null) {
+            var directories = PosixFilePermissions.fromString("rwxr-xr-x");
+            var files = PosixFilePermissions.fromString("rw-r--r--");
+            try (var paths = Files.walk(stage)) {
+                for (Path path : paths.toList()) {
+                    if (Files.isSymbolicLink(path)) throw new IOException("Browser output contains a symbolic link: " + path);
+                    Files.setPosixFilePermissions(path, Files.isDirectory(path) ? directories : files);
+                }
+            }
+        }
         Path backup = null;
         if (Files.exists(destination)) {
             backup = Files.createTempDirectory(destination.getParent(), ".bhash-wasm-backup-");
