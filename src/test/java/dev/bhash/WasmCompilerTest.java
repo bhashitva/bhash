@@ -12,6 +12,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class WasmCompilerTest {
     @TempDir Path directory;
+    @Test void invalidExceptionsFailBeforeBrowserPublishing() {
+        for (String body:new String[]{"फेंको १;", "फेंको;", "प्रयास {} पकड़ो (क: पूर्णांक) {}", "प्रयास {} अंततः { लौटाओ; }"}) {
+            var error=assertThrows(CompilationException.class,()->new WasmCompiler().compile("exceptions.bhash",
+                    "कार्य मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
+            assertTrue(error.getMessage().startsWith("exceptions.bhash:1:"),error.getMessage());
+        }
+        assertFalse(Files.exists(directory.resolve("web")));
+    }
     @Test void validatesLanguageBeforeStartingDotnet() {
         var compiler = new WasmCompiler();
         assertThrows(CompilationException.class, () -> compiler.compile("bad.bhash", "कार्य", directory.resolve("web")));

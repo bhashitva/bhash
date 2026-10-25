@@ -80,13 +80,16 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         }
     }
     record Binding(String java, Type type, boolean mutable) {}
-    enum Flow { NORMAL, RETURN, BREAK, CONTINUE }
+    enum Flow { NORMAL, RETURN, BREAK, CONTINUE, THROW }
     private static final BigInteger MIN = BigInteger.valueOf(Long.MIN_VALUE);
     private static final BigInteger MAX = BigInteger.valueOf(Long.MAX_VALUE);
     private final String sourceName;
     private final Target target;
     private final Map<String, List<Function>> functions = new LinkedHashMap<>();
     private final Map<String,String> slots = new LinkedHashMap<>();
+    private final ClassInfo exceptionClass = new ClassInfo("अपवाद", "BhashRuntime.BException", null);
+    private final Deque<Binding> caughtExceptions = new ArrayDeque<>();
+    private final Deque<int[]> finallyContexts = new ArrayDeque<>();
     private final Map<String, ClassInfo> classes = new LinkedHashMap<>();
     private final List<ClassInfo> classOrder = new ArrayList<>();
     private final Map<CollectionKey,Type> collectionTypes = new HashMap<>();
@@ -150,6 +153,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             } else {
                 var found=classes.get(name);
                 if (found==null) throw error(at,"Unknown type: "+value.getText());
+                if (value.typeArguments()!=null) throw error(at,"Type does not accept type arguments: "+value.getText());
                 result=found.type;
             }
         }
@@ -194,13 +198,13 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             output.append("public final class BhashProgram {\n");
             output.append("public static void main(String[] args) { try { ").append(main.java)
                     .append("(); } catch (RuntimeException | ExceptionInInitializerError e) { Throwable f=bhashFailure(e);")
-                    .append(" if (!(f instanceof BhashRuntime.Failure || f instanceof ArithmeticException)) throw e;")
+                    .append(" if (!(f instanceof BhashRuntime.BException || f instanceof ArithmeticException)) throw e;")
                     .append(" BhashRuntime.report(f.getMessage()); System.exit(1); } }\n");
             output.append("private static Throwable bhashFailure(Throwable e) { while(e instanceof ExceptionInInitializerError && e.getCause()!=null) e=e.getCause(); return e; }\n");
         } else {
             output.append("using System;\ninternal static class BhashProgram {\n");
             output.append("public static int Main(string[] args) { try { ").append(main.java)
-                    .append("(); return 0; } catch (Exception e) when (bhashFailure(e) is BhashRuntime.Failure || bhashFailure(e) is ArithmeticException) {")
+                    .append("(); return 0; } catch (Exception e) when (bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException) {")
                     .append(" BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n");
             output.append("private static Exception bhashFailure(Exception e) { while(e is TypeInitializationException && e.InnerException!=null) e=e.InnerException; return e; }\n");
         }
@@ -258,6 +262,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return slots.computeIfAbsent(key,k->"m"+methodId++);
     }
     private void collectClasses(ProgramContext program) {
+        exceptionClass.state=2;
+        exceptionClass.fields.put(Identifiers.key("संदेश"),new Field("bmessage",Type.TEXT,false,Access.PUBLIC,exceptionClass,null,false));
+        exceptionClass.constructors.add(new Constructor(List.of(),Access.PUBLIC,null,null));
+        exceptionClass.constructors.add(new Constructor(List.of(Type.TEXT),Access.PUBLIC,null,null));
+        classes.put(Identifiers.key("अपवाद"),exceptionClass);
         for (var declaration : program.classDecl()) {
             String name = declaration.IDENTIFIER().getText();
             var definition = new ClassInfo(name, "C" + classes.size(), declaration);
@@ -269,6 +278,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (classes.putIfAbsent(Identifiers.key(name),definition)!=null) throw error(declaration,"Duplicate type: " + name);
         }
         for (ClassInfo definition : classes.values()) {
+            if (definition==exceptionClass) continue;
             if (!definition.isInterface() && definition.declaration.EXTENDS() != null) {
                 String name = definition.declaration.valueType().getText();
                 definition.parent = classes.get(Identifiers.key(name));
@@ -432,6 +442,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     private String constructorCallArguments(List<Expr> args,Constructor constructor) {
         String values=constructorArguments(args,constructor.parameters);
+        if (constructor.tag==null) return values;
         return values+(values.isEmpty()?"":",")+"(("+constructor.tag+")null)";
     }
 
@@ -597,6 +608,18 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             require(assignment, destination.type, value.type);
             if (destination.location.setter!=null) output.append(destination.location.setter).append(value.java).append(");\n");
             else output.append(destination.java).append('=').append(value.java).append(";\n");
+        } else if (statement.tryStatement()!=null) {
+            return tryStatement(statement.tryStatement());
+        } else if (statement.THROW()!=null) {
+            Expr value;
+            if (statement.expression()==null) {
+                if (caughtExceptions.isEmpty()) throw error(statement,"Bare फेंको requires an enclosing पकड़ो.");
+                var binding=caughtExceptions.peek(); value=new Expr(binding.type,binding.java);
+            } else value=visit(statement.expression());
+            if (value.type.object==null || !subclass(value.type.object,exceptionClass))
+                throw error(statement,"फेंको requires an अपवाद instance.");
+            output.append("throw BhashRuntime.instance(").append(value.java).append(");\n");
+            return EnumSet.of(Flow.THROW);
         } else if (statement.ifStatement() != null) {
             return ifStatement(statement.ifStatement());
         } else if (statement.switchStatement() != null) {
@@ -615,8 +638,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             loopDepth--;
             var flow = EnumSet.of(Flow.NORMAL); // Conservative: loops may execute zero times.
             if (body.contains(Flow.RETURN)) flow.add(Flow.RETURN);
+            if (body.contains(Flow.THROW)) flow.add(Flow.THROW);
             return flow;
         } else if (statement.RETURN() != null) {
+            if (!finallyContexts.isEmpty()) throw error(statement,"Cannot return from अंततः.");
             var value = statement.expression() == null ? null : visit(statement.expression());
             if (returnType == Type.VOID && value != null) throw error(statement, "Void function cannot return a value.");
             if (returnType != Type.VOID && value == null) throw error(statement, "Return value required.");
@@ -625,6 +650,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             return EnumSet.of(Flow.RETURN);
         } else if (statement.BREAK() != null || statement.CONTINUE() != null) {
             boolean isBreak = statement.BREAK() != null;
+            if (!finallyContexts.isEmpty()) {
+                var boundary=finallyContexts.peek();
+                if (isBreak ? breakTargets.size()<=boundary[0] : loopDepth<=boundary[1])
+                    throw error(statement,"Cannot leave अंततः using loop control.");
+            }
             if (isBreak) {
                 if (breakTargets.isEmpty()) throw error(statement,"Loop control विराम is only valid inside a loop or चयन.");
                 var destination=breakTargets.peek();
@@ -651,6 +681,44 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             output.append(value.type == Type.VOID ? value.java : "BhashRuntime.discard(" + value.java + ")").append(";\n");
         }
         return EnumSet.of(Flow.NORMAL);
+    }
+
+    private EnumSet<Flow> tryStatement(TryStatementContext statement) {
+        output.append("try ");
+        boolean handlers=!statement.catchClause().isEmpty();
+        if (handlers) output.append("{ try ");
+        var flow=block(statement.block(0));
+        // CLR/JVM wrap failures from static initialization. Unwrap only known Bhash
+        // exceptions; infrastructure exceptions retain their host behavior.
+        if (handlers) {
+            if (target==Target.JVM) output.append("catch (ExceptionInInitializerError initialization) { Throwable cause=bhashFailure(initialization); if (cause instanceof BhashRuntime.BException) throw (BhashRuntime.BException)cause; throw initialization; } } ");
+            else output.append("catch (TypeInitializationException initialization) { Exception cause=bhashFailure(initialization); if (cause is BhashRuntime.BException) throw (BhashRuntime.BException)cause; throw; } } ");
+        }
+        var previous=new ArrayList<Type>();
+        for (var clause:statement.catchClause()) {
+            var parameter=clause.parameter();
+            Type caught=type(parameter.valueType());
+            if (caught.object==null || !subclass(caught.object,exceptionClass))
+                throw error(parameter,"पकड़ो requires an अपवाद type.");
+            if (previous.stream().anyMatch(t->subclass(caught.object,t.object)))
+                throw error(parameter,"Unreachable पकड़ो: an earlier catch handles this type.");
+            previous.add(caught);
+            scopes.push(new HashMap<>());
+            var binding=declare(parameter,parameter.IDENTIFIER().getText(),caught,false);
+            output.append("catch (").append(typeName(caught)).append(' ').append(binding.java).append(") ");
+            caughtExceptions.push(binding);
+            flow.addAll(block(clause.block()));
+            caughtExceptions.pop(); scopes.pop();
+        }
+        if (statement.FINALLY()!=null) {
+            output.append("finally ");
+            finallyContexts.push(new int[]{breakTargets.size(),loopDepth});
+            var cleanup=block(statement.block(1));
+            finallyContexts.pop();
+            if (!cleanup.contains(Flow.NORMAL)) flow=cleanup;
+            else { cleanup.remove(Flow.NORMAL); flow.addAll(cleanup); }
+        }
+        return flow;
     }
 
     private EnumSet<Flow> switchStatement(SwitchStatementContext statement) {
@@ -890,6 +958,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         output.append("}\n");
         var flow=EnumSet.of(Flow.NORMAL);
         if (body.contains(Flow.RETURN)) flow.add(Flow.RETURN);
+        if (body.contains(Flow.THROW)) flow.add(Flow.THROW);
         return flow;
     }
 

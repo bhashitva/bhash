@@ -35,7 +35,7 @@ final class GenericExpander {
     }
     private ProgramContext program(ProgramContext program) throws CompilationException {
         collectNames(program);
-        concreteTypes.addAll(List.of("पूर्णांक", "दशमलव", "तार्किक", "पाठ"));
+        concreteTypes.addAll(List.of("पूर्णांक", "दशमलव", "तार्किक", "पाठ", "अपवाद"));
         for (var c : program.classDecl()) register(types,c,c.typeParameters(),c.IDENTIFIER().getSymbol());
         for (var c : program.interfaceDecl()) register(types,c,c.typeParameters(),c.IDENTIFIER().getSymbol());
         for (var f : program.functionDecl()) register(functions,f,f.typeParameters(),f.IDENTIFIER().getSymbol());

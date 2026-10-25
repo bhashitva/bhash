@@ -11,7 +11,12 @@ final class BhashRuntime {
     private static final PrintWriter OUTPUT = new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8), true);
     private static final PrintWriter ERRORS = new PrintWriter(new OutputStreamWriter(System.err, StandardCharsets.UTF_8), true);
 
-    static final class Failure extends RuntimeException {
+    static class BException extends RuntimeException {
+        public final String bmessage;
+        public BException() { this(""); }
+        public BException(String message) { super(message); bmessage=message; }
+    }
+    static final class Failure extends BException {
         Failure(String message) { super(message); }
     }
 

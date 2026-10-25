@@ -1,6 +1,6 @@
-# Bhash / भाष — v0.7 language definition
+# Bhash / भाष — v0.8 language definition
 
-Status: v0.7 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
+Status: v0.8 core implemented on JVM, .NET 10 CLR and browser WebAssembly, open to revision. `Bhash.g4` defines
 syntax. `compile` and `run` enforce the semantic rules below; `check` remains a
 syntax-only command. JVM output uses checked Java source lowering; CLR output
 uses checked C# source lowering. The browser target reuses CLR lowering with the
@@ -48,6 +48,9 @@ is supplied before execution; see [browser target](wasm-browser.md).
 | `स्थिर` | Immutable binding | `स्थिर सीमा: पूर्णांक = १०;` |
 | `यदि` / `अन्यथा` | If / else | `यदि (सत्य) { ... } अन्यथा { ... }` |
 | `चयन` / `विकल्प` / `शेष` | Selection / case / default | `चयन (संख्या) { विकल्प १: ... शेष: ... }` |
+| `प्रयास` / `पकड़ो` / `अंततः` | Try / catch / finally | `प्रयास { ... } पकड़ो (ग: अपवाद) { ... } अंततः { ... }` |
+| `फेंको` | Throw / rethrow | `फेंको नया अपवाद("त्रुटि");` / `फेंको;` |
+| `अपवाद` | Predeclared exception base class | `गलती.संदेश` |
 | `जबतक` | While | `जबतक (गिनती < सीमा) { ... }` |
 | `लौटाओ` | Return | `लौटाओ परिणाम;` |
 | `विराम` / `जारी` | Break / continue | `विराम;` |
@@ -181,8 +184,7 @@ Other integer arithmetic retains wrapping behavior; there is no arbitrary-precis
 integer type yet.
 
 Strings are immutable sequences of Unicode scalars; their physical representation
-may differ by backend. Text has no indexing or character type yet. Collection, user-exception and
-manual memory-management syntax are not implemented. Class-based objects and host
+may differ by backend. Text has no indexing or character type yet. Manual memory-management syntax is not implemented. Class-based objects and host
 garbage collection are described below.
 
 ## 7. Object model
@@ -225,10 +227,20 @@ keys, and a second typed binding iterates map values alongside their keys.
 See [v0.7 collection rules](collections.md) for APIs, equality, mutation checks,
 array dimensions, evaluation order and multi-file examples.
 
-## 11. Deferred design questions
+## 11. Exception handling
+
+`प्रयास block पकड़ो (name: type) block ... अंततः block` supports ordered typed
+handlers and optional cleanup; try/finally without a catch is also valid.
+`अपवाद` is the predeclared exception base class with a readonly `संदेश: पाठ`.
+`फेंको expression;` throws an exception; `फेंको;` inside a catch rethrows its
+current exception. Runtime failures are also catchable as `अपवाद`.
+Exceptions are unchecked. Finally executes across normal and abrupt completion;
+control cannot return or jump out of finally. See [exception semantics](exceptions.md)
+for subtype matching, scopes, replacement exceptions and host limitations.
+
+## 12. Deferred design questions
 
 Confirm vocabulary; choose exact real formatting; extend dependency package distribution;
-design records and generic member methods; choose error/exception behavior beyond arithmetic
-traps; settle WASI vs browser environments and native OS/ABI support; define
+design records and generic member methods; extend exception metadata and resource management; settle WASI vs browser environments and native OS/ABI support; define
 foreign-function interfaces separately for each platform. Do not grow the grammar
 to cover these until their semantics and tests are agreed.

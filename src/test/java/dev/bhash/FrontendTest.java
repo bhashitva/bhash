@@ -14,6 +14,18 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FrontendTest {
+    @Test void parsesExceptionFormsAndRejectsIncompleteTry() {
+        for (String body:new String[]{"प्रयास {} पकड़ो (क: अपवाद) {}", "प्रयास {} अंततः {}", "प्रयास { फेंको नया अपवाद(); } पकड़ो (क: अपवाद) { फेंको; } अंततः {}"})
+            assertTrue(parseBody(body).valid(),body);
+        for (String body:new String[]{"प्रयास {}", "पकड़ो (क: अपवाद) {}", "प्रयास {} अंततः {} पकड़ो (क: अपवाद) {}", "प्रयास {} अंततः {} अंततः {}"})
+            assertFalse(parseBody(body).valid(),body);
+    }
+    @Test void exceptionKeywordsUseLongestMatch() {
+        var lexer=new BhashLexer(CharStreams.fromString("प्रयास पकड़ो अंततः फेंको प्रयासरत"));
+        for (int token:new int[]{BhashLexer.TRY,BhashLexer.CATCH,BhashLexer.FINALLY,BhashLexer.THROW,BhashLexer.IDENTIFIER})
+            assertEquals(token,lexer.nextToken().getType());
+    }
+
     @Test void parsesClassMembersConstructorsInheritanceAndPostfixChains() {
         var result = Frontend.parse("objects.bhash", """
                 वर्ग मूल { मान संख्या: पूर्णांक; }

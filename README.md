@@ -144,6 +144,30 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/collections 
 
 See [collection syntax, APIs and mutation rules](docs/collections.md).
 
+## Exception handling
+
+Bhash v0.8 supports `प्रयास` (try), `पकड़ो` (catch), `अंततः` (finally),
+`फेंको` (throw/rethrow), and custom classes extending `अपवाद`. Existing runtime
+failures are catchable through the same type; read their message with `.संदेश`.
+
+```text
+प्रयास { लिखो(१ / ०); }
+पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
+अंततः { लिखो("कार्य समाप्त।"); }
+```
+
+After rebuilding, run the [exception-handling factorial](examples/exceptions.bhash):
+
+```bash
+git pull --ff-only
+mvn clean package -DskipTests
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/exceptions.bhash
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/exceptions.bhash --target clr
+java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/exceptions.bhash --target wasm-browser -o target/exceptions-web
+```
+
+See [exception rules and cleanup behavior](docs/exceptions.md).
+
 ## The program
 
 ```text

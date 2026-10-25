@@ -25,7 +25,12 @@ internal static class BhashRuntime {
 
 #endif
 
-    internal sealed class Failure : Exception {
+    public class BException : Exception {
+        public readonly string bmessage;
+        public BException() : this("") {}
+        public BException(string message) : base(message) { bmessage=message; }
+    }
+    internal sealed class Failure : BException {
         internal Failure(string message) : base(message) {}
     }
 

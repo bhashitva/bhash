@@ -4,7 +4,7 @@ The JVM implementation is tested by compiling Bhash source to standalone JVM JAR
 and executing them in separate Java/.NET processes (with bytecode verification enabled on the JVM).
 There is no compiler/ANTLR classpath when running the generated programs.
 
-The v0.7 suite contains 168 JUnit tests, including project source discovery, package/import
+The v0.8 suite contains 191 JUnit tests, including project source discovery, package/import
 resolution, frontend checks and a shared JVM/CLR execution corpus. Packaged compiler/application
 smoke checks separately exercise the public CLI. CI runs the suite on Linux and Windows.
 
@@ -13,6 +13,10 @@ with extra CLR tests for output preservation and directory ownership. JVM tests
 require a JDK; CLR tests require the .NET 10 SDK. CI requires both backends.
 
 Coverage includes:
+
+- Exception subtyping, catch order/scopes, custom constructor messages, identity,
+  rethrow, catchable runtime/static-initialization failures, finally on return/loop
+  control and exception replacement, uncaught errors and cross-file generic bodies.
 
 - Interactive factorial for ASCII/Devanagari input, 0!, 1!, 5!, 6!, 10! and 20!.
 - Negative/out-of-domain input messages; malformed, mixed-script, overflowing
@@ -49,7 +53,7 @@ as downloadable artifacts.
 See the repository's Actions page for current CI results.
 
 The browser WebAssembly workflow installs .NET 10 `wasm-tools` and Chromium,
-builds thirteen application bundles, and executes `scripts/browser_smoke_test.cjs`.
+builds fifteen application bundles, and executes `scripts/browser_smoke_test.cjs`.
 It checks procedural/object factorial (including exact 20!), input validation,
 objects and virtual dispatch, null/division errors, 64-bit boundaries/overflow,
 text rendering, reruns, Stop and output replacement safeguards. It uploads the
@@ -69,4 +73,8 @@ Browser checks also execute the bitboard example and bitwise boundary/evaluation
 and reject invalid operand types before publishing.
 The browser collection corpus runs the multi-file example, generic/array/ordered-map
 semantics and twelve runtime-error scenarios, including mutation during iteration.
+The browser exception corpus checks custom subtypes, identity/rethrow, runtime and static
+initialization failures, generic functions, cleanup across return/break/continue, cleanup
+exception replacement and uncaught exception reporting. The factorial example checks
+valid input, domain errors and handled malformed input.
 Standalone WASI and native targets remain unimplemented.

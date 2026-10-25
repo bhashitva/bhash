@@ -59,6 +59,12 @@ for target in ("jvm", "clr"):
     command = ["java", "-jar", str(compiler), "run", "examples/multi-file", "--target", target]
     output, errors = invoke(command, "0\n")
     assert output == "० से २० तक एक पूर्णांक लिखें:\nगुणनफल: १\nसत्य १\nसंख्या ठीक\n" and not errors, (target, output, errors)
+# Exceptions: custom types, runtime input errors and finally through the packaged CLI.
+for target in ("jvm", "clr"):
+    for value, expected in [("५\n", "१२०\nकार्य समाप्त।\n"), ("-1\n", "अमान्य अंक: ० से २० के बीच पूर्णांक लिखें।\nकार्य समाप्त।\n")]:
+        output, errors = invoke(["java", "-jar", str(compiler), "run", "examples/exceptions.bhash", "--target", target], value)
+        assert output == expected and not errors, (target, output, errors)
+print("Exception handling and finally passed on JVM/CLR.")
 # Collection examples exercise typed arrays, lists/maps and generic interfaces across files.
 for target in ("jvm", "clr"):
     output_path = Path("target") / ("collections.jar" if target == "jvm" else "collections-clr")

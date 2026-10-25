@@ -9,6 +9,8 @@
 - Interfaces, explicit generic types/global functions, overload resolution and static members.
 - Fixed and jagged arrays, indexing, generic growable lists, insertion-ordered maps,
   portable key equality and collection iteration with structural-mutation checks.
+- Typed exceptions, custom exception subclasses, ordered catch handlers, throw/rethrow
+  and finally cleanup across all three managed targets.
 - Selection statements with typed literal cases, grouped labels, default, scopes and nested loop control.
 - Integer bitwise AND/OR/XOR/complement and three portable 64-bit shifts, including
   generic syntax compatibility and a chess bitboard example.

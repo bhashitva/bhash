@@ -37,6 +37,7 @@ jobs:
             target/collections.jar
             target/collections-clr/
             examples/collections/
+            examples/exceptions.bhash
             target/bitboards.jar
             target/bitboards-clr/
             examples/bitboards.bhash

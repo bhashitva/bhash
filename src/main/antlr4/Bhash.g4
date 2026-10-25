@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Bhash (भाष) v0.7 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
+// Bhash (भाष) v0.8 core. UTF-8. Generate the Java visitor with ANTLR 4.13.2.
 // Parsing recognizes syntax; docs/language-spec.md defines semantic constraints.
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
@@ -61,6 +61,8 @@ statement
     | whileStatement
     | foreachStatement
     | switchStatement
+    | tryStatement
+    | THROW expression? SEMI
     | RETURN expression? SEMI
     | BREAK SEMI
     | CONTINUE SEMI
@@ -68,6 +70,8 @@ statement
     | expression SEMI
     | block
     ;
+tryStatement : TRY block (catchClause+ (FINALLY block)? | FINALLY block) ;
+catchClause : CATCH LPAREN parameter RPAREN block ;
 variableDecl : (LET | CONST) IDENTIFIER COLON valueType ASSIGN expression SEMI ;
 assignment : postfix ASSIGN expression SEMI ;
 ifStatement : IF LPAREN expression RPAREN block (ELSE (ifStatement | block))? ;
@@ -141,6 +145,10 @@ IN : 'में' ;
 SWITCH : 'चयन' ;
 CASE : 'विकल्प' ;
 DEFAULT : 'शेष' ;
+TRY : 'प्रयास' ;
+CATCH : 'पकड़ो' ;
+FINALLY : 'अंततः' ;
+THROW : 'फेंको' ;
 RETURN : 'लौटाओ' ;
 BREAK : 'विराम' ;
 CONTINUE : 'जारी' ;

@@ -201,3 +201,14 @@ extensions. Native assembly still needs assembling/linking and a target runtime.
 Next, extract a source-located typed AST and shared control-flow IR from the current
 backend, then use cross-backend golden tests to preserve evaluation, arithmetic,
 text and I/O semantics when adding another target.
+
+## Exception lowering
+
+The shared emitter validates exception subtyping, handler order/scopes and abrupt
+completion before producing host try/catch/finally and throw statements. A built-in
+`अपवाद` class maps to the runtime's unchecked `BException`; existing `Failure`
+errors extend it. User exception subclasses use ordinary class lowering, including
+constructor overload tags. Catch boundaries unwrap static initialization wrappers
+only for known Bhash exceptions. Finally may throw but cannot return or jump to an
+outer loop, keeping source semantics valid on both JVM and CLR (including browser
+.NET WebAssembly). Runtime stack traces and exception causes are not yet exposed.

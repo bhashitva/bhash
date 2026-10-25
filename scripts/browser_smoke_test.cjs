@@ -21,6 +21,8 @@ function compile(name, source) {
     build(name, file);
 }
 build('multi-file', path.resolve('examples/multi-file'));
+compile('exceptions', fs.readFileSync('examples/exceptions.bhash', 'utf8'));
+compile('exception-semantics', fs.readFileSync('src/test/resources/exceptions/browser.bhash', 'utf8'));
 build('collections', path.resolve('examples/collections'));
 compile('collection-semantics', fs.readFileSync('src/test/resources/collections/browser.bhash', 'utf8'));
 for (const name of ['factorial-console', 'factorial-objects', 'objects', 'contracts-generics', 'switch-console', 'bitboards'])
@@ -91,6 +93,8 @@ rejectedBuild('कार्य');
 for (const expression of ['सत्य & असत्य', '१ << सत्य', '~१.०'])
     rejectedBuild(`कार्य मुख्य() -> शून्य { लिखो(${expression}); }`);
 for (const body of ['स्थिर क: पूर्णांक[] = नया पूर्णांक[]{सत्य};', 'प्रत्येक (क: पूर्णांक में १) {}'])
+    rejectedBuild(`कार्य मुख्य() -> शून्य { ${body} }`);
+for (const body of ['फेंको १;', 'फेंको;', 'प्रयास {} पकड़ो (क: पूर्णांक) {}', 'प्रयास {} अंततः { लौटाओ; }'])
     rejectedBuild(`कार्य मुख्य() -> शून्य { ${body} }`);
 const note = path.join(root, 'semantics/_framework/notes.txt');
 fs.writeFileSync(note, 'keep me');
@@ -172,6 +176,12 @@ const server = http.createServer((request, response) => {
             for (const input of ['', '1२', 'abc', '9223372036854775808'])
                 await run(name, input, prompt, 1, 'भाष:');
         }
+        await run('exceptions', '५', '१२०\nकार्य समाप्त।\n');
+        await run('exceptions', '-1', 'अमान्य अंक: ० से २० के बीच पूर्णांक लिखें।\nकार्य समाप्त।\n');
+        await run('exceptions', 'abc', 'इनपुट त्रुटि: अमान्य इनपुट: एक पंक्ति में एक पूर्णांक लिखें (0-9 या ०-९)।\nकार्य समाप्त।\n');
+        await run('exception-semantics', '0', 'सत्य मूल\nभीतर\nसत्य मूल\nबाहर\nभाग\nसीमा\nप्रारंभ\nवापसी\n७\nचक्र १\nचक्र २\n');
+        await run('exception-semantics', '1', 'सफाई\n', 1, 'असफल');
+        await run('exception-semantics', '2', 'अंतिम\n');
         await run('collections', '', fs.readFileSync('examples/collections/expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('collection-semantics', '0', '० ९\n१\n७\nक १\nख ३\nसत्य\n२ ७ ९\nठीक असत्य\n५ ३\n४\n');
         for (let signal = 1; signal <= 12; signal++)
