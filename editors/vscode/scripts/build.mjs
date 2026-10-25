@@ -2,7 +2,12 @@
 import {readFile, writeFile, mkdir, copyFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {build} from 'esbuild';
+import {fileURLToPath} from 'node:url';
 const root = new URL('../../../', import.meta.url);
+// Refuse to produce a deceptively installable VSIX from a missing/interrupted Maven build.
+const compiler = new URL('target/bhash-compiler-0.1.0-SNAPSHOT.jar', root);
+const sanity = spawnSync('java', ['-Dfile.encoding=UTF-8', '-jar', fileURLToPath(compiler), 'targets'], {encoding: 'utf8'});
+if (sanity.status !== 0) throw new Error(`Build the compiler with mvn package before packaging the extension. ${sanity.stderr || sanity.error || ''}`);
 const grammar = await readFile(new URL('src/main/antlr4/Bhash.g4',root),'utf8');
 const words = [...grammar.matchAll(/^([A-Z_]+)\s*:\s*'([^']+)'/gm)].filter(([, ,value])=>/\p{L}/u.test(value));
 const identifier = '[\\u0900-\\u094F\\u0951-\\u0963\\u0966-\\u097F0-9_]';

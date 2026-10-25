@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs/promises');
 const os=require('node:os');
 const path=require('node:path');
-const {pathToFileURL}=require('node:url');
+const {pathToFileURL,fileURLToPath}=require('node:url');
 const {spawn}=require('node:child_process');
 const {EventEmitter}=require('node:events');
 const jar=path.resolve(__dirname,'../../../target/bhash-compiler-0.1.0-SNAPSHOT.jar');
@@ -18,6 +18,7 @@ function transport(){
     function wait(predicate){let cached=messages.find(predicate);if(cached)return Promise.resolve(cached);return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{events.off('message',listener);reject(new Error(`Notification timeout: ${JSON.stringify(messages.slice(-4))}; stderr=${stderr}`));},20000);function listener(message){if(predicate(message)){clearTimeout(timer);events.off('message',listener);resolve(message);}}events.on('message',listener);});}
     return {process,request,send,wait,messages};
 }
+function sameUri(left,right){const normalize=value=>{const file=path.resolve(fileURLToPath(value));return process.platform==='win32'?file.toLowerCase():file;};return normalize(left)===normalize(right);}
 function position(text,needle){const offset=text.indexOf(needle);assert.ok(offset>=0);const prefix=text.slice(0,offset);return {line:prefix.split('\n').length-1,character:offset-prefix.lastIndexOf('\n')-1};}
 test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode positions and project isolation', {timeout:90000},async t=>{
     const root=await fs.mkdtemp(path.join(os.tmpdir(),'bhash-lsp-'));
@@ -33,13 +34,13 @@ test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode position
     const initialized=await lsp.request('initialize',{processId:process.pid,workspaceFolders:[{uri:uri(a),name:'a'},{uri:uri(b),name:'b'}],capabilities:{}});
     assert.equal(initialized.capabilities.definitionProvider,true);lsp.send('initialized',{});
     lsp.send('textDocument/didOpen',{textDocument:{...document,languageId:'bhash',version:1,text:program}});
-    const diagnostic=async(file,version,predicate)=>lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&m.params.uri===uri(file)&&(version===undefined||m.params.version===version)&&predicate(m.params.diagnostics));
+    const diagnostic=async(file,version,predicate)=>lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri(file))&&(version===undefined||m.params.version===version)&&predicate(m.params.diagnostics));
     await diagnostic(main,1,ds=>ds.length===0);
     assert.equal(await lsp.request('bhash/projectInput',document),path.join(a,'bhash.project'));
     const outside=path.join(a,'outside.bhash');await fs.writeFile(outside,'वर्ग अलग {}');
     assert.equal(await lsp.request('bhash/projectInput',{uri:uri(outside)}),outside);
     const defs=await lsp.request('textDocument/definition',{textDocument:document,position:position(program,'दो(३)')});
-    assert.equal(defs.length,1);assert.equal(defs[0].uri,uri(lib));assert.equal(defs[0].range.start.line,2);
+    assert.equal(defs.length,1);assert.ok(sameUri(defs[0].uri,uri(lib)),`${defs[0].uri} != ${uri(lib)}`);assert.equal(defs[0].range.start.line,2);
     const completion=await lsp.request('textDocument/completion',{textDocument:document,position:position(program,'दो(३)')});
     assert.ok(completion.some(item=>item.label.startsWith('स्थिर')));assert.ok(completion.some(item=>item.label==='दो'));assert.ok(completion.some(item=>item.label==='जोड़ा'));
     const symbols=await lsp.request('textDocument/documentSymbol',{textDocument:document});assert.equal(symbols[0].name,'मुख्य');
@@ -68,6 +69,6 @@ test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode position
     await lsp.request('textDocument/completion',{textDocument:document,position:{line:0,character:0}});
     assert.equal((await lsp.request('workspace/symbol',{query:'अतिरिक्त'})).length,0);
     // No मुख्य is required for a library-only project; ordinary builds still require it.
-    assert.ok(lsp.messages.filter(m=>m.params?.uri===uri(path.join(b,'src','other.bhash'))).every(m=>m.params.diagnostics.length===0));
+    assert.ok(lsp.messages.filter(m=>m.params?.uri && sameUri(m.params.uri,uri(path.join(b,'src','other.bhash')))).every(m=>m.params.diagnostics.length===0));
     await lsp.request('shutdown',null);lsp.send('exit');lsp.process.stdin.end();
 });
