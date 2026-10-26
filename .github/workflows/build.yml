@@ -25,6 +25,8 @@ jobs:
       - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar check examples/hello.bhash
       - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar check examples/factorial.bhash
       - run: python scripts/smoke_test.py
+      - run: python scripts/check_lessons.py --target jvm
+      - run: python scripts/check_lessons.py --target clr
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-managed-${{ matrix.os }}

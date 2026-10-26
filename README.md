@@ -7,6 +7,13 @@ A Devanagari-first programming language with a compiler written in Java.
 Bhash source (`.bhash`) compiles to a **JVM executable JAR**, a **.NET CLR managed assembly**, or a **browser WebAssembly application**.
 All three targets support the same factorial source.
 
+## Learn and teach Bhash
+
+The [12-lesson classroom course](lessons/README.md) includes Hindi lesson plans,
+Bhash-only examples, challenge starters and reference solutions. Teachers can use
+the [Bhash-to-English concept map](lessons/concept-map.md) to connect `यदि`/`लौटाओ`
+to `if`/`return` and prepare learners for Java/C# concepts.
+
 ## Try the interactive factorial program
 
 Install **JDK 17+** and **Maven 3.9+**, then run these commands from a UTF-8

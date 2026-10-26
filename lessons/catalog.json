@@ -1,0 +1,250 @@
+[
+  {
+    "path": "01-output",
+    "title": "पहला कार्यक्रम",
+    "concept": "कार्य → function; लिखो → print",
+    "cases": [
+      {
+        "input": "",
+        "output": "मैं भाष सीख रहा हूँ।\nमैं अपना पहला कार्यक्रम बना सकता हूँ।\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "नमस्ते, दुनिया!\n"
+    }
+  },
+  {
+    "path": "02-values",
+    "title": "मान और गणना",
+    "concept": "मान → mutable variable; स्थिर → constant binding",
+    "cases": [
+      {
+        "input": "",
+        "output": "३१\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "४०\n"
+    }
+  },
+  {
+    "path": "03-decisions",
+    "title": "इनपुट और निर्णय",
+    "concept": "यदि / अन्यथा → if / else",
+    "cases": [
+      {
+        "input": "४\n",
+        "output": "सम\n"
+      },
+      {
+        "input": "५\n",
+        "output": "विषम\n"
+      },
+      {
+        "input": "0\n",
+        "output": "सम\n"
+      },
+      {
+        "input": "-३\n",
+        "output": "विषम\n"
+      }
+    ],
+    "example": {
+      "input": "०\n",
+      "output": "ऋणेतर\n"
+    }
+  },
+  {
+    "path": "04-loops",
+    "title": "दोहराव और संचय",
+    "concept": "जबतक → while",
+    "cases": [
+      {
+        "input": "५\n",
+        "output": "१५\n"
+      },
+      {
+        "input": "०\n",
+        "output": "०\n"
+      },
+      {
+        "input": "-२\n",
+        "output": "०\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "१\n२\n३\n४\n५\n"
+    }
+  },
+  {
+    "path": "05-functions",
+    "title": "कार्य और वापसी",
+    "concept": "कार्य / लौटाओ → function / return",
+    "cases": [
+      {
+        "input": "३\n९\n",
+        "output": "९\n"
+      },
+      {
+        "input": "७\n७\n",
+        "output": "७\n"
+      },
+      {
+        "input": "-५\n-२\n",
+        "output": "-२\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "१२\n"
+    }
+  },
+  {
+    "path": "06-recursion",
+    "title": "गुणनफल और पुनरावृत्ति",
+    "concept": "recursive call → स्वयं को बुलाना",
+    "cases": [
+      {
+        "input": "५\n",
+        "output": "१२०\n"
+      },
+      {
+        "input": "०\n",
+        "output": "१\n"
+      },
+      {
+        "input": "20\n",
+        "output": "२४३२९०२००८१७६६४००००\n"
+      },
+      {
+        "input": "२१\n",
+        "output": "सीमा से बाहर\n"
+      },
+      {
+        "input": "-१\n",
+        "output": "सीमा से बाहर\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "१२०\n"
+    }
+  },
+  {
+    "path": "07-arrays",
+    "title": "सरणी और अनुक्रमण",
+    "concept": "सरणी / प्रत्येक → array / foreach",
+    "cases": [
+      {
+        "input": "",
+        "output": "९\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "१०\n२५\n३०\n"
+    }
+  },
+  {
+    "path": "08-collections",
+    "title": "सूची और मानचित्र",
+    "concept": "सूची / मानचित्र → List / Map",
+    "cases": [
+      {
+        "input": "",
+        "output": "२\n१\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "आशा\nरवि\nमीना\n८\n"
+    }
+  },
+  {
+    "path": "09-selection",
+    "title": "कई विकल्पों में चुनाव",
+    "concept": "चयन / विकल्प / शेष → switch / case / default",
+    "cases": [
+      {
+        "input": "१\n",
+        "output": "खेल\n"
+      },
+      {
+        "input": "२\n",
+        "output": "संगीत\n"
+      },
+      {
+        "input": "९\n",
+        "output": "अमान्य\n"
+      }
+    ],
+    "example": {
+      "input": "१\n",
+      "output": "सोमवार\n"
+    }
+  },
+  {
+    "path": "10-objects",
+    "title": "वस्तु और अवस्था",
+    "concept": "वर्ग / निर्माता / यह → class / constructor / this",
+    "cases": [
+      {
+        "input": "",
+        "output": "१५\n२०\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "१५\n"
+    }
+  },
+  {
+    "path": "11-exceptions",
+    "title": "त्रुटि से उबरना",
+    "concept": "प्रयास / पकड़ो / अंततः → try / catch / finally",
+    "cases": [
+      {
+        "input": "१२\n",
+        "output": "१२\nसमाप्त\n"
+      },
+      {
+        "input": "-१\n",
+        "output": "अमान्य\nसमाप्त\n"
+      },
+      {
+        "input": "abc\n",
+        "output": "अमान्य\nसमाप्त\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "उदाहरण त्रुटि\nसमाप्त\n"
+    }
+  },
+  {
+    "path": "12-packages",
+    "title": "फ़ाइलें, संकुल और आयात",
+    "concept": "संकुल / आयात → package / import",
+    "cases": [
+      {
+        "input": "३\n",
+        "output": "९\n"
+      },
+      {
+        "input": "०\n",
+        "output": "०\n"
+      },
+      {
+        "input": "-४\n",
+        "output": "१६\n"
+      }
+    ],
+    "example": {
+      "input": "",
+      "output": "२५\n"
+    }
+  }
+]
