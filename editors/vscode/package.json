@@ -2,7 +2,7 @@
   "name": "bhash",
   "displayName": "Bhash (भाष)",
   "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "bhashitva",
   "license": "Apache-2.0",
   "repository": {
@@ -211,7 +211,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.cjs",
     "test:integration": "node test/run.cjs",
-    "package": "npm run build && vsce package --no-dependencies -o ../../target/bhash-vscode-0.1.1.vsix"
+    "package": "npm run build && vsce package --no-dependencies -o ../../target/bhash-vscode-0.1.2.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"
@@ -225,5 +225,6 @@
     "typescript": "5.9.3",
     "vscode-textmate": "9.2.0",
     "vscode-oniguruma": "2.0.1"
-  }
+  },
+  "icon": "images/bhash-icon.png"
 }

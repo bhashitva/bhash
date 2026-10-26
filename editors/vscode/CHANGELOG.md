@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Add a Devanagari compiler icon to the extension listing.
+
 ## 0.1.1
 
 - Fix Linux/WSL browser output permissions so a separate HTTP-server user can read generated WASM bundles.
