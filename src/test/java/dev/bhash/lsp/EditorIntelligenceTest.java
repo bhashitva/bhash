@@ -29,6 +29,18 @@ class EditorIntelligenceTest {
         सार्वजनिक परिगणना स्थिति { तैयार, पूर्ण }
         सार्वजनिक कार्य दुगुना(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }
         """;
+    @Test void qualifiedImportCompletionAndMidWordEditsRemainValid() throws Exception {
+        var lib=source("lib.bhash",library);
+        var importing=source("importing.bhash","संकुल उपयोग;\nआयात पुस्तक.बिं");
+        assertTrue(importing.completions(after(importing,"बिं"),List.of(importing,lib)).stream().anyMatch(i->i.getLabel().equals("पुस्तक.बिंदु")));
+        var main=source("main.bhash","संकुल उपयोग;\nकार्य मुख्य() -> शून्य { स्थिर क: बिंदु = नया बिंदु(१,२); लिखो(क.अ); }");
+        var item=new EditorModel(main,List.of(main,lib)).autoImports(after(main,"क: बिं")).get(0);
+        var edits=new ArrayList<TextEdit>(item.getAdditionalTextEdits());edits.add(item.getTextEdit().getLeft());
+        edits.sort(Comparator.comparingInt((TextEdit e)->main.coordinates.offset(e.getRange().getStart())).reversed());String fixed=main.text;
+        for(var edit:edits){int start=main.coordinates.offset(edit.getRange().getStart()),end=main.coordinates.offset(edit.getRange().getEnd());fixed=fixed.substring(0,start)+edit.getNewText()+fixed.substring(end);}
+        final String valid=fixed;
+        assertDoesNotThrow(()->dev.bhash.backend.ManagedEmitter.check(List.of(new SourceFile("main.bhash",valid),new SourceFile("lib.bhash",library))));
+    }
     @Test void incompleteDeclarationsDoNotBreakEditorRequests() {
         for(String text:List.of("", "आयात ", "वर्ग क { कार्य लो(", "कार्य क(अ: ", "कार्य मुख्य() -> शून्य { नया सूची<पाठ>(", "अभिलेख क(अ: पूर्णांक,")) {
             var main=source("incomplete.bhash",text);

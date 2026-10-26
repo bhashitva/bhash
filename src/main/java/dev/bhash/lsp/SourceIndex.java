@@ -139,11 +139,12 @@ final class SourceIndex {
     }
     static String packageOf(String qualified) { int dot=qualified.lastIndexOf('.');return dot<0?"":qualified.substring(0,dot); }
     List<CompletionItem> completions(Position position, Collection<SourceIndex> project) {
+        int offset=coordinates.offset(position), start=offset;
+        boolean importing=text.substring(Math.max(0,text.lastIndexOf('\n',Math.max(0,offset-1))+1),offset).stripLeading().startsWith("आयात ");
         var model=new EditorModel(this,project);
-        var members=model.memberCompletions(position);
+        var members=importing?null:model.memberCompletions(position);
         if(members!=null)return members;
         var result=new ArrayList<CompletionItem>();
-        int offset=coordinates.offset(position), start=offset;
         while(start>0) { int cp=text.codePointBefore(start);if(!Character.isLetterOrDigit(cp)&&Character.getType(cp)!=Character.NON_SPACING_MARK&&Character.getType(cp)!=Character.COMBINING_SPACING_MARK&&cp!='_')break;start-=Character.charCount(cp); }
         var replace=new Range(coordinates.position(start),position);
         for(int type=1;type<=dev.bhash.parser.BhashLexer.VOCABULARY.getMaxTokenType();type++) {
@@ -159,7 +160,7 @@ final class SourceIndex {
         for(String builtin:List.of("पढ़ो","पाठपढ़ो","लंबाई","अंश","अंकपाठ","पूर्णांकपाठ","बड़ाअक्षर","त्रुटि","यूटीएफ८बफ़र","यूटीएफ८पाठ","सरणी","सूची","मानचित्र","अपवाद")) {
             var item=new CompletionItem(builtin);item.setKind(CompletionItemKind.Function);item.setDetail("Bhash built-in");result.add(item);
         }
-        boolean importing=text.substring(Math.max(0,text.lastIndexOf('\n',Math.max(0,offset-1))+1),offset).stripLeading().startsWith("आयात ");
+
         for(var index:project)for(var s:index.symbols)if(s.global) {
             String label=null;
             if(importing && (s.exported || index.pkg.equals(pkg)))label=s.qualified;

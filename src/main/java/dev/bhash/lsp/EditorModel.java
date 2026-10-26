@@ -372,6 +372,10 @@ final class EditorModel {
         while(offset>0&&identifierPart(index.text.codePointBefore(offset)))offset-=Character.charCount(index.text.codePointBefore(offset));
         return offset;
     }
+    private int wordEnd(int offset) {
+        while(offset<index.text.length()&&identifierPart(index.text.codePointAt(offset)))offset+=Character.charCount(index.text.codePointAt(offset));
+        return offset;
+    }
     private int dotBefore(int start) {
         int p=start;while(p>0&&Character.isWhitespace(index.text.charAt(p-1)))p--;
         return p>0&&index.text.charAt(p-1)=='.'?p-1:-1;
@@ -383,7 +387,7 @@ final class EditorModel {
         for(var member:members(receiver(dot,position),position)) {
             var item=new CompletionItem(member.name);item.setDetail(member.label());
             item.setKind(member.callable?CompletionItemKind.Method:CompletionItemKind.Field);
-            item.setTextEdit(Either.forLeft(new TextEdit(new Range(index.coordinates.position(start),position),member.name)));
+            item.setTextEdit(Either.forLeft(new TextEdit(new Range(index.coordinates.position(start),index.coordinates.position(wordEnd(offset))),member.name)));
             result.add(item);
         }
         return result;
@@ -407,7 +411,7 @@ final class EditorModel {
             if(!symbol.global()||!symbol.exported()||source.pkg.equals(index.pkg)||occupied.contains(name)||!name.startsWith(prefix)||!seen.add(symbol.qualified())||index.imports.containsValue(symbol.qualified()))continue;
             var item=new CompletionItem(symbol.name());item.setKind(symbol.kind()==SymbolKind.Function?CompletionItemKind.Function:CompletionItemKind.Class);
             item.setDetail("आयात "+symbol.qualified());item.setSortText("z_"+name+symbol.qualified());
-            item.setTextEdit(Either.forLeft(new TextEdit(new Range(index.coordinates.position(start),position),symbol.name())));
+            item.setTextEdit(Either.forLeft(new TextEdit(new Range(index.coordinates.position(start),index.coordinates.position(wordEnd(offset))),symbol.name())));
             var at=index.coordinates.position(insert);
             // Insert before a declaration at offset zero; otherwise start a new line
             // after the package/import semicolon, preserving trailing comments.
