@@ -91,3 +91,9 @@ are still required after each deployment.
 - Rollback configuration: /opt/bhash/analytics-backup-20261026T135738Z.
 - GA4 account 335743816, property 466329429, stream 9915340912; ID verified in the UI.
   Domain rule and enhanced-measurement settings saved. Tag UI reported sending data.
+
+Realtime verification confirmed Bhash Playground and Bhash Chess page views,
+playground_run, playground_compile_success, playground_run_complete, and
+chess_game_start. Six event-scoped dimensions were saved: site_area, destination,
+mode, example, outcome, and stage. Public WordPress tag inclusion was verified;
+signed-in WordPress visitors are intentionally excluded.
