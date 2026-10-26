@@ -16,6 +16,17 @@ exports.run=async()=>{
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.some(d=>d.source==='bhash'&&d.severity===vscode.DiagnosticSeverity.Error),'unsaved semantic diagnostic');
     const restore=new vscode.WorkspaceEdit();restore.replace(uri,new vscode.Range(0,0,document.lineCount,0),source);await vscode.workspace.applyEdit(restore);await document.save();
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'diagnostic clearing');
+    // Exercise new features through VS Code's actual provider adapters.
+    const rich='कार्य मुख्य() -> शून्य { स्थिर अंक: सूची<पूर्णांक> = नया सूची<पूर्णांक>(); अंक.जोड़ो(१); }';
+    const change=new vscode.WorkspaceEdit();change.replace(uri,new vscode.Range(0,0,document.lineCount,0),rich);await vscode.workspace.applyEdit(change);
+    const memberPosition=document.positionAt(rich.indexOf('अंक.जोड़ो')+'अंक.'.length);
+    const memberList=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,memberPosition),list=>list?.items?.some(i=>label(i)==='जोड़ो'),'typed list member completion');
+    assert.ok(memberList.items.some(i=>label(i)==='जोड़ो'&&i.detail.includes('पूर्णांक')));
+    const signaturePosition=document.positionAt(rich.indexOf('जोड़ो(')+'जोड़ो('.length);
+    const signature=await vscode.commands.executeCommand('vscode.executeSignatureHelpProvider',uri,signaturePosition,'(');
+    assert.ok(signature?.signatures.some(s=>s.label.includes('पूर्णांक')),'typed list signature help');
+    const original=new vscode.WorkspaceEdit();original.replace(uri,new vscode.Range(0,0,document.lineCount,0),source);await vscode.workspace.applyEdit(original);await document.save();
+    await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'diagnostic clearing after provider tests');
     const tasks=await vscode.tasks.fetchTasks({type:'bhash'});const build=tasks.find(task=>task.definition.command==='build');assert.ok(build,'configured Bhash task resolves');
     await new Promise(async(resolve,reject)=>{const timer=setTimeout(()=>{listener.dispose();reject(new Error('Build task timed out'));},60000);const listener=vscode.tasks.onDidEndTaskProcess(event=>{if(event.execution.task.definition.type==='bhash'){clearTimeout(timer);listener.dispose();event.exitCode===0?resolve():reject(new Error(`Build task exit ${event.exitCode}`));}});try{await vscode.tasks.executeTask(build);}catch(error){clearTimeout(timer);listener.dispose();reject(error);}});
     const result=await promisify(execFile)('java',['-jar',path.join(workspace,'build','host-test.jar')],{encoding:'utf8'});assert.equal(result.stdout.trim(),'६');

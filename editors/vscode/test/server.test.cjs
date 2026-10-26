@@ -72,3 +72,36 @@ test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode position
     assert.ok(lsp.messages.filter(m=>m.params?.uri && sameUri(m.params.uri,uri(path.join(b,'src','other.bhash')))).every(m=>m.params.diagnostics.length===0));
     await lsp.request('shutdown',null);lsp.send('exit');lsp.process.stdin.end();
 });
+
+test('stdio LSP: member types, signatures, automatic import edits and coded multi-error diagnostics', {timeout:90000},async t=>{
+    const root=await fs.mkdtemp(path.join(os.tmpdir(),'bhash-intelligence-'));
+    t.after(()=>fs.rm(root,{recursive:true,force:true}));
+    await fs.mkdir(path.join(root,'src'));
+    await fs.writeFile(path.join(root,'bhash.project'),'name=intelligence\nsources=src\n');
+    await fs.writeFile(path.join(root,'src/lib.bhash'),'संकुल गणित; सार्वजनिक अभिलेख बिंदु(अ: पूर्णांक, ब: पूर्णांक); सार्वजनिक कार्य जोड़(अ: पूर्णांक, ब: पूर्णांक) -> पूर्णांक { लौटाओ अ + ब; }');
+    const main=path.join(root,'src/main.bhash'),uri=pathToFileURL(main).href,document={uri};
+    const source='संकुल उपयोग;\nआयात गणित.जोड़;\nकार्य मुख्य() -> शून्य { स्थिर क: बिंदु = नया बिंदु(१,२); लिखो(क.अ, जोड़(१, २)); }';
+    await fs.writeFile(main,source);
+    const lsp=transport();t.after(()=>lsp.process.kill());
+    const result=await lsp.request('initialize',{workspaceFolders:[{uri:pathToFileURL(root).href,name:'test'}],capabilities:{}});
+    assert.deepEqual(result.capabilities.signatureHelpProvider.triggerCharacters,['(', ',']);
+    lsp.send('initialized',{});lsp.send('textDocument/didOpen',{textDocument:{...document,languageId:'bhash',version:1,text:source}});
+    const after=needle=>{const p=position(source,needle);return {...p,character:p.character+needle.length};};
+    const items=await lsp.request('textDocument/completion',{textDocument:document,position:after('क: बिं')});
+    const item=items.find(i=>i.label==='बिंदु'&&i.additionalTextEdits?.length);assert.ok(item,'unimported public type completion carries import edit');
+    const diagnostic=await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri)&&m.params.version===1&&m.params.diagnostics.some(d=>d.code==='BH2002'));
+    const actions=await lsp.request('textDocument/codeAction',{textDocument:document,range:diagnostic.params.diagnostics[0].range,context:{diagnostics:diagnostic.params.diagnostics}});
+    assert.ok(actions.some(a=>a.kind==='quickfix'&&a.title==='आयात गणित.बिंदु'));
+    const fixed=source.replace('आयात गणित.जोड़;','आयात गणित.जोड़;\nआयात गणित.बिंदु;');
+    lsp.send('textDocument/didChange',{textDocument:{...document,version:2},contentChanges:[{text:fixed}]});
+    const p=position(fixed,'क.अ');p.character+=2;
+    const members=await lsp.request('textDocument/completion',{textDocument:document,position:p});assert.ok(members.some(i=>i.label==='अ'&&i.detail==='अ: पूर्णांक'));
+    const call=position(fixed,'जोड़(१, ');call.character+='जोड़(१, '.length;
+    const signature=await lsp.request('textDocument/signatureHelp',{textDocument:document,position:call});assert.equal(signature.activeParameter,1);assert.ok(signature.signatures[0].label.includes('ब: पूर्णांक'));
+    const bad='कार्य मुख्य() -> शून्य { लिखो(अज्ञात); स्थिर क: पूर्णांक = १; क = २; }';
+    lsp.send('textDocument/didChange',{textDocument:{...document,version:3},contentChanges:[{text:bad}]});
+    const errors=await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri)&&m.params.version===3&&m.params.diagnostics.length===2);
+    assert.deepEqual(errors.params.diagnostics.map(d=>d.code),['BH2001','BH4001']);
+    assert.ok(errors.params.diagnostics.every(d=>d.message.includes('—')),'Hindi guidance retains English detail');
+    await lsp.request('shutdown',null);lsp.send('exit');lsp.process.stdin.end();
+});

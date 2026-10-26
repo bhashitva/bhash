@@ -30,7 +30,9 @@
 ## Next: frontend structure and developer experience
 
 - Extract a source-located typed AST from combined semantic checking/Java lowering.
-- Improve diagnostic codes, multiple-error recovery and runtime source mapping.
+- Completed initial diagnostic codes, Hindi guidance and bounded recovery across independent bodies/statements.
+- Completed declaration-based member completion, signature help, automatic imports and import Quick Fixes.
+- Extend recovery through declaration/type-graph failures; runtime source mapping remains pending.
 - Expand standard input support beyond integers; extend numeric parsing and formatting.
 - Maintain Apache 2.0 licensing, contribution guidance and third-party notices.
 

@@ -26,7 +26,7 @@ public final class Frontend {
         var listener = new BaseErrorListener() {
             @Override public void syntaxError(Recognizer<?, ?> recognizer, Object symbol,
                     int line, int column, String message, RecognitionException exception) {
-                diagnostics.add(new Diagnostic(sourceName, line, column + 1, message));
+                diagnostics.add(new Diagnostic(sourceName, line, column + 1, DiagnosticMessages.explain(message)));
             }
         };
         var lexer = new BhashLexer(CharStreams.fromString(source, sourceName));

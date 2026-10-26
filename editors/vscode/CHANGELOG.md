@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — 2026-10-26
+
+- Report multiple independent semantic errors with stable diagnostic codes, Hindi
+  guidance and retained English details; preserve source locations and limit recovery.
+- Add typed member completion for classes/inheritance/generics, records, enums,
+  arrays/lists/maps and byte buffers, respecting visibility and static receivers.
+- Add function/method/constructor signature help, overload lists and active arguments.
+- Add automatic import edits on completion and import Quick Fixes for project declarations.
+- Extend receiver member hover/navigation and preserve completion in incomplete buffers.
+- Keep the existing JVM/CLR/browser build tasks and bundled compiler; no language syntax changes.
+
+
 ## 0.1.2
 
 - Add a Devanagari compiler icon to the extension listing.

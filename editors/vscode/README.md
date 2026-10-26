@@ -7,7 +7,7 @@ programs while you edit.
 
 ## Install
 
-1. Download `bhash-vscode-0.1.2.vsix` from the **Bhash VS Code extension** GitHub
+1. Download `bhash-vscode-0.2.0.vsix` from the **Bhash VS Code extension** GitHub
    Actions artifact for a successful main-branch build.
 2. In VS Code choose **Extensions → … → Install from VSIX…** and select the file.
 3. Install **Java 17 or later** on the computer running the extension host.
@@ -16,9 +16,9 @@ programs while you edit.
 4. Open a folder containing `bhash.project`, or open a standalone `.bhash` file.
    Trust the workspace to enable analysis and compiler tasks.
 
-No Maven or Node installation is needed to use the packaged extension. There is
-no Marketplace listing yet; `bhashitva` is the intended publisher identifier, not
-a claim that a Marketplace publisher has been registered.
+No Maven or Node installation is needed to use the packaged extension. The extension is
+available on the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash).
+A locally packaged or Actions-built version can be installed before its Marketplace update is published.
 
 ## Features
 
@@ -31,10 +31,20 @@ a claim that a Marketplace publisher has been registered.
 - Whole-project syntax and semantic diagnostics in Problems, including unsaved
   source/manifest buffers and newly created source buffers. Imports and types are
   checked using the same semantic checker as all three managed/browser targets.
-- Hover and F12 for lexical declarations and imported/same-package top-level
-  types/functions. Overloaded function navigation lists declarations; it does not
-  select the resolved overload. Outline and workspace symbol search include types,
-  records, enums, interfaces, functions, and members.
+- Typed member completion for declared receivers, inherited and generic members,
+  records, enums, lists/maps/arrays and byte buffers. Private/protected visibility
+  and instance/static receiver rules filter suggestions.
+- Signature help on `(` and `,` for functions, overloads, methods and constructors,
+  including parameter types and the active argument. Nested calls are tracked.
+- Completion of an unimported public type/function adds a file-local `आयात`.
+  Existing aliases and name conflicts are respected; unresolved names also offer
+  an import Quick Fix when a matching public declaration exists in the project.
+- Hover and F12 for lexical, top-level and resolved receiver members. Overloaded
+  navigation lists declarations rather than choosing a call's resolved overload.
+  Outline and workspace symbols include types, records, enums, interfaces, functions and members.
+- Coded diagnostics with Hindi guidance and English detail. Independent body errors
+  are collected in one pass (up to 50); declaration/import/type-graph failures stop
+  the semantic pass to avoid misleading follow-on errors.
 - Independent manifests and multi-root workspaces remain separate compilation
   units. Discovery ignores `.git`, `node_modules`, `target`, `build`, and `dist`.
 - Build JVM, CLR, or browser WebAssembly; run JVM/CLR in an integrated terminal
@@ -93,15 +103,23 @@ until saved to a `.bhash` path. No Java runtime is downloaded automatically.
 
 ## Current limits
 
-This is the first compiler-backed tooling release. Arbitrary receiver/member type
-inference, automatic import edits, call signature help, semantic rename/references,
-formatting, and source debugging are not implemented. F12 deliberately avoids
-claiming a binding for `object.member`. The checker reports all syntax errors and
-the first semantic failure in each project per pass. Unchanged project indexes are reused. Changed projects are reanalyzed as a whole
-rather than doing incremental semantic compilation;
-large repositories should measure latency before adopting it as their only IDE.
-Nested project source roots should not overlap: each manifest owns its source
-files. External binary package management is not added by the extension.
+The editor resolves declared types and common expression chains conservatively;
+unknown or ambiguous receiver types produce no member suggestions. It is not a
+complete semantic binding graph: semantic rename/references, formatting and source
+debugging remain pending. Signature help lists overloads and selects a signature
+with enough parameters; it does not promise full overload selection while a call
+is incomplete. Generic member declarations remain a language limitation.
+
+Syntax diagnostics are collected first. If syntax is invalid, semantic diagnostics
+wait until it is repaired; completion can still use recovered declarations.
+Declaration/import/generic-expansion failures can still stop at the first error.
+Independent statement, function, constructor and field-initializer errors are
+recovered without emitting an executable. See [diagnostic codes and behavior](../../docs/developer-experience.md).
+
+Unchanged project indexes are reused. Changed projects are analyzed as a whole;
+incremental semantic compilation is pending. Automatic imports search the current
+compilation project, not other workspace roots or external binary libraries.
+Builds use saved files. No code is executed during completion or diagnostics.
 
 ## Development
 

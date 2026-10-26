@@ -2,6 +2,8 @@
 import {EditorView, basicSetup} from 'codemirror';
 import {StreamLanguage} from '@codemirror/language';
 import {autocompletion, snippetCompletion} from '@codemirror/autocomplete';
+import {setDiagnostics, lintGutter} from '@codemirror/lint';
+import {compilerDiagnostics} from './diagnostics.mjs';
 const $ = id => document.getElementById(id);
 const track = (name, values) => window.bhashAnalytics?.(name, values);
 const keywordData = BHASH_KEYWORDS;
@@ -68,11 +70,35 @@ try {
 } catch {}
 function validDraft(draft) { return draft && typeof draft.source === 'string' && draft.source.length <= 32768 && ['scratch', 'program'].includes(draft.mode) && typeof draft.input === 'string' && draft.input.length <= 16384; }
 $('mode').value = initial.mode; $('stdin').value = initial.input;
-const editor = new EditorView({doc: initial.source, parent: $('editor'), extensions: [basicSetup, language, EditorView.lineWrapping,
+const editor = new EditorView({doc: initial.source, parent: $('editor'), extensions: [basicSetup, language, lintGutter(), EditorView.lineWrapping,
   autocompletion({override: [context => { const word = context.matchBefore(/[\p{L}\p{M}\p{N}_]+/u); return word || context.explicit ? {from: word?.from ?? context.pos, options: completionOptions} : null; }]}),
   EditorView.contentAttributes.of({'aria-label': 'Bhash source code', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off'}),
-  EditorView.updateListener.of(update => { if (update.docChanged) save(); if (update.selectionSet || update.docChanged) { const pos = update.state.selection.main.head, line = update.state.doc.lineAt(pos); $('position').textContent = `Ln ${line.number}, Col ${pos - line.from + 1}`; } })
+  EditorView.updateListener.of(update => { if (update.docChanged) { save(); queueMicrotask(clearCompilerErrors); } if (update.selectionSet || update.docChanged) { const pos = update.state.selection.main.head, line = update.state.doc.lineAt(pos); $('position').textContent = `Ln ${line.number}, Col ${pos - line.from + 1}`; } })
 ]});
+function clearCompilerErrors() {
+  if ($('diagnostics').childElementCount) {
+    $('diagnostics').replaceChildren();
+    editor.dispatch(setDiagnostics(editor.state, []));
+  }
+}
+function showCompilerErrors(message, compiledSource) {
+  $('errors').textContent = message;
+  // Do not attach stale server locations after the user has edited during a build.
+  if (editor.state.doc.toString() !== compiledSource) return;
+  const diagnostics = compilerDiagnostics(message, compiledSource);
+  editor.dispatch(setDiagnostics(editor.state, diagnostics));
+  $('diagnostics').replaceChildren();
+  for (const diagnostic of diagnostics) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = `पंक्ति ${diagnostic.line}, स्तंभ ${diagnostic.column}: ${diagnostic.message}`;
+    button.addEventListener('click', () => {
+      editor.dispatch({selection: {anchor: diagnostic.from, head: diagnostic.to}, scrollIntoView: true});
+      editor.focus();
+    });
+    $('diagnostics').append(button);
+  }
+}
 function save() { try { localStorage.setItem('bhash-draft', JSON.stringify({source: editor.state.doc.toString(), mode: $('mode').value, input: $('stdin').value})); $('saved').textContent = 'SAVED LOCALLY'; } catch { $('saved').textContent = 'STORAGE UNAVAILABLE'; } }
 $('stdin').addEventListener('input', save); $('mode').addEventListener('change', save);
 $('example').addEventListener('change', () => { const item = examples[$('example').value]; track('playground_example_select', {example: $('example').value}); editor.dispatch({changes: {from: 0, to: editor.state.doc.length, insert: item.source}}); $('mode').value = item.mode; $('stdin').value = item.input; save(); });
@@ -100,11 +126,13 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function run() {
   if (!config || !navigator.onLine || $('run').disabled) return;
   track('playground_run', {mode: $('mode').value});
+  clearCompilerErrors();
+  const compiledSource = editor.state.doc.toString();
   save(); const id = ++current; $('output').textContent = ''; $('errors').textContent = ''; $('output-tab').click();
   $('run').disabled = true; $('stop').disabled = false; $('indicator').classList.add('active'); $('status').textContent = 'Compiling · तैयार किया जा रहा है…';
   abort = new AbortController(); timer = setTimeout(() => stop('Compilation timed out. Try again shortly.'), 240000);
   try {
-    const response = await fetch('/api/compile', {method: 'POST', headers: {'X-Bhash-Playground': '1'}, body: new URLSearchParams({source: editor.state.doc.toString(), mode: $('mode').value}), signal: abort.signal});
+    const response = await fetch('/api/compile', {method: 'POST', headers: {'X-Bhash-Playground': '1'}, body: new URLSearchParams({source: compiledSource, mode: $('mode').value}), signal: abort.signal});
     let job = await response.json(); if (!response.ok) throw new Error(job.error || 'Compilation service unavailable');
     while (['queued', 'compiling'].includes(job.status)) {
       $('status').textContent = job.status === 'queued' ? 'Queued · अपनी बारी की प्रतीक्षा…' : 'Compiling · तैयार किया जा रहा है…';
@@ -120,7 +148,7 @@ async function run() {
     frame = document.createElement('iframe'); frame.title = 'Isolated Bhash execution'; frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
     nonce = crypto.randomUUID(); frame.src = url.href; $('runner-slot').append(frame);
     timer = setTimeout(() => stop('Runtime loading timed out. Check the connection and try again.'), 90000);
-  } catch (error) { if (id !== current) return; track('playground_run_failed', {stage: 'compile'}); $('errors').textContent = error.message; finish('Could not run · कार्यक्रम नहीं चला'); }
+  } catch (error) { if (id !== current) return; track('playground_run_failed', {stage: 'compile'}); showCompilerErrors(error.message, compiledSource); finish('Could not run · कार्यक्रम नहीं चला'); }
 }
 $('run').addEventListener('click', run);
 addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); run(); } });

@@ -102,6 +102,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private final Map<String,ArrayFactory> arrayFactories = new LinkedHashMap<>();
     private final Deque<Map<String, Binding>> scopes = new ArrayDeque<>();
     private final StringBuilder output = new StringBuilder();
+    private final List<String> diagnostics = new ArrayList<>();
+    private static final int MAX_DIAGNOSTICS = 50;
     private Type returnType;
     private ClassInfo currentClass;
     private boolean fieldInitializer, baseArguments, constructorBody, currentStatic;
@@ -228,8 +230,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     .append(" BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n");
             output.append("private static Exception bhashFailure(Exception e) { while(e is TypeInitializationException && e.InnerException!=null) e=e.InnerException; return e; }\n");
         }
-        for (var overloads : functions.values()) for (var function : overloads) if (function.declaration!=null) emitFunction(function);
-        for (ClassInfo definition : classOrder) emitClass(definition);
+        for (var overloads : functions.values()) for (var function : overloads) if (function.declaration!=null) recover(() -> emitFunction(function));
+        for (ClassInfo definition : classOrder) recover(() -> emitClass(definition));
+        if (!diagnostics.isEmpty()) throw new Invalid(String.join("\n", diagnostics));
         for (int i=0;i<constructorId;i++) output.append(target==Target.JVM?"public static final class ":"public sealed class ").append("CtorTag").append(i).append(" {}\n");
         for (var factory:arrayFactories.values()) output.append(factory.code.replace("() ->",target==Target.JVM?"() ->":"() =>"));
         return output.append("}\n").toString();
@@ -251,8 +254,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         output.append(typeName(function.result)).append(' ').append(function.java).append('(');
         emitParameters(declaration.parameters(), function.parameters);
         output.append(") {\n");
+        int errorsBeforeBody = diagnostics.size();
         var flow = statements(declaration.block());
-        if (returnType != Type.VOID && flow.contains(Flow.NORMAL))
+        if (diagnostics.size() == errorsBeforeBody && returnType != Type.VOID && flow.contains(Flow.NORMAL))
             throw error(declaration, "Function must return " + returnType.bhash + " on every path.");
         output.append("}\n");
         scopes.pop();
@@ -521,7 +525,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 .append(String.join(",",definition.contracts.stream().map(c->c.java).toList()));
         output.append(" {\n");
         Map<Field, String> initializers = new LinkedHashMap<>();
-        for (Field field : definition.fields.values()) {
+        for (Field field : definition.fields.values()) recover(() -> {
             currentClass = definition; currentStatic=field.shared;
             Expr value;
             if (field.declaration.expression() == null) value = new Expr(field.type,defaultValue(field.type));
@@ -538,12 +542,12 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (field.shared) output.append('=').append(value.java);
             output.append(";\n");
             if (!field.shared) initializers.put(field, value.java);
-        }
+        });
         if (target==Target.CLR && definition.fields.values().stream().anyMatch(f->f.shared))
             output.append("static ").append(definition.java).append("() {}\n");
         currentStatic=false;
-        for (Constructor constructor:definition.constructors) emitConstructor(definition,constructor,initializers);
-        for (var overloads:definition.methods.values()) for (Function method:overloads) emitFunction(method);
+        for (Constructor constructor:definition.constructors) recover(() -> emitConstructor(definition,constructor,initializers));
+        for (var overloads:definition.methods.values()) for (Function method:overloads) recover(() -> emitFunction(method));
         output.append("}\n");
         currentClass = null;
     }
@@ -600,13 +604,53 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return null;
     }
 
+    /** Recover only at independent statement/body boundaries. Declaration graph failures
+     * remain fatal: continuing with an inconsistent type graph would invent diagnostics. */
+    private boolean recover(Runnable action) {
+        if (diagnostics.size() >= MAX_DIAGNOSTICS) return false;
+        int length = output.length();
+        var savedScopes = scopes.stream().map(HashMap::new).toList();
+        var savedBreaks = new ArrayList<>(breakTargets);
+        var savedCaught = new ArrayList<>(caughtExceptions);
+        var savedFinally = new ArrayList<>(finallyContexts);
+        var savedClass = currentClass; var savedReturn = returnType;
+        boolean savedStatic=currentStatic, savedField=fieldInitializer, savedBase=baseArguments, savedConstructor=constructorBody;
+        int savedLoop=loopDepth;
+        try { action.run(); return true; }
+        catch (Invalid invalid) {
+            if (diagnostics.size() < MAX_DIAGNOSTICS) diagnostics.add(invalid.getMessage());
+            output.setLength(length);
+            scopes.clear(); scopes.addAll(savedScopes);
+            breakTargets.clear(); breakTargets.addAll(savedBreaks);
+            caughtExceptions.clear(); caughtExceptions.addAll(savedCaught);
+            finallyContexts.clear(); finallyContexts.addAll(savedFinally);
+            currentClass=savedClass; returnType=savedReturn; currentStatic=savedStatic;
+            fieldInitializer=savedField; baseArguments=savedBase; constructorBody=savedConstructor; loopDepth=savedLoop;
+            return false;
+        }
+    }
+
     private EnumSet<Flow> statements(BlockContext block) { return statements(block.statement()); }
 
     private EnumSet<Flow> statements(List<StatementContext> statements) {
         var result = EnumSet.of(Flow.NORMAL);
         for (var statement : statements) {
-            if (!result.remove(Flow.NORMAL)) throw error(statement, "Unreachable statement.");
-            result.addAll(statement(statement));
+            if (diagnostics.size() >= MAX_DIAGNOSTICS) break;
+            if (!result.remove(Flow.NORMAL)) {
+                diagnostics.add(error(statement, "Unreachable statement.").getMessage());
+                break;
+            }
+            var flow = new java.util.concurrent.atomic.AtomicReference<>(EnumSet.of(Flow.NORMAL));
+            boolean valid = recover(() -> flow.set(statement(statement)));
+            result.addAll(flow.get());
+            // Preserve a well-typed declaration after a bad initializer to avoid spurious
+            // undefined-binding errors in subsequent statements. No output is emitted on errors.
+            if (!valid && statement.variableDecl()!=null && !scopes.isEmpty()) {
+                var d = statement.variableDecl();
+                try { scopes.peek().putIfAbsent(Identifiers.key(d.IDENTIFIER().getText()),
+                    new Binding("invalid", type(d.valueType()), d.LET()!=null)); }
+                catch (Invalid ignored) { /* Unknown declared types cannot be recovered safely. */ }
+            }
         }
         return result;
     }

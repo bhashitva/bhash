@@ -3,5 +3,5 @@ package dev.bhash.backend;
 
 /** A source-located Bhash diagnostic, or a compiler/toolchain failure. */
 public final class CompilationException extends Exception {
-    public CompilationException(String message) { super(message); }
+    public CompilationException(String message) { super(dev.bhash.frontend.DiagnosticMessages.render(message)); }
 }

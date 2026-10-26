@@ -269,7 +269,10 @@ I/O error. `run` forwards the generated process's exit status.
 - Entry-point, name, type, return-path, literal-range and control-flow checks.
 - UTF-8 console input/output, a JVM backend and a .NET 10 CLR backend.
 
-The compiler reports the first semantic error with the Bhash source location.
+The compiler reports coded diagnostics with Hindi guidance, English detail and Bhash
+source locations. Independent body errors are collected in one pass (up to 50);
+invalid declarations/imports may still stop semantic analysis early. See
+[diagnostics and editor assistance](docs/developer-experience.md).
 Loop return analysis is conservative: a value-returning function needs a return
 path outside a potentially zero-iteration loop. Large programs may reach normal
 Java method/class limits; optimization and debug source maps remain future work.
@@ -373,6 +376,8 @@ Hostinger when the repository is updated.
 
 The [Bhash VS Code extension](editors/vscode/README.md) provides syntax highlighting,
 Devanagari/English snippets, compiler-backed multi-file diagnostics, completion,
-outline, declaration navigation, and JVM/CLR/browser build tasks. Install the VSIX
-from a successful **Bhash VS Code extension** Actions build. Java 17+ is required;
+outline, typed member completion, signature help, automatic imports, declaration
+navigation, and JVM/CLR/browser build tasks. Install from the
+[Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash)
+or use the VSIX from a successful **Bhash VS Code extension** Actions build. Java 17+ is required;
 the packaged extension includes its compiler and does not require Maven.

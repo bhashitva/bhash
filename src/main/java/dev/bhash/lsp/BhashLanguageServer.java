@@ -45,10 +45,12 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
             var capabilities=new ServerCapabilities();
             capabilities.setTextDocumentSync(TextDocumentSyncKind.Full);
             capabilities.setCompletionProvider(new CompletionOptions(false,List.of(".")));
+            capabilities.setSignatureHelpProvider(new SignatureHelpOptions(List.of("(", ","),List.of(")")));
+            capabilities.setCodeActionProvider(new CodeActionOptions(List.of(CodeActionKind.QuickFix)));
             capabilities.setHoverProvider(true);capabilities.setDefinitionProvider(true);capabilities.setDocumentSymbolProvider(true);capabilities.setWorkspaceSymbolProvider(true);
             var folders = new WorkspaceFoldersOptions();folders.setSupported(true);folders.setChangeNotifications(true);
             capabilities.setWorkspace(new WorkspaceServerCapabilities(folders));
-            return new InitializeResult(capabilities,new ServerInfo("Bhash","0.1.0"));
+            return new InitializeResult(capabilities,new ServerInfo("Bhash","0.2.0"));
         });
     }
     @Override public void initialized(InitializedParams params) { schedule(true); }
@@ -172,7 +174,7 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
             if(!located)diagnostics.computeIfAbsent(fallback.toUri().toASCIIString(),k->new ArrayList<>()).add(error(new Range(new Position(0,0),new Position(0,0)),line));
         }
     }
-    private static Diagnostic error(Range range,String message) {var d=new Diagnostic(range,message,DiagnosticSeverity.Error,"bhash");return d;}
+    private static Diagnostic error(Range range,String message) {var explained=DiagnosticMessages.explain(message);var d=new Diagnostic(range,explained,DiagnosticSeverity.Error,"bhash");d.setCode(DiagnosticMessages.code(explained));return d;}
     private void log(String message) {if(client!=null)client.logMessage(new MessageParams(MessageType.Warning,message));else System.err.println(message);}
     private ProjectState state(String uri) {
         // A request after an edit observes that edit, even before the debounce timer fires.
@@ -187,6 +189,35 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
     @Override public CompletableFuture<Either<List<CompletionItem>,CompletionList>> completion(CompletionParams params) {
         return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
             return Either.forLeft(index==null?List.of():index.completions(params.getPosition(),project.indexes.values()));});
+    }
+    @Override public CompletableFuture<SignatureHelp> signatureHelp(SignatureHelpParams params) {
+        return submit(()->{var project=state(params.getTextDocument().getUri());
+            var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
+            return index==null?null:new EditorModel(index,project.indexes.values()).signatureHelp(params.getPosition());});
+    }
+    @Override public CompletableFuture<List<Either<Command,CodeAction>>> codeAction(CodeActionParams params) {
+        return submit(()->{var project=state(params.getTextDocument().getUri());
+            var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
+            if(index==null)return List.of();
+            var actions=new ArrayList<Either<Command,CodeAction>>();
+            for(var diagnostic:params.getContext().getDiagnostics()) {
+                String code=diagnostic.getCode()==null||!diagnostic.getCode().isLeft()?"":diagnostic.getCode().getLeft();
+                if(!Set.of("BH2001","BH2002","BH2004").contains(code))continue;
+                int end=index.coordinates.offset(diagnostic.getRange().getStart());
+                while(end<index.text.length()) {
+                    int cp=index.text.codePointAt(end);
+                    if(!Character.isLetterOrDigit(cp)&&Character.getType(cp)!=Character.NON_SPACING_MARK&&Character.getType(cp)!=Character.COMBINING_SPACING_MARK&&cp!='_')break;
+                    end+=Character.charCount(cp);
+                }
+                for(var item:new EditorModel(index,project.indexes.values()).autoImports(index.coordinates.position(end))) {
+                    var edit=item.getTextEdit().getLeft();
+                    if(!item.getLabel().equals(index.text.substring(index.coordinates.offset(edit.getRange().getStart()),end)))continue;
+                    var action=new CodeAction(item.getDetail());action.setKind(CodeActionKind.QuickFix);action.setDiagnostics(List.of(diagnostic));
+                    action.setEdit(new WorkspaceEdit(Map.of(index.uri,item.getAdditionalTextEdits())));actions.add(Either.forRight(action));
+                }
+            }
+            return actions;
+        });
     }
     @Override public CompletableFuture<Either<List<? extends Location>,List<? extends LocationLink>>> definition(DefinitionParams params) {
         return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());

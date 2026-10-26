@@ -17,6 +17,8 @@ final class SourceIndex {
     final String uri, text, pkg;
     final TextCoordinates coordinates;
     final List<Symbol> symbols = new ArrayList<>();
+    final Map<Symbol,ParserRuleContext> declarations = new LinkedHashMap<>();
+    final ProgramContext tree;
     final List<DocumentSymbol> outline = new ArrayList<>();
     final Map<String,String> imports = new LinkedHashMap<>();
     final List<Token> tokens = new ArrayList<>();
@@ -26,7 +28,7 @@ final class SourceIndex {
         uri = java.nio.file.Path.of(source.name()).toUri().toASCIIString();
         text = source.text(); coordinates = new TextCoordinates(text);
         var parsed = source.parse();
-        var tree = parsed.tree();
+        tree = parsed.tree();
         pkg = tree.packageDecl() == null ? "" : key(tree.packageDecl().qualifiedName().getText());
         for (var imp : tree.importDecl()) {
             String full = key(imp.qualifiedName().getText());
@@ -50,7 +52,14 @@ final class SourceIndex {
     }
     static String key(String name) { return Identifiers.key(name); }
     private int start(ParserRuleContext context) { return context.start == null ? 0 : Math.max(0,context.start.getStartIndex()); }
-    private int end(ParserRuleContext context) { return context.stop == null ? start(context) : Math.max(start(context),context.stop.getStopIndex() + 1); }
+    private int end(ParserRuleContext context) {
+        TerminalNode close=context instanceof BlockContext c?c.RBRACE():context instanceof ClassDeclContext c?c.RBRACE():context instanceof InterfaceDeclContext c?c.RBRACE():null;
+        if((context instanceof BlockContext || context instanceof InterfaceDeclContext || context instanceof ClassDeclContext c && c.RECORD()==null)
+                && (close==null || close.getSymbol().getStartIndex()<0))return text.codePointCount(0,text.length());
+        if(context instanceof FunctionDeclContext c && c.block()!=null)return end(c.block());
+        if(context instanceof ConstructorDeclContext c && c.block()!=null)return end(c.block());
+        return context.stop == null ? start(context) : Math.max(start(context),context.stop.getStopIndex() + 1);
+    }
     private Range range(int start, int end) {
         // AST token offsets exclude an initial BOM.
         int shift = text.startsWith("\uFEFF") ? 1 : 0;
@@ -85,7 +94,8 @@ final class SourceIndex {
             Range full = range(start(context),Math.max(end(context),id.getSymbol().getStopIndex()+1));
             String qualified = pkg.isEmpty()?key(name):pkg+"."+key(name);
             int visible = context instanceof VariableDeclContext ? end(context) : scopeStart;
-            symbols.add(new Symbol(name,qualified,uri,kind,detail,full,selection,exported,global,scopeStart,scopeEnd,visible));
+            var symbol = new Symbol(name,qualified,uri,kind,detail,full,selection,exported,global,scopeStart,scopeEnd,visible);
+            symbols.add(symbol); declarations.put(symbol,context);
             if (!(context instanceof ParameterContext) && !(context instanceof VariableDeclContext)) {
                 var document = new DocumentSymbol(name,kind,full,selection,detail);
                 children = new ArrayList<>(); document.setChildren(children);destination.add(document);
@@ -116,9 +126,9 @@ final class SourceIndex {
         if(typeReference)name=typeReferences.get(token.getStartIndex());
         final String lookupName=name;
         for (var symbol:symbols) if (symbol.selection.equals(range(token.getStartIndex(),token.getStopIndex()+1))) return List.of(symbol);
-        // Never guess the type of an arbitrary expression receiver. Member inference/rename need the semantic graph.
+        // Member navigation uses the same conservative declaration/type model as completion.
         int at=tokens.indexOf(token);
-        if (!typeReference && at>0 && tokens.get(at-1).getText().equals(".")) return List.of();
+        if (!typeReference && at>0 && tokens.get(at-1).getText().equals(".")) return new EditorModel(this,project).resolveMember(position);
         var lexical=visibleLexical(position).stream().filter(s->key(s.name).equals(lookupName) && (!typeReference||s.kind==SymbolKind.TypeParameter)).toList();
         if (!lexical.isEmpty()) {
             int narrowest=lexical.stream().mapToInt(s->s.scopeEnd-s.scopeStart).min().orElse(0);
@@ -129,6 +139,9 @@ final class SourceIndex {
     }
     static String packageOf(String qualified) { int dot=qualified.lastIndexOf('.');return dot<0?"":qualified.substring(0,dot); }
     List<CompletionItem> completions(Position position, Collection<SourceIndex> project) {
+        var model=new EditorModel(this,project);
+        var members=model.memberCompletions(position);
+        if(members!=null)return members;
         var result=new ArrayList<CompletionItem>();
         int offset=coordinates.offset(position), start=offset;
         while(start>0) { int cp=text.codePointBefore(start);if(!Character.isLetterOrDigit(cp)&&Character.getType(cp)!=Character.NON_SPACING_MARK&&Character.getType(cp)!=Character.COMBINING_SPACING_MARK&&cp!='_')break;start-=Character.charCount(cp); }
@@ -157,6 +170,7 @@ final class SourceIndex {
                     item.setTextEdit(org.eclipse.lsp4j.jsonrpc.messages.Either.forLeft(new TextEdit(new Range(coordinates.position(importStart),position),label)));}item.setKind(s.kind==SymbolKind.Function?CompletionItemKind.Function:CompletionItemKind.Class);item.setDetail(s.detail+" — "+s.qualified);result.add(item);}
         }
         for(var s:visibleLexical(position)){var item=new CompletionItem(s.name);item.setKind(CompletionItemKind.Variable);item.setDetail(s.detail);result.add(item);}
+        if(!importing)result.addAll(model.autoImports(position));
         return result;
     }
 }
