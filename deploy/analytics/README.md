@@ -62,12 +62,12 @@ For hostname breakdowns use the built-in Host name dimension. Register
 custom dimensions if needed. Mark `donation_click` as a key event if useful;
 it records interest, not a completed donation. Do not create duplicate page-view tags.
 
-Turn off enhanced Site search and Form interactions: searches and form contents
-are outside this instrumentation's intended scope. Review automatic outbound
-click events separately; custom `resource_click` and `donation_click` use fixed
+Enhanced Site search, Form interactions, Outbound clicks and browser-history
+page views were disabled during setup: searches and form contents
+are outside this instrumentation's intended scope. The custom `resource_click` and `donation_click` use fixed
 categories rather than full target URLs. Keep advertising features disabled.
-A hostname-contains-bhashitva.org domain rule can support link attribution across
-the subdomains; validate that the same visitor cookie survives navigation.
+An anchored domain regex includes bhashitva.org, www.bhashitva.org,
+play.bhashitva.org and chess.bhashitva.org for link attribution; validate that the same visitor cookie survives navigation.
 
 Custom events: playground_run, playground_compile_success,
 playground_run_complete (success/error), playground_run_failed (compile),
@@ -78,3 +78,16 @@ Run `node --test scripts/analytics_test.cjs` from the repository root. Tests ver
 URL redaction, allowlisted event values, duplicate initialization, privacy opt-out,
 and suppression on development and execution hosts. Browser and Realtime checks
 are still required after each deployment.
+
+## Deployment record (2026-10-26)
+
+- WordPress: added the two must-use plugin files; verified public homepage script inclusion.
+- Chess: updated index.html/app.js plus the shared tag; a legal e2-e4 move completed.
+  Source is maintained in bhashitva/js-chess-engine branch bhash, commit
+  fe559bda58b8346e72c598a95784c017c5681f7d. Its build copies the tag into distribution assets.
+- Playground: frontend from commit 279425934e1915602e162441b1a0a4f915fe30d7,
+  deployed at /opt/bhash/analytics-release-2794259 with a read-only analytics-web mount.
+  The compiler remains at 8180c48. Caddy validated; service healthy; hello program exited 0.
+- Rollback configuration: /opt/bhash/analytics-backup-20261026T135738Z.
+- GA4 account 335743816, property 466329429, stream 9915340912; ID verified in the UI.
+  Domain rule and enhanced-measurement settings saved. Tag UI reported sending data.
