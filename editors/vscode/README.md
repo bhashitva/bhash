@@ -105,6 +105,10 @@ files. External binary package management is not added by the extension.
 
 ## Development
 
+Use JDK 17+, Maven and Node.js 22 or later with its bundled npm. In WSL,
+use Linux installations of Java, Node and npm (check `command -v node` and
+`command -v npm`; they should not resolve under `/mnt/c/`).
+
 From the repository root:
 
 ```sh
@@ -125,3 +129,19 @@ clearing, and UTF-16 positions after supplementary Unicode characters.
 The VSIX includes Apache-2.0 Bhash code, ANTLR BSD-3-Clause notices, LSP4J's
 EDL-1.0/BSD-3-Clause license option, Gson/Error Prone Apache-2.0 notices, and
 Microsoft's MIT client-library notices. See the included license files.
+
+If `npm ci` says no lockfile exists, verify that
+`editors/vscode/package-lock.json` is present and readable in your checkout.
+The lockfile is committed; do not regenerate it just to bypass the error.
+Try installing directly from the extension directory:
+
+```sh
+cd editors/vscode
+node --version
+npm --version
+node -p "require('./package-lock.json').lockfileVersion"
+npm ci
+```
+
+The lockfile version should be `3`. If the same error persists, inspect
+`type -a node npm` and the npm debug log for the underlying load error.
