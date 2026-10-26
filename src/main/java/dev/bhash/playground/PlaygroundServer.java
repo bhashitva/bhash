@@ -120,7 +120,7 @@ public final class PlaygroundServer implements AutoCloseable {
                 json(exchange,200,jobJson(job));return;
             }
             if(path.startsWith("/api/")) throw new Rejected(404,"Unknown endpoint");
-            exchange.getResponseHeaders().set("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src "+runOrigin+"; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+            exchange.getResponseHeaders().set("Content-Security-Policy","default-src 'self'; script-src 'self' https://www.googletagmanager.com; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-src "+runOrigin+"; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
             serve(exchange,settings.web,path.equals("/")?"index.html":path.substring(1),false);
         } catch(Rejected rejected) { json(exchange,rejected.status,"{\"error\":"+quote(rejected.getMessage())+"}"); }
         catch(IllegalArgumentException rejected) { json(exchange,400,"{\"error\":\"Invalid request encoding\"}"); }

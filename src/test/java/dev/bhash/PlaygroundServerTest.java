@@ -35,13 +35,18 @@ class PlaygroundServerTest {
     @Test void compilesScratchOnceCachesByVersionAndIsolatesArtifactOrigin() throws Exception {
         AtomicInteger calls=new AtomicInteger();AtomicReference<String> source=new AtomicReference<>();
         try(var app=create((file,destination)->{calls.incrementAndGet();source.set(Files.readString(file));output(destination);},100)) {
-            app.start();var response=post(app,form("लिखो(१);","scratch"));assertEquals(202,response.statusCode());String id=id(response.body());
+            app.start();
+            String editorPolicy=get(app.origin()).headers().firstValue("Content-Security-Policy").orElseThrow();
+            assertTrue(editorPolicy.contains("https://www.googletagmanager.com"));
+            assertTrue(editorPolicy.contains("https://region1.google-analytics.com"));
+            var response=post(app,form("लिखो(१);","scratch"));assertEquals(202,response.statusCode());String id=id(response.body());
             assertTrue(finished(app,id).contains("\"ready\""));assertEquals("कार्य मुख्य() -> शून्य {\nलिखो(१);\n}\n",source.get());
             assertEquals(id,id(post(app,form("लिखो(१);","scratch")).body()));assertEquals(1,calls.get());
             assertEquals(404,get(app.origin().resolve("/artifacts/"+id+"/runner.html")).statusCode());
             var runner=get(app.runOrigin().resolve("/artifacts/"+id+"/runner.html"));assertEquals(200,runner.statusCode());assertTrue(runner.body().contains("runner.js"));
             var wasm=get(app.runOrigin().resolve("/artifacts/"+id+"/_framework/runtime.wasm"));assertEquals("application/wasm",wasm.headers().firstValue("Content-Type").orElseThrow());
             assertTrue(runner.headers().firstValue("Content-Security-Policy").orElseThrow().contains(app.origin().toString()));
+            assertFalse(runner.headers().firstValue("Content-Security-Policy").orElseThrow().contains("google"));
             assertFalse(Files.exists(directory.resolve("data/work/"+id+"/playground.bhash")));
         }
     }

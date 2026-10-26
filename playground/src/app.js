@@ -3,6 +3,7 @@ import {EditorView, basicSetup} from 'codemirror';
 import {StreamLanguage} from '@codemirror/language';
 import {autocompletion, snippetCompletion} from '@codemirror/autocomplete';
 const $ = id => document.getElementById(id);
+const track = (name, values) => window.bhashAnalytics?.(name, values);
 const keywordData = BHASH_KEYWORDS;
 const words = new Map(keywordData.map(({token, value}) => [value, token]));
 const language = StreamLanguage.define({
@@ -74,13 +75,13 @@ const editor = new EditorView({doc: initial.source, parent: $('editor'), extensi
 ]});
 function save() { try { localStorage.setItem('bhash-draft', JSON.stringify({source: editor.state.doc.toString(), mode: $('mode').value, input: $('stdin').value})); $('saved').textContent = 'SAVED LOCALLY'; } catch { $('saved').textContent = 'STORAGE UNAVAILABLE'; } }
 $('stdin').addEventListener('input', save); $('mode').addEventListener('change', save);
-$('example').addEventListener('change', () => { const item = examples[$('example').value]; editor.dispatch({changes: {from: 0, to: editor.state.doc.length, insert: item.source}}); $('mode').value = item.mode; $('stdin').value = item.input; save(); });
+$('example').addEventListener('change', () => { const item = examples[$('example').value]; track('playground_example_select', {example: $('example').value}); editor.dispatch({changes: {from: 0, to: editor.state.doc.length, insert: item.source}}); $('mode').value = item.mode; $('stdin').value = item.input; save(); });
 for (const button of document.querySelectorAll('[data-insert]')) button.addEventListener('click', () => { const insert = button.dataset.insert.replaceAll('\\"', '"'); editor.dispatch(editor.state.replaceSelection(insert)); editor.focus(); });
 for (const name of ['output', 'input']) $(`${name}-tab`).addEventListener('click', () => { for (const other of ['output', 'input']) { $(`${other}-tab`).classList.toggle('selected', other === name); $(`${other}-tab`).setAttribute('aria-selected', String(other === name)); $(`${other}-panel`).hidden = other !== name; } });
 $('download').addEventListener('click', () => {
   const text = editor.state.doc.toString(), source = $('mode').value === 'scratch' ? `कार्य मुख्य() -> शून्य {\n${text}\n}\n` : text;
   const url = URL.createObjectURL(new Blob([source], {type: 'text/plain;charset=utf-8'}));
-  const a = document.createElement('a'); a.href = url; a.download = 'playground.bhash'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const a = document.createElement('a'); a.href = url; a.download = 'playground.bhash'; a.click(); track('playground_download'); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 $('upload').addEventListener('change', async event => { const file = event.target.files[0]; if (!file) return; if (file.size > 131072) { $('errors').textContent = 'File is too large.'; return; } const source = await file.text(); if (source.length > 32768) { $('errors').textContent = 'File is too large.'; return; } editor.dispatch({changes: {from: 0, to: editor.state.doc.length, insert: source.replace(/^\uFEFF/, '')}}); $('mode').value = 'program'; save(); });
 $('share').addEventListener('click', async () => {
@@ -88,16 +89,17 @@ $('share').addEventListener('click', async () => {
   const bytes = new TextEncoder().encode(editor.state.doc.toString());
   const hash = new URLSearchParams({mode: $('mode').value, code: btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''))});
   const url = `${location.origin}${location.pathname}#${hash}`;
-  try { await navigator.clipboard.writeText(url); $('status').textContent = 'Link copied · लिंक कॉपी हुआ'; }
+  try { await navigator.clipboard.writeText(url); track('playground_share'); $('status').textContent = 'Link copied · लिंक कॉपी हुआ'; }
   catch { $('errors').textContent = `Copy this link:\n${url}`; }
 });
 let config, current = 0, abort, frame, timer, nonce;
 function finish(message) { abort?.abort(); abort = null; clearTimeout(timer); frame?.remove(); frame = null; nonce = null; $('run').disabled = !config || !navigator.onLine; $('stop').disabled = true; $('indicator').classList.remove('active'); $('status').textContent = message; }
 function stop(message = 'Stopped · रोक दिया गया') { current++; frame?.contentWindow?.postMessage({type: 'stop'}, config?.runOrigin ?? location.origin); finish(message); }
-$('stop').addEventListener('click', () => stop());
+$('stop').addEventListener('click', () => { track('playground_stop'); stop(); });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function run() {
   if (!config || !navigator.onLine || $('run').disabled) return;
+  track('playground_run', {mode: $('mode').value});
   save(); const id = ++current; $('output').textContent = ''; $('errors').textContent = ''; $('output-tab').click();
   $('run').disabled = true; $('stop').disabled = false; $('indicator').classList.add('active'); $('status').textContent = 'Compiling · तैयार किया जा रहा है…';
   abort = new AbortController(); timer = setTimeout(() => stop('Compilation timed out. Try again shortly.'), 240000);
@@ -113,11 +115,12 @@ async function run() {
     if (id !== current) return;
     if (job.status !== 'ready') throw new Error(job.error || 'Compilation failed');
     const url = new URL(job.url); if (url.origin !== config.runOrigin) throw new Error('Invalid execution origin');
+    track('playground_compile_success');
     clearTimeout(timer); $('status').textContent = 'Loading runtime · रनटाइम लोड हो रहा है…';
     frame = document.createElement('iframe'); frame.title = 'Isolated Bhash execution'; frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
     nonce = crypto.randomUUID(); frame.src = url.href; $('runner-slot').append(frame);
     timer = setTimeout(() => stop('Runtime loading timed out. Check the connection and try again.'), 90000);
-  } catch (error) { if (id !== current) return; $('errors').textContent = error.message; finish('Could not run · कार्यक्रम नहीं चला'); }
+  } catch (error) { if (id !== current) return; track('playground_run_failed', {stage: 'compile'}); $('errors').textContent = error.message; finish('Could not run · कार्यक्रम नहीं चला'); }
 }
 $('run').addEventListener('click', run);
 addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); run(); } });
@@ -126,7 +129,7 @@ addEventListener('message', event => {
   if (event.data.type === 'ready') { frame.contentWindow.postMessage({type: 'start', input: $('stdin').value, nonce}, config.runOrigin); return; }
   if (event.data.nonce !== nonce) return;
   if (event.data.type === 'running') { clearTimeout(timer); $('status').textContent = 'Running · चल रहा है…'; timer = setTimeout(() => stop('Execution stopped after 15 seconds.'), config.executionSeconds * 1000); return; }
-  if (event.data.type === 'result') { $('output').textContent = event.data.output || ''; $('errors').textContent = event.data.errors || ''; finish(`Finished (exit ${event.data.exitCode}) · पूरा हुआ`); }
+  if (event.data.type === 'result') { track('playground_run_complete', {outcome: event.data.exitCode === 0 ? 'success' : 'error'}); $('output').textContent = event.data.output || ''; $('errors').textContent = event.data.errors || ''; finish(`Finished (exit ${event.data.exitCode}) · पूरा हुआ`); }
 });
 async function connect() {
   $('network').textContent = navigator.onLine ? 'Online compilation' : 'Offline · editing available';

@@ -1,0 +1,43 @@
+--- a/app.js
++++ b/app.js
+@@ -3,6 +3,8 @@
+ import { pieceSvg } from './pieces.js';
+ 
+ const $ = id => document.getElementById(id);
++const track = (name, values) => window.bhashAnalytics?.(name, values);
++let analyticsGameStarted = false, analyticsGameCompleted = false;
+ const storageKey = 'bhash-chess-browser-v1';
+ const initialPieces = {};
+ for (let i = 0; i < 8; i++) {
+@@ -139,6 +141,13 @@
+       const p = next.board.pieces[to];
+       history.push({ before: before.fen, from, to, turn: before.board.turn, number: before.board.fullMove, label: moveLabel(from, to, before.board.pieces[from], p) });
+     }
++    if (action === 'move' || action === 'ai') {
++      if (!analyticsGameStarted) { track('chess_game_start', {mode}); analyticsGameStarted = true; }
++      if (next.board.isFinished && !analyticsGameCompleted) {
++        track('chess_game_complete', {mode, outcome: next.board.checkMate ? 'checkmate' : next.board.staleMate ? 'stalemate' : 'draw'});
++        analyticsGameCompleted = true;
++      }
++    }
+     snapshot = next; ready = true; busy = false; render(); persist();
+     if (auto) maybeAI();
+     return true;
+@@ -153,6 +162,7 @@
+ }
+ function interrupt() { epoch++; engine.cancel(); busy = false; ready = false; }
+ async function newGame() {
++  track('chess_restart', {mode}); analyticsGameStarted = false; analyticsGameCompleted = false;
+   if (busy) interrupt();
+   flipped = side === 'black';
+   await execute('snapshot', [], { fen: START_FEN, reset: true });
+--- a/index.html
++++ b/index.html
+@@ -6,6 +6,7 @@
+   <meta name="description" content="A game of chess, written in Bhash. Play a native Devanagari chess engine entirely in your browser.">
+   <title>भाष शतरंज · Bhash Chess</title>
+   <link rel="stylesheet" href="./styles.css">
++<script defer src="./bhash-analytics.js"></script>
+ </head>
+ <body>
+   <div class="page">

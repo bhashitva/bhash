@@ -7,6 +7,7 @@ const words = [...grammar.matchAll(/^([A-Z_]+)\s*:\s*'([^']+)'/gm)]
 await rm('dist', {recursive: true, force: true});
 await mkdir('dist', {recursive: true});
 await cp('public', 'dist', {recursive: true});
+await cp('../deploy/analytics/bhash-analytics.js', 'dist/bhash-analytics.js');
 await build({entryPoints: ['src/app.js'], bundle: true, minify: true, target: ['es2022'], outfile: 'dist/app.js',
   define: {BHASH_KEYWORDS: JSON.stringify(words)}, legalComments: 'eof'});
 const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));

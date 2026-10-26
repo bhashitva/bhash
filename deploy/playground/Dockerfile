@@ -4,6 +4,7 @@ WORKDIR /src/playground
 COPY playground/package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY playground/ ./
+COPY deploy/analytics/ /src/deploy/analytics/
 COPY src/main/antlr4/Bhash.g4 /src/src/main/antlr4/Bhash.g4
 COPY LICENSE NOTICE LICENSING.md /src/
 RUN npm run build
