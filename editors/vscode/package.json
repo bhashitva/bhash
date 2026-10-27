@@ -112,6 +112,18 @@
       {
         "command": "bhash.openPlayground",
         "title": "Bhash: Open Browser Playground"
+      },
+      {
+        "command": "bhash.lockDependencies",
+        "title": "Bhash: Update Dependencies Lock"
+      },
+      {
+        "command": "bhash.restoreDependencies",
+        "title": "Bhash: Restore Dependencies"
+      },
+      {
+        "command": "bhash.verifyDependencies",
+        "title": "Bhash: Verify Dependencies"
       }
     ],
     "configuration": {
