@@ -92,7 +92,7 @@ public final class ProjectLoader {
         if (files.isEmpty()) throw new IOException(input + ": Project contains no .bhash source files.");
         var sources = new ArrayList<SourceFile>();
         for (Path path : files) sources.add(new SourceFile(path.toString(),read(path,overlays)));
-        return new Project(input,root,name,List.copyOf(roots),List.copyOf(files),List.copyOf(sources),metadata.version(),metadata.library(),List.of(input));
+        return new Project(input,root,name,List.copyOf(roots),List.copyOf(files),List.copyOf(sources),metadata.version(),metadata.library(),List.of(input,root.resolve(SourcePackages.LOCK)));
     }
     private static String read(Path path, Map<Path,String> overlays) throws IOException {
         String text = overlays.get(path);

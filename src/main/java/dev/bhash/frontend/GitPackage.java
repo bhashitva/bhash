@@ -5,6 +5,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.nio.file.attribute.DosFileAttributeView;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -35,6 +36,7 @@ final class GitPackage {
         }
         if(!fetch)throw error("Dependency is not cached. Run deps restore (or deps lock initially): "+url+" @ "+revision);
         Files.createDirectories(base);Path work=Files.createTempDirectory(base,".fetch-");Path export=work.resolve("snapshot");Files.createDirectory(export);
+        IOException failure=null;
         try{
             Path empty=work.resolve("empty");Files.createDirectory(empty);Files.writeString(empty.resolve("config"),"");
             Path repository;
@@ -68,11 +70,25 @@ final class GitPackage {
                 Files.createDirectories(output.getParent());Files.write(output,content,StandardOpenOption.CREATE_NEW);
             }
             Files.writeString(export.resolve(".bhash-snapshot"),marker,StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW);
-            try{Files.move(export,destination,StandardCopyOption.ATOMIC_MOVE);}
+            try{install(export,destination);}
             catch(FileAlreadyExistsException race){return snapshot(project,url,revision,false);}
-            catch(AtomicMoveNotSupportedException unsupported){try{Files.move(export,destination);}catch(FileAlreadyExistsException race){return snapshot(project,url,revision,false);}}
             return destination;
-        }finally{removeTemporary(base,work);}
+        }catch(IOException failed){failure=failed;throw failed;}
+        finally{try{removeTemporary(base,work);}catch(IOException cleanup){if(failure!=null)failure.addSuppressed(cleanup);else throw cleanup;}}
+    }
+    // Windows scanners can briefly retain a directory handle after the last blob is written.
+    // Retry only access-denied moves, without deleting or replacing an existing cache entry.
+    private static void install(Path source,Path destination) throws IOException {
+        for(int attempt=0;;attempt++)try{
+            try{Files.move(source,destination,StandardCopyOption.ATOMIC_MOVE);}
+            catch(AtomicMoveNotSupportedException unsupported){Files.move(source,destination);}
+            return;
+        }catch(AccessDeniedException denied){
+            if(Files.exists(destination,LinkOption.NOFOLLOW_LINKS))throw new FileAlreadyExistsException(destination.toString());
+            if(attempt>=5)throw error("Cannot install source snapshot: "+denied.getMessage());
+            try{TimeUnit.MILLISECONDS.sleep(100L*(attempt+1));}
+            catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IOException("Snapshot installation interrupted.",interrupted);}
+        }
     }
     static void safePath(String name) throws IOException {
         if(name.isEmpty()||name.startsWith("/")||name.contains("\\")||name.chars().anyMatch(c->c<32||"<>:\"|?*".indexOf(c)>=0))throw error("Unsafe or nonportable package path: "+name);
@@ -110,6 +126,13 @@ final class GitPackage {
     private static IOException error(String detail){return SourcePackages.failure("BH8005","Git निर्भरता या कैश जाँचें; केवल पिन किया हुआ स्रोत बहाल करें।",detail);}
     private static void removeTemporary(Path base,Path work) throws IOException {
         if(!work.getParent().equals(base)||!work.getFileName().toString().startsWith(".fetch-")||Files.isSymbolicLink(work))throw error("Unexpected temporary cache path.");
-        try(var paths=Files.walk(work)){for(Path path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}
+        try(var paths=Files.walk(work)){for(Path path:paths.sorted(Comparator.reverseOrder()).toList()){
+            // Git marks pack/index files read-only on Windows. Only alter files in this checked temporary tree.
+            if(System.getProperty("os.name").startsWith("Windows")&&Files.isRegularFile(path,LinkOption.NOFOLLOW_LINKS)){
+                var dos=Files.getFileAttributeView(path,DosFileAttributeView.class,LinkOption.NOFOLLOW_LINKS);
+                if(dos!=null)dos.setReadOnly(false);
+            }
+            Files.deleteIfExists(path);
+        }}
     }
 }
