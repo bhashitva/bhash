@@ -27,6 +27,12 @@ jobs:
       - run: python scripts/smoke_test.py
       - run: python scripts/check_lessons.py --target jvm
       - run: python scripts/check_lessons.py --target clr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node tutorial/standard-library/verify.mjs --coverage-only
+      - run: node tutorial/standard-library/verify.mjs --target jvm
+      - run: node tutorial/standard-library/verify.mjs --target clr
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-managed-${{ matrix.os }}
