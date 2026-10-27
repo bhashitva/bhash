@@ -1,0 +1,475 @@
+[
+  {
+    "owner": "पाठ्य",
+    "name": "लंबाई",
+    "signatures": [
+      "पाठ्य|लंबाई|length|पूर्णांक|मानक: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "length",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "अंश",
+    "signatures": [
+      "पाठ्य|अंश|slice|पाठ|मानक: पाठ, आरंभ: पूर्णांक, अंत: पूर्णांक"
+    ],
+    "document": "01-text.md",
+    "anchor": "substring-slice",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "खोजो",
+    "signatures": [
+      "पाठ्य|खोजो|stdFind|पूर्णांक|मानक: पाठ, खोज: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "index-of-find",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "है",
+    "signatures": [
+      "पाठ्य|है|stdContains|तार्किक|मानक: पाठ, खोज: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "contains",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "आरंभ",
+    "signatures": [
+      "पाठ्य|आरंभ|stdStarts|तार्किक|मानक: पाठ, खोज: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "starts-with",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "अंत",
+    "signatures": [
+      "पाठ्य|अंत|stdEnds|तार्किक|मानक: पाठ, खोज: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "ends-with",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "बदलो",
+    "signatures": [
+      "पाठ्य|बदलो|stdReplace|पाठ|मानक: पाठ, पुराना: पाठ, नवीन: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "replace",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "बाँटो",
+    "signatures": [
+      "पाठ्य|बाँटो|stdSplit|सूची<पाठ>|मानक: पाठ, विभाजक: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "split",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "जोड़ो",
+    "signatures": [
+      "पाठ्य|जोड़ो|stdJoin|पाठ|मानक: सूची<पाठ>, विभाजक: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "join",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "छाँटो",
+    "signatures": [
+      "पाठ्य|छाँटो|stdTrim|पाठ|मानक: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "trim",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "बड़ाअक्षर",
+    "signatures": [
+      "पाठ्य|बड़ाअक्षर|upper|पाठ|मानक: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "to-upper-case",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "छोटाअक्षर",
+    "signatures": [
+      "पाठ्य|छोटाअक्षर|stdLower|पाठ|मानक: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "to-lower-case",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "दोहराओ",
+    "signatures": [
+      "पाठ्य|दोहराओ|stdRepeat|पाठ|मानक: पाठ, गिनती: पूर्णांक"
+    ],
+    "document": "01-text.md",
+    "anchor": "repeat",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "संख्यापाठ",
+    "signatures": [
+      "पाठ्य|संख्यापाठ|stdFixed|पाठ|मानक: दशमलव, स्थान: पूर्णांक"
+    ],
+    "document": "01-text.md",
+    "anchor": "fixed-decimal-formatting-to-fixed",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "अंकदेवनागरी",
+    "signatures": [
+      "पाठ्य|अंकदेवनागरी|devanagari|पाठ|मानक: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "convert-digits-to-devanagari",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "यूटीएफ८",
+    "signatures": [
+      "पाठ्य|यूटीएफ८|stdEncode|बाइटबफ़र|मानक: पाठ"
+    ],
+    "document": "01-text.md",
+    "anchor": "encode-utf-8",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "पाठ्य",
+    "name": "यूटीएफ८पाठ",
+    "signatures": [
+      "पाठ्य|यूटीएफ८पाठ|decodeUtf8|पाठ|मानक: बाइटबफ़र"
+    ],
+    "document": "01-text.md",
+    "anchor": "decode-utf-8",
+    "example": "examples/01-text.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "निरपेक्ष",
+    "signatures": [
+      "गणित|निरपेक्ष|stdAbs|पूर्णांक|मानक: पूर्णांक",
+      "गणित|निरपेक्ष|stdAbs|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "absolute-value-abs",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "न्यूनतम",
+    "signatures": [
+      "गणित|न्यूनतम|stdMin|पूर्णांक|क: पूर्णांक, ख: पूर्णांक",
+      "गणित|न्यूनतम|stdMin|दशमलव|क: दशमलव, ख: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "minimum-min",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "अधिकतम",
+    "signatures": [
+      "गणित|अधिकतम|stdMax|पूर्णांक|क: पूर्णांक, ख: पूर्णांक",
+      "गणित|अधिकतम|stdMax|दशमलव|क: दशमलव, ख: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "maximum-max",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "वर्गमूल",
+    "signatures": [
+      "गणित|वर्गमूल|stdSqrt|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "square-root-sqrt",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "घात",
+    "signatures": [
+      "गणित|घात|stdPow|दशमलव|आधारक: दशमलव, घातक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "power-pow",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "फर्श",
+    "signatures": [
+      "गणित|फर्श|stdFloor|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "floor",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "छत",
+    "signatures": [
+      "गणित|छत|stdCeil|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "ceiling-ceil",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "निकटतम",
+    "signatures": [
+      "गणित|निकटतम|stdRound|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "round-to-nearest-ties-to-even",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "ज्या",
+    "signatures": [
+      "गणित|ज्या|stdSin|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "sine-sin",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "कोज्या",
+    "signatures": [
+      "गणित|कोज्या|stdCos|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "cosine-cos",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "लघुगणक",
+    "signatures": [
+      "गणित|लघुगणक|stdLog|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "natural-logarithm-log",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "घातांक",
+    "signatures": [
+      "गणित|घातांक|stdExp|दशमलव|मानक: दशमलव"
+    ],
+    "document": "02-math.md",
+    "anchor": "exponential-exp",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "गणित",
+    "name": "पाई",
+    "signatures": [
+      "गणित|पाई|stdPi|दशमलव|"
+    ],
+    "document": "02-math.md",
+    "anchor": "pi",
+    "example": "examples/02-math.bhash"
+  },
+  {
+    "owner": "यादृच्छिक",
+    "name": "बीज",
+    "signatures": [
+      "यादृच्छिक|बीज|stdSeed|शून्य|मानक: पूर्णांक"
+    ],
+    "document": "03-random.md",
+    "anchor": "seed",
+    "example": "examples/03-random.bhash"
+  },
+  {
+    "owner": "यादृच्छिक",
+    "name": "पूर्णांकचुनो",
+    "signatures": [
+      "यादृच्छिक|पूर्णांकचुनो|stdRandom|पूर्णांक|निम्न: पूर्णांक, ऊपरी: पूर्णांक"
+    ],
+    "document": "03-random.md",
+    "anchor": "random-integer-next-int",
+    "example": "examples/03-random.bhash"
+  },
+  {
+    "owner": "यादृच्छिक",
+    "name": "अंश",
+    "signatures": [
+      "यादृच्छिक|अंश|stdRandomUnit|दशमलव|"
+    ],
+    "document": "03-random.md",
+    "anchor": "random-fraction-next-double",
+    "example": "examples/03-random.bhash"
+  },
+  {
+    "owner": "जेसन",
+    "name": "पढ़ो",
+    "signatures": [
+      "जेसन|पढ़ो|stdJsonRead|सर्ववस्तु|मानक: पाठ"
+    ],
+    "document": "04-json.md",
+    "anchor": "parse-json",
+    "example": "examples/04-json.bhash"
+  },
+  {
+    "owner": "जेसन",
+    "name": "पाठबनाओ",
+    "signatures": [
+      "जेसन|पाठबनाओ|stdJsonWrite|पाठ|मानक: सर्ववस्तु"
+    ],
+    "document": "04-json.md",
+    "anchor": "stringify-json-serialize",
+    "example": "examples/04-json.bhash"
+  },
+  {
+    "owner": "समय",
+    "name": "अभी",
+    "signatures": [
+      "समय|अभी|stdNow|पूर्णांक|"
+    ],
+    "document": "05-time.md",
+    "anchor": "current-time-now",
+    "example": "examples/05-time.bhash"
+  },
+  {
+    "owner": "समय",
+    "name": "पढ़ो",
+    "signatures": [
+      "समय|पढ़ो|stdTimeRead|पूर्णांक|मानक: पाठ"
+    ],
+    "document": "05-time.md",
+    "anchor": "parse-utc-timestamp",
+    "example": "examples/05-time.bhash"
+  },
+  {
+    "owner": "समय",
+    "name": "पाठबनाओ",
+    "signatures": [
+      "समय|पाठबनाओ|stdTimeWrite|पाठ|मानक: पूर्णांक"
+    ],
+    "document": "05-time.md",
+    "anchor": "format-utc-timestamp",
+    "example": "examples/05-time.bhash"
+  },
+  {
+    "owner": "समय",
+    "name": "वर्ष",
+    "signatures": [
+      "समय|वर्ष|stdYear|पूर्णांक|मानक: पूर्णांक"
+    ],
+    "document": "05-time.md",
+    "anchor": "year",
+    "example": "examples/05-time.bhash"
+  },
+  {
+    "owner": "समय",
+    "name": "माह",
+    "signatures": [
+      "समय|माह|stdMonth|पूर्णांक|मानक: पूर्णांक"
+    ],
+    "document": "05-time.md",
+    "anchor": "month",
+    "example": "examples/05-time.bhash"
+  },
+  {
+    "owner": "समय",
+    "name": "दिन",
+    "signatures": [
+      "समय|दिन|stdDay|पूर्णांक|मानक: पूर्णांक"
+    ],
+    "document": "05-time.md",
+    "anchor": "day-of-month",
+    "example": "examples/05-time.bhash"
+  },
+  {
+    "owner": "फ़ाइल",
+    "name": "समर्थित",
+    "signatures": [
+      "फ़ाइल|समर्थित|stdFilesSupported|तार्किक|"
+    ],
+    "document": "06-files.md",
+    "anchor": "file-capability-is-supported",
+    "example": "examples/06-files.bhash"
+  },
+  {
+    "owner": "फ़ाइल",
+    "name": "है",
+    "signatures": [
+      "फ़ाइल|है|stdFileExists|तार्किक|पथ: पाठ"
+    ],
+    "document": "06-files.md",
+    "anchor": "file-exists-is-regular-file",
+    "example": "examples/06-files.bhash"
+  },
+  {
+    "owner": "फ़ाइल",
+    "name": "पाठपढ़ो",
+    "signatures": [
+      "फ़ाइल|पाठपढ़ो|stdFileReadText|पाठ|पथ: पाठ"
+    ],
+    "document": "06-files.md",
+    "anchor": "read-text-file",
+    "example": "examples/06-files.bhash"
+  },
+  {
+    "owner": "फ़ाइल",
+    "name": "पाठलिखो",
+    "signatures": [
+      "फ़ाइल|पाठलिखो|stdFileWriteText|शून्य|पथ: पाठ, मानक: पाठ"
+    ],
+    "document": "06-files.md",
+    "anchor": "write-text-file",
+    "example": "examples/06-files.bhash"
+  },
+  {
+    "owner": "फ़ाइल",
+    "name": "बाइटपढ़ो",
+    "signatures": [
+      "फ़ाइल|बाइटपढ़ो|stdFileReadBytes|बाइटबफ़र|पथ: पाठ"
+    ],
+    "document": "06-files.md",
+    "anchor": "read-bytes",
+    "example": "examples/06-files.bhash"
+  },
+  {
+    "owner": "फ़ाइल",
+    "name": "बाइटलिखो",
+    "signatures": [
+      "फ़ाइल|बाइटलिखो|stdFileWriteBytes|शून्य|पथ: पाठ, मानक: बाइटबफ़र"
+    ],
+    "document": "06-files.md",
+    "anchor": "write-bytes",
+    "example": "examples/06-files.bhash"
+  }
+]
