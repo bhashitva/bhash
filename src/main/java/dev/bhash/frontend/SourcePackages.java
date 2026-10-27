@@ -108,7 +108,9 @@ public final class SourcePackages {
             Path identity=directory.toRealPath();
             if(origin.git()&&!identity.startsWith(origin.boundary().toRealPath()))throw graphError("Dependency escapes its pinned repository: "+directory);
             if(active.contains(identity))throw graphError("Dependency cycle: "+active+" -> "+identity);
-            var manifest=ProjectManifest.read(identity.resolve(ProjectLoader.MANIFEST),Map.of());
+            // Keep paths relative to the requested project spelling (including Windows 8.3 aliases).
+            // Physical identities above are only for cycle/conflict and escape checks.
+            var manifest=ProjectManifest.read(directory.resolve(ProjectLoader.MANIFEST),Map.of());
             if(!manifest.library())throw graphError("A dependency must declare kind=library: "+manifest.input());
             if(!manifest.version().equals(dependency.version()))throw graphError("Version mismatch for "+dependency.alias()+": expected "+dependency.version()+", found "+manifest.version());
             Path previousName=names.putIfAbsent(manifest.name(),identity);
@@ -117,7 +119,7 @@ public final class SourcePackages {
             if(visited.containsKey(identity))return;
             var disk=ProjectLoader.loadOwn(manifest.input(),Map.of(),manifest);noEntry(disk);
             var value=new JsonObject();value.addProperty("name",manifest.name());value.addProperty("version",manifest.version());
-            value.add("source",origin.json(root,identity));value.addProperty("manifestSha256",manifest.digest());value.addProperty("sourcesSha256",fingerprint(disk));
+            value.add("source",origin.json(root,directory));value.addProperty("manifestSha256",manifest.digest());value.addProperty("sourcesSha256",fingerprint(disk));
             if(previous!=null&&!value.equals(locked.get(manifest.name())))throw integrity("Changed or unlocked package: "+manifest.name()+". The lockfile was not updated.");
             packages.put(manifest.name(),value);active.add(identity);
             for(var child:manifest.dependencies().values())visit(manifest,child,origin);
