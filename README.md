@@ -14,6 +14,10 @@ Bhash-only examples, challenge starters and reference solutions. Teachers can us
 the [Bhash-to-English concept map](lessons/concept-map.md) to connect `यदि`/`लौटाओ`
 to `if`/`return` and prepare learners for Java/C# concepts.
 
+The separate [tutorial references](tutorial/README.md) explain individual topics in Hindi,
+with familiar English names, runnable examples, expected output and API limits.
+Start with the [complete standard-library tutorials](tutorial/standard-library/README.md).
+
 ## Try the interactive factorial program
 
 Install **JDK 17+** and **Maven 3.9+**, then run these commands from a UTF-8
