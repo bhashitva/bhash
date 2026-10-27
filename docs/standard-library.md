@@ -1,5 +1,8 @@
 # Bhash standard library — first edition
 
+For Hindi explanations and runnable examples of every function and overload, see the
+[standard-library tutorials](../tutorial/standard-library/README.md).
+
 The `मानक` package is bundled with the compiler and available to single-file and
 multi-file programs on JVM, .NET CLR and browser .NET WebAssembly. Compiled programs
 include their runtime support; they do not download Bhash source packages, Maven
