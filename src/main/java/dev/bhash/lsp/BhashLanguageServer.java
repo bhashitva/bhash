@@ -133,7 +133,7 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
         var inputs=new LinkedHashSet<Path>();
         for(Path root:roots)if(Files.isDirectory(root))Files.walkFileTree(root,Set.of(),32,new SimpleFileVisitor<>() {
             @Override public FileVisitResult preVisitDirectory(Path dir,BasicFileAttributes attributes) {
-                return !dir.equals(root)&&Set.of(".git","node_modules","target","build","dist",".idea",".vscode").contains(dir.getFileName().toString())?FileVisitResult.SKIP_SUBTREE:FileVisitResult.CONTINUE;
+                return !dir.equals(root)&&Set.of(".bhash",".git","node_modules","target","build","dist",".idea",".vscode").contains(dir.getFileName().toString())?FileVisitResult.SKIP_SUBTREE:FileVisitResult.CONTINUE;
             }
             @Override public FileVisitResult visitFile(Path file,BasicFileAttributes attributes) {
                 if(attributes.isRegularFile() && (file.getFileName().toString().equals(ProjectLoader.MANIFEST)||file.toString().endsWith(".bhash")))inputs.add(input(file));
