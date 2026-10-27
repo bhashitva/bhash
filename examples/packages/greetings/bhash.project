@@ -1,0 +1,6 @@
+name=example-greetings
+kind=library
+version=1.0.0
+sources=src
+dependency.core.path=../core
+dependency.core.version=1.0.0
