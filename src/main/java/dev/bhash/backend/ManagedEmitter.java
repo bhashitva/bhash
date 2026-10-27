@@ -72,6 +72,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     record Constructor(List<Type> parameters, Access access, ConstructorDeclContext declaration,String tag) {}
     static final class Function {
         final String java;
+        final String intrinsic;
         final Type result;
         final List<Type> parameters;
         final ClassInfo owner;
@@ -81,6 +82,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         final FunctionDeclContext declaration;
         Function(String java, Type result, List<Type> parameters, ClassInfo owner, Access access,
                  boolean overriding, FunctionDeclContext declaration, boolean shared) {
+            this.intrinsic=dev.bhash.stdlib.StandardLibrary.intrinsic(declaration);
             this.java = java; this.result = result; this.parameters = parameters; this.owner = owner;
             this.access = access; this.overriding = overriding; this.declaration = declaration; this.shared = shared;
         }
@@ -239,6 +241,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private void emitFunction(Function function) {
+        if(function.intrinsic!=null)return;
         var declaration = function.declaration;
         currentClass = function.owner;
         currentStatic = function.shared;
@@ -1332,6 +1335,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (!method.shared && constructorBody && (object.base || object.java.equals("this")))
             throw error(at, "Constructors cannot call instance methods on यह or आधार before construction completes.");
         checkAccess(at, method.owner, method.access, object);
+        if(method.intrinsic!=null)return tagged(new Expr(method.result,"BhashStandard."+method.intrinsic+"("+join(arguments)+")",true));
         String receiver=method.shared?method.owner.java:memberReceiver(object, method.owner, method.access);
         return new Expr(method.result, receiver + "." + method.java + "(" + join(arguments) + ")", true);
     }

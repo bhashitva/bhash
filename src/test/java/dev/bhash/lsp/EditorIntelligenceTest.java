@@ -29,6 +29,15 @@ class EditorIntelligenceTest {
         सार्वजनिक परिगणना स्थिति { तैयार, पूर्ण }
         सार्वजनिक कार्य दुगुना(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }
         """;
+    @Test void standardLibraryMembersImportsAndSignaturesUseTheSharedCatalog() {
+        var library=new SourceIndex(dev.bhash.stdlib.StandardLibrary.source());
+        var main=source("stdlib-app.bhash","आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो(\"अ\", ");
+        var model=new EditorModel(main,List.of(main,library));
+        var help=model.signatureHelp(main.coordinates.position(main.text.length()));
+        assertNotNull(help);assertTrue(help.getSignatures().get(0).getLabel().contains("सूची<पाठ>"));
+        var partial=source("stdlib-import.bhash","कार्य मुख्य() -> शून्य { जेस");
+        assertTrue(new EditorModel(partial,List.of(partial,library)).autoImports(partial.coordinates.position(partial.text.length())).stream().anyMatch(i->i.getDetail().equals("आयात मानक.जेसन")));
+    }
     @Test void qualifiedImportCompletionAndMidWordEditsRemainValid() throws Exception {
         var lib=source("lib.bhash",library);
         var importing=source("importing.bhash","संकुल उपयोग;\nआयात पुस्तक.बिं");

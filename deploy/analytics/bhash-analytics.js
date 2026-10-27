@@ -32,7 +32,7 @@
     'playground_run_failed','playground_stop','playground_example_select','playground_download',
     'playground_share','chess_game_start','chess_game_complete','chess_restart',
     'donation_click','resource_click']);
-  const values = {mode:['scratch','program','ai','local'], example:['hello','factorial','collections','types'],
+  const values = {mode:['scratch','program','ai','local'], example:['hello','factorial','collections','types','standard'],
     outcome:['success','error','checkmate','stalemate','draw'], destination:['playground','chess','lessons','github','vscode'],
     stage:['compile','runtime']};
   window.bhashAnalytics = (name, parameters = {}) => {

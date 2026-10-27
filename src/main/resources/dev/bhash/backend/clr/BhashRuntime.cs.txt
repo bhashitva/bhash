@@ -209,7 +209,8 @@ internal static class BhashRuntime {
         public override bool Equals(object other) => other is BKey<T> key && collectionSame(value,key.value);
         public override int GetHashCode() => collectionHash(value);
     }
-    internal abstract class BSeq<T> : BTyped, System.Collections.Generic.IEnumerable<T> {
+    internal abstract class BSeq<T> : BTyped, System.Collections.Generic.IEnumerable<T>, BhashStandard.JsonSequence {
+        System.Collections.Generic.IEnumerable<object> BhashStandard.JsonSequence.jsonValues() { foreach(T value in this)yield return value; }
         internal abstract long size();
         internal abstract T get(long index);
         internal abstract void set(long index,T value);
@@ -253,7 +254,8 @@ internal static class BhashRuntime {
         internal readonly K key; internal readonly V value;
         internal BEntry(K key,V value) { this.key=key; this.value=value; }
     }
-    internal sealed class BMap<K,V> : BTyped, System.Collections.Generic.IEnumerable<K> {
+    internal sealed class BMap<K,V> : BTyped, System.Collections.Generic.IEnumerable<K>, BhashStandard.JsonObject {
+        System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<object,object>> BhashStandard.JsonObject.jsonEntries() { foreach(var entry in entries())yield return new System.Collections.Generic.KeyValuePair<object,object>(entry.key,entry.value); }
         private sealed class Cell {
             internal V value; internal readonly System.Collections.Generic.LinkedListNode<BKey<K>> node;
             internal Cell(V value,System.Collections.Generic.LinkedListNode<BKey<K>> node) { this.value=value; this.node=node; }

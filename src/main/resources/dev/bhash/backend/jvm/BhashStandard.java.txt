@@ -1,0 +1,217 @@
+// SPDX-License-Identifier: Apache-2.0
+import java.math.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.time.*;
+import java.time.format.*;
+import java.util.*;
+
+/** Portable standard library. Embedded in applications; no external dependencies. */
+final class BhashStandard {
+    private static final int TEXT_LIMIT=1048576, FILE_LIMIT=16777216;
+    private static BhashRuntime.Failure failure(String message) {return new BhashRuntime.Failure(message);}
+    static long length(String s) {return BhashRuntime.length(s);}
+    static String slice(String s,long a,long b) {return BhashRuntime.slice(s,a,b);}
+    static String upper(String s) {return BhashRuntime.upper(s);}
+    static String decodeUtf8(BhashRuntime.BBuffer b) {return BhashRuntime.decodeUtf8(b);}
+    static long stdFind(String s,String needle) {int at=s.indexOf(needle);return at<0?-1:s.codePointCount(0,at);}
+    static boolean stdContains(String s,String needle) {return s.contains(needle);}
+    static boolean stdStarts(String s,String needle) {return s.startsWith(needle);}
+    static boolean stdEnds(String s,String needle) {return s.endsWith(needle);}
+    private static void separator(String s) {if(s.isEmpty())throw failure("विभाजक या बदलने वाला पाठ खाली नहीं हो सकता।");}
+    static String stdReplace(String s,String old,String value) {separator(old);return s.replace(old,value);}
+    static BhashRuntime.BList<String> stdSplit(String s,String by) {
+        separator(by);var result=new BhashRuntime.BList<String>();
+        for(String part:s.split(java.util.regex.Pattern.quote(by),-1))result.add(part);
+        return result;
+    }
+    static String stdJoin(BhashRuntime.BList<String> values,String by) {
+        var result=new StringBuilder();boolean first=true;
+        for(String value:BhashRuntime.instance(values)) {if(!first)result.append(by);first=false;result.append(value);}
+        return result.toString();
+    }
+    private static boolean white(int c) {return c>=9&&c<=13||c==32||c==0x85||c==0xa0||c==0x1680||c>=0x2000&&c<=0x200a||c==0x2028||c==0x2029||c==0x202f||c==0x205f||c==0x3000;}
+    static String stdTrim(String s) {int a=0,b=s.length();while(a<b&&white(s.charAt(a)))a++;while(b>a&&white(s.charAt(b-1)))b--;return s.substring(a,b);}
+    static String stdLower(String s) {var b=new StringBuilder();s.codePoints().forEach(c->b.appendCodePoint(c>='A'&&c<='Z'?c+32:c));return b.toString();}
+    static String stdRepeat(String s,long n) {
+        if(n<0||!s.isEmpty()&&n>TEXT_LIMIT/s.length())throw failure("दोहराए गए पाठ की सीमा पार हो गई।");
+        return s.isEmpty()?"":s.repeat((int)n);
+    }
+    static String devanagari(String s) {var b=new StringBuilder();for(char c:s.toCharArray())b.append(c>='0'&&c<='9'?(char)('०'+c-'0'):c);return b.toString();}
+    private static double finite(double x) {if(!Double.isFinite(x))throw failure("एक सीमित दशमलव मान आवश्यक है।");return x;}
+    /** Exact IEEE binary64 -> decimal, then round ties to even; no locale dependence. */
+    static String stdFixed(double x,long places) {
+        finite(x);if(places<0||places>15)throw failure("दशमलव स्थान ० से १५ तक होने चाहिए।");
+        long bits=Double.doubleToRawLongBits(x),mantissa=bits&0xfffffffffffffL;
+        int exponent=(int)((bits>>>52)&2047),power=exponent==0?-1074:exponent-1075;
+        if(exponent!=0)mantissa|=1L<<52;
+        BigInteger n=BigInteger.valueOf(mantissa).multiply(BigInteger.TEN.pow((int)places));
+        BigInteger d=BigInteger.ONE;
+        if(power>=0)n=n.shiftLeft(power);else d=d.shiftLeft(-power);
+        BigInteger[] qr=n.divideAndRemainder(d);int compare=qr[1].shiftLeft(1).compareTo(d);
+        if(compare>0||compare==0&&qr[0].testBit(0))qr[0]=qr[0].add(BigInteger.ONE);
+        String s=qr[0].toString();int digits=(int)places;
+        if(digits>0){s="0".repeat(Math.max(0,digits+1-s.length()))+s;s=s.substring(0,s.length()-digits)+"."+s.substring(s.length()-digits);}
+        return (bits<0?"-":"")+s;
+    }
+    static long stdAbs(long x) {if(x==Long.MIN_VALUE)throw failure("निरपेक्ष पूर्णांक सीमा से बाहर है।");return Math.abs(x);}
+    static double stdAbs(double x) {return Math.abs(finite(x));}
+    static long stdMin(long a,long b) {return Math.min(a,b);}
+    static double stdMin(double a,double b) {return Math.min(finite(a),finite(b));}
+    static long stdMax(long a,long b) {return Math.max(a,b);}
+    static double stdMax(double a,double b) {return Math.max(finite(a),finite(b));}
+    static double stdSqrt(double x) {return finite(StrictMath.sqrt(finite(x)));}
+    static double stdPow(double a,double b) {return finite(StrictMath.pow(finite(a),finite(b)));}
+    static double stdFloor(double x) {return StrictMath.floor(finite(x));}
+    static double stdCeil(double x) {return StrictMath.ceil(finite(x));}
+    static double stdRound(double x) {return StrictMath.rint(finite(x));}
+    static double stdSin(double x) {return StrictMath.sin(finite(x));}
+    static double stdCos(double x) {return StrictMath.cos(finite(x));}
+    static double stdLog(double x) {return finite(StrictMath.log(finite(x)));}
+    static double stdExp(double x) {return finite(StrictMath.exp(finite(x)));}
+    static double stdPi() {return Math.PI;}
+    private static long randomState=System.nanoTime()^System.currentTimeMillis();
+    static void stdSeed(long seed) {randomState=seed;}
+    private static long nextRandom() {
+        long z=(randomState+=0x9e3779b97f4a7c15L);
+        z=(z^(z>>>30))*0xbf58476d1ce4e5b9L;z=(z^(z>>>27))*0x94d049bb133111ebL;
+        return z^(z>>>31);
+    }
+    static long stdRandom(long lower,long upper) {
+        if(lower>=upper||upper-lower<=0)throw failure("यादृच्छिक पूर्णांक की सीमा अमान्य है।");
+        long bound=upper-lower,u,r;
+        do{u=nextRandom()>>>1;r=u%bound;}while(u+(bound-1)-r<0);
+        return lower+r;
+    }
+    static double stdRandomUnit() {return (nextRandom()>>>11)*0x1.0p-53;}
+    private static final long TIME_MIN=-62135596800000L,TIME_MAX=253402300799999L;
+    private static final DateTimeFormatter TIME=DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSS'Z'",Locale.ROOT).withResolverStyle(ResolverStyle.STRICT);
+    private static LocalDateTime date(long value) {if(value<TIME_MIN||value>TIME_MAX)throw failure("समय सीमा से बाहर है।");return LocalDateTime.ofInstant(Instant.ofEpochMilli(value),ZoneOffset.UTC);}
+    static long stdNow() {return System.currentTimeMillis();}
+    static String stdTimeWrite(long value) {return TIME.format(date(value));}
+    static long stdTimeRead(String s) {
+        if(!s.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z"))throw failure("अमान्य UTC समय पाठ।");
+        try{long value=LocalDateTime.parse(s,TIME).toInstant(ZoneOffset.UTC).toEpochMilli();date(value);return value;}
+        catch(DateTimeException e){throw failure("अमान्य UTC समय पाठ।");}
+    }
+    static long stdYear(long value) {return date(value).getYear();}
+    static long stdMonth(long value) {return date(value).getMonthValue();}
+    static long stdDay(long value) {return date(value).getDayOfMonth();}
+    private static void unicode(String s) {
+        for(int i=0;i<s.length();i++) {
+            char c=s.charAt(i);
+            if(Character.isHighSurrogate(c)){if(++i>=s.length()||!Character.isLowSurrogate(s.charAt(i)))throw failure("अमान्य यूनिकोड पाठ।");}
+            else if(Character.isLowSurrogate(c))throw failure("अमान्य यूनिकोड पाठ।");
+        }
+    }
+    static BhashRuntime.BBuffer stdEncode(String s) {unicode(s);return BhashRuntime.encodeUtf8(s);}
+    static boolean stdFilesSupported() {return true;}
+    private static Path path(String s) {
+        unicode(s);if(s.isEmpty()||s.indexOf(0)>=0)throw failure("अमान्य फ़ाइल पथ।");
+        try{return Path.of(s);}catch(InvalidPathException e){throw failure("अमान्य फ़ाइल पथ।");}
+    }
+    static boolean stdFileExists(String s) {try{return Files.isRegularFile(path(s));}catch(SecurityException e){throw failure("फ़ाइल तक पहुँच नहीं है।");}}
+    static BhashRuntime.BBuffer stdFileReadBytes(String s) {
+        try(var input=Files.newInputStream(path(s))) {
+            byte[] bytes=input.readNBytes(FILE_LIMIT+1);if(bytes.length>FILE_LIMIT)throw failure("फ़ाइल १६ MiB सीमा से बड़ी है।");
+            var result=new BhashRuntime.BBuffer(bytes.length);for(int i=0;i<bytes.length;i++)result.set(i,(short)(bytes[i]&255));return result;
+        }catch(java.io.IOException|SecurityException e){throw failure("फ़ाइल पढ़ी नहीं जा सकी।");}
+    }
+    static String stdFileReadText(String s) {return decodeUtf8(stdFileReadBytes(s));}
+    static void stdFileWriteBytes(String s,BhashRuntime.BBuffer value) {
+        BhashRuntime.instance(value);if(value.size()>FILE_LIMIT)throw failure("फ़ाइल १६ MiB सीमा से बड़ी है।");
+        byte[] bytes=new byte[(int)value.size()];for(int i=0;i<bytes.length;i++)bytes[i]=(byte)(short)value.get(i);
+        try{Files.write(path(s),bytes);}catch(java.io.IOException|SecurityException e){throw failure("फ़ाइल लिखी नहीं जा सकी।");}
+    }
+    static void stdFileWriteText(String s,String value) {stdFileWriteBytes(s,stdEncode(value));}
+    static Object stdJsonRead(String s) {
+        if(s.length()>TEXT_LIMIT)throw failure("जेसन पाठ सीमा से बाहर है।");
+        return new JsonReader(s).read();
+    }
+    private static final class JsonReader {
+        final String source;int at;
+        JsonReader(String source){this.source=source;}
+        BhashRuntime.Failure invalid(){return failure("अमान्य जेसन पाठ, स्थान "+at+"।");}
+        void space(){while(at<source.length()&&" \t\r\n".indexOf(source.charAt(at))>=0)at++;}
+        boolean take(char c){if(at<source.length()&&source.charAt(at)==c){at++;return true;}return false;}
+        void need(char c){if(!take(c))throw invalid();}
+        Object read(){Object result=value(0);space();if(at!=source.length())throw invalid();return result;}
+        Object value(int depth) {
+            space();if(depth>64||at>=source.length())throw invalid();char c=source.charAt(at);
+            if(c=='"')return string();
+            if(take('{')) {
+                var result=BhashRuntime.typed(new BhashRuntime.BMap<String,Object>(),"MAP:[String, Object]");space();if(take('}'))return result;
+                do{space();if(at>=source.length()||source.charAt(at)!='"')throw invalid();String key=string();space();need(':');
+                    if(result.contains(key))throw invalid();result.set(key,value(depth+1));space();if(take('}'))return result;need(',');
+                }while(true);
+            }
+            if(take('[')) {
+                var result=BhashRuntime.typed(new BhashRuntime.BList<Object>(),"LIST:[Object]");space();if(take(']'))return result;
+                do{result.add(value(depth+1));space();if(take(']'))return result;need(',');}while(true);
+            }
+            for(String literal:List.of("true","false","null"))if(source.startsWith(literal,at)){at+=literal.length();return literal.equals("null")?null:literal.equals("true");}
+            return number();
+        }
+        String string() {
+            need('"');var b=new StringBuilder();
+            while(at<source.length()) {
+                char c=source.charAt(at++);if(c=='"'){String s=b.toString();unicode(s);return s;}if(c<32)throw invalid();
+                if(c!='\\'){b.append(c);continue;}
+                if(at>=source.length())throw invalid();c=source.charAt(at++);
+                switch(c) {
+                    case '"','\\','/' -> b.append(c);
+                    case 'b' -> b.append('\b');case 'f' -> b.append('\f');case 'n' -> b.append('\n');case 'r' -> b.append('\r');case 't' -> b.append('\t');
+                    case 'u' -> {int code=0;for(int i=0;i<4;i++){if(at>=source.length())throw invalid();char digit=source.charAt(at++);int n=digit>='0'&&digit<='9'?digit-'0':digit>='a'&&digit<='f'?digit-'a'+10:digit>='A'&&digit<='F'?digit-'A'+10:-1;if(n<0)throw invalid();code=code*16+n;}b.append((char)code);}
+                    default -> throw invalid();
+                }
+            }
+            throw invalid();
+        }
+        boolean digit(){return at<source.length()&&source.charAt(at)>='0'&&source.charAt(at)<='9';}
+        Object number() {
+            int start=at;take('-');
+            if(take('0')){if(digit())throw invalid();}else{if(!digit()||source.charAt(at)=='0')throw invalid();while(digit())at++;}
+            boolean real=false;
+            if(take('.')){real=true;if(!digit())throw invalid();while(digit())at++;}
+            if(take('e')||take('E')){real=true;if(!take('+'))take('-');if(!digit())throw invalid();while(digit())at++;}
+            String s=source.substring(start,at);
+            try {if(!real)return Long.valueOf(s);return finite(Double.parseDouble(s));}
+            catch(NumberFormatException e){throw invalid();}
+        }
+    }
+    static String stdJsonWrite(Object value) {
+        var writer=new JsonWriter();writer.value(value,0);return writer.text.toString();
+    }
+    private static final class JsonWriter {
+        final StringBuilder text=new StringBuilder();
+        final Set<Object> active=Collections.newSetFromMap(new IdentityHashMap<>());
+        void add(String s){if(text.length()>TEXT_LIMIT-s.length())throw failure("जेसन पाठ सीमा से बाहर है।");text.append(s);}
+        void string(String s) {
+            unicode(s);add("\"");
+            for(char c:s.toCharArray()) {
+                if(c=='"'||c=='\\')add("\\"+c);
+                else if(c<32)add(String.format(Locale.ROOT,"\\u%04x",(int)c));else add(String.valueOf(c));
+            }
+            add("\"");
+        }
+        void value(Object x,int depth) {
+            if(depth>64)throw failure("जेसन की गहराई सीमा पार हो गई।");
+            if(x==null){add("null");return;}
+            if(x instanceof String s){string(s);return;}
+            if(x instanceof Boolean b){add(b?"true":"false");return;}
+            if(x instanceof Long||x instanceof Integer||x instanceof Short){add(x.toString());return;}
+            if(x instanceof Double d){finite(d);String s=Double.toString(d);if(!s.contains(".")&&!s.contains("E")&&!s.contains("e"))s+=".0";add(s);return;}
+            if(!active.add(x))throw failure("चक्रीय संग्रह को जेसन में नहीं लिख सकते।");
+            try {
+                if(x instanceof BhashRuntime.BSeq<?> sequence) {
+                    add("[");boolean first=true;for(Object item:sequence){if(!first)add(",");first=false;value(item,depth+1);}add("]");return;
+                }
+                if(x instanceof BhashRuntime.BMap<?,?> map) {
+                    add("{");boolean first=true;
+                    for(var entry:map.entries()){if(!(entry.key instanceof String key))throw failure("जेसन मानचित्र की कुंजी पाठ होनी चाहिए।");if(!first)add(",");first=false;string(key);add(":");value(entry.value,depth+1);}add("}");return;
+                }
+                throw failure("यह प्रकार जेसन में समर्थित नहीं है।");
+            }finally{active.remove(x);}
+        }
+    }
+}

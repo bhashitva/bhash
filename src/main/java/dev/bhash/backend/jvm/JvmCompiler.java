@@ -34,11 +34,16 @@ public final class JvmCompiler {
                 if (resource == null) throw new CompilationException("Compiler installation is missing its JVM runtime source.");
                 Files.copy(resource, runtime);
             }
+            Path standard=temporary.resolve("BhashStandard.java");
+            try(var resource=JvmCompiler.class.getResourceAsStream("BhashStandard.java.txt")) {
+                if(resource==null)throw new CompilationException("Missing JVM standard library runtime.");
+                Files.copy(resource,standard);
+            }
             Path classes = Files.createDirectory(temporary.resolve("classes"));
             var diagnostics = new DiagnosticCollector<JavaFileObject>();
             var messages = new StringWriter();
             try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
-                var units = manager.getJavaFileObjects(program.toFile(), runtime.toFile());
+                var units = manager.getJavaFileObjects(program.toFile(), runtime.toFile(), standard.toFile());
                 boolean success = compiler.getTask(messages, manager, diagnostics,
                         List.of("--release", "17", "-encoding", "UTF-8", "-proc:none", "-classpath", classes.toString(),
                                 "-d", classes.toString()), null, units).call();

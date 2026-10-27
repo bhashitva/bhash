@@ -22,7 +22,9 @@ class GenericExpanderTest {
                     लिखो(पहली.अगली.मूल्य);
                 }
                 """);
-        assertEquals(1,code.split("static class C",-1).length-1);
+        // Compiler-owned facade classes are not generic specializations.
+        int facades=dev.bhash.stdlib.StandardLibrary.source().parse().tree().classDecl().size();
+        assertEquals(1,code.split("static class C",-1).length-1-facades);
     }
     @Test void expandingRecursiveTemplatesFailWithADiagnostic() {
         var error=assertThrows(CompilationException.class,()->emit("""

@@ -175,6 +175,27 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/exceptions.b
 
 See [exception rules and cleanup behavior](docs/exceptions.md).
 
+## Standard library
+
+The compiler bundles the `मानक` package on JVM, .NET CLR and browser WASM:
+
+```text
+आयात मानक.पाठ्य;
+आयात मानक.जेसन;
+कार्य मुख्य() -> शून्य {
+    स्थिर शब्द: सूची<पाठ> = पाठ्य.बाँटो("भाष,भारत,ज्ञान", ",");
+    लिखो(पाठ्य.जोड़ो(शब्द, " · "));
+    लिखो(जेसन.पाठबनाओ(शब्द));
+}
+```
+
+Text search/replace/split/join, fixed numeric formatting, math, seeded randomness,
+JSON parsing/serialization, UTC dates and bounded UTF-8/binary file I/O share typed
+APIs. Files work on JVM/CLR; check `मानक.फ़ाइल.समर्थित()` in portable programs.
+No registry, Maven or NuGet dependency is needed by a compiled application.
+See [all APIs and portability rules](docs/standard-library.md) and
+[the runnable example](examples/standard-library/portable.bhash).
+
 ## Types, conversions and binary data
 
 Bhash v0.9 adds checked numeric conversions, unsigned `बाइट`, signed 32-bit

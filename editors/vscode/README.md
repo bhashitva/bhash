@@ -7,7 +7,7 @@ programs while you edit.
 
 ## Install
 
-1. Download `bhash-vscode-0.2.0.vsix` from the **Bhash VS Code extension** GitHub
+1. Download `bhash-vscode-0.3.0.vsix` from the **Bhash VS Code extension** GitHub
    Actions artifact for a successful main-branch build.
 2. In VS Code choose **Extensions → … → Install from VSIX…** and select the file.
 3. Install **Java 17 or later** on the computer running the extension host.
@@ -54,6 +54,16 @@ A locally packaged or Actions-built version can be installed before its Marketpl
   **Bhash: Open Browser Playground** commands.
 
 `स्थिर` means a constant binding. Static class members use **`साझा`**.
+
+## Standard library
+
+The bundled compiler includes `मानक.पाठ्य`, `मानक.गणित`, `मानक.यादृच्छिक`,
+`मानक.जेसन`, `मानक.समय` and `मानक.फ़ाइल`. Use `आयात मानक.पाठ्य;` or fully
+qualified names. Completion, signature help and automatic imports use the same
+catalog as compiler checking; F12 opens a readable declaration document.
+No dependency download is needed. Browser builds expose file capability checks,
+but local file operations are unavailable in browser WASM.
+See [the standard library guide](../../docs/standard-library.md).
 
 ## Projects and tasks
 

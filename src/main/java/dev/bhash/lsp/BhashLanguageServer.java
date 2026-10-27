@@ -27,6 +27,8 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
     private final Set<String> published = new HashSet<>();
     private final AtomicLong revision = new AtomicLong();
     private LanguageClient client;
+    private SourceIndex libraryIndex;
+    private Path libraryDirectory;
     private ScheduledFuture<?> pending;
     private volatile boolean shutdown;
     private boolean needsDiscovery = true;
@@ -50,13 +52,27 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
             capabilities.setHoverProvider(true);capabilities.setDefinitionProvider(true);capabilities.setDocumentSymbolProvider(true);capabilities.setWorkspaceSymbolProvider(true);
             var folders = new WorkspaceFoldersOptions();folders.setSupported(true);folders.setChangeNotifications(true);
             capabilities.setWorkspace(new WorkspaceServerCapabilities(folders));
-            return new InitializeResult(capabilities,new ServerInfo("Bhash","0.2.0"));
+            return new InitializeResult(capabilities,new ServerInfo("Bhash","0.3.0"));
         });
     }
     @Override public void initialized(InitializedParams params) { schedule(true); }
     @Override public CompletableFuture<Object> shutdown() { shutdown=true;return submit(()->null); }
     @Override public void exit() { close(); }
-    @Override public void close() { executor.shutdownNow(); }
+    @Override public void close() {
+        executor.shutdownNow();
+        if(libraryDirectory!=null)try {
+            var file=libraryDirectory.resolve(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME);file.toFile().setWritable(true);
+            Files.deleteIfExists(file);Files.deleteIfExists(libraryDirectory);
+        }catch(IOException ignored) { /* Temporary declaration cache may be in use by an editor. */ }
+    }
+    private SourceIndex libraryIndex() throws IOException {
+        if(libraryIndex==null) {
+            libraryDirectory=Files.createTempDirectory("bhash-standard-library-");
+            libraryIndex=new SourceIndex(dev.bhash.stdlib.StandardLibrary.editorSource(libraryDirectory));
+        }
+        return libraryIndex;
+    }
+    private boolean libraryFile(Path file) {return libraryIndex!=null&&file!=null&&file.equals(path(libraryIndex.uri));}
     @Override public TextDocumentService getTextDocumentService() { return this; }
     @Override public WorkspaceService getWorkspaceService() { return this; }
     private <T> CompletableFuture<T> submit(Callable<T> task) {
@@ -74,11 +90,11 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
         pending=executor.schedule(()->analyze(version,discover),300,TimeUnit.MILLISECONDS);
     }
     @Override public void didOpen(DidOpenTextDocumentParams params) {
-        var document=params.getTextDocument();Path path=path(document.getUri());if(path==null)return;
+        var document=params.getTextDocument();Path path=path(document.getUri());if(path==null||libraryFile(path))return;
         change(()->buffers.put(path,new Buffer(document.getText(),document.getVersion())));
     }
     @Override public void didChange(DidChangeTextDocumentParams params) {
-        Path path=path(params.getTextDocument().getUri());if(path==null)return;
+        Path path=path(params.getTextDocument().getUri());if(path==null||libraryFile(path))return;
         change(()->{var old=buffers.get(path);if(old==null || params.getTextDocument().getVersion()<=old.version)return;
             String text=old.text;
             for(var edit:params.getContentChanges()) {
@@ -151,6 +167,7 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
                     syntaxValid &= parsed.valid();
                     indexes.put(uri,new SourceIndex(source));
                 }
+                var standard=libraryIndex();indexes.put(standard.uri,standard);
                 if(syntaxValid)try {ManagedEmitter.check(project.sources());}
                 catch(CompilationException invalid){semanticErrors(invalid.getMessage(),project.sources(),projectDiagnostics,input);}
                 fresh.put(input,new ProjectState(input,project.sources(),indexes,projectDiagnostics));diagnostics.putAll(projectDiagnostics);
