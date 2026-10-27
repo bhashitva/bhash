@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: Apache-2.0
+आयात मानक.फ़ाइल;
+आयात मानक.पाठ्य;
+
+कार्य मुख्य() -> शून्य {
+    यदि (!फ़ाइल.समर्थित()) { लिखो("ब्राउज़र में फ़ाइल API उपलब्ध नहीं है।"); लौटाओ; }
+    // समर्थित (File Capability / Is Supported)
+    {
+        लिखो("फ़ाइल.समर्थित");
+        लिखो(फ़ाइल.समर्थित());
+    }
+    // है (File Exists / Is Regular File)
+    {
+        लिखो("फ़ाइल.है");
+        फ़ाइल.पाठलिखो("target/tutorial-files/exists.txt", "नमस्ते");
+        लिखो(फ़ाइल.है("target/tutorial-files/exists.txt"));
+        लिखो(फ़ाइल.है("target/tutorial-files"));
+    }
+    // पाठपढ़ो (Read Text File)
+    {
+        लिखो("फ़ाइल.पाठपढ़ो");
+        फ़ाइल.पाठलिखो("target/tutorial-files/read.txt", "नमस्ते😀");
+        लिखो(फ़ाइल.पाठपढ़ो("target/tutorial-files/read.txt"));
+    }
+    // पाठलिखो (Write Text File)
+    {
+        लिखो("फ़ाइल.पाठलिखो");
+        फ़ाइल.पाठलिखो("target/tutorial-files/write.txt", "पुराना");
+        फ़ाइल.पाठलिखो("target/tutorial-files/write.txt", "नया😀");
+        लिखो(फ़ाइल.पाठपढ़ो("target/tutorial-files/write.txt"));
+    }
+    // बाइटपढ़ो (Read Bytes)
+    {
+        लिखो("फ़ाइल.बाइटपढ़ो");
+        स्थिर मूल: बाइटबफ़र = नया बाइटबफ़र{परिवर्तित<बाइट>(०), परिवर्तित<बाइट>(२५५)};
+        फ़ाइल.बाइटलिखो("target/tutorial-files/read.bin", मूल);
+        स्थिर पढ़ी: बाइटबफ़र = फ़ाइल.बाइटपढ़ो("target/tutorial-files/read.bin");
+        लिखो(पढ़ी.आकार, पढ़ी[०], पढ़ी[१]);
+    }
+    // बाइटलिखो (Write Bytes)
+    {
+        लिखो("फ़ाइल.बाइटलिखो");
+        स्थिर बाइटें: बाइटबफ़र = पाठ्य.यूटीएफ८("भारत😀");
+        फ़ाइल.बाइटलिखो("target/tutorial-files/write.bin", बाइटें);
+        लिखो(पाठ्य.यूटीएफ८पाठ(फ़ाइल.बाइटपढ़ो("target/tutorial-files/write.bin")));
+    }
+}
