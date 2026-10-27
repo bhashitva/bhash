@@ -25,6 +25,14 @@ exports.run=async()=>{
     const signaturePosition=document.positionAt(rich.indexOf('जोड़ो(')+'जोड़ो('.length);
     const signature=await vscode.commands.executeCommand('vscode.executeSignatureHelpProvider',uri,signaturePosition,'(');
     assert.ok(signature?.signatures.some(s=>s.label.includes('पूर्णांक')),'typed list signature help');
+    const standard='आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो("अ", ","); }';
+    const stdEdit=new vscode.WorkspaceEdit();stdEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),standard);await vscode.workspace.applyEdit(stdEdit);
+    const stdPosition=document.positionAt(standard.indexOf('पाठ्य.बाँटो')+'पाठ्य.'.length);
+    const stdItems=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,stdPosition),list=>list?.items?.some(i=>label(i)==='बाँटो'),'standard-library completion');
+    assert.ok(stdItems.items.some(i=>label(i)==='बाँटो'&&i.detail.includes('सूची<पाठ>')));
+    const stdDefinitions=await vscode.commands.executeCommand('vscode.executeDefinitionProvider',uri,document.positionAt(standard.indexOf('बाँटो(')));
+    assert.ok(stdDefinitions.length>0,'standard-library F12');
+    const stdDoc=await vscode.workspace.openTextDocument(stdDefinitions[0].uri);assert.ok(stdDoc.getText().includes('संकुल मानक;'));
     const original=new vscode.WorkspaceEdit();original.replace(uri,new vscode.Range(0,0,document.lineCount,0),source);await vscode.workspace.applyEdit(original);await document.save();
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'diagnostic clearing after provider tests');
     const tasks=await vscode.tasks.fetchTasks({type:'bhash'});const build=tasks.find(task=>task.definition.command==='build');assert.ok(build,'configured Bhash task resolves');

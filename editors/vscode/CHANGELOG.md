@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 — 2026-10-26
+
+- Bundle the first standard library: text, math, seeded random numbers, JSON, UTC time, and desktop file I/O.
+- Add standard-library member completion, signatures, automatic imports and readable F12 declarations.
+- Preserve the browser file-access boundary through capability checks and catchable unsupported-operation errors.
+
+
 ## 0.2.0 — 2026-10-26
 
 - Report multiple independent semantic errors with stable diagnostic codes, Hindi

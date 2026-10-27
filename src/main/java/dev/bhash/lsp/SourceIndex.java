@@ -140,7 +140,16 @@ final class SourceIndex {
     static String packageOf(String qualified) { int dot=qualified.lastIndexOf('.');return dot<0?"":qualified.substring(0,dot); }
     List<CompletionItem> completions(Position position, Collection<SourceIndex> project) {
         int offset=coordinates.offset(position), start=offset;
-        boolean importing=text.substring(Math.max(0,text.lastIndexOf('\n',Math.max(0,offset-1))+1),offset).stripLeading().startsWith("आयात ");
+        // Import context ends at its semicolon, even when code follows on the same line.
+        int importStart=-1, cursor=text.codePointCount(0,offset)-(text.startsWith("\uFEFF")?1:0);
+        for(var token:tokens) {
+            if(token.getStartIndex()>=cursor)break;
+            if(token.getType()==dev.bhash.parser.BhashLexer.IMPORT)
+                importStart=coordinates.fromCodePoint(token.getStopIndex()+1+(text.startsWith("\uFEFF")?1:0));
+            else if(token.getText().equals(";")||token.getText().equals("{")||token.getText().equals("}"))importStart=-1;
+        }
+        boolean importing=importStart>=0;
+        if(importing)while(importStart<offset&&Character.isWhitespace(text.charAt(importStart)))importStart++;
         var model=new EditorModel(this,project);
         var members=importing?null:model.memberCompletions(position);
         if(members!=null)return members;
@@ -167,7 +176,7 @@ final class SourceIndex {
             else if(index.pkg.equals(pkg))label=s.name;
             else if(s.exported)for(var imp:imports.entrySet())if(imp.getValue().equals(s.qualified))label=imp.getKey();
             if(label!=null){var item=new CompletionItem(label);
-                if(importing){int lineStart=text.lastIndexOf('\n',Math.max(0,offset-1))+1;int importStart=text.indexOf("आयात",lineStart)+"आयात".length();while(importStart<offset&&Character.isWhitespace(text.charAt(importStart)))importStart++;
+                if(importing){
                     item.setTextEdit(org.eclipse.lsp4j.jsonrpc.messages.Either.forLeft(new TextEdit(new Range(coordinates.position(importStart),position),label)));}item.setKind(s.kind==SymbolKind.Function?CompletionItemKind.Function:CompletionItemKind.Class);item.setDetail(s.detail+" — "+s.qualified);result.add(item);}
         }
         for(var s:visibleLexical(position)){var item=new CompletionItem(s.name);item.setKind(CompletionItemKind.Variable);item.setDetail(s.detail);result.add(item);}

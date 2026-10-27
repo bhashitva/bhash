@@ -35,6 +35,7 @@ public final class ProjectResolver {
         var trees = new ArrayList<ProgramContext>();
         var errors = new ArrayList<String>();
         for (var source : sources) {
+            if(source.name().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME))throw new CompilationException("Reserved standard library source name.");
             var parsed = source.parse();
             if (parsed.valid()) trees.add(parsed.tree());
             else parsed.diagnostics().forEach(d -> errors.add(d.toString()));
@@ -49,8 +50,14 @@ public final class ProjectResolver {
         }
     }
     static Resolution resolveTrees(List<ProgramContext> trees) throws CompilationException {
+        if(trees.isEmpty())throw new CompilationException("Project contains no .bhash source files.");
+        for(var input:trees)if(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME.equals(LocatedToken.source(input.start,"")))throw new CompilationException("Reserved standard library source name.");
         var resolver = new ProjectResolver();
-        var tree = resolver.resolveProgram(trees);
+        var all=new ArrayList<>(trees);
+        var library=dev.bhash.stdlib.StandardLibrary.source().parse();
+        if(!library.valid())throw new IllegalStateException("Invalid bundled standard library: "+library.diagnostics());
+        all.add(library.tree());
+        var tree = resolver.resolveProgram(all);
         var names = new HashMap<String,String>();
         for (var table : List.of(resolver.types,resolver.functions))
             for (var symbol : table.values()) names.put(symbol.lowered,symbol.full);
@@ -99,6 +106,8 @@ public final class ProjectResolver {
     }
     private void register(Unit unit, ParserRuleContext declaration, Token name, Kind kind, boolean exported) throws CompilationException {
         String shortName = key(name.getText()), full = full(unit, shortName);
+        if(dev.bhash.stdlib.StandardLibrary.owns(full)&&!dev.bhash.stdlib.StandardLibrary.SOURCE_NAME.equals(LocatedToken.source(name,"")))
+            throw error(name,"Reserved standard library declaration: "+full);
         if (kind == Kind.TYPE && (CollectionTypes.builtin(shortName) || shortName.equals(key("अपवाद")))) throw error(name,"Reserved built-in type: " + shortName);
         if (kind == Kind.FUNCTION && BUILTINS.contains(shortName)) {
             if (((FunctionDeclContext)declaration).typeParameters()!=null) throw error(name,"Reserved function cannot be generic: " + shortName);

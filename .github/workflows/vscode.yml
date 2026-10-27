@@ -34,5 +34,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-vscode-${{ runner.os }}
-          path: target/bhash-vscode-0.2.0.vsix
+          path: target/bhash-vscode-0.3.0.vsix
           if-no-files-found: error

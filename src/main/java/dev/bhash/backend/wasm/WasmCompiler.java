@@ -62,6 +62,7 @@ public final class WasmCompiler {
                     </packageSources></configuration>
                     """, StandardCharsets.UTF_8);
             resource("/dev/bhash/backend/clr/BhashRuntime.cs.txt", work.resolve("BhashRuntime.cs"));
+            resource("/dev/bhash/backend/clr/BhashStandard.cs.txt", work.resolve("BhashStandard.cs"));
             resource("/dev/bhash/backend/wasm/BrowserHost.cs.txt", work.resolve("BrowserHost.cs"));
             var builder = new ProcessBuilder(ClrCompiler.executable(), "publish", "BhashProgram.csproj",
                     "-c", "Release", "-o", work.resolve("publish").toString(), "--nologo", "--verbosity", "quiet",

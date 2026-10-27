@@ -11,6 +11,7 @@
   portable key equality and collection iteration with structural-mutation checks.
 - Checked numeric conversions, 8-bit unsigned bytes, 32-bit integers, packed byte buffers,
   UTF-8/binary I/O, typed enums, immutable generic records and reified runtime type tests/casts.
+- Bundled मानक package: text, math, seeded PRNG, JSON, UTC timestamps and capability-gated UTF-8/binary file I/O, with editor discovery.
 - Typed exceptions, custom exception subclasses, ordered catch handlers, throw/rethrow
   and finally cleanup across all three managed targets.
 - Selection statements with typed literal cases, grouped labels, default, scopes and nested loop control.
@@ -65,6 +66,6 @@
 ## Later language growth
 
 Abstract/final members, generic member methods, constraints/inference, constructor-assigned
-immutable fields, record bodies/patterns, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, standard
-library, debugger support, editor tooling, dependency package management and FFI. Changes require a spec update,
+immutable fields, record bodies/patterns, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, broader standard
+library coverage, debugger support, editor tooling, dependency package management and FFI. Changes require a spec update,
 examples and tests. Generated code, JVM JARs, CLR deployment folders and browser bundles remain build products.

@@ -40,6 +40,7 @@ public final class ClrCompiler {
               <ItemGroup>
                 <Compile Include="Program.cs" />
                 <Compile Include="BhashRuntime.cs" />
+                <Compile Include="BhashStandard.cs" />
               </ItemGroup>
             </Project>
             """;
@@ -68,6 +69,10 @@ public final class ClrCompiler {
             try (var runtime = ClrCompiler.class.getResourceAsStream("BhashRuntime.cs.txt")) {
                 if (runtime == null) throw new CompilationException("Compiler installation is missing its CLR runtime source.");
                 Files.copy(runtime, work.resolve("BhashRuntime.cs"));
+            }
+            try(var standard=ClrCompiler.class.getResourceAsStream("BhashStandard.cs.txt")) {
+                if(standard==null)throw new CompilationException("Missing CLR standard library runtime.");
+                Files.copy(standard,work.resolve("BhashStandard.cs"));
             }
             var command = List.of(executable(), "publish", "BhashProgram.csproj", "--configuration", "Release",
                     "--output", stage.toString(), "--no-self-contained", "--nologo", "--verbosity", "quiet",
