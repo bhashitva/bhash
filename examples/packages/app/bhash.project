@@ -1,0 +1,4 @@
+name=package-demo
+sources=src
+dependency.greetings.path=../greetings
+dependency.greetings.version=1.0.0

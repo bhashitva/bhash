@@ -1,0 +1,28 @@
+{
+  "lockVersion": 1,
+  "root": {
+    "manifestSha256": "2b5fd0079c37426cf453957761c5bf4d46aaa88ceaa4aae4a0aa605a3d2c4839"
+  },
+  "packages": [
+    {
+      "name": "example-core",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "../core"
+      },
+      "manifestSha256": "fbba1b9e76fcd6ca1c8935a0c70d859afa695ea9621b1d84d8c02123666cbdbc",
+      "sourcesSha256": "a698617f0e54585c088f8a84eb7d43d84b9792a72b35bdf630b2a511897770e3"
+    },
+    {
+      "name": "example-greetings",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "../greetings"
+      },
+      "manifestSha256": "a86fe8bda3f50c7ea7add02688ec41d821727bbe1b53bae4f61172cc8407197a",
+      "sourcesSha256": "f154d51a03720158500829cadacb21cd60591510425500d94db41d37719675bd"
+    }
+  ]
+}
