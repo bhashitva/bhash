@@ -1,1 +1,18 @@
-{"name":"Bhash Project","scopeName":"source.bhash-project","patterns":[{"name":"comment.line.number-sign.bhash-project","match":"^\\s*[#!].*$"},{"name":"keyword.other.bhash-project","match":"^\\s*(?:name|sources)(?=\\s*[:=])"},{"name":"keyword.operator.assignment.bhash-project","match":"[:=]"}]}
+{
+  "name": "Bhash Project",
+  "scopeName": "source.bhash-project",
+  "patterns": [
+    {
+      "name": "comment.line.number-sign.bhash-project",
+      "match": "^\\s*[#!].*$"
+    },
+    {
+      "name": "keyword.other.bhash-project",
+      "match": "^\\s*(?:name|sources|version|kind|dependency\\.[A-Za-z][A-Za-z0-9_-]{0,63}\\.(?:path|version|git|rev|dir))(?=\\s*[:=])"
+    },
+    {
+      "name": "keyword.operator.assignment.bhash-project",
+      "match": "[:=]"
+    }
+  ]
+}

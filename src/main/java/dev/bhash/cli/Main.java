@@ -32,6 +32,17 @@ public final class Main {
             }
             return 0;
         }
+        if (args.length >= 1 && args[0].equals("deps")) {
+            if (args.length < 3 || args.length > 4 || !java.util.Set.of("lock","restore","verify").contains(args[1])
+                    || args.length == 4 && !args[3].equals("--offline")) return usage(err);
+            try {
+                var project = dev.bhash.frontend.SourcePackages.manage(Path.of(args[2]),args[1],args.length == 4);
+                out.println("Dependencies " + args[1] + ": " + project.name());
+                return 0;
+            } catch (IOException | IllegalArgumentException exception) {
+                err.println(exception.getMessage()); return 2;
+            }
+        }
         if (args.length >= 2 && args[0].equals("compile")) return compile(args, out, err);
         if (args.length >= 2 && args[0].equals("run")) return execute(args, err);
         if (args.length != 2 || !(args[0].equals("check") || args[0].equals("parse"))) return usage(err);
@@ -73,6 +84,7 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar parse <file.bhash>");
         err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser]");
         err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr]");
+        err.println("       java -jar bhash-compiler.jar deps lock|restore|verify <project> [--offline]");
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
@@ -113,6 +125,7 @@ public final class Main {
 
     private static void build(Options options) throws IOException, CompilationException {
         var project = ProjectLoader.load(options.source);
+        if (project.library()) throw new IOException("[BH8001] Library packages are shared source, not executable programs. Build an application that depends on this library.");
         project.protectOutput(options.output,options.target != Target.JVM);
         if (options.target == Target.JVM) new JvmCompiler().compile(project.sources(), options.output);
         else if (options.target == Target.WASM) new WasmCompiler().compile(project.sources(), options.output);

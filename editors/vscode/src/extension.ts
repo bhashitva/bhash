@@ -31,7 +31,7 @@ async function startServer() {
     try {({java,jar} = tools());} catch (error) {output.appendLine(String(error));void vscode.window.showErrorMessage(String(error));return;}
     const server: ServerOptions = {command: java, args: ['-Dfile.encoding=UTF-8', '-Xmx768m', '-jar', jar, 'language-server']};
     serverWatcher?.dispose();
-    const watcher = vscode.workspace.createFileSystemWatcher('**/*.{bhash,project}');serverWatcher=watcher;
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*.{bhash,project,lock}');serverWatcher=watcher;
     const options: LanguageClientOptions = {documentSelector: schemes, outputChannel: output,
         synchronize: {fileEvents: watcher}, markdown: {isTrusted: false}};
     const next = new LanguageClient('bhash', 'Bhash', server, options);
@@ -84,6 +84,27 @@ async function execute(command: 'build' | 'run') {
     const target = await vscode.window.showQuickPick(available, {title: `Bhash: ${command}`, placeHolder: 'Select the target platform'});
     if (target) await vscode.tasks.executeTask(taskFor({type: 'bhash', command, target: target as Target}, folder, input));
 }
+async function dependencies(action: 'lock' | 'restore' | 'verify') {
+    if (!trusted()) return;
+    const {input,folder} = await activeInput();
+    if (path.basename(input) !== 'bhash.project') throw new Error('Open a file in a Bhash project before managing dependencies.');
+    for (const document of vscode.workspace.textDocuments) {
+        if (document.isDirty && document.uri.scheme === 'file' && ['bhash','bhash-project'].includes(document.languageId)
+            && !await document.save()) throw new Error('Save Bhash source and project files before managing dependencies.');
+    }
+    const {java,jar} = tools();
+    const task = new vscode.Task({type: 'bhash-dependencies', action}, folder || vscode.TaskScope.Global,
+        `${action} dependencies`, 'Bhash', new vscode.ProcessExecution(java,
+            ['-Dfile.encoding=UTF-8','-jar',jar,'deps',action,input], {cwd: path.dirname(input)}));
+    task.presentationOptions = {reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, clear: true};
+    const execution = await vscode.tasks.executeTask(task);
+    const listener = vscode.tasks.onDidEndTaskProcess(event => {
+        if (event.execution !== execution) return;
+        listener.dispose();
+        if (event.exitCode === 0) void restart().catch(error => output.appendLine(String(error)));
+    });
+    context.subscriptions.push(listener);
+}
 async function newProject() {
     if (!trusted()) return;
     const folders = vscode.workspace.workspaceFolders?.filter(f => f.uri.scheme === 'file') || [];
@@ -105,6 +126,9 @@ export function activate(extensionContext: vscode.ExtensionContext) {
     output = vscode.window.createOutputChannel('Bhash');context.subscriptions.push(output);
     const command = (id: string, action: () => unknown) => context.subscriptions.push(vscode.commands.registerCommand(id, async () => {try {await action();}catch(error){void vscode.window.showErrorMessage(`Bhash: ${error instanceof Error ? error.message : String(error)}`);}}));
     command('bhash.build', () => execute('build'));command('bhash.run', () => execute('run'));command('bhash.newProject',newProject);
+    command('bhash.lockDependencies',()=>dependencies('lock'));
+    command('bhash.restoreDependencies',()=>dependencies('restore'));
+    command('bhash.verifyDependencies',()=>dependencies('verify'));
     command('bhash.restartServer',restart);command('bhash.openPlayground',()=>vscode.env.openExternal(vscode.Uri.parse('https://play.bhashitva.org/')));
     context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(() => {void startServer();}));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {if(event.affectsConfiguration('bhash.javaPath') || event.affectsConfiguration('bhash.compilerPath')) void restart().catch(error => output.appendLine(String(error)));}));

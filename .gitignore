@@ -32,3 +32,6 @@ editors/vscode/LICENSING.md
 editors/vscode/THIRD_PARTY_NOTICES.md
 editors/vscode/THIRD_PARTY_CLIENT_NOTICES.txt
 *.vsix
+
+# Downloaded source-package snapshots (commit bhash.lock instead).
+.bhash/

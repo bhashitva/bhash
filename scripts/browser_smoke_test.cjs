@@ -25,6 +25,7 @@ compile('standard-library', fs.readFileSync('examples/standard-library/portable.
 compile('standard-library-browser', fs.readFileSync('src/test/resources/stdlib/browser.bhash', 'utf8'));
 compile('type-semantics', fs.readFileSync('src/test/resources/types/browser.bhash', 'utf8'));
 build('multi-file', path.resolve('examples/multi-file'));
+build('source-packages', path.resolve('examples/packages/app'));
 compile('exceptions', fs.readFileSync('examples/exceptions.bhash', 'utf8'));
 compile('exception-semantics', fs.readFileSync('src/test/resources/exceptions/browser.bhash', 'utf8'));
 build('collections', path.resolve('examples/collections'));
@@ -193,6 +194,7 @@ const server = http.createServer((request, response) => {
         await run('exception-semantics', '0', 'सत्य मूल\nभीतर\nसत्य मूल\nबाहर\nभाग\nसीमा\nप्रारंभ\nवापसी\n७\nचक्र १\nचक्र २\n');
         await run('exception-semantics', '1', 'सफाई\n', 1, 'असफल');
         await run('exception-semantics', '2', 'अंतिम\n');
+        await run('source-packages', '', fs.readFileSync('examples/packages/app.expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('collections', '', fs.readFileSync('examples/collections/expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('collection-semantics', '0', '० ९\n१\n७\nक १\nख ३\nसत्य\n२ ७ ९\nठीक असत्य\n५ ३\n४\n');
         for (let signal = 1; signal <= 12; signal++)

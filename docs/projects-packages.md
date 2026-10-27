@@ -166,15 +166,15 @@ import aliases, qualified static access and shared object identity. For input `�
 संख्या ठीक
 ```
 
-## Scope of this milestone
+## Distribution and dependency management
 
-Source roots form one executable build. They can contain shared Bhash source
-checked into the project, but this version does not fetch dependencies or consume
-precompiled Bhash libraries, JARs, .NET assemblies or NuGet packages. There is no
-package registry, dependency lockfile, separate compilation ABI or incremental
-build cache yet. Package/import names do not fetch network resources.
+Source roots and linked source packages form one executable build. Versioned
+libraries, relative local dependencies, exact Git commits, deterministic lockfiles
+and explicit lock/restore/verify commands are described in
+[reusable source packages](source-packages.md). Language imports themselves never
+fetch network resources.
 
-A build lowers the resolved project into one host program and executable artifact;
-it does not generate an independently reusable host assembly for each Bhash file.
-Future source-package distribution and native Java/.NET interoperability need
-explicit dependency metadata and target compatibility rules.
+A build lowers the resolved sources into one host program and executable artifact;
+it does not generate an independent host assembly per library or Bhash file.
+Precompiled Bhash libraries, native JAR/.NET/NuGet bindings, a public package
+registry and incremental/separate compilation remain future work.

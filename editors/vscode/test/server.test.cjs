@@ -18,7 +18,7 @@ function transport(){
     function wait(predicate){let cached=messages.find(predicate);if(cached)return Promise.resolve(cached);return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{events.off('message',listener);reject(new Error(`Notification timeout: ${JSON.stringify(messages.slice(-4))}; stderr=${stderr}`));},20000);function listener(message){if(predicate(message)){clearTimeout(timer);events.off('message',listener);resolve(message);}}events.on('message',listener);});}
     return {process,request,send,wait,messages};
 }
-function sameUri(left,right){const normalize=value=>{const file=path.resolve(fileURLToPath(value));return process.platform==='win32'?file.toLowerCase():file;};return normalize(left)===normalize(right);}
+function sameUri(left,right){const normalize=value=>{let file=path.resolve(fileURLToPath(value));try{file=require('node:fs').realpathSync.native(file);}catch{}return process.platform==='win32'?file.toLowerCase():file;};return normalize(left)===normalize(right);}
 function position(text,needle){const offset=text.indexOf(needle);assert.ok(offset>=0);const prefix=text.slice(0,offset);return {line:prefix.split('\n').length-1,character:offset-prefix.lastIndexOf('\n')-1};}
 test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode positions and project isolation', {timeout:90000},async t=>{
     const root=await fs.mkdtemp(path.join(os.tmpdir(),'bhash-lsp-'));
@@ -111,5 +111,41 @@ test('stdio LSP: member types, signatures, automatic import edits and coded mult
     const errors=await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri)&&m.params.version===4&&m.params.diagnostics.length===2);
     assert.deepEqual(errors.params.diagnostics.map(d=>d.code),['BH2001','BH4001']);
     assert.ok(errors.params.diagnostics.every(d=>d.message.includes('—')),'Hindi guidance retains English detail');
+    await lsp.request('shutdown',null);lsp.send('exit');lsp.process.stdin.end();
+});
+
+test('stdio LSP: locked library navigation and lock-change diagnostics', {timeout:90000},async t=>{
+    const root=await fs.mkdtemp(path.join(os.tmpdir(),'bhash-packages-lsp-'));
+    t.after(()=>fs.rm(root,{recursive:true,force:true}));
+    const app=path.join(root,'app'),lib=path.join(root,'library');
+    for(const dir of [app,lib])await fs.mkdir(path.join(dir,'src'),{recursive:true});
+    const manifest=path.join(app,'bhash.project'),lock=path.join(app,'bhash.lock');
+    await fs.writeFile(manifest,'name=app\ndependency.lib.path=../library\ndependency.lib.version=1.0.0\n');
+    await fs.writeFile(path.join(lib,'bhash.project'),'name=util\nkind=library\nversion=1.0.0\n');
+    const library=path.join(lib,'src','library.bhash'),main=path.join(app,'src','main.bhash');
+    const source='संकुल पुस्तक; सार्वजनिक कार्य दुगुना(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }';
+    const program='आयात पुस्तक.दुगुना; कार्य मुख्य() -> शून्य { लिखो(दुगुना(३)); }';
+    await fs.writeFile(library,source);await fs.writeFile(main,program);
+    const cli=spawn('java',['-jar',jar,'deps','lock',app,'--offline']);let errors='';cli.stderr.on('data',d=>errors+=d);
+    assert.equal(await new Promise(resolve=>cli.on('exit',resolve)),0,errors);
+    const lsp=transport();t.after(()=>lsp.process.kill());const uri=file=>pathToFileURL(file).href,document={uri:uri(main)};
+    await lsp.request('initialize',{processId:process.pid,workspaceFolders:[{uri:uri(app),name:'app'}],capabilities:{}});lsp.send('initialized',{});
+    lsp.send('textDocument/didOpen',{textDocument:{...document,languageId:'bhash',version:1,text:program}});
+    await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri(main))&&m.params.diagnostics.length===0);
+    const definitions=await lsp.request('textDocument/definition',{textDocument:document,position:position(program,'दुगुना(३)')});
+    assert.ok(definitions.some(d=>sameUri(d.uri,uri(library))),JSON.stringify({expected:uri(library),actual:definitions}));
+    const completion=await lsp.request('textDocument/completion',{textDocument:document,position:position(program,'दुगुना(३)')});
+    assert.ok(completion.some(i=>i.label==='दुगुना'));
+    const call=position(program,'दुगुना(३)');call.character+='दुगुना('.length;
+    const signature=await lsp.request('textDocument/signatureHelp',{textDocument:document,position:call});assert.ok(signature.signatures[0].label.includes('पूर्णांक'));
+    await fs.writeFile(library,source+'\n// changed\n');
+    lsp.send('workspace/didChangeWatchedFiles',{changes:[{uri:uri(library),type:2}]});
+    await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri(manifest))&&m.params.diagnostics.some(d=>d.code==='BH8003'));
+    await fs.writeFile(library,source);const validLock=await fs.readFile(lock,'utf8');await fs.writeFile(lock,'{}');
+    lsp.send('workspace/didChangeWatchedFiles',{changes:[{uri:uri(lock),type:2}]});
+    await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri(manifest))&&m.params.diagnostics.some(d=>d.code==='BH8002'));
+    await fs.writeFile(lock,validLock);lsp.messages.length=0;
+    lsp.send('workspace/didChangeWatchedFiles',{changes:[{uri:uri(lock),type:2}]});
+    await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri(main))&&m.params.diagnostics.length===0);
     await lsp.request('shutdown',null);lsp.send('exit');lsp.process.stdin.end();
 });

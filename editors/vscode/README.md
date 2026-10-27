@@ -46,7 +46,7 @@ A locally packaged or Actions-built version can be installed before its Marketpl
   are collected in one pass (up to 50); declaration/import/type-graph failures stop
   the semantic pass to avoid misleading follow-on errors.
 - Independent manifests and multi-root workspaces remain separate compilation
-  units. Discovery ignores `.git`, `node_modules`, `target`, `build`, and `dist`.
+  units. Discovery ignores `.bhash`, `.git`, `node_modules`, `target`, `build`, and `dist`.
 - Build JVM, CLR, or browser WebAssembly; run JVM/CLR in an integrated terminal
   with console input. File paths are passed as process arguments, never a shell
   command. Builds use saved files and prompt for the target.
@@ -64,6 +64,20 @@ catalog as compiler checking; F12 opens a readable declaration document.
 No dependency download is needed. Browser builds expose file capability checks,
 but local file operations are unavailable in browser WASM.
 See [the standard library guide](../../docs/standard-library.md).
+
+## Reusable source packages
+
+Use **Bhash: Update Dependencies Lock** after intentionally changing dependency
+metadata or local library contents. **Bhash: Restore Dependencies** fetches missing
+exact Git snapshots without updating the lock; **Bhash: Verify Dependencies**
+checks existing local/cached sources offline. These commands require workspace
+trust, save Bhash buffers and refresh analysis on success. Ordinary analysis,
+build and run do not fetch dependencies or modify locks. Dependency declarations
+are highlighted in `bhash.project`; changes to `bhash.lock` refresh diagnostics.
+Verified library sources participate in completion, auto-import, signature help
+and navigation. Add external local-library folders to the workspace to observe
+changes made outside the editor. See [the package guide](../../docs/source-packages.md)
+and [Hindi tutorial](../../tutorial/packages/README.md).
 
 ## Projects and tasks
 

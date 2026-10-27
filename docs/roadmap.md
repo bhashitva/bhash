@@ -39,7 +39,10 @@
 
 ## Project and library follow-ups
 
-- Versioned portable Bhash source dependencies and reproducible dependency lockfiles.
+- Completed versioned Bhash source packages with local paths, exact Git revisions,
+  deterministic integrity lockfiles, explicit restore/verify commands and editor integration.
+  See [source packages](source-packages.md) and the [Hindi tutorial](../tutorial/packages/README.md).
+- Public package registry, authenticated private Git and version-range resolution.
 - Incremental compilation, stable exported signatures and separately compiled libraries.
 - Explicit target-specific Java JAR and .NET assembly/NuGet interoperability.
 

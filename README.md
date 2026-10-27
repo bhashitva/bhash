@@ -111,7 +111,11 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/multi-file -
 ```
 
 Serve browser output over HTTP as described in [the browser guide](docs/wasm-browser.md).
-See [project commands and v0.5 package rules](docs/projects-packages.md) for details.
+See [project commands and package rules](docs/projects-packages.md) for details.
+Versioned source libraries now support local dependencies, pinned Git commits and
+verified lockfiles. See [dependency management](docs/source-packages.md), the
+[three-package example](examples/packages/README.md), and the
+[Hindi tutorial](tutorial/packages/README.md).
 Existing single-file commands continue to work. External library distribution and
 Java/.NET library interoperability remain planned.
 
