@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.1 — 2026-10-27
+
+- Resolve documentation links relative to the extension subdirectory so Marketplace links to the package guide and Hindi tutorials open correctly.
+
+## 0.4.0 — 2026-10-27
+
+- Bundle the compiler with versioned Bhash source packages, relative local dependencies, exact Git revisions, and reproducible integrity lockfiles.
+- Add Update Dependencies Lock, Restore Dependencies, and Verify Dependencies commands in trusted workspaces.
+- Include verified dependency sources in completion, signature help, automatic imports, diagnostics, and F12 navigation.
+- Watch lockfile changes and keep ordinary builds and editor analysis offline.
+- Fix dependency resolution through Windows short folder names while preserving physical-path safety checks.
+
 ## 0.3.0 — 2026-10-26
 
 - Bundle the first standard library: text, math, seeded random numbers, JSON, UTC time, and desktop file I/O.
