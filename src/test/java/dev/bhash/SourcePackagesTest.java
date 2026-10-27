@@ -58,6 +58,43 @@ class SourcePackagesTest {
         assertTrue(project.sources().stream().anyMatch(s->s.text().contains("९")));
         SourcePackages.manage(app,"verify",true);
     }
+    @Test void alternateProjectDirectorySpellingPreservesLocksAndEditorBuffers() throws Exception {
+        lib("util","");Path app=app(dep("util","../util"));lock(app);
+        Path alias=directory.resolve("directory-alias");
+        try{Files.createSymbolicLink(alias,directory);}
+        catch(IOException|UnsupportedOperationException|SecurityException unavailable){
+            org.junit.jupiter.api.Assumptions.abort("Directory aliases unavailable");return;
+        }
+        try{
+            String before=Files.readString(app.resolve("bhash.lock"));Path viaAlias=alias.resolve("app");
+            var project=ProjectLoader.load(viaAlias,Map.of(alias.resolve("util/src/library.bhash"),LIB.replace("४२","९")));
+            assertTrue(project.sources().stream().anyMatch(source->source.text().contains("९")));
+            assertTrue(project.sourcePaths().stream().allMatch(path->path.startsWith(alias)));
+            SourcePackages.manage(viaAlias,"verify",true);lock(viaAlias);
+            assertEquals(before,Files.readString(app.resolve("bhash.lock")));
+        }finally{Files.deleteIfExists(alias);}
+    }
+    @Test @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void windowsShortPathsPreserveLocalLocksOverlaysAndGitSubpackageBoundaries() throws Exception {
+        lib("util","");Path app=app(dep("util","../util"));lock(app);
+        var command=new ProcessBuilder("cmd.exe","/d","/u","/v:off","/c","for %I in (\""+app+"\") do @echo %~sI").redirectErrorStream(true).start();
+        assertTrue(command.waitFor(10,java.util.concurrent.TimeUnit.SECONDS));
+        assertEquals(0,command.exitValue());
+        Path alias=Path.of(new String(command.getInputStream().readAllBytes(),StandardCharsets.UTF_16LE).strip());
+        assertTrue(Files.isSameFile(app,alias));
+        if(app.equals(alias)){org.junit.jupiter.api.Assumptions.abort("Windows short names unavailable");return;}
+        Path aliasLibrary=alias.getParent().resolve("util/src/library.bhash");
+        var project=ProjectLoader.load(alias,Map.of(aliasLibrary,LIB.replace("४२","९")));
+        assertTrue(project.sources().stream().anyMatch(source->source.text().contains("९")));
+        SourcePackages.manage(alias,"verify",true);
+        Path repo=directory.resolve("repo");lib("repo/util","");lib("repo/api",dep("util","../util"));
+        git(repo,"init");String rev=commit(repo);app(gitDep(repo,rev,"api"));
+        SourcePackages.manage(app,"lock",false);
+        var cached=ProjectLoader.load(alias);
+        assertEquals(3,cached.sources().size());
+        assertTrue(cached.sourcePaths().stream().anyMatch(path->path.startsWith(alias.resolve(".bhash"))));
+        SourcePackages.manage(alias,"verify",true);
+    }
     @Test void transitiveDiamondIncludesOneCopyOfEachSource() throws Exception {
         lib("common","");lib("left",dep("common","../common"));lib("right",dep("common","../common"));
         Path app=app(dep("left","../left")+dep("right","../right"));lock(app);
