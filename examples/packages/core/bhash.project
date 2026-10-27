@@ -1,0 +1,4 @@
+name=example-core
+kind=library
+version=1.0.0
+sources=src
