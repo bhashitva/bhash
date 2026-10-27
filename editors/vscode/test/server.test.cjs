@@ -18,7 +18,7 @@ function transport(){
     function wait(predicate){let cached=messages.find(predicate);if(cached)return Promise.resolve(cached);return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{events.off('message',listener);reject(new Error(`Notification timeout: ${JSON.stringify(messages.slice(-4))}; stderr=${stderr}`));},20000);function listener(message){if(predicate(message)){clearTimeout(timer);events.off('message',listener);resolve(message);}}events.on('message',listener);});}
     return {process,request,send,wait,messages};
 }
-function sameUri(left,right){const normalize=value=>{const file=path.resolve(fileURLToPath(value));return process.platform==='win32'?file.toLowerCase():file;};return normalize(left)===normalize(right);}
+function sameUri(left,right){const normalize=value=>{let file=path.resolve(fileURLToPath(value));try{file=require('node:fs').realpathSync.native(file);}catch{}return process.platform==='win32'?file.toLowerCase():file;};return normalize(left)===normalize(right);}
 function position(text,needle){const offset=text.indexOf(needle);assert.ok(offset>=0);const prefix=text.slice(0,offset);return {line:prefix.split('\n').length-1,character:offset-prefix.lastIndexOf('\n')-1};}
 test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode positions and project isolation', {timeout:90000},async t=>{
     const root=await fs.mkdtemp(path.join(os.tmpdir(),'bhash-lsp-'));
@@ -133,7 +133,7 @@ test('stdio LSP: locked library navigation and lock-change diagnostics', {timeou
     lsp.send('textDocument/didOpen',{textDocument:{...document,languageId:'bhash',version:1,text:program}});
     await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri(main))&&m.params.diagnostics.length===0);
     const definitions=await lsp.request('textDocument/definition',{textDocument:document,position:position(program,'दुगुना(३)')});
-    assert.ok(definitions.some(d=>sameUri(d.uri,uri(library))));
+    assert.ok(definitions.some(d=>sameUri(d.uri,uri(library))),JSON.stringify({expected:uri(library),actual:definitions}));
     const completion=await lsp.request('textDocument/completion',{textDocument:document,position:position(program,'दुगुना(३)')});
     assert.ok(completion.some(i=>i.label==='दुगुना'));
     const call=position(program,'दुगुना(३)');call.character+='दुगुना('.length;
