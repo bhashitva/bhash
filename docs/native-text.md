@@ -125,3 +125,15 @@ Local Windows development can additionally compile generated LLVM IR with the
 installed host Clang and run this ABI-compatible subset as a test probe. That is
 not supported Windows CLI output: the public native target remains Linux x86-64
 with LLVM 18, and Linux CI remains the platform acceptance check.
+
+## Recorded milestone validation
+
+The [first Linux heap-text acceptance run](https://github.com/bhashitva/bhash/actions/runs/40628334816)
+passed all 15 native tests with no skips, including ASan/UBSan builds and clean Ubuntu
+container execution. The container example recorded 14,020 allocations, 14,021
+collections, zero remaining managed objects and a 90,194-byte peak charged heap.
+
+A separate host LLVM 23 test matched the JVM's output. With stress disabled, ordinary
+allocation-pressure collection also ran automatically: 14,020 allocations, two
+collections and zero objects remaining. The developer probe does not change the
+supported Linux target or make the compiler independent of Java.
