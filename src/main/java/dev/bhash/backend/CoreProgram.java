@@ -45,6 +45,22 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         final String catalog;
         TextOperation(String catalog) { this.catalog=catalog; }
     }
+    public enum NumericOperation {
+        ABS_INT(Type.INT,Type.INT), ABS_REAL(Type.REAL,Type.REAL),
+        MIN_INT(Type.INT,Type.INT,Type.INT), MIN_REAL(Type.REAL,Type.REAL,Type.REAL),
+        MAX_INT(Type.INT,Type.INT,Type.INT), MAX_REAL(Type.REAL,Type.REAL,Type.REAL),
+        SQRT(Type.REAL,Type.REAL), POW(Type.REAL,Type.REAL,Type.REAL),
+        FLOOR(Type.REAL,Type.REAL), CEIL(Type.REAL,Type.REAL), ROUND(Type.REAL,Type.REAL),
+        SIN(Type.REAL,Type.REAL), COS(Type.REAL,Type.REAL), LOG(Type.REAL,Type.REAL),
+        EXP(Type.REAL,Type.REAL), PI(Type.REAL), SEED(Type.VOID,Type.INT),
+        RANDOM_INT(Type.INT,Type.INT,Type.INT), RANDOM_UNIT(Type.REAL);
+        private final Type result;
+        private final List<Type> parameters;
+        NumericOperation(Type result,Type... parameters){this.result=result;this.parameters=List.of(parameters);}
+        public Type result(){return result;}
+        public List<Type> parameters(){return parameters;}
+    }
+    public record NumericCall(Type type, NumericOperation operation, List<Expression> arguments, Source source) implements Expression {}
     private static final Map<String,TextOperation> GLOBAL_TEXT=Map.of(
         "लंबाई",TextOperation.LENGTH,"अंश",TextOperation.SLICE,"अंकपाठ",TextOperation.INTEGER,
         "पूर्णांकपाठ",TextOperation.PARSE_INTEGER,"बड़ाअक्षर",TextOperation.UPPER,"त्रुटि",TextOperation.FAIL);
@@ -53,7 +69,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -389,9 +405,23 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             for(int i=0;i<values.size();i++)values.set(i,coerce(values.get(i),type(parameters.get(i),c)));
             return List.copyOf(values);
         }
-        TextCall textCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
+        Expression libraryCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
             TextOperation operation=null;
             if(f.intrinsic!=null) {
+                boolean integer=f.result==ManagedEmitter.Type.INT;
+                NumericOperation numeric=switch(f.intrinsic){
+                    case "stdAbs"->integer?NumericOperation.ABS_INT:NumericOperation.ABS_REAL;
+                    case "stdMin"->integer?NumericOperation.MIN_INT:NumericOperation.MIN_REAL;
+                    case "stdMax"->integer?NumericOperation.MAX_INT:NumericOperation.MAX_REAL;
+                    case "stdSqrt"->NumericOperation.SQRT;case "stdPow"->NumericOperation.POW;
+                    case "stdFloor"->NumericOperation.FLOOR;case "stdCeil"->NumericOperation.CEIL;
+                    case "stdRound"->NumericOperation.ROUND;case "stdSin"->NumericOperation.SIN;
+                    case "stdCos"->NumericOperation.COS;case "stdLog"->NumericOperation.LOG;
+                    case "stdExp"->NumericOperation.EXP;case "stdPi"->NumericOperation.PI;
+                    case "stdSeed"->NumericOperation.SEED;case "stdRandom"->NumericOperation.RANDOM_INT;
+                    case "stdRandomUnit"->NumericOperation.RANDOM_UNIT;default->null;
+                };
+                if(numeric!=null)return new NumericCall(type(f.result,at),numeric,arguments(args),source(at));
                 for(var op:TextOperation.values())if(f.intrinsic.equals(op.catalog))operation=op;
             } else if(f.declaration==null && at instanceof PrimaryContext p)
                 operation=GLOBAL_TEXT.entrySet().stream().filter(e->Identifiers.key(e.getKey()).equals(Identifiers.key(p.IDENTIFIER().getText())))
@@ -462,7 +492,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     if(f==null && Identifiers.key(p.IDENTIFIER().getText()).equals(Identifiers.key("लंबाई")))
                         return new CollectionCall(Type.INT,CollectionOperation.SIZE,expression(p.arguments().expression(0)),List.of(),-1,source(p));
                     if(f==null)throw unsupported(p);
-                    if(!ids.containsKey(f))return textCall(f,p,p.arguments());
+                    if(!ids.containsKey(f))return libraryCall(f,p,p.arguments());
                     if(f.owner!=null){var args=new ArrayList<Expression>();args.add(new Read(self,source(p)));args.addAll(arguments(p.arguments()));return methodCall(f,args,p);}
                     return new Call(type(f.result,p),ids.get(f),checkedArguments(p.arguments(),f.parameters),source(c));
                 }
@@ -500,7 +530,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                         previous=result;continue;
                     }
                     var f=a.calls.get(part);
-                    if(f!=null && f.intrinsic!=null){value=textCall(f,part,part.arguments());continue;}
+                    if(f!=null && f.intrinsic!=null){value=libraryCall(f,part,part.arguments());continue;}
                     if(value==null)value=expression(p.primary());
                     if(f!=null){
                         if(!ids.containsKey(f) && !interfaceSlots.containsKey(f))throw unsupported(part);
