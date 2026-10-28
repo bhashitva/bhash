@@ -7,6 +7,9 @@ uses checked C# source lowering. The browser target reuses CLR lowering with the
 .NET WebAssembly runtime. All targets share one semantic checker. Browser input
 is supplied before execution; see [browser target](wasm-browser.md).
 
+The experimental native Linux backend supports only a core subset; it does not yet
+implement the full v0.9 language. See [native profile and runtime design](native-compilation-design.md).
+
 ## 1. Source and lexical rules
 
 - UTF-8 source files; `.bhash` extension. The CLI accepts one optional leading BOM.

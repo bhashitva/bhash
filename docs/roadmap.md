@@ -54,6 +54,10 @@
 
 ## Native and standalone WASI
 
+An experimental direct-LLVM implementation and approved automatic-memory-management
+design are under development. See [native compilation](native-compilation-design.md)
+for scope and the outstanding Linux validation gate.
+
 - Prototype LLVM IR emission from Java and pin an external LLVM toolchain.
 - x86-64 Linux assembly/object/executable pipeline, then AArch64 cross-build.
 - WASM/WASI runtime, memory and I/O support; execute using a chosen WASI engine.
