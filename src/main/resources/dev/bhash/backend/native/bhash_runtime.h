@@ -60,6 +60,26 @@ uint64_t bh_collection_call(void *, uint32_t, uint64_t, uint64_t, const bh_colle
 int bh_print_licenses_if_requested(int argc, char **argv, const void *notices);
 void bh_print_text(const void *);
 void bh_print_int(int64_t);
+/* Math and seeded randomness: process-local state; not a cryptographic generator. */
+int64_t bh_numeric_abs_int(int64_t, const void *);
+double bh_numeric_abs_real(double, const void *);
+int64_t bh_numeric_min_int(int64_t, int64_t, const void *);
+int64_t bh_numeric_max_int(int64_t, int64_t, const void *);
+double bh_numeric_min_real(double, double, const void *);
+double bh_numeric_max_real(double, double, const void *);
+double bh_numeric_sqrt(double, const void *);
+double bh_numeric_pow(double, double, const void *);
+double bh_numeric_floor(double, const void *);
+double bh_numeric_ceil(double, const void *);
+double bh_numeric_round(double, const void *);
+double bh_numeric_sin(double, const void *);
+double bh_numeric_cos(double, const void *);
+double bh_numeric_log(double, const void *);
+double bh_numeric_exp(double, const void *);
+double bh_numeric_pi(const void *);
+void bh_numeric_seed(int64_t, const void *);
+int64_t bh_numeric_random_int(int64_t, int64_t, const void *);
+double bh_numeric_random_unit(const void *);
 void bh_print_real(double);
 int64_t bh_real_to_int(double, const void *);
 void *bh_text_real(double, const void *);
