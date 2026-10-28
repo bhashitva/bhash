@@ -21,9 +21,10 @@ public final class LlvmEmitter {
     private final Map<Binding,Integer> bindingRoots=new LinkedHashMap<>();
     private final Map<Binding,Boolean> bindings=new LinkedHashMap<>();
     private int rootCount;
+    private final Map<Integer,Integer> objectSizes=new HashMap<>();
     private final Map<Expression,Value> values=new IdentityHashMap<>();
     private record Value(Type type,String ir) { String argument(){return llvm(type)+" "+ir;} }
-    private static String llvm(Type t) { return switch(t){case INT->"i64";case BOOL->"i1";case TEXT->"ptr";case VOID->"void";}; }
+    private static String llvm(Type t) { return switch(t){case INT->"i64";case BOOL->"i1";case TEXT,OBJECT->"ptr";case VOID->"void";}; }
     private String temporary(){return "%x"+next++;}
     private String freshLabel(){return "l"+next++;}
     private void line(String s){code.append("  ").append(s).append('\n');}
@@ -42,11 +43,26 @@ public final class LlvmEmitter {
     public static String emit(CoreProgram program){return emit(program, "");}
     public static String emit(CoreProgram program,String notices){return new LlvmEmitter().program(program,notices);}
     private String program(CoreProgram program,String notices){
+        for(var c:program.classes()){
+            objectSizes.put(c.id(),c.fields().size()*8);
+            var refs=c.fields().stream().filter(f->f.type().reference()).toList();
+            String offsets="@refs"+c.id();
+            globals.append(offsets).append(" = private constant [").append(refs.size()).append(" x i64] [")
+                .append(String.join(", ",refs.stream().map(f->"i64 "+f.offset()).toList())).append("]\n");
+            byte[] nameBytes=(c.name()+"\0").getBytes(StandardCharsets.UTF_8);
+            String name="@classname"+c.id();
+            globals.append(name).append(" = private constant [").append(nameBytes.length).append(" x i8] c\"");
+            for(byte b:nameBytes)globals.append(String.format(Locale.ROOT,"\\%02X",b&255));
+            globals.append("\"\n");
+            globals.append("@class").append(c.id()).append(" = private constant { ptr, i64, i64, ptr } { ptr ").append(name)
+                .append(", i64 ").append(c.fields().size()*8).append(", i64 ").append(refs.size()).append(", ptr ").append(offsets).append(" }, align 8\n");
+        }
         for(var f:program.functions())function(f);
         String license=text(notices);
         return "; Bhash native: direct LLVM IR, internal ABI v1\n"+
             "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
+            "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+
             "declare void @bh_print_bool(i32)\ndeclare void @bh_print_space()\ndeclare void @bh_print_end()\n"+
             "declare i32 @bh_text_equal(ptr, ptr)\ndeclare i64 @bh_divide(i64, i64, ptr)\n"+
@@ -67,20 +83,22 @@ public final class LlvmEmitter {
     }
     private void scan(Expression e){
         if(e==null)return;
-        if(e.type()==Type.TEXT && !roots.containsKey(e))roots.put(e,rootCount++);
+        if(e.type().reference() && !roots.containsKey(e))roots.put(e,rootCount++);
         if(e instanceof Read r)register(r.binding());
         else if(e instanceof Unary u)scan(u.value());
         else if(e instanceof Binary b){scan(b.left());scan(b.right());}
         else if(e instanceof Call c)c.arguments().forEach(this::scan);
         else if(e instanceof TextCall c)c.arguments().forEach(this::scan);
+        else if(e instanceof FieldRead f)scan(f.receiver());
     }
     private void register(Binding b){
-        if(bindings.putIfAbsent(b,true)==null && b.type()==Type.TEXT)bindingRoots.put(b,rootCount++);
+        if(bindings.putIfAbsent(b,true)==null && b.type().reference())bindingRoots.put(b,rootCount++);
     }
     private void scan(Statement s){
         if(s==null)return;
         if(s instanceof Block b)b.statements().forEach(this::scan);
         else if(s instanceof Assign a){register(a.binding());scan(a.value());}
+        else if(s instanceof FieldWrite f){scan(f.destination().receiver());scan(f.value());}
         else if(s instanceof Branch b){scan(b.condition());scan(b.yes());scan(b.no());}
         else if(s instanceof Loop l){scan(l.condition());scan(l.body());}
         else if(s instanceof Return r)scan(r.value());
@@ -102,7 +120,7 @@ public final class LlvmEmitter {
         line("%roots = alloca ["+rootCount+" x ptr], align 8");
         line("store ["+rootCount+" x ptr] zeroinitializer, ptr %roots");
         for(var b:bindings.keySet()) {
-            if(b.type()==Type.TEXT)line(address(b)+" = getelementptr ["+rootCount+" x ptr], ptr %roots, i64 0, i64 "+bindingRoots.get(b));
+            if(b.type().reference())line(address(b)+" = getelementptr ["+rootCount+" x ptr], ptr %roots, i64 0, i64 "+bindingRoots.get(b));
             else line(address(b)+" = alloca "+llvm(b.type()));
         }
         for(int i=0;i<f.parameters().size();i++) {
@@ -115,7 +133,14 @@ public final class LlvmEmitter {
     }
     private Value expression(Expression e){
         Value result;
-        if(e instanceof Constant c)result=new Value(c.type(),c.type()==Type.TEXT?text((String)c.value()):c.type()==Type.BOOL?((Boolean)c.value()?"true":"false"):c.value().toString());
+        if(e instanceof Constant c)result=new Value(c.type(),c.type()==Type.TEXT?text((String)c.value()):c.type()==Type.BOOL?((Boolean)c.value()?"true":"false"):c.type()==Type.OBJECT?"null":c.value().toString());
+        else if(e instanceof Allocate a)result=instruction(Type.OBJECT,"call ptr @bh_alloc(ptr @class"+a.objectType()+", i64 "+objectSizes.get(a.objectType())+")");
+        else if(e instanceof FieldRead f){
+            Value receiver=expression(f.receiver());
+            receiver=instance(receiver,f.source());
+            String pointer=temporary();line(pointer+" = getelementptr i8, ptr "+receiver.ir()+", i64 "+f.field().offset());
+            result=instruction(f.type(),"load "+llvm(f.type())+", ptr "+pointer);
+        }
         else if(e instanceof Read r)result=instruction(r.type(),"load "+llvm(r.type())+", ptr "+address(r.binding()));
         else if(e instanceof Unary u){
             Value v=expression(u.value());
@@ -125,7 +150,10 @@ public final class LlvmEmitter {
                 case "!"->instruction(Type.BOOL,"xor i1 "+v.ir()+", true");
                 default->throw new IllegalStateException("Unchecked unary operator");};
         } else if(e instanceof Call c){
-            for(var a:c.arguments())expression(a);
+            for(int i=0;i<c.arguments().size();i++){
+                Value value=expression(c.arguments().get(i));
+                if(i==0 && c.instance())instance(value,c.source());
+            }
             var args=new ArrayList<String>();
             for(var a:c.arguments())args.add(reload(a).argument());
             String call="call "+llvm(c.type())+" @bfn"+c.function()+"("+String.join(", ",args)+")";
@@ -143,27 +171,31 @@ public final class LlvmEmitter {
             else result=instruction(c.type(),call);
         } else if(e instanceof Binary b)result=binary(b);
         else throw new IllegalStateException("Unknown core expression");
-        if(e.type()==Type.TEXT)line("store ptr "+result.ir()+", ptr "+rootAddress(roots.get(e)));
+        if(e.type().reference())line("store ptr "+result.ir()+", ptr "+rootAddress(roots.get(e)));
         // Publish the result before releasing inputs: they may alias its storage.
         if(e instanceof Call c)c.arguments().forEach(this::release);
         else if(e instanceof TextCall c)c.arguments().forEach(this::release);
         else if(e instanceof Binary b){release(b.left());release(b.right());}
         else if(e instanceof Unary u)release(u.value());
+        else if(e instanceof FieldRead f)release(f.receiver());
         values.put(e,result);
         return result;
     }
     private void release(Expression e){
-        if(e!=null && e.type()==Type.TEXT)line("store ptr null, ptr "+rootAddress(roots.get(e)));
+        if(e!=null && e.type().reference())line("store ptr null, ptr "+rootAddress(roots.get(e)));
     }
     private void clearBindings(List<Binding> locals){
-        for(var b:locals)if(b.type()==Type.TEXT)line("store ptr null, ptr "+address(b));
+        for(var b:locals)if(b.type().reference())line("store ptr null, ptr "+address(b));
     }
     private void clearLoopScopes(int depth){
         int count=scopes.size()-depth;
         for(var scope:scopes){if(count--<=0)break;clearBindings(scope);}
     }
     private Value reload(Expression e){
-        return e.type()==Type.TEXT?instruction(Type.TEXT,"load ptr, ptr "+rootAddress(roots.get(e))):values.get(e);
+        return e.type().reference()?instruction(e.type(),"load ptr, ptr "+rootAddress(roots.get(e))):values.get(e);
+    }
+    private Value instance(Value receiver,Source source){
+        return instruction(Type.OBJECT,"call ptr @bh_instance(ptr "+receiver.ir()+", ptr "+text(source.toString())+")");
     }
     private Value binary(Binary b){
         Value left=expression(b.left());String op=b.operator();
@@ -187,6 +219,7 @@ public final class LlvmEmitter {
             Value same=instruction(Type.INT,"call i32 @bh_text_equal(ptr "+left.ir()+", ptr "+right.ir()+")");
             return instruction(Type.BOOL,"icmp "+(op.equals("==")?"ne":"eq")+" i32 "+same.ir()+", 0");
         }
+        if(left.type()==Type.OBJECT){left=reload(b.left());right=reload(b.right());}
         String predicate=switch(op){case "=="->"eq";case "!="->"ne";case "<"->"slt";case "<="->"sle";case ">"->"sgt";case ">="->"sge";default->throw new IllegalStateException("Unchecked binary operator");};
         return instruction(Type.BOOL,"icmp "+predicate+" "+left.argument()+", "+right.ir());
     }
@@ -197,6 +230,18 @@ public final class LlvmEmitter {
             if(!terminated)clearBindings(b.locals());scopes.pop();
         }
         else if(s instanceof Assign a){Value v=expression(a.value());line("store "+v.argument()+", ptr "+address(a.binding()));release(a.value());}
+        else if(s instanceof FieldWrite f){
+            var target=f.destination();
+            instance(expression(target.receiver()),target.source());
+            expression(f.value());
+            Value owner=reload(target.receiver()),value=reload(f.value());
+            if(target.type().reference())line("call void @bh_reference_store(ptr "+owner.ir()+", i64 "+target.field().offset()+", ptr "+value.ir()+")");
+            else {
+                String pointer=temporary();line(pointer+" = getelementptr i8, ptr "+owner.ir()+", i64 "+target.field().offset());
+                line("store "+value.argument()+", ptr "+pointer);
+            }
+            release(target.receiver());release(f.value());
+        }
         else if(s instanceof Return r){
             Value v=r.value()==null?null:expression(r.value());
             line("call void @bh_roots_pop(ptr %frame)");line(v==null?"ret void":"ret "+v.argument());terminated=true;
