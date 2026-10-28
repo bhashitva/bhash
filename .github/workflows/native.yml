@@ -27,9 +27,10 @@ jobs:
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/heap-objects.bhash --target native -o target/heap-objects-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/objects.bhash --target native -o target/objects-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/inheritance.bhash --target native -o target/inheritance-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/interfaces.bhash --target native -o target/interfaces-native
       - name: Inspect executable dependencies
         run: |
-          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native; do
+          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native; do
             file "$executable"
             ldd "$executable"
           done | tee target/native-dependencies.txt
@@ -62,6 +63,11 @@ jobs:
             cmp /tmp/inheritance-actual /tmp/inheritance-expected
             grep "live=0" /tmp/inheritance-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/inheritance-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/interfaces-native > /tmp/interfaces-actual 2> /tmp/interfaces-stats
+            printf "[मूल😀:विशेष!] साथी:ख! सत्य\nसत्य सत्य सत्य सत्य\n[मूल😀:विशेष!] साथी:ख!\n" > /tmp/interfaces-expected
+            cmp /tmp/interfaces-actual /tmp/interfaces-expected
+            grep "live=0" /tmp/interfaces-stats
+            grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/interfaces-stats
           '
       - uses: actions/upload-artifact@v4
         with:
@@ -69,6 +75,7 @@ jobs:
           path: |
             target/factorial-native
             target/objects-native
+            target/interfaces-native
             target/inheritance-native
             target/heap-objects-native
             target/heap-text-native
@@ -79,3 +86,4 @@ jobs:
             docs/native-text.md
             docs/native-objects.md
             docs/native-inheritance.md
+            docs/native-interfaces.md

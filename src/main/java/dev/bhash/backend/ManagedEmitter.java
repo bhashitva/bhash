@@ -131,6 +131,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         final Map<Constructor, Constructor> baseConstructors = new IdentityHashMap<>();
         final Set<ParserRuleContext> baseCalls = Collections.newSetFromMap(new IdentityHashMap<>());
         final Map<PrimaryContext, Constructor> constructors = new IdentityHashMap<>();
+        final Map<PrimaryContext, Type> conversions = new IdentityHashMap<>();
         final Map<ParserRuleContext, Object> constants = new IdentityHashMap<>();
     }
     private Analysis analysis;
@@ -1043,6 +1044,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
     private Expr conversion(PrimaryContext ctx) {
         Type destination=type(ctx.valueType());
+        if(analysis!=null)analysis.conversions.put(ctx,destination);
         Expr source=visit(ctx.expression()); valueRequired(ctx,source.type);
         String tag=destination.collection!=null && destination!=Type.BUFFER?destination.java:"";
         String check=source.java+","+hostString(tag)+","+typeClass(destination);

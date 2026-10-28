@@ -21,9 +21,10 @@ the override of that selected signature. A derived-only overload does not change
 which overload a base-typed call selects. A base call selects the implementation
 resolved from the immediate base type; if that implementation internally calls
 another virtual method on `यह`, that nested call still dispatches dynamically.
-Private methods are direct calls. Interfaces, static members, records, enums,
-generics, casts/type tests, collections and exceptions remain outside this native
-profile. Inheritance from the built-in exception runtime is therefore unsupported.
+Private methods are direct calls. Interface dispatch and runtime tests/casts are
+covered by the subsequent [native interfaces milestone](native-interfaces.md).
+Static members, records, enums, generics, collections and exceptions remain outside
+this native profile. Inheritance from the built-in exception runtime is therefore unsupported.
 
 Existing semantic diagnostics reject cycles, hidden/duplicate fields, a missing
 `अधिलेखन`, an override without an inherited non-private method, changed signatures,
@@ -73,7 +74,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/inheritance
 
 A `नया` expression evaluates constructor arguments once, left to right, and roots
 reference arguments. Its factory allocates exactly one object for the most-derived
-class and installs that class's immutable method table before entering initializers.
+class and installs that class's immutable type metadata before entering initializers.
 Each initializer evaluates its base arguments, invokes the selected base initializer
 on the same object, initializes its own fields in declaration order, then runs its
 body. A missing explicit base initializer selects the existing no-argument base
@@ -95,8 +96,8 @@ and exits 1. Output arguments still all finish evaluating before any are printed
 
 ## Private object ABI and memory management
 
-The compiler's private object ABI is now v2. Payload offset zero holds a nonmanaged
-pointer to a constant method table; all fields occupy eight-byte slots starting at
+The compiler's private object ABI is now v3. Payload offset zero holds a nonmanaged
+pointer to constant type metadata, which references the method table; all fields occupy eight-byte slots starting at
 offset eight. A derived object preserves every base field's offset and appends its
 own fields. Upcasts therefore preserve the same payload-base pointer and identity;
 no pointer adjustment or extra base allocation is needed.
@@ -109,7 +110,7 @@ native calling convention as direct functions. This is whole-program metadata,
 not a stable separate-compilation or foreign ABI.
 
 Descriptors include all inherited and derived text/object reference offsets, and
-exclude primitive fields and the method-table pointer. Every managed field store
+exclude primitive fields and the type-metadata pointer. Every managed field store
 still passes through `bh_reference_store`. The precise, stop-the-world, nonmoving
 mark-and-sweep collector, root frames, allocation safepoints and future barrier/
 relocation contracts are unchanged. Inherited methods keep their receiver rooted

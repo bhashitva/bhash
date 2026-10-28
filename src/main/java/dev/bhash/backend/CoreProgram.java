@@ -10,12 +10,16 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
-public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes) {
+public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes) {
     public enum Type { INT, BOOL, TEXT, OBJECT, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT; }
     }
     public record ObjectField(int owner, int offset, Type type) {}
-    public record ObjectType(int id, String name, List<ObjectField> fields, List<Integer> virtualMethods) {}
+    public record RuntimeType(int id, String name, boolean contract) {}
+    public record ObjectType(int id, String name, List<ObjectField> fields, List<Integer> virtualMethods,
+                             List<Integer> interfaceMethods, List<Integer> assignableTypes) {}
+    public enum TypeAction { TEST, SAFE, CAST }
+    public record TypeOperation(Type type, TypeAction action, Expression value, Type targetType, int targetId, Source source) implements Expression {}
     public enum TextOperation {
         LENGTH("length"), SLICE("slice"), FIND("stdFind"), CONTAINS("stdContains"),
         STARTS("stdStarts"), ENDS("stdEnds"), REPLACE("stdReplace"), TRIM("stdTrim"),
@@ -32,7 +36,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, Allocate, FieldRead {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, Allocate, FieldRead, TypeOperation {
         Type type(); Source source();
     }
     public record Constant(Type type, Object value, Source source) implements Expression {}
@@ -41,9 +45,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     public record Unary(Type type, String operator, Expression value, Source source) implements Expression {}
     public record Binary(Type type, String operator, Expression left, Expression right, Source source) implements Expression {}
-    public record Call(Type type, int function, List<Expression> arguments, Source source, boolean instance, int virtualSlot) implements Expression {
-        public Call(Type type,int function,List<Expression> arguments,Source source){this(type,function,arguments,source,false,-1);}
-        public Call(Type type,int function,List<Expression> arguments,Source source,boolean instance){this(type,function,arguments,source,instance,-1);}
+    public record Call(Type type, int function, List<Expression> arguments, Source source, boolean instance, int virtualSlot, int interfaceSlot) implements Expression {
+        public Call(Type type,int function,List<Expression> arguments,Source source){this(type,function,arguments,source,false,-1,-1);}
+        public Call(Type type,int function,List<Expression> arguments,Source source,boolean instance){this(type,function,arguments,source,instance,-1,-1);}
     }
     public record TextCall(Type type, TextOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public record Allocate(int objectType, Source source) implements Expression { public Type type(){return Type.OBJECT;} }
@@ -73,12 +77,12 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             var child=tree.getChild(i);
             if (!(child instanceof ParserRuleContext c) || library(c)) continue;
             if (c instanceof PackageDeclContext || c instanceof ImportDeclContext) continue;
-            if (!(c instanceof FunctionDeclContext) && !(c instanceof ClassDeclContext)) throw unsupported(c);
+            if (!(c instanceof FunctionDeclContext) && !(c instanceof ClassDeclContext) && !(c instanceof InterfaceDeclContext)) throw unsupported(c);
             validate(c);
         }
     }
     private static void validate(ParserRuleContext c) throws CompilationException {
-        if(c instanceof ClassDeclContext d && (d.RECORD()!=null || d.IMPLEMENTS()!=null))throw unsupported(c);
+        if(c instanceof ClassDeclContext d && d.RECORD()!=null)throw unsupported(c);
         if(c instanceof ClassMemberContext m && m.STATIC()!=null)throw unsupported(c);
         if (c instanceof TypeParametersContext || c instanceof TypeArgumentsContext) throw unsupported(c);
         if (c instanceof ValueTypeContext t && (!t.arraySuffix().isEmpty() ||
@@ -90,7 +94,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         if ((c instanceof ShiftContext || c instanceof BitwiseOrContext || c instanceof BitwiseXorContext ||
                 c instanceof BitwiseAndContext) && c.getChildCount()>1) throw unsupported(c);
         if (c instanceof PrimaryContext p && !(p.INTEGER_LITERAL()!=null || p.STRING_LITERAL()!=null ||
-                p.TRUE()!=null || p.FALSE()!=null || p.IDENTIFIER()!=null || p.NEW()!=null || p.THIS()!=null || p.BASE()!=null || p.NULL()!=null ||
+                p.TRUE()!=null || p.FALSE()!=null || p.IDENTIFIER()!=null || p.NEW()!=null || p.THIS()!=null || p.BASE()!=null || p.NULL()!=null || p.CONVERT()!=null || p.TYPE_TEST()!=null || p.SAFE_CAST()!=null ||
                 p.expression()!=null && p.LPAREN()!=null && p.CONVERT()==null && p.TYPE_TEST()==null && p.SAFE_CAST()==null))
             throw unsupported(c);
         for (int i=0;i<c.getChildCount();i++) if (c.getChild(i) instanceof ParserRuleContext p) validate(p);
@@ -107,7 +111,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         final Map<ManagedEmitter.ClassInfo,Integer> classIds=new IdentityHashMap<>();
         final Map<ManagedEmitter.Field,ObjectField> fields=new IdentityHashMap<>();
         final Map<ManagedEmitter.Constructor,Integer> constructors=new IdentityHashMap<>();
-        final List<ManagedEmitter.ClassInfo> classes;
+        final List<ManagedEmitter.ClassInfo> classes, types;
+        final List<ManagedEmitter.Function> interfaceMethods=new ArrayList<>();
+        final Map<ManagedEmitter.Function,Integer> interfaceSlots=new IdentityHashMap<>();
         Binding self;
         final Map<ManagedEmitter.Constructor,Integer> initializers=new IdentityHashMap<>();
         final Map<ManagedEmitter.ClassInfo,List<ObjectField>> layouts=new IdentityHashMap<>();
@@ -117,7 +123,11 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         Builder(ManagedEmitter.Analysis analysis,List<ManagedEmitter.Function> checked,List<ManagedEmitter.ClassInfo> allClasses) throws CompilationException {
             a=analysis;
             classes=allClasses.stream().filter(c->c.declaration!=null && !library(c.declaration)).toList();
-            for(var c:classes)classIds.put(c,classIds.size());
+            types=allClasses.stream().filter(c->c.at()!=null && !library(c.at()) && (c.declaration!=null || c.contract!=null)).toList();
+            for(var c:types)classIds.put(c,classIds.size());
+            for(var c:types)if(c.isInterface())for(var methods:c.methods.values())for(var f:methods){
+                interfaceSlots.put(f,interfaceMethods.size());interfaceMethods.add(f);
+            }
             for(var c:classes){
                 if(c.parent!=null && !classIds.containsKey(c.parent))throw unsupported(c.declaration);
                 var layout=new ArrayList<ObjectField>();
@@ -171,9 +181,15 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 result.add(new Function(id,type(f.result,d),List.copyOf(parameters),block(d.block()),source(d)));
             }
             if(entry<0)throw new CompilationException("Native core has no checked entry point.");
-            var layouts=new ArrayList<ObjectType>();
+            var objectTypes=new ArrayList<ObjectType>();
             for(var c:classes){
-                layouts.add(new ObjectType(classIds.get(c),c.spelling,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList()));
+                var membership=new LinkedHashSet<ManagedEmitter.ClassInfo>();collectTypes(c,membership);
+                var itable=new ArrayList<Integer>();
+                for(var required:interfaceMethods){
+                    var implementation=membership.contains(required.owner)?tables.get(c).stream().filter(f->f.java.equals(required.java) && f.result==required.result && f.access==ManagedEmitter.Access.PUBLIC).findFirst().orElse(null):null;
+                    itable.add(implementation==null?-1:ids.get(implementation));
+                }
+                objectTypes.add(new ObjectType(classIds.get(c),c.spelling,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList(),List.copyOf(itable),membership.stream().map(classIds::get).toList()));
                 for(var methods:c.methods.values())for(var f:methods){
                     self=new Binding(nextBinding++,Type.OBJECT);
                     var parameters=new ArrayList<Binding>();parameters.add(self);
@@ -212,7 +228,14 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 }
             }
             self=null;
-            return new CoreProgram(List.copyOf(result),entry,List.copyOf(layouts));
+            return new CoreProgram(List.copyOf(result),entry,List.copyOf(objectTypes),types.stream()
+                .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList());
+        }
+        void collectTypes(ManagedEmitter.ClassInfo c, Set<ManagedEmitter.ClassInfo> result) throws CompilationException {
+            if(c==null || !result.add(c))return;
+            if(!classIds.containsKey(c))throw unsupported(c.at());
+            collectTypes(c.parent,result);
+            for(var contract:c.contracts)collectTypes(contract,result);
         }
         Block block(BlockContext c) throws CompilationException {
             var result=new ArrayList<Statement>();
@@ -266,12 +289,23 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         }
         Call methodCall(ManagedEmitter.Function f,List<Expression> args,ParserRuleContext at) throws CompilationException {
             int slot=a.baseCalls.contains(at)?-1:slots.getOrDefault(f,-1);
-            return new Call(type(f.result,at),ids.get(f),List.copyOf(args),source(at),true,slot);
+            boolean contract=f.owner.isInterface();
+            return new Call(type(f.result,at),contract?-1:ids.get(f),List.copyOf(args),source(at),true,slot,contract?interfaceSlots.get(f):-1);
         }
         Expression expression(ParserRuleContext c) throws CompilationException {
             Object constant=a.constants.get(c);
             if(constant!=null)return new Constant(constant instanceof Long?Type.INT:Type.TEXT,constant,source(c));
             if(c instanceof PrimaryContext p) {
+                if(p.CONVERT()!=null || p.TYPE_TEST()!=null || p.SAFE_CAST()!=null){
+                    var destination=a.conversions.get(p);Type target=type(destination,p);
+                    Expression value=expression(p.expression());
+                    if(p.CONVERT()!=null && target==Type.TEXT && value.type()==Type.INT)
+                        return new TextCall(Type.TEXT,TextOperation.INTEGER,List.of(value),source(p));
+                    if(p.CONVERT()!=null && target==Type.INT && value.type()==Type.TEXT)
+                        return new TextCall(Type.INT,TextOperation.PARSE_INTEGER,List.of(value),source(p));
+                    var action=p.TYPE_TEST()!=null?TypeAction.TEST:p.SAFE_CAST()!=null?TypeAction.SAFE:TypeAction.CAST;
+                    return new TypeOperation(action==TypeAction.TEST?Type.BOOL:target,action,value,target,target==Type.OBJECT?classIds.get(destination.object):-1,source(p));
+                }
                 if(p.NULL()!=null)return new Constant(Type.OBJECT,null,source(c));
                 if(p.THIS()!=null || p.BASE()!=null)return new Read(self,source(c));
                 if(p.NEW()!=null){
@@ -303,7 +337,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     if(f!=null && f.intrinsic!=null){value=textCall(f,part,part.arguments());continue;}
                     if(value==null)value=expression(p.primary());
                     if(f!=null){
-                        if(!ids.containsKey(f))throw unsupported(part);
+                        if(!ids.containsKey(f) && !interfaceSlots.containsKey(f))throw unsupported(part);
                         var args=new ArrayList<Expression>();args.add(value);args.addAll(arguments(part.arguments()));
                         value=methodCall(f,args,part);
                     }else{

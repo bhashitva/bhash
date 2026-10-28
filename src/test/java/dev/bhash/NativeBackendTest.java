@@ -45,12 +45,12 @@ class NativeBackendTest {
     }
     @Test void unsupportedUnusedDeclarationsAndLibraryCallsHaveSourceLocations(){
         for(String source:List.of(
-            "अनुबंध अ {} कार्य मुख्य() -> शून्य {}",
+            "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "कार्य अप्रयुक्त() -> दशमलव { लौटाओ १.२; } कार्य मुख्य() -> शून्य {}",
             "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
             "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो(\"अ\", \"ब\"); }",
             "कार्य मुख्य() -> शून्य { लिखो(१ << २); }",
-            "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<पूर्णांक>(१)); }")){
+            "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<लघुपूर्णांक>(१)); }")){
             var error=assertThrows(CompilationException.class,()->core(source));
             assertTrue(error.getMessage().contains("native.bhash:1:"),error.getMessage());
             assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
@@ -94,7 +94,7 @@ class NativeBackendTest {
         for(String s:List.of(
             "वर्ग अ { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}",
             "वर्ग अ विस्तार अपवाद {} कार्य मुख्य() -> शून्य {}",
-            "अनुबंध अ {} कार्य मुख्य() -> शून्य {}",
+            "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}",
             "वर्ग अ { मान न: दशमलव; } कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(s));
@@ -388,6 +388,193 @@ class NativeBackendTest {
         var counts=stats(result);assertTrue(counts.get("allocations")>10000,counts.toString());
         assertTrue(counts.get("collections")>=counts.get("allocations"),counts.toString());
         assertEquals(0,counts.get("live"));assertTrue(counts.get("peak")<20000,counts.toString());
+    }
+
+    @Test void coreIncludesNominalInterfaceClosureAndResolvedDispatch()throws Exception{
+        var p=core("""
+            अनुबंध अ { कार्य नाम() -> पाठ; }
+            अनुबंध ब विस्तार अ { कार्य अंक() -> पूर्णांक; }
+            वर्ग मूल पालन ब {
+                सार्वजनिक कार्य नाम() -> पाठ { लौटाओ "मूल"; }
+                सार्वजनिक कार्य अंक() -> पूर्णांक { लौटाओ १; }
+            }
+            वर्ग उप विस्तार मूल {
+                सार्वजनिक अधिलेखन कार्य नाम() -> पाठ { लौटाओ "उप"; }
+            }
+            वर्ग अलग { सार्वजनिक कार्य नाम() -> पाठ { लौटाओ "अलग"; } }
+            कार्य मुख्य() -> शून्य { स्थिर क: अ = नया उप(); लिखो(क.नाम(), प्रकारहै<ब>(क)); }
+            """);
+        var base=p.classes().get(0);var child=p.classes().get(1);var other=p.classes().get(2);
+        var contracts=p.runtimeTypes().stream().filter(RuntimeType::contract).map(RuntimeType::id).toList();
+        assertEquals(2,contracts.size());
+        assertTrue(child.assignableTypes().containsAll(contracts));
+        assertTrue(child.assignableTypes().containsAll(List.of(base.id(),child.id())));
+        assertFalse(child.assignableTypes().contains(other.id()));
+        assertTrue(child.interfaceMethods().stream().allMatch(id->id>=0));
+        assertNotEquals(base.interfaceMethods().get(0),child.interfaceMethods().get(0));
+        assertTrue(other.interfaceMethods().stream().allMatch(id->id<0));
+        assertTrue(LlvmEmitter.emit(p).contains("call i1 @bhash_is_type"));
+    }
+    @Test void nativeInterfacesPreserveExistingContractDiagnostics(){
+        for(String source:List.of(
+            "अनुबंध अ { कार्य न() -> पूर्णांक; } वर्ग क पालन अ {}",
+            "अनुबंध अ { कार्य न() -> पूर्णांक; } वर्ग क पालन अ { निजी कार्य न() -> पूर्णांक { लौटाओ १; } }",
+            "अनुबंध अ { कार्य न() -> पूर्णांक; } वर्ग क पालन अ { सार्वजनिक कार्य न() -> पाठ { लौटाओ \"अ\"; } }",
+            "अनुबंध अ विस्तार ब {} अनुबंध ब विस्तार अ {}",
+            "अनुबंध अ { कार्य न() -> पूर्णांक { लौटाओ १; } }",
+            "अनुबंध अ {} कार्य चूक() -> शून्य { स्थिर क: अ = नया अ(); }",
+            "अनुबंध अ { कार्य न() -> पूर्णांक; } अनुबंध ब { कार्य न() -> पाठ; } अनुबंध ग विस्तार अ, ब {}"))
+            assertThrows(CompilationException.class,()->core(source+" कार्य मुख्य() -> शून्य {}"));
+        assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { लिखो(सुरक्षितरूप<पूर्णांक>(१)); }"));
+        var unsupported=assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर क: सर्ववस्तु = १; }"));
+        assertTrue(unsupported.getMessage().contains("BH9001"));
+    }
+    @Test void nativeInterfaceDiamondsRedeclarationsAndMultipleContractsMatchJvm()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            अनुबंध मूलनाम { कार्य नाम() -> पाठ; }
+            अनुबंध बायाँ विस्तार मूलनाम { कार्य नाम() -> पाठ; }
+            अनुबंध दायाँ विस्तार मूलनाम { कार्य अंक() -> पूर्णांक; }
+            अनुबंध हीरा विस्तार बायाँ, दायाँ { कार्य स्वयं() -> मूलनाम; }
+            अनुबंध अंकनाम { कार्य नाम() -> पूर्णांक; }
+            वर्ग गिनक पालन अंकनाम { सार्वजनिक कार्य नाम() -> पूर्णांक { लौटाओ ९; } }
+            अनुबंध अतिरिक्त { कार्य सही() -> तार्किक; कार्य रखो(न: पूर्णांक) -> शून्य; }
+            वर्ग आधारवर्ग पालन हीरा, अतिरिक्त {
+                सार्वजनिक मान न: पूर्णांक;
+                सार्वजनिक कार्य नाम() -> पाठ { लौटाओ "आधार"; }
+                सार्वजनिक कार्य अंक() -> पूर्णांक { लौटाओ न; }
+                सार्वजनिक कार्य स्वयं() -> मूलनाम { लौटाओ यह; }
+                सार्वजनिक कार्य सही() -> तार्किक { लौटाओ सत्य; }
+                सार्वजनिक कार्य रखो(न: पूर्णांक) -> शून्य { यह.न = न; }
+            }
+            वर्ग उप विस्तार आधारवर्ग {
+                सार्वजनिक अधिलेखन कार्य नाम() -> पाठ { लौटाओ "उप"; }
+            }
+            कार्य मुख्य() -> शून्य {
+                स्थिर ग: अंकनाम = नया गिनक();
+                स्थिर क: हीरा = नया उप();
+                स्थिर अ: मूलनाम = क; स्थिर ब: बायाँ = क; स्थिर द: दायाँ = क;
+                स्थिर ज: अतिरिक्त = परिवर्तित<अतिरिक्त>(अ); ज.रखो(७);
+                लिखो(अ.नाम(), ब.नाम(), द.नाम(), क.नाम(), द.अंक(), क.स्वयं() == अ, ज.सही(), ग.नाम());
+            }
+            """,GC_STRESS);
+        assertEquals("उप उप उप उप ७ सत्य सत्य ९\n",result.out());
+    }
+    @Test void nativeReferenceTypeTestsCastsAndNullsMatchJvm()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            अनुबंध नामी { कार्य नाम() -> पाठ; }
+            वर्ग मूल {}
+            वर्ग बिल्ली विस्तार मूल पालन नामी { सार्वजनिक कार्य नाम() -> पाठ { लौटाओ "बिल्ली"; } }
+            वर्ग अन्य { सार्वजनिक कार्य नाम() -> पाठ { लौटाओ "अन्य"; } }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: मूल = नया बिल्ली();
+                स्थिर न: नामी = परिवर्तित<नामी>(क);
+                लिखो(प्रकारहै<बिल्ली>(क), प्रकारहै<मूल>(न), प्रकारहै<नामी>(क), प्रकारहै<अन्य>(क));
+                लिखो(न.नाम(), सुरक्षितरूप<अन्य>(न) == रिक्त, परिवर्तित<बिल्ली>(न) == क);
+                लिखो(प्रकारहै<नामी>(नया अन्य()), सुरक्षितरूप<नामी>(नया अन्य()) == रिक्त);
+                स्थिर खाली: नामी = रिक्त;
+                लिखो(प्रकारहै<नामी>(खाली), परिवर्तित<बिल्ली>(खाली) == रिक्त, सुरक्षितरूप<बिल्ली>(खाली) == रिक्त);
+                लिखो(सुरक्षितरूप<नामी>(१) == रिक्त, सुरक्षितरूप<मूल>("पाठ") == रिक्त);
+            }
+            """,GC_STRESS);
+        assertEquals("सत्य सत्य सत्य असत्य\nबिल्ली सत्य सत्य\nअसत्य सत्य\nअसत्य सत्य सत्य\nसत्य सत्य\n",result.out());
+    }
+    @Test void nativeScalarTestsAndExistingScalarConversionsMatchJvm()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग क {}
+            कार्य मुख्य() -> शून्य {
+                लिखो(प्रकारहै<पूर्णांक>(१), प्रकारहै<तार्किक>(सत्य), प्रकारहै<पाठ>("अ" + "ब"));
+                लिखो(प्रकारहै<पाठ>(१), प्रकारहै<पूर्णांक>(सत्य), प्रकारहै<पूर्णांक>(नया क()), प्रकारहै<क>("पाठ"), प्रकारहै<पूर्णांक>(रिक्त));
+                लिखो(परिवर्तित<पूर्णांक>(५), परिवर्तित<तार्किक>(असत्य), परिवर्तित<पाठ>("पाठ"));
+                लिखो(परिवर्तित<पाठ>(-४२), परिवर्तित<पाठ>(सत्य), परिवर्तित<पूर्णांक>("-४२"));
+            }
+            """,GC_STRESS);
+        assertEquals("सत्य सत्य सत्य\nअसत्य असत्य असत्य असत्य असत्य\n५ असत्य पाठ\n-42 सत्य -४२\n",result.out());
+    }
+    @Test void nativeInterfaceReceiversCastsAndOperandsEvaluateOnceAndStayRooted()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            अनुबंध गणक { कार्य जोड़(ख: गणक) -> पाठ; कार्य नाम() -> पाठ; }
+            वर्ग क पालन गणक {
+                सार्वजनिक मान शब्द: पाठ;
+                निर्माता(शब्द: पाठ){ यह.शब्द = शब्द; }
+                सार्वजनिक कार्य नाम() -> पाठ { लौटाओ शब्द; }
+                सार्वजनिक कार्य जोड़(ख: गणक) -> पाठ { लौटाओ शब्द + ख.नाम(); }
+            }
+            कार्य लो(अंक: पूर्णांक) -> गणक { लिखो(अंक); लौटाओ नया क("क" + अंकपाठ(अंक)); }
+            कार्य मुख्य() -> शून्य {
+                लिखो(प्रकारहै<क>(लो(१)));
+                लिखो(परिवर्तित<क>(लो(२)).नाम());
+                लिखो(सुरक्षितरूप<क>(लो(३)).नाम());
+                लिखो(लो(४).जोड़(लो(५)));
+            }
+            """,GC_STRESS);
+        assertEquals("१\nसत्य\n२\nक2\n३\nक3\n४\n५\nक4क5\n",result.out());
+        assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeFailedCheckedCastsAreLocatedAndDoNotPrintPartialArguments()throws Exception{
+        requireTools();
+        for(String source:List.of(
+            "अनुबंध अ { कार्य नाम() -> पाठ; } वर्ग क { सार्वजनिक कार्य नाम() -> पाठ { लौटाओ \"क\"; } } कार्य मुख्य() -> शून्य { लिखो(\"अधूरा\", परिवर्तित<अ>(नया क()).नाम()); }",
+            "वर्ग क {} वर्ग ख {} कार्य मुख्य() -> शून्य { स्थिर क: क = परिवर्तित<क>(नया ख()); }",
+            "वर्ग क {} कार्य मुख्य() -> शून्य { स्थिर क: क = परिवर्तित<क>(१); }",
+            "कार्य मुख्य() -> शून्य { लिखो(\"अधूरा\", परिवर्तित<तार्किक>(१)); }")){
+            var result=nativeRun(source,GC_STRESS);assertEquals(1,result.exit());assertEquals("",result.out());
+            assertTrue(result.err().contains("native.bhash:"),result.err());
+            assertTrue(result.err().contains("रनटाइम प्रकार परिवर्तन असफल हुआ।"),result.err());
+        }
+    }
+    @Test void nativeNullInterfaceReceiverFailsBeforeEvaluatingArguments()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            अनुबंध अ { कार्य जोड़(ब: अ) -> पूर्णांक; }
+            वर्ग क पालन अ { सार्वजनिक कार्य जोड़(ब: अ) -> पूर्णांक { लौटाओ १; } }
+            कार्य लो() -> अ { लिखो(९); लौटाओ नया क(); }
+            कार्य मुख्य() -> शून्य { स्थिर क: अ = रिक्त; लिखो(क.जोड़(लो())); }
+            """,GC_STRESS);
+        assertEquals(1,result.exit());assertEquals("",result.out());assertTrue(result.err().contains("रिक्त वस्तु के सदस्य"));
+    }
+    @Test void nativeInterfaceGraphsAndRepeatedCastsSurviveCollection()throws Exception{
+        requireTools();
+        var result=nativeRun(Files.readString(Path.of("examples/native/interfaces.bhash")),GC_STRESS);
+        assertEquals("[मूल😀:विशेष!] साथी:ख! सत्य\nसत्य सत्य सत्य सत्य\n[मूल😀:विशेष!] साथी:ख!\n",result.out());
+        var counts=stats(result);assertTrue(counts.get("allocations")>10000,counts.toString());
+        assertTrue(counts.get("collections")>=counts.get("allocations"),counts.toString());
+        assertEquals(0,counts.get("live"));assertTrue(counts.get("peak")<20000,counts.toString());
+    }
+
+    private static List<SourceFile> interfaceSources(){
+        return List.of(
+            new SourceFile("contracts.bhash","संकुल अनुबंधपुस्तक; सार्वजनिक अनुबंध नामी { कार्य नाम() -> पाठ; } सार्वजनिक अनुबंध सज्जा विस्तार नामी { कार्य स्वयं() -> नामी; }"),
+            new SourceFile("base.bhash","संकुल मूलपुस्तक; आयात अनुबंधपुस्तक.नामी; आयात अनुबंधपुस्तक.सज्जा; सार्वजनिक वर्ग मूल पालन सज्जा { सार्वजनिक कार्य नाम() -> पाठ { लौटाओ \"मूल\"; } सार्वजनिक कार्य स्वयं() -> नामी { लौटाओ यह; } }"),
+            new SourceFile("derived.bhash","संकुल उपपुस्तक; आयात मूलपुस्तक.मूल; सार्वजनिक वर्ग उप विस्तार मूल { सार्वजनिक अधिलेखन कार्य नाम() -> पाठ { लौटाओ \"उप\"; } }"),
+            new SourceFile("app.bhash","आयात अनुबंधपुस्तक.नामी; आयात अनुबंधपुस्तक.सज्जा; आयात मूलपुस्तक.मूल; आयात उपपुस्तक.उप; कार्य मुख्य() -> शून्य { स्थिर क: सज्जा = नया उप(); लिखो(क.नाम(), प्रकारहै<मूल>(क), परिवर्तित<नामी>(क.स्वयं()) == क); }"));
+    }
+    @Test void nativeInterfacesAcrossPackagesMatchJvm()throws Exception{
+        requireTools();var result=nativeRun(interfaceSources(),GC_STRESS);
+        assertEquals("उप सत्य सत्य\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeRepeatedTypeChecksAndCastsDoNotAllocate()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            अनुबंध अ { कार्य अंक() -> पूर्णांक; }
+            वर्ग क पालन अ { सार्वजनिक कार्य अंक() -> पूर्णांक { लौटाओ १; } }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: अ = नया क();
+                मान न: पूर्णांक = ०; मान योग: पूर्णांक = ०;
+                जबतक (न < ५०००){
+                    यदि (प्रकारहै<क>(क)){ योग = योग + परिवर्तित<क>(क).अंक(); }
+                    स्थिर ज: अ = सुरक्षितरूप<अ>(क);
+                    यदि (ज != क){ त्रुटि("पहचान बदली"); }
+                    न = न + १;
+                }
+                लिखो(योग);
+            }
+            """,GC_STRESS);
+        assertEquals("५०००\n",result.out());assertEquals(1,stats(result).get("allocations"));
+        assertEquals(0,stats(result).get("live"));
     }
 
     private void requireTools()throws Exception{

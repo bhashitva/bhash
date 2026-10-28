@@ -64,6 +64,8 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - Ordinary heap-backed classes, constructors, instance methods and reference fields
   in [native objects](native-objects.md), including single class inheritance and
   [virtual dispatch](native-inheritance.md).
+- Interface dispatch, nominal runtime tests and checked/safe casts in
+  [native interfaces and casts](native-interfaces.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
@@ -72,8 +74,8 @@ Unsupported features produce source-located Hindi diagnostics, including unused
 unsupported declarations. Unsupported calls to standard-library intrinsics are rejected;
 injected compiler metadata alone does not require library execution.
 
-Decimals, other integer widths, conversions, bitwise operations, input, unsupported
-standard-library calls, interfaces/static members, generics, arrays/collections, exceptions, selection,
+Decimals, other integer widths, unsupported conversions, bitwise operations, input, unsupported
+standard-library calls, static members, universal boxing, generics, arrays/collections, exceptions, selection,
 interop and concurrency are not yet available. The original decimal-area example is
 therefore outside this native profile. Defaults and behavior of managed targets are
 unchanged.

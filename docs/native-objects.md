@@ -12,6 +12,7 @@ Applications require neither JVM nor .NET; the compiler still uses Java and LLVM
   immutable fields with existing constant initializers.
 - Default and overloaded constructors, and overloaded instance methods.
 - Single class inheritance and virtual dispatch, detailed in [native inheritance](native-inheritance.md).
+- Interface references and runtime tests/casts in [native interfaces](native-interfaces.md).
 - `यह`, implicit instance members, chained field/method access, object parameters,
   return values, recursive methods, `रिक्त`, and object identity `==` / `!=`.
 - Existing access control, overload resolution, initialization, immutability and
@@ -23,8 +24,8 @@ the completed object is still returned to its caller. A constructor cannot expos
 `यह` early or call an instance method on it; immutable fields still require their
 existing declaration initializer. This milestone does not broaden those language rules.
 
-Interfaces, static fields/methods, records, enums, generics, arrays,
-collections, casts, type tests, boxing, decimals and exceptions remain outside the
+Static fields/methods, records, enums, generics, arrays,
+collections, universal boxing, decimals and exceptions remain outside the
 native class subset. Unsupported loaded declarations, even unused ones, produce
 source-located `BH9001` diagnostics. Printing an object directly remains invalid;
 print its scalar fields or method results.
@@ -79,18 +80,19 @@ selected methods and instance receivers. The native core collapses checked objec
 references to a pointer representation only after source type checking; field
 identities and offsets remain explicit. Public/protected instance methods dispatch
 through stable slots in per-class method tables; private methods and explicit base
-calls use direct calls. Base fields form a prefix of every derived layout.
+calls use direct calls. Base fields form a prefix of every derived layout. Interface calls use resolved signature slots in a separate
+per-class table; nominal membership metadata drives runtime tests/casts.
 
-The private native object ABI v2 reserves the first eight payload bytes for an
-immutable method-table pointer. Every field then occupies an eight-byte slot. Integers use 64 bits,
+The private native object ABI v3 reserves the first eight payload bytes for an
+immutable type-metadata pointer. Every field then occupies an eight-byte slot. Integers use 64 bits,
 booleans use the low byte, and text/object fields contain payload-base pointers.
 Descriptors list exactly the text and object reference offsets. Primitive fields
-are never conservatively interpreted as pointers, and the method-table pointer
+are never conservatively interpreted as pointers, and the metadata pointer
 is excluded from GC tracing. Empty objects have only the eight-byte prefix and
 distinct allocation identities. Layout is private, not a foreign ABI.
 
 Constructors lower to a factory and an initializer. The factory allocates one zeroed
-object with its final method table and roots it. Initializers invoke the selected
+object with its final type metadata and roots it. Initializers invoke the selected
 base initializer on that same object, then initialize their own fields and execute
 their checked body. The factory returns the rooted object. Constructor arguments
 are evaluated and rooted before allocation. Instance receivers are evaluated and null
