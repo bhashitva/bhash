@@ -126,7 +126,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         final Map<org.antlr.v4.runtime.tree.ParseTree, Expr> expressions = new IdentityHashMap<>();
         final Map<ParserRuleContext, Binding> bindings = new IdentityHashMap<>();
         final Map<PrimaryContext, Binding> reads = new IdentityHashMap<>();
-        final Map<PrimaryContext, Function> calls = new IdentityHashMap<>();
+        final Map<ParserRuleContext, Function> calls = new IdentityHashMap<>();
         final Map<ParserRuleContext, Object> constants = new IdentityHashMap<>();
     }
     private Analysis analysis;
@@ -1366,6 +1366,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (!method.shared && constructorBody && (object.base || object.java.equals("this")))
             throw error(at, "Constructors cannot call instance methods on यह or आधार before construction completes.");
         checkAccess(at, method.owner, method.access, object);
+        if (analysis != null && method.intrinsic != null) analysis.calls.put(at, method);
         if(method.intrinsic!=null)return tagged(new Expr(method.result,"BhashStandard."+method.intrinsic+"("+join(arguments)+")",true));
         String receiver=method.shared?method.owner.java:memberReceiver(object, method.owner, method.access);
         return new Expr(method.result, receiver + "." + method.java + "(" + join(arguments) + ")", true);

@@ -12,12 +12,23 @@ import org.antlr.v4.runtime.tree.ParseTree;
 /** Target-independent checked core. No host-language expressions or identifiers. */
 public record CoreProgram(List<Function> functions, int entry) {
     public enum Type { INT, BOOL, TEXT, VOID }
+    public enum TextOperation {
+        LENGTH("length"), SLICE("slice"), FIND("stdFind"), CONTAINS("stdContains"),
+        STARTS("stdStarts"), ENDS("stdEnds"), REPLACE("stdReplace"), TRIM("stdTrim"),
+        UPPER("upper"), LOWER("stdLower"), REPEAT("stdRepeat"), DEVANAGARI("devanagari"),
+        INTEGER(null), PARSE_INTEGER(null), FAIL(null);
+        final String catalog;
+        TextOperation(String catalog) { this.catalog=catalog; }
+    }
+    private static final Map<String,TextOperation> GLOBAL_TEXT=Map.of(
+        "लंबाई",TextOperation.LENGTH,"अंश",TextOperation.SLICE,"अंकपाठ",TextOperation.INTEGER,
+        "पूर्णांकपाठ",TextOperation.PARSE_INTEGER,"बड़ाअक्षर",TextOperation.UPPER,"त्रुटि",TextOperation.FAIL);
     public record Source(String file, int line, int column) {
         @Override public String toString() { return file+":"+line+":"+column; }
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall {
         Type type(); Source source();
     }
     public record Constant(Type type, Object value, Source source) implements Expression {}
@@ -27,8 +38,9 @@ public record CoreProgram(List<Function> functions, int entry) {
     public record Unary(Type type, String operator, Expression value, Source source) implements Expression {}
     public record Binary(Type type, String operator, Expression left, Expression right, Source source) implements Expression {}
     public record Call(Type type, int function, List<Expression> arguments, Source source) implements Expression {}
+    public record TextCall(Type type, TextOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public sealed interface Statement permits Block, Assign, Branch, Loop, Return, Jump, Print, Evaluate {}
-    public record Block(List<Statement> statements) implements Statement {}
+    public record Block(List<Statement> statements, List<Binding> locals) implements Statement {}
     public record Assign(Binding binding, Expression value) implements Statement {}
     public record Branch(Expression condition, Block yes, Statement no) implements Statement {}
     public record Loop(Expression condition, Block body) implements Statement {}
@@ -61,7 +73,11 @@ public record CoreProgram(List<Function> functions, int entry) {
                 !(t.INT_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null))) throw unsupported(c);
         if (c instanceof StatementContext s && (s.tryStatement()!=null || s.THROW()!=null ||
                 s.switchStatement()!=null || s.foreachStatement()!=null)) throw unsupported(c);
-        if (c instanceof PostfixContext p && !p.postfixPart().isEmpty()) throw unsupported(c);
+        if (c instanceof PostfixContext p && !p.postfixPart().isEmpty()) {
+            if(p.postfixPart().size()!=1 || p.postfixPart(0).LBRACK()!=null ||
+                    p.postfixPart(0).LPAREN()==null || p.primary().IDENTIFIER()==null ||
+                    p.primary().LPAREN()!=null) throw unsupported(c);
+        }
         if (c instanceof UnaryContext u && u.BIT_NOT()!=null) throw unsupported(c);
         if ((c instanceof ShiftContext || c instanceof BitwiseOrContext || c instanceof BitwiseXorContext ||
                 c instanceof BitwiseAndContext) && c.getChildCount()>1) throw unsupported(c);
@@ -114,8 +130,12 @@ public record CoreProgram(List<Function> functions, int entry) {
         }
         Block block(BlockContext c) throws CompilationException {
             var result=new ArrayList<Statement>();
-            for(var s:c.statement())result.add(statement(s));
-            return new Block(List.copyOf(result));
+            var locals=new ArrayList<Binding>();
+            for(var s:c.statement()) {
+                result.add(statement(s));
+                if(s.variableDecl()!=null) locals.add(binding(a.bindings.get(s.variableDecl()),s.variableDecl()));
+            }
+            return new Block(List.copyOf(result),List.copyOf(locals));
         }
         Statement branch(IfStatementContext c) throws CompilationException {
             Statement no=c.ifStatement()!=null?branch(c.ifStatement()):c.block().size()>1?block(c.block(1)):null;
@@ -145,6 +165,16 @@ public record CoreProgram(List<Function> functions, int entry) {
             if(c!=null)for(var e:c.expression())result.add(expression(e));
             return List.copyOf(result);
         }
+        TextCall textCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
+            TextOperation operation=null;
+            if(f.intrinsic!=null) {
+                for(var op:TextOperation.values())if(f.intrinsic.equals(op.catalog))operation=op;
+            } else if(f.declaration==null && at instanceof PrimaryContext p)
+                operation=GLOBAL_TEXT.entrySet().stream().filter(e->Identifiers.key(e.getKey()).equals(Identifiers.key(p.IDENTIFIER().getText())))
+                    .map(Map.Entry::getValue).findFirst().orElse(null);
+            if(operation==null)throw unsupported(at);
+            return new TextCall(type(f.result,at),operation,arguments(args),source(at));
+        }
         Expression expression(ParserRuleContext c) throws CompilationException {
             Object constant=a.constants.get(c);
             if(constant!=null)return new Constant(constant instanceof Long?Type.INT:Type.TEXT,constant,source(c));
@@ -153,7 +183,8 @@ public record CoreProgram(List<Function> functions, int entry) {
                 if(p.IDENTIFIER()!=null) {
                     if(p.LPAREN()==null)return new Read(binding(a.reads.get(p),p),source(c));
                     var f=a.calls.get(p);
-                    if(f==null || !ids.containsKey(f))throw unsupported(p);
+                    if(f==null)throw unsupported(p);
+                    if(!ids.containsKey(f))return textCall(f,p,p.arguments());
                     return new Call(type(f.result,p),ids.get(f),arguments(p.arguments()),source(c));
                 }
                 if(p.expression()!=null)return expression(p.expression());
@@ -163,12 +194,16 @@ public record CoreProgram(List<Function> functions, int entry) {
                 if(u.BIT_NOT()!=null)throw unsupported(u);
                 return new Unary(type(a.expressions.get(c).type(),c),u.getChild(0).getText(),expression(u.unary()),source(c));
             }
+            if(c instanceof PostfixContext p && !p.postfixPart().isEmpty()) {
+                var part=p.postfixPart(0);var f=a.calls.get(part);
+                if(f==null || f.intrinsic==null)throw unsupported(part);
+                return textCall(f,part,part.arguments());
+            }
             if(c.getChildCount()==1)return expression((ParserRuleContext)c.getChild(0));
             if(c instanceof PostfixContext p)return expression(p.primary());
             Expression result=expression((ParserRuleContext)c.getChild(0));
             for(int i=1;i<c.getChildCount();i+=2) {
                 String op=c.getChild(i).getText();
-                if(op.equals("+") && result.type()==Type.TEXT)throw unsupported(c);
                 Expression right=expression((ParserRuleContext)c.getChild(i+1));
                 Type t=Set.of("==","!=","<","<=",">",">=","&&","||").contains(op)?Type.BOOL:result.type();
                 result=new Binary(t,op,result,right,source(c));

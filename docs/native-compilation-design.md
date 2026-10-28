@@ -59,7 +59,8 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - Typed global functions, overloads, forward calls and recursion.
 - Integer `+ - * / %`, unary signs, comparisons, equality and boolean logic.
 - `यदि`/`अन्यथा`, `जबतक`, `विराम`, `जारी`, `लौटाओ`.
-- Literal text passed, returned, assigned and compared by value.
+- Literal and heap-backed text passed, returned, assigned and compared by value.
+- Concatenation and the scalar text-library subset in [native text](native-text.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
@@ -68,7 +69,7 @@ Unsupported features produce source-located Hindi diagnostics, including unused
 unsupported declarations. Actual calls to standard-library intrinsics are rejected;
 injected compiler metadata alone does not require library execution.
 
-Decimals, other integer widths, conversions, bitwise operations, input, dynamic text,
+Decimals, other integer widths, conversions, bitwise operations, input, unsupported
 standard-library calls, objects, generics, arrays/collections, exceptions, selection,
 interop and concurrency are not yet available. The original decimal-area example is
 therefore outside this native profile. Defaults and behavior of managed targets are
@@ -104,10 +105,10 @@ object's lifetime, normally in static read-only storage.
 
 Compiler-generated root frames identify reference slots precisely. Frames are pushed
 on function entry and popped on every normal return. Parameters, text bindings and
-text temporaries have initialized slots. Initial temporary slots may retain their
-last value until function return; exact last-use analysis is deferred. This can retain
-objects longer than strictly necessary, but cannot reclaim live ones. Literal-only
-programs currently have no dynamic text allocations.
+text temporaries have initialized slots. Consumed temporary slots are released after their parent result is rooted. Block-local
+slots are cleared when control leaves their scope, including loop jumps; function
+frames are popped on return. Bindings that remain in scope may outlive their last
+use. [Heap-backed text](native-text.md) exercises these rules through real programs.
 
 Allocation is the initial collection safepoint. Before allocation, callers must root
 all live managed references, including intermediate arguments. Calls reload reference

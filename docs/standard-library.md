@@ -33,6 +33,10 @@ The catalog reserves the six listed fully qualified class names, not all ordinar
 Devanagari names. Existing globals such as `लंबाई`, `अंश`, `पाठपढ़ो` and conversions
 retain their existing behavior.
 
+The experimental native Linux target supports a [scalar text subset](native-text.md),
+including concatenation and garbage-collected text results. Other library modules
+and collection/buffer-based text functions remain unsupported on native.
+
 ## Portable contracts
 
 - **Text:** ordinal matching and literal separators, with Unicode scalar positions

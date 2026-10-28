@@ -34,3 +34,10 @@ are implemented separately in [v0.5](projects-packages.md).
 Tests in `ManagedCompilerTest` exercise Unicode supplementary characters,
 ASCII case behavior, input, script validation, overflow, bounds, EOF, explicit
 failures, reserved names and rejected mixed-type concatenation on both backends.
+
+## Native target
+
+The Linux LLVM target supports concatenation and the globals above except `पाठपढ़ो`,
+plus the scalar `मानक.पाठ्य` subset. Allocated results are automatically collected;
+see [native text and rooting](native-text.md). Input and collection operations remain
+outside the native profile.
