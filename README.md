@@ -49,7 +49,8 @@ The generated JAR requires **Java 17+ only**. It includes its small console runt
 and does not need Maven, the Bhash compiler or ANTLR to run. Building Bhash programs
 requires a full JDK because this backend lowers checked Bhash to Java source and
 uses the JDK compiler to produce JVM bytecode. It is a compiler, not a parse-tree
-interpreter. CLR and browser WebAssembly output are also implemented (see below); native output remains planned.
+interpreter. CLR and browser WebAssembly output are also implemented (see below); the experimental Linux x86-64 native target supports the subset described in the
+[native guide](docs/native-compilation-design.md).
 
 On Windows, if Devanagari input is garbled, run `chcp 65001` before starting Java
 and use a font with Devanagari support.
@@ -158,6 +159,10 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/collections 
 ```
 
 See [collection syntax, APIs and mutation rules](docs/collections.md).
+
+The experimental Linux x86-64 native target now supports arrays, lists, maps and
+iteration for integers, booleans, text, object/interface references and `सर्ववस्तु`.
+See [native collections and collector rules](docs/native-collections.md).
 
 ## Exception handling
 
