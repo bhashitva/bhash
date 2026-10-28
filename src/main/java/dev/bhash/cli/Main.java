@@ -2,6 +2,7 @@
 package dev.bhash.cli;
 
 import dev.bhash.backend.Target;
+import dev.bhash.backend.llvm.NativeCompiler;
 import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.jvm.JvmCompiler;
 import dev.bhash.backend.clr.ClrCompiler;
@@ -28,7 +29,7 @@ public final class Main {
         if (args.length == 1 && args[0].equals("targets")) {
             for (var target : Target.values()) {
                 out.println(target.name().toLowerCase(java.util.Locale.ROOT) + ": "
-                        + target.description() + ((target == Target.JVM || target == Target.CLR || target == Target.WASM) ? " [implemented]" : " [planned]"));
+                        + target.description() + (target == Target.NATIVE ? " [experimental]" : (target == Target.JVM || target == Target.CLR || target == Target.WASM) ? " [implemented]" : " [planned]"));
             }
             return 0;
         }
@@ -82,12 +83,13 @@ public final class Main {
     private static int usage(PrintStream err) {
         err.println("Usage: java -jar bhash-compiler.jar check <file.bhash|project-directory|bhash.project>");
         err.println("       java -jar bhash-compiler.jar parse <file.bhash>");
-        err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser]");
-        err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr]");
+        err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser|native]");
+        err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr|native]");
         err.println("       java -jar bhash-compiler.jar deps lock|restore|verify <project> [--offline]");
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
+        err.println("Native output is an experimental Linux x86-64 executable; LLVM 18 is required for builds.");
         err.println("check validates syntax only; compile/run also validate names, types and control flow.");
         return 2;
     }
@@ -108,14 +110,15 @@ public final class Main {
                 target = switch (args[++i]) {
                     case "jvm" -> Target.JVM;
                     case "clr" -> Target.CLR;
+                    case "native" -> Target.NATIVE;
                     case "wasm-browser", "wasm" -> Target.WASM;
-                    default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm).");
+                    default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm), native (experimental Linux x86-64).");
                 };
             } else throw new IllegalArgumentException("Invalid or incomplete option: " + args[i]);
         }
         if (output == null && allowOutput) {
             var project = ProjectLoader.load(source);
-            String suffix = target == Target.JVM ? ".jar" : target == Target.CLR ? "-clr" : "-web";
+            String suffix = target == Target.JVM ? ".jar" : target == Target.CLR ? "-clr" : target == Target.NATIVE ? "-native" : "-web";
             output = ProjectLoader.manifest(source).getFileName().toString().equals(ProjectLoader.MANIFEST)
                     ? project.root().resolve("build").resolve(project.name() + suffix)
                     : source.resolveSibling(project.name() + suffix);
@@ -126,9 +129,10 @@ public final class Main {
     private static void build(Options options) throws IOException, CompilationException {
         var project = ProjectLoader.load(options.source);
         if (project.library()) throw new IOException("[BH8001] Library packages are shared source, not executable programs. Build an application that depends on this library.");
-        project.protectOutput(options.output,options.target != Target.JVM);
+        project.protectOutput(options.output,options.target == Target.CLR || options.target == Target.WASM);
         if (options.target == Target.JVM) new JvmCompiler().compile(project.sources(), options.output);
         else if (options.target == Target.WASM) new WasmCompiler().compile(project.sources(), options.output);
+        else if (options.target == Target.NATIVE) new NativeCompiler().compile(project.sources(), options.output);
         else new ClrCompiler().compile(project.sources(), options.output);
     }
 
@@ -149,6 +153,9 @@ public final class Main {
             } else if (options.target == Target.WASM) {
                 out.println("Compiled browser WebAssembly program: " + options.output);
                 out.println("Serve this directory over HTTP, then open index.html (see docs/wasm-browser.md).");
+            } else if (options.target == Target.NATIVE) {
+                out.println("Compiled experimental native program: " + options.output);
+                out.println("Run: \"" + options.output + "\"");
             } else {
                 Path assembly = options.output.resolve("BhashProgram.dll");
                 out.println("Compiled CLR program: " + assembly);
@@ -185,7 +192,8 @@ public final class Main {
                 String executable = System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java";
                 Path java = Path.of(System.getProperty("java.home"), "bin", executable);
                 builder = new ProcessBuilder(java.toString(), "-jar", output.toString());
-            } else builder = new ProcessBuilder(ClrCompiler.executable(), output.resolve("BhashProgram.dll").toString());
+            } else if (options.target == Target.NATIVE) builder = new ProcessBuilder(output.toAbsolutePath().toString());
+            else builder = new ProcessBuilder(ClrCompiler.executable(), output.resolve("BhashProgram.dll").toString());
             process = builder.inheritIO().start();
             return process.waitFor();
         } catch (CompilationException exception) {
