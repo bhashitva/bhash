@@ -111,6 +111,16 @@ def main():
         assert result.stdout.replace(b'\r\n', b'\n') == b'Native byte/buffer checks passed.\n'
         print(f'{name}: packed bytes, binary layouts, UTF-8, file round trips, precision and exception cleanup passed')
 
+        time_exe = BUILD / ('time-' + name + ('.exe' if os.name == 'nt' else ''))
+        time_command = [part.replace('runtime_test.c', 'time_runtime_test.c').replace(str(exe), str(time_exe)) for part in command]
+        result = run(time_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(time_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native UTC time checks passed.\n'
+        print(f'{name}: entire Gregorian calendar, UTC milliseconds, strict parsing, clock bounds and GC cleanup passed')
+
         numeric_exe = BUILD / ('math-random-' + name + ('.exe' if os.name == 'nt' else ''))
         numeric_command = [part.replace('runtime_test.c', 'math_random_runtime_test.c').replace(str(exe), str(numeric_exe)) for part in command]
         result = run(numeric_command)
