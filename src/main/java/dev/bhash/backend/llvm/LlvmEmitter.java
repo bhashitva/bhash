@@ -49,6 +49,14 @@ public final class LlvmEmitter {
     private String program(CoreProgram program,String notices){
         boxMetadata();
         collectionMetadata(program.collections());
+        String dataInit="";
+        if(program.structuredTypes()!=null){
+            var t=program.structuredTypes();
+            globals.append("@data_info = private constant %DataInfo { ptr ").append(collectionInfo(t.texts()))
+                .append(", ptr ").append(collectionInfo(t.values())).append(", ptr ").append(collectionInfo(t.object()))
+                .append(", [4 x ptr] [ptr @box_gc1, ptr @box_gc2, ptr @box_gc3, ptr @box_gc6], [4 x ptr] [ptr @box_info1, ptr @box_info2, ptr @box_info3, ptr @box_info6] }, align 8\n");
+            dataInit="  call void @bh_data_configure(ptr @data_info)\n";
+        }
         var objectTypes=new ArrayList<>(program.classes());objectTypes.add(program.exceptionType());
         for(var c:objectTypes){
             objectSizes.put(c.id(),8+c.fields().size()*8);
@@ -74,8 +82,8 @@ public final class LlvmEmitter {
         }
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v8\n"+
-            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v9\n"+
+            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+
@@ -85,9 +93,9 @@ public final class LlvmEmitter {
             "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\n"+
             "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
-            textDeclarations()+numericDeclarations()+"\n"+typeTestHelper()+equalityHelper()+functions+
+            textDeclarations()+numericDeclarations()+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
-            "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
+            "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
     }
     private static String numericDeclarations(){
         var declarations=new StringBuilder();
@@ -328,6 +336,7 @@ public final class LlvmEmitter {
         else if(e instanceof Call c)c.arguments().forEach(this::scan);
         else if(e instanceof TextCall c)c.arguments().forEach(this::scan);
         else if(e instanceof NumericCall c)c.arguments().forEach(this::scan);
+        else if(e instanceof StructuredCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FieldRead f)scan(f.receiver());
         else if(e instanceof TypeOperation t)scan(t.value());
         else if(e instanceof Box b)scan(b.value());
@@ -388,6 +397,7 @@ public final class LlvmEmitter {
         else if(e instanceof Call c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof TextCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof NumericCall c)c.arguments().forEach(a->expressionRoots(a,slots));
+        else if(e instanceof StructuredCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof FieldRead f)expressionRoots(f.receiver(),slots);
         else if(e instanceof TypeOperation t)expressionRoots(t.value(),slots);
         else if(e instanceof Box b)expressionRoots(b.value(),slots);
@@ -551,6 +561,10 @@ public final class LlvmEmitter {
             String call="call "+llvm(c.type())+" "+target+"("+String.join(", ",args)+")";
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else result=instruction(c.type(),call);
+        } else if(e instanceof StructuredCall c) {
+            for(var a:c.arguments())expression(a);
+            var args=new ArrayList<String>();for(var a:c.arguments())args.add(reload(a).argument());args.add("ptr "+text(c.source().toString()));
+            result=instruction(c.type(),"call ptr @bh_data_"+c.operation().name().toLowerCase(Locale.ROOT)+"("+String.join(", ",args)+")");
         } else if(e instanceof NumericCall c) {
             for(var a:c.arguments())expression(a);
             var args=new ArrayList<String>();for(var a:c.arguments())args.add(reload(a).argument());
@@ -576,6 +590,7 @@ public final class LlvmEmitter {
         if(e instanceof Call c)c.arguments().forEach(this::release);
         else if(e instanceof TextCall c)c.arguments().forEach(this::release);
         else if(e instanceof NumericCall c)c.arguments().forEach(this::release);
+        else if(e instanceof StructuredCall c)c.arguments().forEach(this::release);
         else if(e instanceof Binary b){release(b.left());release(b.right());}
         else if(e instanceof Unary u)release(u.value());
         else if(e instanceof FieldRead f)release(f.receiver());
