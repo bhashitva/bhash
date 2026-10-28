@@ -56,7 +56,7 @@ remain in force. An invalid checked cast such as integer-to-boolean reports the
 same runtime failure category as managed targets.
 
 [Universal `सर्ववस्तु` boxing/unboxing](native-boxing.md) extends these operations
-to boxed integers, booleans, text and object references. Other numeric widths/decimals,
+to boxed integers, booleans, text and object references. Other numeric widths,
 records/enums, user-defined generics and static members remain outside
 the native profile.
 
@@ -99,7 +99,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/interfaces
 
 ## Private metadata and collector contract
 
-Private object ABI v6 (including [boxing](native-boxing.md) and [collections](native-collections.md)) keeps the eight-byte nonmanaged prefix and all existing field
+Private object ABI v7 (including [boxing](native-boxing.md) and [collections](native-collections.md)) keeps the eight-byte nonmanaged prefix and all existing field
 offsets. That prefix now points to an immutable metadata record containing pointers
 to class-virtual and interface-dispatch arrays, plus nominal membership IDs. Class
 virtual slots remain inherited prefixes. Each declared interface signature has a
@@ -139,3 +139,5 @@ CI also builds the ordinary stress executable, checks dependencies, and runs it 
 a clean Ubuntu container without Java/.NET/build tools or networking. Host LLVM 23
 probes at debug/optimized settings are development aids; Linux LLVM 18 acceptance
 and full managed/browser regressions remain required before merge.
+
+[Native दशमलव support](native-decimals.md) adds binary64 arithmetic, conversions, formatting, boxing and collection values.
