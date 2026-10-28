@@ -11,14 +11,14 @@ import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
 public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes) {
-    public enum Type { INT, REAL, BOOL, TEXT, OBJECT, ANY, VOID;
+    public enum Type { INT, BYTE, REAL, BOOL, TEXT, OBJECT, ANY, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT || this==ANY; }
     }
     public record ObjectField(int owner, int offset, Type type) {}
     public record RuntimeType(int id, String name, boolean contract) {}
     public record ObjectType(int id, String name, List<ObjectField> fields, List<Integer> virtualMethods,
                              List<Integer> interfaceMethods, List<Integer> assignableTypes) {}
-    public enum CollectionKind { ARRAY, LIST, MAP }
+    public enum CollectionKind { ARRAY, LIST, MAP, BUFFER }
     public record CollectionType(int id, CollectionKind kind, int keyKind, int valueKind,
                                  int element, int keyList, int valueList) {}
     public enum CollectionOperation { SIZE, EMPTY, GET, GET_OR, SET, CONTAINS, ADD, INSERT,
@@ -38,6 +38,8 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public enum TypeAction { TEST, SAFE, CAST }
     public record TypeOperation(Type type, TypeAction action, Expression value, Type targetType, int targetId, Source source) implements Expression {}
     public record StructuredTypes(int texts,int values,int object) {}
+    public enum BufferOperation { ENCODE, DECODE, READ_FILE, WRITE_FILE, SLICE, ARRAY, FILL, READ_INT, WRITE_INT, READ_REAL, WRITE_REAL }
+    public record BufferCall(Type type, BufferOperation operation, List<Expression> arguments, int descriptor, Source source) implements Expression {}
     public enum FileOperation { SUPPORTED, EXISTS, READ_TEXT, WRITE_TEXT }
     public record FileCall(Type type, FileOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public enum StructuredOperation { SPLIT, JOIN, JSON_READ, JSON_WRITE }
@@ -74,7 +76,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -127,7 +129,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         if(c instanceof TypeArgumentsContext && !(c.getParent() instanceof ValueTypeContext t &&
                 t.IDENTIFIER()!=null && CollectionTypes.builtin(t.IDENTIFIER().getText())))throw unsupported(c);
         if (c instanceof ValueTypeContext t &&
-                !(t.INT_TYPE()!=null || t.REAL_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null || t.OBJECT_TYPE()!=null || t.IDENTIFIER()!=null)) throw unsupported(c);
+                !(t.INT_TYPE()!=null || t.REAL_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null || t.OBJECT_TYPE()!=null || t.BYTE_TYPE()!=null || t.BUFFER_TYPE()!=null || t.IDENTIFIER()!=null)) throw unsupported(c);
         if (c instanceof StatementContext s && s.switchStatement()!=null) throw unsupported(c);
         if (c instanceof UnaryContext u && u.BIT_NOT()!=null) throw unsupported(c);
         if ((c instanceof ShiftContext || c instanceof BitwiseOrContext || c instanceof BitwiseXorContext ||
@@ -172,12 +174,12 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         }
         int valueKind(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             Type value=type(t,at);
-            return switch(value){case REAL->6;case INT->1;case BOOL->2;case TEXT->3;case OBJECT->4;case ANY->5;default->throw unsupported(at);};
+            return switch(value){case BYTE->7;case REAL->6;case INT->1;case BOOL->2;case TEXT->3;case OBJECT->4;case ANY->5;default->throw unsupported(at);};
         }
         int runtimeId(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             if(t.collection!=null)return collectionId(t,at);
             Type value=type(t,at);
-            return switch(value){case REAL->-6;case INT->-1;case BOOL->-2;case TEXT->-3;case ANY->-4;case OBJECT->classIds.get(t.object);default->throw unsupported(at);};
+            return switch(value){case BYTE->-7;case REAL->-6;case INT->-1;case BOOL->-2;case TEXT->-3;case ANY->-4;case OBJECT->classIds.get(t.object);default->throw unsupported(at);};
         }
         ManagedEmitter.Type listType(ManagedEmitter.Type element){
             return collectionIds.keySet().stream().filter(t->t.collection==ManagedEmitter.CollectionKind.LIST && t.arguments.get(0)==element).findFirst()
@@ -186,7 +188,6 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         int collectionId(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             // Managed types are interned except synthetic snapshot lists; canonicalize by structural signature.
             for(var entry:collectionIds.entrySet())if(entry.getKey().collection==t.collection && entry.getKey().arguments.equals(t.arguments))return entry.getValue();
-            if(t.collection==ManagedEmitter.CollectionKind.BUFFER)throw unsupported(at);
             int id=classIds.size()+collections.size();collectionIds.put(t,id);int slot=collections.size();collections.add(null);
             boolean map=t.collection==ManagedEmitter.CollectionKind.MAP;
             var value=t.arguments.get(map?1:0);var key=map?t.arguments.get(0):ManagedEmitter.Type.INT;
@@ -245,6 +246,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         Type type(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             if(t.collection!=null){collectionId(t,at);return Type.OBJECT;}
             if(t==ManagedEmitter.Type.INT)return Type.INT;
+            if(t==ManagedEmitter.Type.BYTE)return Type.BYTE;
             if(t==ManagedEmitter.Type.REAL)return Type.REAL;
             if(t==ManagedEmitter.Type.BOOL)return Type.BOOL;
             if(t==ManagedEmitter.Type.TEXT)return Type.TEXT;
@@ -310,7 +312,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     }
                     for(var f:c.fields.values()){
                         Type t=type(f.type(),f.declaration());
-                        Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(t,t==Type.TEXT?"":t==Type.BOOL?false:t==Type.INT?(Object)0L:t==Type.REAL?(Object)0.0:null,source(f.declaration()));
+                        Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(t,t==Type.TEXT?"":t==Type.BOOL?false:(t==Type.INT || t==Type.BYTE)?(Object)0L:t==Type.REAL?(Object)0.0:null,source(f.declaration()));
                         statements.add(new FieldWrite(new FieldRead(new Read(self,source(at)),fields.get(f),source(f.declaration())),coerce(value,t)));
                     }
                     resultType=Type.VOID;
@@ -419,6 +421,15 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             return List.copyOf(values);
         }
         Expression libraryCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
+            String intrinsic=f.intrinsic;
+            if(intrinsic==null && at instanceof PrimaryContext p && p.IDENTIFIER()!=null){
+                String name=Identifiers.key(p.IDENTIFIER().getText());
+                if(name.equals(Identifiers.key("यूटीएफ८बफ़र")))intrinsic="stdEncode";
+                if(name.equals(Identifiers.key("यूटीएफ८पाठ")))intrinsic="decodeUtf8";
+            }
+            BufferOperation buffer=intrinsic==null?null:switch(intrinsic){case "stdEncode"->BufferOperation.ENCODE;case "decodeUtf8"->BufferOperation.DECODE;
+                case "stdFileReadBytes"->BufferOperation.READ_FILE;case "stdFileWriteBytes"->BufferOperation.WRITE_FILE;default->null;};
+            if(buffer!=null)return new BufferCall(type(f.result,at),buffer,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             TextOperation operation=null;
             if(f.intrinsic!=null) {
                 FileOperation file=switch(f.intrinsic){case "stdFilesSupported"->FileOperation.SUPPORTED;case "stdFileExists"->FileOperation.EXISTS;
@@ -473,7 +484,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     var destination=a.conversions.get(p);Type target=type(destination,p);
                     Expression value=expression(p.expression());
                     if(target==Type.ANY && p.TYPE_TEST()==null)return coerce(value,Type.ANY);
-                    if(p.CONVERT()!=null && target==Type.TEXT && value.type()==Type.INT)
+                    if(p.CONVERT()!=null && target==Type.TEXT && (value.type()==Type.INT || value.type()==Type.BYTE))
                         return new TextCall(Type.TEXT,TextOperation.INTEGER,List.of(value),source(p));
                     if(p.CONVERT()!=null && target==Type.TEXT && value.type()==Type.REAL)
                         return new TextCall(Type.TEXT,TextOperation.REAL,List.of(value),source(p));
@@ -481,6 +492,8 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                         return new TextCall(Type.REAL,TextOperation.PARSE_REAL,List.of(value),source(p));
                     if(p.CONVERT()!=null && target==Type.INT && value.type()==Type.TEXT)
                         return new TextCall(Type.INT,TextOperation.PARSE_INTEGER,List.of(value),source(p));
+                    if(p.CONVERT()!=null && target==Type.BYTE && value.type()==Type.TEXT)
+                        value=new TextCall(Type.INT,TextOperation.PARSE_INTEGER,List.of(value),source(p));
                     var action=p.TYPE_TEST()!=null?TypeAction.TEST:p.SAFE_CAST()!=null?TypeAction.SAFE:TypeAction.CAST;
                     return new TypeOperation(action==TypeAction.TEST?Type.BOOL:target,action,value,target,runtimeId(destination,p),source(p));
                 }
@@ -534,6 +547,14 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                         if(part.LBRACK()!=null)value=new IndexRead(type(result,part),value,coerce(expression(part.expression()),type(key,part)),type(key,part),source(part));
                         else {
                             String name=part.IDENTIFIER().getText();var args=new ArrayList<>(arguments(part.arguments()));
+                            BufferOperation bufferOp=previous.collection!=ManagedEmitter.CollectionKind.BUFFER?null:switch(Identifiers.key(name)){
+                                case "पूर्णांकपढ़ो"->BufferOperation.READ_INT;case "पूर्णांकलिखो"->BufferOperation.WRITE_INT;
+                                case "दशमलवपढ़ो"->BufferOperation.READ_REAL;case "दशमलवलिखो"->BufferOperation.WRITE_REAL;
+                                case "काटो"->BufferOperation.SLICE;case "सरणी"->BufferOperation.ARRAY;case "भरो"->BufferOperation.FILL;default->null;};
+                            if(bufferOp!=null){
+                                args.add(0,value);value=new BufferCall(type(result,part),bufferOp,List.copyOf(args),result.collection!=null?collectionId(result,part):-1,source(part));
+                                previous=result;continue;
+                            }
                             CollectionOperation operation=collectionOperation(name,args.size());
                             for(int i=0;i<args.size();i++){
                                 ManagedEmitter.Type expected=switch(operation){
@@ -569,7 +590,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             for(int i=1;i<c.getChildCount();i+=2) {
                 String op=c.getChild(i).getText();
                 Expression right=expression((ParserRuleContext)c.getChild(i+1));
-                Type t=Set.of("==","!=","<","<=",">",">=","&&","||").contains(op)?Type.BOOL:result.type();
+                Type t=Set.of("==","!=","<","<=",">",">=","&&","||").contains(op)?Type.BOOL:result.type()==Type.BYTE?Type.INT:result.type();
                 if((op.equals("==") || op.equals("!=")) && (result.type()==Type.ANY || right.type()==Type.ANY)){
                     result=coerce(result,Type.ANY);right=coerce(right,Type.ANY);
                 }
