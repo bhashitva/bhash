@@ -66,6 +66,8 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
   [virtual dispatch](native-inheritance.md).
 - Interface dispatch, nominal runtime tests and checked/safe casts in
   [native interfaces and casts](native-interfaces.md).
+- `सर्ववस्तु` boxing/unboxing of integers, booleans, text and object/interface references
+  in [native universal values](native-boxing.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
@@ -75,7 +77,7 @@ unsupported declarations. Unsupported calls to standard-library intrinsics are r
 injected compiler metadata alone does not require library execution.
 
 Decimals, other integer widths, unsupported conversions, bitwise operations, input, unsupported
-standard-library calls, static members, universal boxing, generics, arrays/collections, exceptions, selection,
+standard-library calls, static members, generics, arrays/collections, exceptions, selection,
 interop and concurrency are not yet available. The original decimal-area example is
 therefore outside this native profile. Defaults and behavior of managed targets are
 unchanged.
