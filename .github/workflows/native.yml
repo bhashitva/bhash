@@ -40,9 +40,10 @@ jobs:
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/math-random.bhash --target native -o target/math-random-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/json-text.bhash --target native -o target/json-text-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/hello.bhash --target native -o target/hello-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/files.bhash --target native -o target/files-native
       - name: Inspect executable dependencies
         run: |
-          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native target/math-random-native target/json-text-native target/hello-native; do
+          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native target/math-random-native target/json-text-native target/hello-native target/files-native; do
             file "$executable"
             ldd "$executable"
           done | tee target/native-dependencies.txt
@@ -53,6 +54,11 @@ jobs:
             for tool in java dotnet clang gcc; do
               if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
             done
+            mkdir -p target/native-file-example
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/files-native > /tmp/files-actual 2> /tmp/files-stats
+            printf "सत्य\n४९५० सत्य\nफ़ाइल पढ़ी नहीं जा सकी।\nबचा😀\n" > /tmp/files-expected
+            cmp /tmp/files-actual /tmp/files-expected
+            grep "live=0" /tmp/files-stats
             /artifacts/hello-native > /tmp/hello-actual
             printf "नमस्ते, दुनिया!\n१\nबीच ४\n९\n" > /tmp/hello-expected
             cmp /tmp/hello-actual /tmp/hello-expected
@@ -125,6 +131,7 @@ jobs:
             target/decimals-native
             target/math-random-native
             target/json-text-native
+            target/files-native
             target/collections-native
             target/boxing-native
             target/interfaces-native
@@ -145,3 +152,4 @@ jobs:
             docs/native-decimals.md
             docs/native-math-random.md
             docs/native-json-text.md
+            docs/native-files.md
