@@ -196,6 +196,7 @@ Native LLVM now supports `दशमलव` arithmetic, comparisons, checked conv
 The native target also supports every `मानक.गणित` and `मानक.यादृच्छिक` function, including matching seeded streams; see the [native math/random guide](docs/native-math-random.md).
 
 Native text split/join and strict JSON parsing/serialization are also available, with typed nested collections and safe partial-failure cleanup; see [native structured text](docs/native-json-text.md).
+Native UTF-8 text file I/O is available through `मानक.फ़ाइल`; see [native files](docs/native-files.md).
 
 ## Standard library
 
@@ -213,7 +214,7 @@ The compiler bundles the `मानक` package on JVM, .NET CLR and browser WAS
 
 Text search/replace/split/join, fixed numeric formatting, math, seeded randomness,
 JSON parsing/serialization, UTC dates and bounded UTF-8/binary file I/O share typed
-APIs. Files work on JVM/CLR; check `मानक.फ़ाइल.समर्थित()` in portable programs.
+APIs. Text files also work on native Linux; binary files work on JVM/CLR; check `मानक.फ़ाइल.समर्थित()` in portable programs.
 No registry, Maven or NuGet dependency is needed by a compiled application.
 See [all APIs and portability rules](docs/standard-library.md) and
 [the runnable example](examples/standard-library/portable.bhash).
