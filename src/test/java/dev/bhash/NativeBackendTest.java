@@ -440,9 +440,9 @@ class NativeBackendTest {
     @Test void unsupportedUnusedDeclarationsAndLibraryCallsHaveSourceLocations(){
         for(String source:List.of(
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
-            "कार्य अप्रयुक्त() -> बाइट { लौटाओ परिवर्तित<बाइट>(१); } कार्य मुख्य() -> शून्य {}",
+            "कार्य अप्रयुक्त() -> लघुपूर्णांक { लौटाओ परिवर्तित<लघुपूर्णांक>(१); } कार्य मुख्य() -> शून्य {}",
             "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
-            "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.यूटीएफ८(\"अ\"); }",
+            "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { मानक.समय.अभी(); }",
             "कार्य मुख्य() -> शून्य { लिखो(१ << २); }",
             "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<लघुपूर्णांक>(१)); }")){
             var error=assertThrows(CompilationException.class,()->core(source));
@@ -490,7 +490,7 @@ class NativeBackendTest {
             "परिगणना अ { क } कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}",
-            "वर्ग अ { मान न: बाइट; } कार्य मुख्य() -> शून्य {}")){
+            "वर्ग अ { मान न: लघुपूर्णांक; } कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(s));
             assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
         }
@@ -820,7 +820,7 @@ class NativeBackendTest {
             "अनुबंध अ { कार्य न() -> पूर्णांक; } अनुबंध ब { कार्य न() -> पाठ; } अनुबंध ग विस्तार अ, ब {}"))
             assertThrows(CompilationException.class,()->core(source+" कार्य मुख्य() -> शून्य {}"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { लिखो(सुरक्षितरूप<पूर्णांक>(१)); }"));
-        var unsupported=assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर क: बाइट = परिवर्तित<बाइट>(१); }"));
+        var unsupported=assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर क: लघुपूर्णांक = परिवर्तित<लघुपूर्णांक>(१); }"));
         assertTrue(unsupported.getMessage().contains("BH9001"));
     }
     @Test void nativeInterfaceDiamondsRedeclarationsAndMultipleContractsMatchJvm()throws Exception{
@@ -1137,7 +1137,7 @@ class NativeBackendTest {
         assertEquals(1,p.collections().stream().filter(t->t.kind()==CollectionKind.ARRAY).count());
         assertEquals(1,p.collections().stream().filter(t->t.kind()==CollectionKind.LIST && t.valueKind()==3).count());
         assertTrue(LlvmEmitter.emit(p).contains("%CollectionInfo"));
-        assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: बाइट[] = नया बाइट[१]; }"));
+        assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[१]; }"));
         assertThrows(CompilationException.class,()->core("वर्ग क<त> {} कार्य मुख्य() -> शून्य {}"));
     }
     @Test void nativeArraysDefaultsAliasesInitializersAndJaggedDimensionsMatchJvm()throws Exception{
@@ -1545,7 +1545,7 @@ class NativeBackendTest {
             """);
         var ir=LlvmEmitter.emit(p);
         for(String operation:List.of("supported","exists","read_text","write_text"))assertTrue(ir.contains("call "+(operation.equals("write_text")?"void":operation.equals("read_text")?"ptr":"i32")+" @bh_file_"+operation));
-        assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { मानक.फ़ाइल.बाइटपढ़ो(\"x\"); }"));
+        assertTrue(LlvmEmitter.emit(core("कार्य मुख्य() -> शून्य { मानक.फ़ाइल.बाइटपढ़ो(\"x\"); }")).contains("@bh_buffer_call"));
     }
     private String fileLiteral(Path path){return "\""+path.toString().replace("\\","/").replace("\"","\\\"")+"\"";}
     @Test void nativeFileTextRoundTripsAndErrorsMatchBothManagedTargets()throws Exception{
@@ -1636,6 +1636,102 @@ class NativeBackendTest {
     @Test void nativeFileStressExampleMatchesBothManagedTargets()throws Exception{
         requireNumericTargets();Files.createDirectories(Path.of("target/native-file-example"));
         assertEquals(0,numericExact(Files.readString(Path.of("examples/native/files.bhash"))).exit());
+    }
+    @Test void byteCoreRetainsDistinctKindsAndPackedBufferMetadata()throws Exception{
+        var p=core("""
+            वर्ग अंक { मान ब: बाइट; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर ब: बाइटबफ़र = मानक.पाठ्य.यूटीएफ८("भारत😀");
+                स्थिर स: सर्ववस्तु = परिवर्तित<बाइट>(२५५); लिखो(परिवर्तित<बाइट>(स));
+                ब.भरो(परिवर्तित<बाइट>(१)); लिखो(ब.काटो(०,१).सरणी()[०]);
+            }
+            """);
+        assertTrue(p.collections().stream().anyMatch(c->c.kind()==CollectionKind.BUFFER&&c.valueKind()==7));
+        var ir=LlvmEmitter.emit(p);assertTrue(ir.contains("@box_info7"));assertTrue(ir.contains("@bh_buffer_call"));
+    }
+    @Test void nativeBytesConversionsBoxingAndCollectionKeysMatchManaged()throws Exception{
+        requireNumericTargets();assertEquals(0,numericExact("""
+            आयात मानक.जेसन उपनाम ज;
+            वर्ग अंक { सार्वजनिक मान ब: बाइट; }
+            कार्य पहचान(ब: बाइट) -> बाइट { लौटाओ ब; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर ब: बाइट = पहचान(परिवर्तित<बाइट>(२५५)); स्थिर श: अंक = नया अंक();
+                लिखो(ब,श.ब,ब+ब,-ब,+ब,ब>२५४,परिवर्तित<पूर्णांक>(ब),परिवर्तित<दशमलव>(ब),परिवर्तित<पाठ>(ब));
+                लिखो(परिवर्तित<बाइट>("२५५"),परिवर्तित<बाइट>(२५५.९),परिवर्तित<बाइट>(-०.५));
+                स्थिर स: सर्ववस्तु = ब; स्थिर क: सर्ववस्तु = परिवर्तित<बाइट>(२५५);
+                स्थिर धन: सर्ववस्तु = +ब; लिखो(प्रकारहै<पूर्णांक>(धन),प्रकारहै<बाइट>(धन),प्रकारहै<पूर्णांक>(ब+ब));
+                लिखो(प्रकारहै<बाइट>(स),प्रकारहै<पूर्णांक>(स),प्रकारहै<पूर्णांक>(ब),परिवर्तित<बाइट>(स),स==क,स==२५५);
+                स्थिर म: मानचित्र<सर्ववस्तु,पाठ> = नया मानचित्र<सर्ववस्तु,पाठ>{};
+                म.रखो(स,"byte");म.रखो(२५५,"int");लिखो(म.आकार(),म.लो(क),म.लो(२५५));
+                स्थिर बा: बाइट[] = नया बाइट[]{ब,परिवर्तित<बाइट>(०)};
+                स्थिर ल: सूची<बाइट> = नया सूची<बाइट>{ब};ल.जोड़ो(परिवर्तित<बाइट>(१));लिखो(बा[०],ल.लो(१),ल.है(ब));
+                लिखो(ज.पाठबनाओ(स),ज.पाठबनाओ(ल));
+                प्रयास { लिखो(परिवर्तित<बाइट>(-१)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(परिवर्तित<बाइट>(२५६)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(परिवर्तित<बाइट>(१.०/०.०)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(परिवर्तित<पूर्णांक>(स)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+            }
+            """).exit());
+    }
+    @Test void nativeBufferOperationsUtf8AndBinaryLayoutsMatchManaged()throws Exception{
+        requireNumericTargets();assertEquals(0,numericExact("""
+            आयात मानक.पाठ्य उपनाम प;
+            आयात मानक.जेसन उपनाम ज;
+            कार्य मुख्य() -> शून्य {
+                स्थिर ब: बाइटबफ़र = नया बाइटबफ़र(२५६);
+                मान इ: पूर्णांक = ०; जबतक (इ<२५६) { ब[इ]=परिवर्तित<बाइट>(इ);इ=इ+१; }
+                मान योग: पूर्णांक = ०; प्रत्येक (क: बाइट में ब) { योग=योग+क; }
+                लिखो(ब.आकार,ब.लंबाई(),लंबाई(ब),ब.खाली(),योग,ब.है(परिवर्तित<बाइट>(२५५)));
+                स्थिर क: बाइटबफ़र = ब.काटो(२५४,२५६);क.रखो(०,परिवर्तित<बाइट>(७));स्थिर स: बाइट[] = क.सरणी();स[१]=परिवर्तित<बाइट>(८);
+                लिखो(ब[२५४],क.लो(०),क[१],स[१],ज.पाठबनाओ(क));
+                क.भरो(परिवर्तित<बाइट>(९));प्रत्येक (व: बाइट में क) { लिखो(व); }
+                स्थिर आवरण: सर्ववस्तु = क; लिखो(प्रकारहै<बाइटबफ़र>(आवरण),परिवर्तित<बाइटबफ़र>(आवरण)==क,प्रकारहै<बाइट[]>(आवरण));
+                मान क्रम: पूर्णांक = ०;प्रत्येक (व: बाइट में क) { क[क्रम]=परिवर्तित<बाइट>(व+१);क्रम=क्रम+१; }लिखो(क[०],क[१]);
+                स्थिर मूलपाठ: पाठ = "\\uFEFFभारत😀\\u0000\\r\\n";
+                स्थिर उ: बाइटबफ़र = प.यूटीएफ८(मूलपाठ);लिखो(प.यूटीएफ८पाठ(उ)==मूलपाठ,यूटीएफ८पाठ(यूटीएफ८बफ़र(मूलपाठ))==मूलपाठ);
+                स्थिर र: बाइटबफ़र = नया बाइटबफ़र(१७);
+                र.पूर्णांकलिखो(१,-९२२३३७२०३६८५४७७५८०८,असत्य);लिखो(र.पूर्णांकपढ़ो(१,असत्य),र[१],र[८]);
+                र.पूर्णांकलिखो(९,९२२३३७२०३६८५४७७५८०७,सत्य);लिखो(र.पूर्णांकपढ़ो(९,सत्य),र[९],र[१६]);
+                र.दशमलवलिखो(१,-०.०,सत्य);लिखो(र.दशमलवपढ़ो(१,सत्य),र.पूर्णांकपढ़ो(१,सत्य));
+                र.दशमलवलिखो(९,१२३.२५,असत्य);लिखो(र.दशमलवपढ़ो(९,असत्य));
+                लिखो(प.यूटीएफ८पाठ(नया बाइटबफ़र(०)),नया बाइटबफ़र{}.खाली());
+                प्रयास { लिखो(प.यूटीएफ८पाठ(ब)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(क[-१]); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { र.पूर्णांकलिखो(१०,१,असत्य); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { क.काटो(१,०); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { स्थिर अ: बाइटबफ़र = नया बाइटबफ़र(-१); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { स्थिर अ: बाइटबफ़र = नया बाइटबफ़र(२१४७४८३६४८); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+            }
+            """).exit());
+    }
+    @Test void nativeBinaryFilesByteLimitsAndFailuresMatchManaged()throws Exception{
+        requireNumericTargets();Path file=temporary.resolve("बाइट😀.bin"),large=temporary.resolve("large");
+        try(var f=new java.io.RandomAccessFile(large.toFile(),"rw")){f.setLength(16777217);}
+        String code="""
+            आयात मानक.फ़ाइल उपनाम फ;
+            आयात मानक.पाठ्य उपनाम प;
+            कार्य मुख्य() -> शून्य {
+                स्थिर ब: बाइटबफ़र = नया बाइटबफ़र(२५६);मान इ: पूर्णांक = ०;
+                जबतक (इ<२५६) { ब[इ]=परिवर्तित<बाइट>(इ);इ=इ+१; }
+                फ.बाइटलिखो(FILE,ब);स्थिर क: बाइटबफ़र = फ.बाइटपढ़ो(FILE);
+                मान योग: पूर्णांक = ०;प्रत्येक (व: बाइट में क) { योग=योग+व; }लिखो(क.आकार,योग,क[२५५]);
+                फ.बाइटलिखो(FILE,नया बाइटबफ़र(०));लिखो(फ.बाइटपढ़ो(FILE).खाली());
+                स्थिर सीमा: बाइटबफ़र = नया बाइटबफ़र(१६७७७२१६);सीमा[१६७७७२१५]=परिवर्तित<बाइट>(२५५);
+                फ.बाइटलिखो(FILE,सीमा);लिखो(फ.बाइटपढ़ो(FILE)[१६७७७२१५]);
+                फ.पाठलिखो(FILE,"बचा");
+                प्रयास { फ.बाइटलिखो(FILE,नया बाइटबफ़र(१६७७७२१७)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                लिखो(फ.पाठपढ़ो(FILE));
+                प्रयास { फ.बाइटपढ़ो(LARGE); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.बाइटलिखो("",ब); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.बाइटपढ़ो(FILE+".missing"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+            }
+            """.replace("FILE",fileLiteral(file)).replace("LARGE",fileLiteral(large));
+        assertEquals(0,numericExact(code).exit());assertEquals("बचा",Files.readString(file));
+    }
+    @Test void nativeBufferStressAndUnwindingMatchManaged()throws Exception{
+        requireNumericTargets();Files.createDirectories(Path.of("target/native-byte-example"));
+        var result=numericExact(Files.readString(Path.of("examples/native/bytes.bhash")));
+        assertEquals(0,result.exit());assertTrue(stats(result).get("allocations")>3000,result.err());
     }
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));

@@ -705,7 +705,7 @@ static uint64_t mix_hash(uint64_t value) {
 static uint64_t boxed_kind(const void *value) {
     const bh_class_info *info; memcpy(&info, value, 8);
     int64_t id = info->type_count ? info->type_ids[0] : 0;
-    return id == -6 ? BH_REAL : id >= -3 && id <= -1 ? (uint64_t)-id : BH_REFERENCE;
+    return id == -7 ? BH_BYTE : id == -6 ? BH_REAL : id >= -3 && id <= -1 ? (uint64_t)-id : BH_REFERENCE;
 }
 static uint64_t box_payload(const void *value) { uint64_t bits; memcpy(&bits, (const unsigned char *)value + 8, 8); return bits; }
 static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
@@ -770,6 +770,13 @@ static void rehash(bh_collection *c) {
 static void collection_reserve(bh_collection *owner, uint64_t needed, const void *location) {
     if (needed <= owner->capacity) return;
     checked_length((int64_t)needed, location);
+    if(owner->info->kind==BH_BUFFER){
+        void *slot=owner;bh_root_frame frame;bh_roots_push(&frame,&slot,1);
+        void *bytes=bh_alloc(&scalar_storage,needed);owner=slot;
+        if(owner->size)memcpy(bytes,owner->data,(size_t)owner->size);
+        bh_reference_store(owner,offsetof(bh_collection,data),bytes);owner->capacity=needed;
+        bh_roots_pop(&frame);return;
+    }
     uint64_t capacity = owner->capacity ? owner->capacity : 4;
     while (capacity < needed) capacity *= 2;
     /* Capacity is an internal power of two; logical sizes retain the signed-32-bit limit. */
@@ -857,16 +864,16 @@ uint64_t bh_collection_call(void *receiver, uint32_t operation, uint64_t a, uint
             result = b < c->size; break;
         case BH_ITER_KEY: case BH_ITER_VALUE:
             index = checked_index(a, c->size, 0, location);
-            result = c->data[map ? index*4+(operation == BH_ITER_VALUE ? 1 : 0) : index]; break;
+            result = c->info->kind==BH_BUFFER ? ((unsigned char *)c->data)[index] : c->data[map ? index*4+(operation == BH_ITER_VALUE ? 1 : 0) : index]; break;
         case BH_GET: case BH_GET_OR:
             if (map) {
                 if (index == UINT64_MAX && operation == BH_GET) runtime_error(location, "मानचित्र में कुंजी नहीं मिली।");
                 result = index == UINT64_MAX ? b : c->data[index*4+1];
-            } else result = c->data[checked_index(a, c->size, 0, location)];
+            } else {index=checked_index(a,c->size,0,location);result=c->info->kind==BH_BUFFER?((unsigned char *)c->data)[index]:c->data[index];}
             break;
         case BH_CONTAINS:
             if (map) result = index != UINT64_MAX;
-            else for (uint64_t i=0; i<c->size; ++i) if (collection_same(value_kind, c->data[i], a)) { result = 1; break; }
+            else for (uint64_t i=0; i<c->size; ++i) if (collection_same(value_kind, c->info->kind==BH_BUFFER?((unsigned char *)c->data)[i]:c->data[i], a)) { result = 1; break; }
             break;
         case BH_SET:
             if (map) {
@@ -881,7 +888,8 @@ uint64_t bh_collection_call(void *receiver, uint32_t operation, uint64_t a, uint
                     c->data[index*4+3] = c->buckets[bucket]; c->buckets[bucket] = index+1;
                 }
                 storage_store(c->data, index*4+1, b, reference_kind(value_kind));
-            } else storage_store(c->data, checked_index(a, c->size, 0, location), b, reference_kind(value_kind));
+            } else if(c->info->kind==BH_BUFFER)((unsigned char *)c->data)[checked_index(a,c->size,0,location)]=(unsigned char)bh_to_byte((int64_t)b,location);
+            else storage_store(c->data, checked_index(a, c->size, 0, location), b, reference_kind(value_kind));
             break;
         case BH_ADD: case BH_INSERT:
             index = operation == BH_ADD ? c->size : checked_index(a, c->size, 1, location);
@@ -937,14 +945,15 @@ void *bh_collection_literal(const bh_collection_info *info, uint64_t count, cons
         if (reference_kind(kind)) slots[i+1] = bits_pointer(values[i]);
     }
     bh_root_frame frame; bh_roots_push(&frame, slots, words+1);
-    slots[0] = bh_collection_new(info, info->kind == BH_ARRAY ? (int64_t)count : 0, location);
+    slots[0] = bh_collection_new(info, (info->kind == BH_ARRAY || info->kind == BH_BUFFER) ? (int64_t)count : 0, location);
     for (uint64_t i=0; i<count; ++i) {
         uint64_t ak = width==2 ? info->key_kind : info->value_kind;
         uint64_t a = reference_kind(ak) ? pointer_bits(slots[i*width+1]) : values[i*width];
         if (width==2) {
             uint64_t b = reference_kind(info->value_kind) ? pointer_bits(slots[i*2+2]) : values[i*2+1];
             bh_collection_call(slots[0], BH_SET, a, b, NULL, location);
-        } else if (info->kind == BH_LIST) bh_collection_call(slots[0], BH_ADD, a, 0, NULL, location);
+        } else if(info->kind==BH_BUFFER)bh_collection_call(slots[0],BH_SET,i,a,NULL,location);
+        else if (info->kind == BH_LIST) bh_collection_call(slots[0], BH_ADD, a, 0, NULL, location);
         else {
             bh_collection *c = slots[0]; storage_store(c->data, i, a, reference_kind(info->value_kind));
         }
@@ -1170,8 +1179,8 @@ static void json_write_value(json_writer *w,uint64_t kind,uint64_t bits,unsigned
     }else if(kind==BH_TEXT)slots[1]=slots[0];
     if(kind==BH_TEXT)json_write_string(w,slots[1]);
     else if(kind==BH_BOOL)buffer_bytes(&w->buffer,bits?"true":"false",bits?4:5,bits?4:5);
-    else if(kind==BH_INT||kind==BH_REAL){
-        if(kind==BH_INT){int64_t value;memcpy(&value,&bits,8);slots[1]=bh_text_integer(value,w->location);}
+    else if(kind==BH_INT||kind==BH_BYTE||kind==BH_REAL){
+        if(kind==BH_INT||kind==BH_BYTE){int64_t value;memcpy(&value,&bits,8);slots[1]=bh_text_integer(value,w->location);}
         else{double value;memcpy(&value,&bits,8);slots[1]=bh_text_real(numeric_finite(value,w->location),w->location);}
         uint64_t n=text_length(slots[1]);buffer_text(&w->buffer,&slots[1],n,n);
     }else{
@@ -1192,7 +1201,7 @@ static void json_write_value(json_writer *w,uint64_t kind,uint64_t bits,unsigned
                     else runtime_error(w->location,"जेसन मानचित्र की कुंजी पाठ होनी चाहिए।");
                     json_write_string(w,slots[1]);slots[1]=NULL;buffer_bytes(&w->buffer,":",1,1);c=slots[0];
                 }
-                uint64_t value=c->data[map?i*4+1:i],value_kind=c->info->value_kind;
+                uint64_t value=c->info->kind==BH_BUFFER?((unsigned char *)c->data)[i]:c->data[map?i*4+1:i],value_kind=c->info->value_kind;
                 json_write_value(w,value_kind,value,depth+1);
             }
             buffer_bytes(&w->buffer,map?"}":"]",1,1);w->active[depth]=NULL;
@@ -1254,7 +1263,7 @@ int bh_file_exists(const void *path,const void *location) {
     return !stat((const char *)text_data(name),&info)&&S_ISREG(info.st_mode);
 #endif
 }
-void *bh_file_read_text(const void *path,const void *location) {
+static void *file_read(const void *path,const bh_collection_info *info,const void *location) {
     void *slots[2]={NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
     slots[0]=file_path(path,location);
     FILE *file=fopen((const char *)text_data(slots[0]),"rb");
@@ -1265,22 +1274,79 @@ void *bh_file_read_text(const void *path,const void *location) {
     while((count=fread(chunk,1,sizeof chunk,file))!=0)buffer_bytes(&buffer,chunk,count,count);
     int failed=ferror(file);int closed=file_close(file,&cleanup);
     if(failed||closed)runtime_error(location,"फ़ाइल पढ़ी नहीं जा सकी।");
-    slots[1]=buffer_finish(&buffer);
-    if(!valid_utf8(text_data(slots[1]),text_length(slots[1])))runtime_error(location,"अमान्य UTF-8 बाइटबफ़र।");
+    if(info){
+        slots[1]=bh_collection_new(info,(int64_t)buffer.size,location);
+        if(buffer.size)memcpy(((bh_collection *)slots[1])->data,text_data(buffer.slots[0]),(size_t)buffer.size);
+        bh_roots_pop(&buffer.frame);
+    }else{
+        slots[1]=buffer_finish(&buffer);
+        if(!valid_utf8(text_data(slots[1]),text_length(slots[1])))runtime_error(location,"अमान्य UTF-8 बाइटबफ़र।");
+    }
     void *result=slots[1];bh_roots_pop(&frame);return result;
 }
-void bh_file_write_text(const void *path,const void *value,const void *location) {
+static void file_write(const void *path,const void *value,int binary,const void *location) {
     bh_instance((void *)value,location);
-    uint64_t n=text_length(value);
-    if(!valid_utf8(text_data(value),n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
+    uint64_t n=binary?((const bh_collection *)value)->size:text_length(value);
+    if(!binary&&!valid_utf8(text_data(value),n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
     if(n>BH_FILE_LIMIT)runtime_error(location,"फ़ाइल १६ MiB सीमा से बड़ी है।");
     void *slots[2]={(void *)value,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
     slots[1]=file_path(path,location);
     FILE *file=fopen((const char *)text_data(slots[1]),"wb");
     if(!file)runtime_error(location,"फ़ाइल लिखी नहीं जा सकी।");
     /* All validation/allocation precedes truncation. No safepoint until close. */
-    size_t count=fwrite(text_data(slots[0]),1,(size_t)n,file);
+    const void *bytes=binary?(const void *)((bh_collection *)slots[0])->data:(const void *)text_data(slots[0]);
+    size_t count=n?fwrite(bytes,1,(size_t)n,file):0;
     int closed=fclose(file);
     if(count!=n||closed)runtime_error(location,"फ़ाइल लिखी नहीं जा सकी।");
     bh_roots_pop(&frame);
+}
+
+void *bh_file_read_text(const void *path,const void *location){return file_read(path,NULL,location);}
+void bh_file_write_text(const void *path,const void *value,const void *location){file_write(path,value,0,location);}
+int64_t bh_to_byte(int64_t value,const void *location){
+    if(value<0||value>255)runtime_error(location,"बाइट परिवर्तन सीमा से बाहर है।");
+    return value;
+}
+static uint64_t buffer_span(uint64_t offset,uint64_t size,const void *location){
+    if(size<8||offset>size-8)runtime_error(location,"बाइटबफ़र सीमा से बाहर है।");return offset;
+}
+uint64_t bh_buffer_call(uint32_t operation,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
+                        const bh_collection_info *info,const void *location){
+    void *slots[3]={bits_pointer(a),NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,3);
+    if(operation==BH_WRITE_FILE)slots[1]=bits_pointer(b);
+    if(operation!=BH_WRITE_FILE)bh_instance(slots[0],location);
+    uint64_t result=0;
+    if(operation==BH_READ_FILE)slots[2]=file_read(slots[0],info,location);
+    else if(operation==BH_WRITE_FILE)file_write(slots[0],slots[1],1,location);
+    else if(operation==BH_ENCODE){
+        uint64_t n=text_length(slots[0]);
+        if(!valid_utf8(text_data(slots[0]),n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
+        if(n>INT32_MAX)runtime_error(location,"सरणी की लंबाई सीमा से बाहर है।");
+        slots[2]=bh_collection_new(info,(int64_t)n,location);
+        if(n)memcpy(((bh_collection *)slots[2])->data,text_data(slots[0]),(size_t)n);
+    }else{
+        bh_collection *buffer=slots[0];uint64_t n=buffer->size;
+        if(operation==BH_DECODE){
+            if(!valid_utf8((unsigned char *)buffer->data,n))runtime_error(location,"अमान्य UTF-8 बाइटबफ़र।");
+            slots[2]=new_text(n,location);buffer=slots[0];
+            if(n)memcpy(text_data(slots[2]),buffer->data,(size_t)n);
+        }else if(operation==BH_SLICE){
+            if(b>n||c<b||c>n)runtime_error(location,"बाइटबफ़र सीमा से बाहर है।");
+            slots[2]=bh_collection_new(info,(int64_t)(c-b),location);buffer=slots[0];
+            if(c>b)memcpy(((bh_collection *)slots[2])->data,(unsigned char *)buffer->data+b,(size_t)(c-b));
+        }else if(operation==BH_TO_ARRAY){
+            slots[2]=bh_collection_new(info,(int64_t)n,location);buffer=slots[0];
+            bh_collection *array=slots[2];for(uint64_t i=0;i<n;++i)array->data[i]=((unsigned char *)buffer->data)[i];
+        }else if(operation==BH_FILL){
+            bh_to_byte((int64_t)b,location);if(n)memset(buffer->data,(int)b,(size_t)n);
+        }else{
+            uint64_t at=buffer_span(b,n,location);unsigned char *bytes=(unsigned char *)buffer->data;
+            int writing=operation==BH_WRITE_INT||operation==BH_WRITE_REAL;uint64_t big=writing?d:c;
+            if(writing){for(unsigned i=0;i<8;++i)bytes[at+i]=(unsigned char)(c>>(8*(big?7-i:i)));}
+            else if(operation==BH_READ_INT||operation==BH_READ_REAL){
+                for(unsigned i=0;i<8;++i)result|=(uint64_t)bytes[at+i]<<(8*(big?7-i:i));
+            }else fatal("आंतरिक बाइटबफ़र क्रिया अमान्य है।");
+        }
+    }
+    if(slots[2])result=pointer_bits(slots[2]);bh_roots_pop(&frame);return result;
 }

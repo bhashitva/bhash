@@ -101,6 +101,16 @@ def main():
         assert result.stdout.replace(b'\r\n', b'\n') == b'Native file checks passed.\n'
         print(f'{name}: UTF-8 files, byte limits, errors, descriptor cleanup and forced GC passed')
 
+        bytes_exe = BUILD / ('bytes-' + name + ('.exe' if os.name == 'nt' else ''))
+        bytes_command = [part.replace('runtime_test.c', 'bytes_runtime_test.c').replace(str(exe), str(bytes_exe)) for part in command]
+        result = run(bytes_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(bytes_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native byte/buffer checks passed.\n'
+        print(f'{name}: packed bytes, binary layouts, UTF-8, file round trips, precision and exception cleanup passed')
+
         numeric_exe = BUILD / ('math-random-' + name + ('.exe' if os.name == 'nt' else ''))
         numeric_command = [part.replace('runtime_test.c', 'math_random_runtime_test.c').replace(str(exe), str(numeric_exe)) for part in command]
         result = run(numeric_command)
