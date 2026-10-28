@@ -38,6 +38,8 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public enum TypeAction { TEST, SAFE, CAST }
     public record TypeOperation(Type type, TypeAction action, Expression value, Type targetType, int targetId, Source source) implements Expression {}
     public record StructuredTypes(int texts,int values,int object) {}
+    public enum FileOperation { SUPPORTED, EXISTS, READ_TEXT, WRITE_TEXT }
+    public record FileCall(Type type, FileOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public enum StructuredOperation { SPLIT, JOIN, JSON_READ, JSON_WRITE }
     public record StructuredCall(Type type, StructuredOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public enum TextOperation {
@@ -72,7 +74,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -419,6 +421,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         Expression libraryCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
             TextOperation operation=null;
             if(f.intrinsic!=null) {
+                FileOperation file=switch(f.intrinsic){case "stdFilesSupported"->FileOperation.SUPPORTED;case "stdFileExists"->FileOperation.EXISTS;
+                    case "stdFileReadText"->FileOperation.READ_TEXT;case "stdFileWriteText"->FileOperation.WRITE_TEXT;default->null;};
+                if(file!=null)return new FileCall(type(f.result,at),file,arguments(args),source(at));
                 StructuredOperation data=switch(f.intrinsic){case "stdSplit"->StructuredOperation.SPLIT;case "stdJoin"->StructuredOperation.JOIN;
                     case "stdJsonRead"->StructuredOperation.JSON_READ;case "stdJsonWrite"->StructuredOperation.JSON_WRITE;default->null;};
                 if(data!=null){ensureStructuredTypes(at);return new StructuredCall(type(f.result,at),data,checkedArguments(args,f.parameters),source(at));}

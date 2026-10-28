@@ -1,6 +1,6 @@
 # फ़ाइलों के साथ काम (File I/O)
 
-इन उदाहरणों को खाली अभ्यास फ़ोल्डर में चलाएँ। वे target/tutorial-files के भीतर निश्चित नामों की फ़ाइलें बनाते या बदलते हैं; उसी नाम की पुरानी फ़ाइल overwrite होगी। parent directory अपने-आप नहीं बनती। JVM/CLR पर OS permissions और साधारण path/symlink व्यवहार लागू हैं। Browser WASM में समर्थित() असत्य है और हर दूसरी फ़ाइल operation फ़ाइल तक पहुँचने से पहले अपवाद देती है।
+इन उदाहरणों को खाली अभ्यास फ़ोल्डर में चलाएँ। वे target/tutorial-files के भीतर निश्चित नामों की फ़ाइलें बनाते या बदलते हैं; उसी नाम की पुरानी फ़ाइल overwrite होगी। parent directory अपने-आप नहीं बनती। JVM/CLR और native Linux text operations पर OS permissions और साधारण path/symlink व्यवहार लागू हैं। Browser WASM में समर्थित() असत्य है और हर दूसरी फ़ाइल operation फ़ाइल तक पहुँचने से पहले अपवाद देती है।
 
 [मानक पुस्तकालय का सूचकांक](README.md) · [पूरा चलाने योग्य उदाहरण](examples/06-files.bhash) · [पूरे उदाहरण का अपेक्षित आउटपुट](examples/06-files.expected.txt)
 
@@ -156,3 +156,10 @@
 ```
 
 सीमा १६ MiB है। यह atomic replacement, streaming या append API नहीं है। फ़ाइल handles सफलता और failure दोनों पर बंद किए जाते हैं।
+
+## मूल-मशीन लक्ष्य (Native Target)
+
+Native Linux पर `समर्थित`, `है`, `पाठपढ़ो` और `पाठलिखो` यही text व्यवहार देते हैं।
+`बाइटबफ़र` और binary operations अभी native पर उपलब्ध नहीं हैं; इसलिए ऊपर का पूरा
+मिश्रित text/binary उदाहरण JVM/CLR के लिए है। [Native text-only उदाहरण](../../examples/native/files.bhash)
+और [सीमाएँ व त्रुटियाँ](../../docs/native-files.md) देखें।

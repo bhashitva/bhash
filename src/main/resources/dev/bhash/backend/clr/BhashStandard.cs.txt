@@ -102,7 +102,16 @@ internal static class BhashStandard {
         try{return Path.GetFullPath(s);}catch(Exception e) when(fileError(e)){throw failure("अमान्य फ़ाइल पथ।");}
     }
     private static bool fileError(Exception e) => e is IOException||e is UnauthorizedAccessException||e is System.Security.SecurityException||e is ArgumentException||e is NotSupportedException;
-    internal static bool stdFileExists(string s) {fileGuard();return File.Exists(path(s));}
+    internal static bool stdFileExists(string s) {
+        fileGuard();string name=path(s);
+        try {
+            var info=new FileInfo(name);
+            // File.Exists can report a dangling Unix symlink as present. Follow its
+            // final target explicitly to match the JVM/native regular-file check.
+            if(info.LinkTarget!=null)return info.ResolveLinkTarget(true) is FileInfo target&&target.Exists;
+            return File.Exists(name);
+        }catch(Exception e) when(fileError(e)){return false;}
+    }
     internal static BhashRuntime.BBuffer stdFileReadBytes(string s) {
         fileGuard();
         try{using var input=File.OpenRead(path(s));using var output=new MemoryStream();byte[] chunk=new byte[8192];int count;

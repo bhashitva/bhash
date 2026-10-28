@@ -118,4 +118,9 @@ void *bh_text_devanagari(const void *, const void *location);
 void *bh_text_integer(int64_t, const void *location);
 int64_t bh_text_parse_integer(const void *, const void *location);
 void bh_text_fail(const void *, const void *location);
+/* Files: strict UTF-8, bounded whole-file text operations. */
+int bh_file_supported(const void *);
+int bh_file_exists(const void *, const void *);
+void *bh_file_read_text(const void *, const void *);
+void bh_file_write_text(const void *, const void *, const void *);
 #endif

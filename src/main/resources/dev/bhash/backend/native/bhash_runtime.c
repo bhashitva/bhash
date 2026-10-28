@@ -1,4 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#endif
 #include "bhash_runtime.h"
 #include <limits.h>
 #include <float.h>
@@ -9,6 +12,7 @@ _Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
 #include <setjmp.h>
 #ifdef _MSC_VER
 #include <io.h>
@@ -61,6 +65,7 @@ static const void *exception_info;
 typedef struct bh_cleanup {
     struct bh_cleanup *previous;
     void *memory;
+    void (*dispose)(void *);
 } bh_cleanup;
 static bh_cleanup *cleanups;
 typedef struct bh_handler {
@@ -639,7 +644,7 @@ _Noreturn void bh_throw(void *value, const void *location) {
        The pending object is a precise global root before any frame is removed. */
     roots = handlers->saved_roots;
     while (cleanups != handlers->saved_cleanups) {
-        bh_cleanup *entry = cleanups; cleanups = entry->previous; free(entry->memory);
+        bh_cleanup *entry = cleanups; cleanups = entry->previous; entry->dispose(entry->memory);
     }
     longjmp(handlers->jump, 1);
 }
@@ -926,7 +931,7 @@ void *bh_collection_literal(const bh_collection_info *info, uint64_t count, cons
     uint64_t words = count*width;
     void **slots = calloc((size_t)words+1, sizeof(void *));
     if (!slots) fatal("स्मृति उपलब्ध नहीं है।");
-    bh_cleanup cleanup = {cleanups, slots}; cleanups = &cleanup;
+    bh_cleanup cleanup = {cleanups, slots, free}; cleanups = &cleanup;
     for (uint64_t i=0; i<words; ++i) {
         uint64_t kind = width==2 && i%2==0 ? info->key_kind : info->value_kind;
         if (reference_kind(kind)) slots[i+1] = bits_pointer(values[i]);
@@ -1201,4 +1206,81 @@ void *bh_data_json_write(void *value,const void *location) {
     buffer_init(&writer.buffer,1048576,"जेसन पाठ सीमा से बाहर है।",location);
     bh_roots_push(&writer.frame,writer.active,65);json_write_value(&writer,BH_ANY,pointer_bits(slot),0);bh_roots_pop(&writer.frame);
     void *result=buffer_finish(&writer.buffer);bh_roots_pop(&frame);return result;
+}
+
+/* Whole-file text I/O. Open handles join the same nonallocating unwind cleanup
+   stack as compiler scratch storage. Managed buffers/paths have writable roots;
+   no interior pointer survives a GC safepoint. The supported platform is Linux. */
+#define BH_FILE_LIMIT UINT64_C(16777216)
+static int valid_utf8(const unsigned char *s,uint64_t n) {
+    uint64_t i=0;
+    while(i<n){
+        unsigned c=s[i++];uint32_t cp;unsigned extra;
+        if(c<0x80)continue;
+        if(c>=0xc2&&c<=0xdf){cp=c&31;extra=1;}
+        else if(c>=0xe0&&c<=0xef){cp=c&15;extra=2;}
+        else if(c>=0xf0&&c<=0xf4){cp=c&7;extra=3;}
+        else return 0;
+        if(n-i<extra)return 0;
+        unsigned width=extra;
+        while(extra--){c=s[i++];if((c&0xc0)!=0x80)return 0;cp=(cp<<6)|(c&63);}
+        if((width==2&&cp<0x800)||(width==3&&cp<0x10000)||
+           (cp>=0xd800&&cp<=0xdfff)||cp>0x10ffff)return 0;
+    }
+    return 1;
+}
+static void *file_path(const void *path,const void *location) {
+    bh_instance((void *)path,location);
+    uint64_t n=text_length(path);
+    if(!valid_utf8(text_data(path),n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
+    if(!n||memchr(text_data(path),0,(size_t)n))runtime_error(location,"अमान्य फ़ाइल पथ।");
+    void *input=(void *)path;bh_root_frame frame;bh_roots_push(&frame,&input,1);
+    void *result=new_text(checked_add(n,1,location),location);
+    memcpy(text_data(result),text_data(input),(size_t)n);text_data(result)[n]=0;
+    bh_roots_pop(&frame);return result;
+}
+static void file_dispose(void *file) {(void)fclose((FILE *)file);}
+static int file_close(FILE *file,bh_cleanup *cleanup) {
+    int status=fclose(file);cleanups=cleanup->previous;return status;
+}
+int bh_file_supported(const void *location) {(void)location;return 1;}
+int bh_file_exists(const void *path,const void *location) {
+    void *name=file_path(path,location); /* No allocation during stat. */
+#ifdef _MSC_VER
+    struct _stat info;
+    return !_stat((const char *)text_data(name),&info)&&(info.st_mode&_S_IFMT)==_S_IFREG;
+#else
+    struct stat info;
+    return !stat((const char *)text_data(name),&info)&&S_ISREG(info.st_mode);
+#endif
+}
+void *bh_file_read_text(const void *path,const void *location) {
+    void *slots[2]={NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
+    slots[0]=file_path(path,location);
+    FILE *file=fopen((const char *)text_data(slots[0]),"rb");
+    if(!file)runtime_error(location,"फ़ाइल पढ़ी नहीं जा सकी।");
+    bh_cleanup cleanup={cleanups,file,file_dispose};cleanups=&cleanup;
+    data_buffer buffer;buffer_init(&buffer,BH_FILE_LIMIT,"फ़ाइल १६ MiB सीमा से बड़ी है।",location);
+    unsigned char chunk[8192];size_t count;
+    while((count=fread(chunk,1,sizeof chunk,file))!=0)buffer_bytes(&buffer,chunk,count,count);
+    int failed=ferror(file);int closed=file_close(file,&cleanup);
+    if(failed||closed)runtime_error(location,"फ़ाइल पढ़ी नहीं जा सकी।");
+    slots[1]=buffer_finish(&buffer);
+    if(!valid_utf8(text_data(slots[1]),text_length(slots[1])))runtime_error(location,"अमान्य UTF-8 बाइटबफ़र।");
+    void *result=slots[1];bh_roots_pop(&frame);return result;
+}
+void bh_file_write_text(const void *path,const void *value,const void *location) {
+    bh_instance((void *)value,location);
+    uint64_t n=text_length(value);
+    if(!valid_utf8(text_data(value),n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
+    if(n>BH_FILE_LIMIT)runtime_error(location,"फ़ाइल १६ MiB सीमा से बड़ी है।");
+    void *slots[2]={(void *)value,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
+    slots[1]=file_path(path,location);
+    FILE *file=fopen((const char *)text_data(slots[1]),"wb");
+    if(!file)runtime_error(location,"फ़ाइल लिखी नहीं जा सकी।");
+    /* All validation/allocation precedes truncation. No safepoint until close. */
+    size_t count=fwrite(text_data(slots[0]),1,(size_t)n,file);
+    int closed=fclose(file);
+    if(count!=n||closed)runtime_error(location,"फ़ाइल लिखी नहीं जा सकी।");
+    bh_roots_pop(&frame);
 }

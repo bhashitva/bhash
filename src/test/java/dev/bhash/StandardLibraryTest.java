@@ -127,5 +127,17 @@ abstract class StandardLibraryTest {
             """.replace("PATH",path).replace("BINARY",binary)));
         assertArrayEquals("नमस्ते😀".getBytes(StandardCharsets.UTF_8),Files.readAllBytes(directory.resolve("हिन्दी file.txt")));
     }
+    @Test void fileExistsFollowsSymlinkTargetsOnLinux()throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name").equals("Linux"));
+        Path target=directory.resolve("target.txt"),link=directory.resolve("link"),broken=directory.resolve("broken"),dir=directory.resolve("dir-link"),loop=directory.resolve("loop");
+        Files.writeString(target,"kept");Files.createSymbolicLink(link,target);
+        Files.createSymbolicLink(broken,directory.resolve("missing"));Files.createSymbolicLink(dir,directory);Files.createSymbolicLink(loop,loop);
+        String code="""
+            आयात मानक.फ़ाइल उपनाम फ;
+            कार्य मुख्य() -> शून्य { लिखो(फ.है(LINK),फ.है(BROKEN),फ.है(DIR),फ.है(LOOP)); }
+            """.replace("LINK",literal(link.toString())).replace("BROKEN",literal(broken.toString()))
+                .replace("DIR",literal(dir.toString())).replace("LOOP",literal(loop.toString()));
+        assertEquals("सत्य असत्य असत्य असत्य\n",execute(code));
+    }
     static String literal(String s){return "\""+s.replace("\\","\\\\").replace("\"","\\\"").replace("\n","\\n").replace("\r","\\r").replace("\t","\\t")+"\"";}
 }
