@@ -37,8 +37,8 @@ uint64_t bh_heap_bytes(void);
 void *bh_instance(void *value, const void *location);
 void bh_reference_store(void *owner, uint64_t offset, void *value);
 /* Collection metadata begins with the same immutable nominal metadata as classes. */
-enum { BH_ARRAY=1, BH_LIST=2, BH_MAP=3 };
-enum { BH_INT=1, BH_BOOL=2, BH_TEXT=3, BH_REFERENCE=4, BH_ANY=5, BH_REAL=6 };
+enum { BH_ARRAY=1, BH_LIST=2, BH_MAP=3, BH_BUFFER=4 };
+enum { BH_INT=1, BH_BOOL=2, BH_TEXT=3, BH_REFERENCE=4, BH_ANY=5, BH_REAL=6, BH_BYTE=7 };
 enum { BH_SIZE, BH_EMPTY, BH_GET, BH_GET_OR, BH_SET, BH_CONTAINS, BH_ADD,
        BH_INSERT, BH_REMOVE, BH_CLEAR, BH_KEYS, BH_VALUES, BH_VERSION,
        BH_ITER_CHECK, BH_ITER_KEY, BH_ITER_VALUE };
@@ -118,6 +118,11 @@ void *bh_text_devanagari(const void *, const void *location);
 void *bh_text_integer(int64_t, const void *location);
 int64_t bh_text_parse_integer(const void *, const void *location);
 void bh_text_fail(const void *, const void *location);
+/* Packed buffers; operands/results carry scalar bits or allocation-base pointers. */
+enum { BH_ENCODE, BH_DECODE, BH_READ_FILE, BH_WRITE_FILE, BH_SLICE, BH_TO_ARRAY, BH_FILL,
+       BH_READ_INT, BH_WRITE_INT, BH_READ_REAL, BH_WRITE_REAL };
+int64_t bh_to_byte(int64_t, const void *);
+uint64_t bh_buffer_call(uint32_t, uint64_t, uint64_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
 /* Files: strict UTF-8, bounded whole-file text operations. */
 int bh_file_supported(const void *);
 int bh_file_exists(const void *, const void *);
