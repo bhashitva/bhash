@@ -79,7 +79,7 @@ Real overflow/nonfinite values पर मौजूदा finite-value error म�
 का output `{}` है, भले declared key type अलग हो। Map insertion order बचता है।
 
 Ordinary classes और exceptions को पहले explicit data map/list में बदलें; automatic
-object reflection नहीं है। Records, enums, अन्य numeric widths और byte buffers अभी
+object reflection नहीं है। Records, enums और अन्य numeric widths अभी
 native profile के बाहर हैं। Byte-buffer JSON support इस milestone में नहीं जुड़ता।
 
 Real values में decimal/exponent marker रहता है ताकि `१.०` वापस `दशमलव` पढ़ा जाए।
@@ -144,3 +144,7 @@ boundaries, supplementary characters, error offsets और uncaught failure क�
 allocating finally हैं। Independent C tests 1,000 successful/failed nested parse
 cycles के बाद explicit collection से zero retained objects जाँचते हैं। Linux CI
 LLVM verification, ASan/UBSan और clean-container standalone execution चलाता है।
+
+Native byte और buffer JSON serialization भी उपलब्ध है: byte integer number बनता है
+और packed buffer numeric JSON array। Parsing हमेशा मौजूदा integer/list types देता है।
+[Native bytes](native-bytes.md) देखें।

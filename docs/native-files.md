@@ -57,8 +57,8 @@ unwinding पर बंद होता है। Write में validation/all
 write और close के बीच GC allocation नहीं होती। Success और failure दोनों पर handles बंद होते हैं।
 Handles user code तक नहीं पहुँचते; programmer को manual close/free नहीं करना पड़ता।
 
-`बाइटपढ़ो`, `बाइटलिखो` और `बाइटबफ़र` इस native milestone का हिस्सा नहीं हैं; unsupported
-calls compile-time `BH9001` देते हैं। JVM/CLR की binary APIs उपलब्ध रहती हैं।
+`बाइटपढ़ो`, `बाइटलिखो` और `बाइटबफ़र` अब native पर भी उपलब्ध हैं;
+[बाइट और binary I/O guide](native-bytes.md) देखें। वही 16 MiB और path/error नियम लागू हैं।
 
 ## जाँच (Validation)
 

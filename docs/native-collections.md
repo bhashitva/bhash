@@ -188,6 +188,6 @@ Other numeric widths, records/enums, user-defined generics, static members and
 foreign interoperability remain outside the native profile. Built-in
 collection type arguments are supported; this does not add user-defined generic
 classes/functions. Standard-library intrinsics outside the existing native text
-subset remain unsupported, including byte-buffer and file APIs. [JSON and text split/join](native-json-text.md) are now supported.
+subset remain unsupported. Packed byte buffers and file APIs are now supported; see [native bytes](native-bytes.md). [JSON and text split/join](native-json-text.md) are now supported.
 
 [Native दशमलव support](native-decimals.md) adds binary64 arithmetic, conversions, formatting, boxing and collection values.
