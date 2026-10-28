@@ -49,6 +49,20 @@ def main():
         assert result.returncode == 0
         assert result.stdout.decode('utf-8').replace('\r\n', '\n') == '-९२२३३७२०३६८५४७७५८०८ ९२२३३७२०३६८५४७७५८०७ सत्य असत्य\n'
         print(f'{name}: collector, cycles, precision, roots, stress, Unicode, arithmetic and failure checks passed')
+        text_exe = BUILD / ('text-' + name + ('.exe' if os.name == 'nt' else ''))
+        text_command = [part.replace('runtime_test.c', 'text_runtime_test.c').replace(str(exe), str(text_exe)) for part in command]
+        result = run(text_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(text_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native heap text checks passed.\n'
+        for scenario in ('empty-replace', 'slice-bounds', 'negative-repeat', 'repeat-limit', 'mixed-digits', 'integer-overflow', 'explicit-failure'):
+            result = run([str(text_exe), scenario])
+            assert result.returncode == 1, (scenario, result.returncode)
+            assert not result.stdout
+            assert result.stderr.startswith('भाष: runtime-test:1:1: '.encode('utf-8'))
+        print(f'{name}: heap text, helper rooting, Unicode, limits and failure checks passed')
 
 if __name__ == '__main__':
     main()
