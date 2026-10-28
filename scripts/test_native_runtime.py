@@ -91,6 +91,16 @@ def main():
         assert result.stdout.replace(b'\r\n', b'\n') == b'Native structured text checks passed.\n'
         print(f'{name}: split/join, nested JSON, scalar boxes, Unicode, cycles, depth and partial-failure root cleanup passed')
 
+        files_exe = BUILD / ('files-' + name + ('.exe' if os.name == 'nt' else ''))
+        files_command = [part.replace('runtime_test.c', 'files_runtime_test.c').replace(str(exe), str(files_exe)) for part in command]
+        result = run(files_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(files_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native file checks passed.\n'
+        print(f'{name}: UTF-8 files, byte limits, errors, descriptor cleanup and forced GC passed')
+
         numeric_exe = BUILD / ('math-random-' + name + ('.exe' if os.name == 'nt' else ''))
         numeric_command = [part.replace('runtime_test.c', 'math_random_runtime_test.c').replace(str(exe), str(numeric_exe)) for part in command]
         result = run(numeric_command)
