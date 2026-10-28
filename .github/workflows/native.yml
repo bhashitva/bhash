@@ -25,9 +25,11 @@ jobs:
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/factorial.bhash --target native -o target/factorial-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/heap-text.bhash --target native -o target/heap-text-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/heap-objects.bhash --target native -o target/heap-objects-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/objects.bhash --target native -o target/objects-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/inheritance.bhash --target native -o target/inheritance-native
       - name: Inspect executable dependencies
         run: |
-          for executable in target/factorial-native target/heap-text-native target/heap-objects-native; do
+          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native; do
             file "$executable"
             ldd "$executable"
           done | tee target/native-dependencies.txt
@@ -52,12 +54,22 @@ jobs:
             cmp /tmp/objects-actual /tmp/objects-expected
             grep "live=0" /tmp/objects-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/objects-stats
+            /artifacts/objects-native > /tmp/bank-actual
+            printf "मनोज १५० १५ १६५\n" > /tmp/bank-expected
+            cmp /tmp/bank-actual /tmp/bank-expected
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/inheritance-native > /tmp/inheritance-actual 2> /tmp/inheritance-stats
+            printf "मूल😀:आधार:विशेष!\nसाथी:आधार:ख! सत्य\nमूल😀:आधार:विशेष! साथी:आधार:ख!\n" > /tmp/inheritance-expected
+            cmp /tmp/inheritance-actual /tmp/inheritance-expected
+            grep "live=0" /tmp/inheritance-stats
+            grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/inheritance-stats
           '
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-experimental-native-linux-x86_64
           path: |
             target/factorial-native
+            target/objects-native
+            target/inheritance-native
             target/heap-objects-native
             target/heap-text-native
             target/native-dependencies.txt
@@ -66,3 +78,4 @@ jobs:
             docs/native-compilation-design.md
             docs/native-text.md
             docs/native-objects.md
+            docs/native-inheritance.md
