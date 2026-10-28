@@ -256,3 +256,7 @@ library interop, exact decimal arithmetic, networking, streaming I/O, local time
 zones, Unicode case folding or asynchronous APIs. Those remain independent roadmap
 items. Public library declarations are compiler-owned; applications can use normal
 packages alongside them, and compiled applications carry the library runtime.
+
+Native Linux also supports the text-file subset (`समर्थित`, `है`, `पाठपढ़ो`,
+`पाठलिखो`), with the same UTF-8 and 16 MiB contracts. See [native files](native-files.md).
+The byte-buffer file APIs remain JVM/CLR-only.
