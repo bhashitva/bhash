@@ -21,6 +21,7 @@ public final class LlvmEmitter {
     private final Map<Binding,Integer> bindingRoots=new LinkedHashMap<>();
     private final Map<Binding,Boolean> bindings=new LinkedHashMap<>();
     private int rootCount;
+    private final Map<NewCollection,Integer> buffers=new IdentityHashMap<>();
     private final Map<Integer,Integer> objectSizes=new HashMap<>();
     private final Map<Expression,Value> values=new IdentityHashMap<>();
     private record Value(Type type,String ir) { String argument(){return llvm(type)+" "+ir;} }
@@ -44,6 +45,7 @@ public final class LlvmEmitter {
     public static String emit(CoreProgram program,String notices){return new LlvmEmitter().program(program,notices);}
     private String program(CoreProgram program,String notices){
         boxMetadata();
+        collectionMetadata(program.collections());
         for(var c:program.classes()){
             objectSizes.put(c.id(),8+c.fields().size()*8);
             globals.append("@vtable").append(c.id()).append(" = private constant [").append(c.virtualMethods().size()).append(" x ptr] [")
@@ -63,19 +65,21 @@ public final class LlvmEmitter {
             globals.append(name).append(" = private constant [").append(nameBytes.length).append(" x i8] c\"");
             for(byte b:nameBytes)globals.append(String.format(Locale.ROOT,"\\%02X",b&255));
             globals.append("\"\n");
-            globals.append("@class").append(c.id()).append(" = private constant { ptr, i64, i64, ptr } { ptr ").append(name)
-                .append(", i64 ").append(8+c.fields().size()*8).append(", i64 ").append(refs.size()).append(", ptr ").append(offsets).append(" }, align 8\n");
+            globals.append("@class").append(c.id()).append(" = private constant { ptr, i64, i64, ptr, i64, i64, i64 } { ptr ").append(name)
+                .append(", i64 ").append(8+c.fields().size()*8).append(", i64 ").append(refs.size()).append(", ptr ").append(offsets).append(", i64 0, i64 0, i64 0 }, align 8\n");
         }
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v4\n"+
-            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v5\n"+
+            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+
             "declare void @bh_print_bool(i32)\ndeclare void @bh_print_space()\ndeclare void @bh_print_end()\n"+
             "declare i32 @bh_text_equal(ptr, ptr)\ndeclare i64 @bh_divide(i64, i64, ptr)\n"+
             "declare i64 @bh_remainder(i64, i64, ptr)\n"+
+            "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\n"+
+            "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
             textDeclarations()+"\n"+typeTestHelper()+equalityHelper()+functions+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  call void @bfn"+program.entry()+"()\n  call void @bh_shutdown()\n  br label %done\ndone:\n  ret i32 0\n}\n";
     }
@@ -129,11 +133,59 @@ public final class LlvmEmitter {
             globals.append("@box_info").append(kind).append(" = private constant %ClassInfo { ptr null, ptr null, i64 2, ptr @box_types").append(kind).append(" }, align 8\n");
             globals.append("@box_refs").append(kind).append(" = private constant [").append(kind==3?1:0).append(" x i64] [").append(kind==3?"i64 8":"").append("]\n");
             // The collector uses the name only for diagnostics, so share a static UTF-8 name.
-            globals.append("@box_gc").append(kind).append(" = private constant { ptr, i64, i64, ptr } { ptr @box_name, i64 16, i64 ")
-                .append(kind==3?1:0).append(", ptr @box_refs").append(kind).append(" }, align 8\n");
+            globals.append("@box_gc").append(kind).append(" = private constant { ptr, i64, i64, ptr, i64, i64, i64 } { ptr @box_name, i64 16, i64 ")
+                .append(kind==3?1:0).append(", ptr @box_refs").append(kind).append(", i64 0, i64 0, i64 0 }, align 8\n");
         }
         globals.append("@box_name = private constant [4 x i8] c\"box\\00\"\n");
     }
+    private static String collectionInfo(int id){return id<0?"null":"@collection_info"+id;}
+    private void collectionMetadata(List<CollectionType> types){
+        for(var t:types){
+            collectionTypes.put(t.id(),t);
+            globals.append("@collection_ids").append(t.id()).append(" = private constant [2 x i64] [i64 ").append(t.id()).append(", i64 -4]\n");
+            globals.append(collectionInfo(t.id())).append(" = private constant %CollectionInfo { %ClassInfo { ptr null, ptr null, i64 2, ptr @collection_ids")
+                .append(t.id()).append(" }, i64 ").append(t.kind().ordinal()+1).append(", i64 ").append(t.keyKind()).append(", i64 ").append(t.valueKind())
+                .append(", ptr ").append(collectionInfo(t.element())).append(", ptr ").append(collectionInfo(t.keyList())).append(", ptr ")
+                .append(collectionInfo(t.valueList())).append(" }, align 8\n");
+        }
+    }
+    private Value bits(Value value){
+        if(value.type().reference())return instruction(Type.INT,"ptrtoint ptr "+value.ir()+" to i64");
+        if(value.type()==Type.BOOL)return instruction(Type.INT,"zext i1 "+value.ir()+" to i64");
+        return value;
+    }
+    private Value collectionResult(Type type,Value bits){
+        if(type.reference())return instruction(type,"inttoptr i64 "+bits.ir()+" to ptr");
+        if(type==Type.BOOL)return instruction(type,"icmp ne i64 "+bits.ir()+", 0");
+        if(type==Type.VOID)return new Value(type,"");
+        return bits;
+    }
+    private Value collectionCall(Type result,CollectionOperation operation,Value receiver,List<Value> arguments,int snapshot,Source source){
+        var args=new ArrayList<Value>();for(var arg:arguments)args.add(bits(arg));
+        String a=args.isEmpty()?"0":args.get(0).ir(),b=args.size()<2?"0":args.get(1).ir();
+        Value bits=instruction(Type.INT,"call i64 @bh_collection_call(ptr "+receiver.ir()+", i32 "+operation.ordinal()+", i64 "+a+", i64 "+b+
+            ", ptr "+collectionInfo(snapshot)+", ptr "+text(source.toString())+")");
+        return collectionResult(result,bits);
+    }
+    private Value collectionCall(CollectionCall c){
+        instance(expression(c.receiver()),c.source());for(var arg:c.arguments())expression(arg);
+        return collectionCall(c.type(),c.operation(),reload(c.receiver()),c.arguments().stream().map(this::reload).toList(),c.snapshot(),c.source());
+    }
+    private Value newCollection(NewCollection c){
+        for(var arg:c.arguments())expression(arg);
+        String buffer="%buffer"+buffers.get(c);int count=c.arguments().size();
+        for(int i=0;i<count;i++){
+            Value value=bits(reload(c.arguments().get(i)));String slot=temporary();
+            line(slot+" = getelementptr ["+count+" x i64], ptr "+buffer+", i64 0, i64 "+i);
+            line("store i64 "+value.ir()+", ptr "+slot);
+        }
+        String location=text(c.source().toString());
+        CollectionType type=collectionTypes.get(c.collection());
+        if(c.literal())return instruction(Type.OBJECT,"call ptr @bh_collection_literal(ptr "+collectionInfo(c.collection())+", i64 "+(type.kind()==CollectionKind.MAP?count/2:count)+", ptr "+buffer+", ptr "+location+")");
+        if(type.kind()==CollectionKind.ARRAY)return instruction(Type.OBJECT,"call ptr @bh_array_dimensions(ptr "+collectionInfo(c.collection())+", i64 "+count+", ptr "+buffer+", ptr "+location+")");
+        return instruction(Type.OBJECT,"call ptr @bh_collection_new(ptr "+collectionInfo(c.collection())+", i64 0, ptr "+location+")");
+    }
+    private final Map<Integer,CollectionType> collectionTypes=new HashMap<>();
     private static String equalityHelper(){
         return """
             define internal i1 @bhash_any_equal(ptr %a, ptr %b) {
@@ -241,6 +293,9 @@ public final class LlvmEmitter {
         else if(e instanceof FieldRead f)scan(f.receiver());
         else if(e instanceof TypeOperation t)scan(t.value());
         else if(e instanceof Box b)scan(b.value());
+        else if(e instanceof IndexRead r){scan(r.receiver());scan(r.index());}
+        else if(e instanceof CollectionCall c){scan(c.receiver());c.arguments().forEach(this::scan);}
+        else if(e instanceof NewCollection c){buffers.putIfAbsent(c,buffers.size());c.arguments().forEach(this::scan);}
     }
     private void register(Binding b){
         if(bindings.putIfAbsent(b,true)==null && b.type().reference())bindingRoots.put(b,rootCount++);
@@ -255,13 +310,15 @@ public final class LlvmEmitter {
         else if(s instanceof Return r)scan(r.value());
         else if(s instanceof Print p)p.arguments().forEach(this::scan);
         else if(s instanceof Evaluate e)scan(e.value());
+        else if(s instanceof IndexWrite w){scan(w.destination().receiver());scan(w.destination().index());scan(w.value());}
+        else if(s instanceof Foreach f){scan(f.collection());register(f.owner());register(f.index());register(f.version());f.items().forEach(this::scan);scan(f.body());}
     }
     private String rootAddress(int slot){
         String address=temporary();line(address+" = getelementptr ["+rootCount+" x ptr], ptr %roots, i64 0, i64 "+slot);return address;
     }
     private String address(Binding b){return "%b"+b.id();}
     private void function(Function f){
-        code=new StringBuilder(); values.clear(); roots.clear(); bindingRoots.clear(); bindings.clear();rootCount=0;next=0;loops.clear();scopes.clear();
+        code=new StringBuilder(); values.clear(); roots.clear(); bindingRoots.clear(); bindings.clear();rootCount=0;next=0;buffers.clear();loops.clear();scopes.clear();
         f.parameters().forEach(this::register);scan(f.body());
         code.append("define internal ").append(llvm(f.result())).append(" @bfn").append(f.id()).append('(');
         var arguments=new ArrayList<String>();
@@ -270,6 +327,7 @@ public final class LlvmEmitter {
         line("%frame = alloca %RootFrame, align 8");
         line("%roots = alloca ["+rootCount+" x ptr], align 8");
         line("store ["+rootCount+" x ptr] zeroinitializer, ptr %roots");
+        for(var entry:buffers.entrySet().stream().sorted(Map.Entry.comparingByValue()).toList())line("%buffer"+entry.getValue()+" = alloca ["+entry.getKey().arguments().size()+" x i64], align 8");
         for(var b:bindings.keySet()) {
             if(b.type().reference())line(address(b)+" = getelementptr ["+rootCount+" x ptr], ptr %roots, i64 0, i64 "+bindingRoots.get(b));
             else line(address(b)+" = alloca "+llvm(b.type()));
@@ -289,6 +347,12 @@ public final class LlvmEmitter {
             result=instruction(Type.OBJECT,"call ptr @bh_alloc(ptr @class"+a.objectType()+", i64 "+objectSizes.get(a.objectType())+")");
             // The immutable type-metadata pointer is not a managed reference or safepoint.
             line("store ptr @typeinfo"+a.objectType()+", ptr "+result.ir());
+        }
+        else if(e instanceof NewCollection c)result=newCollection(c);
+        else if(e instanceof CollectionCall c)result=collectionCall(c);
+        else if(e instanceof IndexRead r){
+            instance(expression(r.receiver()),r.source());expression(r.index());
+            result=collectionCall(r.type(),CollectionOperation.GET,reload(r.receiver()),List.of(reload(r.index())),-1,r.source());
         }
         else if(e instanceof FieldRead f){
             Value receiver=expression(f.receiver());
@@ -348,6 +412,9 @@ public final class LlvmEmitter {
         else if(e instanceof FieldRead f)release(f.receiver());
         else if(e instanceof TypeOperation t)release(t.value());
         else if(e instanceof Box b)release(b.value());
+        else if(e instanceof IndexRead r){release(r.receiver());release(r.index());}
+        else if(e instanceof CollectionCall c){release(c.receiver());c.arguments().forEach(this::release);}
+        else if(e instanceof NewCollection c)c.arguments().forEach(this::release);
         values.put(e,result);
         return result;
     }
@@ -398,6 +465,22 @@ public final class LlvmEmitter {
         String predicate=switch(op){case "=="->"eq";case "!="->"ne";case "<"->"slt";case "<="->"sle";case ">"->"sgt";case ">="->"sge";default->throw new IllegalStateException("Unchecked binary operator");};
         return instruction(Type.BOOL,"icmp "+predicate+" "+left.argument()+", "+right.ir());
     }
+    private Value load(Binding b){return instruction(b.type(),"load "+llvm(b.type())+", ptr "+address(b));}
+    private void foreach(Foreach f){
+        Value source=expression(f.collection());instance(source,f.source());
+        line("store ptr "+source.ir()+", ptr "+address(f.owner()));release(f.collection());
+        Value version=collectionCall(Type.INT,CollectionOperation.VERSION,load(f.owner()),List.of(),-1,f.source());
+        line("store i64 "+version.ir()+", ptr "+address(f.version()));line("store i64 0, ptr "+address(f.index()));
+        String condition=freshLabel(),body=freshLabel(),advance=freshLabel(),exit=freshLabel();jump(condition);block(condition);
+        Value more=collectionCall(Type.BOOL,CollectionOperation.ITER_CHECK,load(f.owner()),List.of(load(f.version()),load(f.index())),-1,f.source());
+        line("br i1 "+more.ir()+", label %"+body+", label %"+exit);block(body);
+        var locals=f.items().stream().map(Assign::binding).toList();int depth=scopes.size();scopes.push(locals);
+        loops.push(new LoopTarget(advance,exit,depth));f.items().forEach(this::statement);statement(f.body());loops.pop();
+        if(!terminated){clearBindings(locals);jump(advance);}scopes.pop();
+        block(advance);Value index=load(f.index());Value next=instruction(Type.INT,"add i64 "+index.ir()+", 1");
+        line("store i64 "+next.ir()+", ptr "+address(f.index()));jump(condition);block(exit);
+        clearBindings(locals);line("store ptr null, ptr "+address(f.owner()));
+    }
     private void statement(Statement s){
         if(s==null || terminated)return;
         if(s instanceof Block b){
@@ -405,6 +488,12 @@ public final class LlvmEmitter {
             if(!terminated)clearBindings(b.locals());scopes.pop();
         }
         else if(s instanceof Assign a){Value v=expression(a.value());line("store "+v.argument()+", ptr "+address(a.binding()));release(a.value());}
+        else if(s instanceof Foreach f)foreach(f);
+        else if(s instanceof IndexWrite w){
+            var target=w.destination();instance(expression(target.receiver()),target.source());expression(target.index());expression(w.value());
+            collectionCall(Type.VOID,CollectionOperation.SET,reload(target.receiver()),List.of(reload(target.index()),reload(w.value())),-1,target.source());
+            release(target.receiver());release(target.index());release(w.value());
+        }
         else if(s instanceof FieldWrite f){
             var target=f.destination();
             instance(expression(target.receiver()),target.source());
