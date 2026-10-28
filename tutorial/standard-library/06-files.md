@@ -160,6 +160,6 @@
 ## मूल-मशीन लक्ष्य (Native Target)
 
 Native Linux पर `समर्थित`, `है`, `पाठपढ़ो` और `पाठलिखो` यही text व्यवहार देते हैं।
-`बाइटबफ़र` और binary operations अभी native पर उपलब्ध नहीं हैं; इसलिए ऊपर का पूरा
-मिश्रित text/binary उदाहरण JVM/CLR के लिए है। [Native text-only उदाहरण](../../examples/native/files.bhash)
+`बाइटबफ़र` और binary operations भी native Linux पर उपलब्ध हैं;
+[Native byte guide](../../docs/native-bytes.md) देखें। [Native text-only उदाहरण](../../examples/native/files.bhash)
 और [सीमाएँ व त्रुटियाँ](../../docs/native-files.md) देखें।
