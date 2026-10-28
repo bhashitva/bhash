@@ -110,7 +110,7 @@ Unboxing में exact runtime type चाहिए: boxed पूर्णा�
 
 ## स्मृति और निजी अनुबंध (GC and private ABI)
 
-निजी native ABI v7 में decimal scalar का LLVM प्रकार `double` और आकार आठ bytes है।
+निजी native ABI v8 में decimal scalar का LLVM प्रकार `double` और आकार आठ bytes है।
 Function arguments/results और fields में doubles सीधे जाते हैं। Collection kind 6
 (`BH_REAL`) के slots raw binary64 bits रखते हैं; वे GC references नहीं हैं। Decimal
 box की nominal membership `-6` और `सर्ववस्तु` membership `-4` है। उसका 16-byte
@@ -137,5 +137,7 @@ Linux sanitizer builds में करते हैं। CI executable को 
 एक साफ Linux container में चलाता है।
 
 अन्य numeric widths, exact decimal arithmetic और अभी unsupported standard-library
-math/JSON/time/file APIs इस milestone में नहीं जुड़ते। आगे की native scope के लिए
+JSON/time/file APIs इस milestone में नहीं जुड़ते। आगे की native scope के लिए
 [native profile](native-compilation-design.md) देखें।
+
+[Native math and seeded randomness](native-math-random.md) now support all existing functions in those two modules.

@@ -71,6 +71,7 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - Arrays, growable lists, insertion-ordered maps and iteration in [native collections](native-collections.md).
 - Typed exceptions, catch/finally, throw/rethrow and safe root unwinding in [native exceptions](native-exceptions.md).
 - Binary64 `दशमलव` arithmetic, comparisons, conversions, formatting and boxing in [native decimals](native-decimals.md).
+- All existing math and random library signatures in [native math/random](native-math-random.md), including exact seeded sequences.
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
@@ -82,7 +83,7 @@ injected compiler metadata alone does not require library execution.
 Other integer widths, unsupported conversions, bitwise operations, input, unsupported
 standard-library calls, static members, user-defined generics, selection,
 interop and concurrency are not yet available. The decimal-area calculation is supported;
-unsupported math library calls still receive diagnostics. Defaults and behavior of managed targets are unchanged.
+math and seeded random library calls are supported. Other unsupported library calls receive diagnostics. Defaults and behavior of managed targets are unchanged.
 
 ## Runtime semantics
 

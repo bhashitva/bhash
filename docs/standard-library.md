@@ -34,8 +34,9 @@ Devanagari names. Existing globals such as `लंबाई`, `अंश`, `प�
 retain their existing behavior.
 
 The experimental native Linux target supports a [scalar text subset](native-text.md),
-including concatenation and garbage-collected text results. Other library modules
-and collection/buffer-based text functions remain unsupported on native.
+including concatenation and garbage-collected text results, [decimal formatting](native-decimals.md),
+and all [math/random functions](native-math-random.md). Other library modules and
+collection/buffer-based text functions remain unsupported on native.
 
 ## Portable contracts
 

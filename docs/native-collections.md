@@ -136,7 +136,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/collections
 
 ## Runtime and collector contract
 
-Private native ABI v7 (extended by [exceptions](native-exceptions.md)) extends GC descriptors with a repeated region: byte offset,
+Private native ABI v8 (extended by [exceptions](native-exceptions.md)) extends GC descriptors with a repeated region: byte offset,
 stride, and a bitmap of reference lanes within each stride. The allocator validates
 these regions against payload size. The collector visits only declared pointer
 lanes, and the reference-store barrier accepts those same writable slots. Integer
