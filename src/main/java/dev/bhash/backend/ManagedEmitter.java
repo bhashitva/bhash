@@ -128,6 +128,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         final Map<PrimaryContext, Binding> reads = new IdentityHashMap<>();
         final Map<ParserRuleContext, Function> calls = new IdentityHashMap<>();
         final Map<ParserRuleContext, Field> fields = new IdentityHashMap<>();
+        final Map<Constructor, Constructor> baseConstructors = new IdentityHashMap<>();
+        final Set<ParserRuleContext> baseCalls = Collections.newSetFromMap(new IdentityHashMap<>());
         final Map<PrimaryContext, Constructor> constructors = new IdentityHashMap<>();
         final Map<ParserRuleContext, Object> constants = new IdentityHashMap<>();
     }
@@ -604,6 +606,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (declaration != null && declaration.BASE() != null) throw error(at, "A base initializer requires a parent class.");
         } else {
             Constructor parent = selectConstructor(at,definition.parent,arguments);
+            if (analysis != null) analysis.baseConstructors.put(constructor,parent);
             if (parent.access == Access.PRIVATE) throw error(at, "Base constructor is not accessible (private).");
             checkArguments(at, arguments, parent.parameters, "base constructor");
             if (target == Target.CLR) output.append(" : base(").append(constructorCallArguments(arguments,parent)).append(')');
@@ -1369,7 +1372,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (!method.shared && constructorBody && (object.base || object.java.equals("this")))
             throw error(at, "Constructors cannot call instance methods on यह or आधार before construction completes.");
         checkAccess(at, method.owner, method.access, object);
-        if (analysis != null) analysis.calls.put(at, method);
+        if (analysis != null) {
+            analysis.calls.put(at, method);
+            if (object.base) analysis.baseCalls.add(at);
+        }
         if(method.intrinsic!=null)return tagged(new Expr(method.result,"BhashStandard."+method.intrinsic+"("+join(arguments)+")",true));
         String receiver=method.shared?method.owner.java:memberReceiver(object, method.owner, method.access);
         return new Expr(method.result, receiver + "." + method.java + "(" + join(arguments) + ")", true);
