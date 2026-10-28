@@ -191,6 +191,8 @@ See [exception rules and cleanup behavior](docs/exceptions.md).
 The experimental Linux native target also supports try/catch/finally, throw/rethrow,
 custom exceptions and safe GC-root unwinding. See [native exceptions](docs/native-exceptions.md).
 
+Native LLVM now supports `दशमलव` arithmetic, comparisons, checked conversions, formatting, and boxing/unboxing; see the [native decimal guide](docs/native-decimals.md) and [runnable example](examples/native/decimals.bhash).
+
 ## Standard library
 
 The compiler bundles the `मानक` package on JVM, .NET CLR and browser WASM:
