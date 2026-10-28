@@ -41,9 +41,10 @@ jobs:
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/json-text.bhash --target native -o target/json-text-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/hello.bhash --target native -o target/hello-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/files.bhash --target native -o target/files-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/bytes.bhash --target native -o target/bytes-native
       - name: Inspect executable dependencies
         run: |
-          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native target/math-random-native target/json-text-native target/hello-native target/files-native; do
+          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native target/math-random-native target/json-text-native target/hello-native target/files-native target/bytes-native; do
             file "$executable"
             ldd "$executable"
           done | tee target/native-dependencies.txt
@@ -54,6 +55,11 @@ jobs:
             for tool in java dotnet clang gcc; do
               if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
             done
+            mkdir -p target/native-byte-example
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/bytes-native > /tmp/bytes-actual 2> /tmp/bytes-stats
+            printf "अमान्य UTF-8 बाइटबफ़र।\n३०० ३३५८६\n२५५ २५५ -१\n" > /tmp/bytes-expected
+            cmp /tmp/bytes-actual /tmp/bytes-expected
+            grep "live=0" /tmp/bytes-stats
             mkdir -p target/native-file-example
             BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/files-native > /tmp/files-actual 2> /tmp/files-stats
             printf "सत्य\n४९५० सत्य\nफ़ाइल पढ़ी नहीं जा सकी।\nबचा😀\n" > /tmp/files-expected
@@ -132,6 +138,7 @@ jobs:
             target/math-random-native
             target/json-text-native
             target/files-native
+            target/bytes-native
             target/collections-native
             target/boxing-native
             target/interfaces-native
@@ -153,3 +160,4 @@ jobs:
             docs/native-math-random.md
             docs/native-json-text.md
             docs/native-files.md
+            docs/native-bytes.md
