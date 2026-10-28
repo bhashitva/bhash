@@ -70,6 +70,7 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
   in [native universal values](native-boxing.md).
 - Arrays, growable lists, insertion-ordered maps and iteration in [native collections](native-collections.md).
 - Typed exceptions, catch/finally, throw/rethrow and safe root unwinding in [native exceptions](native-exceptions.md).
+- Binary64 `दशमलव` arithmetic, comparisons, conversions, formatting and boxing in [native decimals](native-decimals.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
@@ -78,11 +79,10 @@ Unsupported features produce source-located Hindi diagnostics, including unused
 unsupported declarations. Unsupported calls to standard-library intrinsics are rejected;
 injected compiler metadata alone does not require library execution.
 
-Decimals, other integer widths, unsupported conversions, bitwise operations, input, unsupported
+Other integer widths, unsupported conversions, bitwise operations, input, unsupported
 standard-library calls, static members, user-defined generics, selection,
-interop and concurrency are not yet available. The original decimal-area example is
-therefore outside this native profile. Defaults and behavior of managed targets are
-unchanged.
+interop and concurrency are not yet available. The decimal-area calculation is supported;
+unsupported math library calls still receive diagnostics. Defaults and behavior of managed targets are unchanged.
 
 ## Runtime semantics
 

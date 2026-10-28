@@ -11,7 +11,7 @@ import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
 public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType) {
-    public enum Type { INT, BOOL, TEXT, OBJECT, ANY, VOID;
+    public enum Type { INT, REAL, BOOL, TEXT, OBJECT, ANY, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT || this==ANY; }
     }
     public record ObjectField(int owner, int offset, Type type) {}
@@ -41,7 +41,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         LENGTH("length"), SLICE("slice"), FIND("stdFind"), CONTAINS("stdContains"),
         STARTS("stdStarts"), ENDS("stdEnds"), REPLACE("stdReplace"), TRIM("stdTrim"),
         UPPER("upper"), LOWER("stdLower"), REPEAT("stdRepeat"), DEVANAGARI("devanagari"),
-        INTEGER(null), PARSE_INTEGER(null), FAIL(null);
+        INTEGER(null), PARSE_INTEGER(null), REAL(null), PARSE_REAL(null), FIXED("stdFixed"), FAIL(null);
         final String catalog;
         TextOperation(String catalog) { this.catalog=catalog; }
     }
@@ -106,12 +106,12 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         if(c instanceof TypeArgumentsContext && !(c.getParent() instanceof ValueTypeContext t &&
                 t.IDENTIFIER()!=null && CollectionTypes.builtin(t.IDENTIFIER().getText())))throw unsupported(c);
         if (c instanceof ValueTypeContext t &&
-                !(t.INT_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null || t.OBJECT_TYPE()!=null || t.IDENTIFIER()!=null)) throw unsupported(c);
+                !(t.INT_TYPE()!=null || t.REAL_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null || t.OBJECT_TYPE()!=null || t.IDENTIFIER()!=null)) throw unsupported(c);
         if (c instanceof StatementContext s && s.switchStatement()!=null) throw unsupported(c);
         if (c instanceof UnaryContext u && u.BIT_NOT()!=null) throw unsupported(c);
         if ((c instanceof ShiftContext || c instanceof BitwiseOrContext || c instanceof BitwiseXorContext ||
                 c instanceof BitwiseAndContext) && c.getChildCount()>1) throw unsupported(c);
-        if (c instanceof PrimaryContext p && !(p.INTEGER_LITERAL()!=null || p.STRING_LITERAL()!=null ||
+        if (c instanceof PrimaryContext p && !(p.INTEGER_LITERAL()!=null || p.REAL_LITERAL()!=null || p.STRING_LITERAL()!=null ||
                 p.TRUE()!=null || p.FALSE()!=null || p.IDENTIFIER()!=null || p.NEW()!=null || p.THIS()!=null || p.BASE()!=null || p.NULL()!=null || p.CONVERT()!=null || p.TYPE_TEST()!=null || p.SAFE_CAST()!=null ||
                 p.expression()!=null && p.LPAREN()!=null && p.CONVERT()==null && p.TYPE_TEST()==null && p.SAFE_CAST()==null))
             throw unsupported(c);
@@ -143,12 +143,12 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         final List<CollectionType> collections=new ArrayList<>();
         int valueKind(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             Type value=type(t,at);
-            return switch(value){case INT->1;case BOOL->2;case TEXT->3;case OBJECT->4;case ANY->5;default->throw unsupported(at);};
+            return switch(value){case REAL->6;case INT->1;case BOOL->2;case TEXT->3;case OBJECT->4;case ANY->5;default->throw unsupported(at);};
         }
         int runtimeId(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             if(t.collection!=null)return collectionId(t,at);
             Type value=type(t,at);
-            return switch(value){case INT->-1;case BOOL->-2;case TEXT->-3;case ANY->-4;case OBJECT->classIds.get(t.object);default->throw unsupported(at);};
+            return switch(value){case REAL->-6;case INT->-1;case BOOL->-2;case TEXT->-3;case ANY->-4;case OBJECT->classIds.get(t.object);default->throw unsupported(at);};
         }
         ManagedEmitter.Type listType(ManagedEmitter.Type element){
             return collectionIds.keySet().stream().filter(t->t.collection==ManagedEmitter.CollectionKind.LIST && t.arguments.get(0)==element).findFirst()
@@ -216,6 +216,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         Type type(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             if(t.collection!=null){collectionId(t,at);return Type.OBJECT;}
             if(t==ManagedEmitter.Type.INT)return Type.INT;
+            if(t==ManagedEmitter.Type.REAL)return Type.REAL;
             if(t==ManagedEmitter.Type.BOOL)return Type.BOOL;
             if(t==ManagedEmitter.Type.TEXT)return Type.TEXT;
             if(t==ManagedEmitter.Type.OBJECT)return Type.ANY;
@@ -280,7 +281,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     }
                     for(var f:c.fields.values()){
                         Type t=type(f.type(),f.declaration());
-                        Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(t,t==Type.TEXT?"":t==Type.BOOL?false:t==Type.INT?0L:null,source(f.declaration()));
+                        Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(t,t==Type.TEXT?"":t==Type.BOOL?false:t==Type.INT?(Object)0L:t==Type.REAL?(Object)0.0:null,source(f.declaration()));
                         statements.add(new FieldWrite(new FieldRead(new Read(self,source(at)),fields.get(f),source(f.declaration())),coerce(value,t)));
                     }
                     resultType=Type.VOID;
@@ -417,7 +418,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         }
         Expression expression(ParserRuleContext c) throws CompilationException {
             Object constant=a.constants.get(c);
-            if(constant!=null)return new Constant(constant instanceof Long?Type.INT:Type.TEXT,constant,source(c));
+            if(constant!=null)return new Constant(constant instanceof Long?Type.INT:constant instanceof Double?Type.REAL:Type.TEXT,constant,source(c));
             if(c instanceof PrimaryContext p) {
                 if(p.CONVERT()!=null || p.TYPE_TEST()!=null || p.SAFE_CAST()!=null){
                     var destination=a.conversions.get(p);Type target=type(destination,p);
@@ -425,6 +426,10 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     if(target==Type.ANY && p.TYPE_TEST()==null)return coerce(value,Type.ANY);
                     if(p.CONVERT()!=null && target==Type.TEXT && value.type()==Type.INT)
                         return new TextCall(Type.TEXT,TextOperation.INTEGER,List.of(value),source(p));
+                    if(p.CONVERT()!=null && target==Type.TEXT && value.type()==Type.REAL)
+                        return new TextCall(Type.TEXT,TextOperation.REAL,List.of(value),source(p));
+                    if(p.CONVERT()!=null && target==Type.REAL && value.type()==Type.TEXT)
+                        return new TextCall(Type.REAL,TextOperation.PARSE_REAL,List.of(value),source(p));
                     if(p.CONVERT()!=null && target==Type.INT && value.type()==Type.TEXT)
                         return new TextCall(Type.INT,TextOperation.PARSE_INTEGER,List.of(value),source(p));
                     var action=p.TYPE_TEST()!=null?TypeAction.TEST:p.SAFE_CAST()!=null?TypeAction.SAFE:TypeAction.CAST;

@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 #include "bhash_runtime.h"
 #include <limits.h>
+#include <float.h>
+#include <math.h>
+_Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024, "binary64 required");
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -444,6 +447,108 @@ int64_t bh_text_parse_integer(const void *s, const void *location) {
     if (negative && value == UINT64_C(9223372036854775808)) return INT64_MIN;
     return negative ? -(int64_t)value : (int64_t)value;
 }
+
+/* Default process C locale and round-to-nearest are retained: no locale mutation
+   or fast-math flags are used by this runtime or generated programs. */
+int64_t bh_real_to_int(double value, const void *location) {
+    if (!isfinite(value) || value < -0x1p63 || value >= 0x1p63)
+        runtime_error(location, "संख्यात्मक परिवर्तन सीमा से बाहर है।");
+    return (int64_t)value;
+}
+static void *ascii_text(const char *value, const void *location) {
+    size_t n = strlen(value); void *result = new_text(n, location);
+    memcpy(text_data(result), value, n); return result;
+}
+void *bh_text_fixed(double value, int64_t places, const void *location) {
+    if (!isfinite(value)) runtime_error(location, "एक सीमित दशमलव मान आवश्यक है।");
+    if (places < 0 || places > 15) runtime_error(location, "दशमलव स्थान ० से १५ तक होने चाहिए।");
+    /* Largest finite binary64: 309 integer digits + sign, dot and 15 places. */
+    char buffer[512]; int n = snprintf(buffer, sizeof buffer, "%.*f", (int)places, value);
+    if (n < 0 || (size_t)n >= sizeof buffer) fatal("आंतरिक दशमलव प्रारूप सीमा।");
+    return ascii_text(buffer, location);
+}
+void *bh_text_real(double value, const void *location) {
+    if (isnan(value)) return ascii_text("NaN", location);
+    if (isinf(value)) return ascii_text(signbit(value) ? "-Infinity" : "Infinity", location);
+    if (value == 0) return ascii_text(signbit(value) ? "-0.0" : "0.0", location);
+    char raw[64]; double magnitude = value < 0 ? -value : value;
+    /* Find the shortest correctly rounded significant-digit representation that
+       parses to the original bits. Two significant digits in exponent notation
+       retain the Bhash/Java presentation of very small values. */
+    for (int digits = 1; digits <= 17; ++digits) {
+        int n = snprintf(raw, sizeof raw, "%.*g", digits, magnitude);
+        if (n < 0 || (size_t)n >= sizeof raw) fatal("आंतरिक दशमलव प्रारूप सीमा।");
+        if (strtod(raw, NULL) == magnitude) {
+            if (digits == 1 && strchr(raw, 'e')) continue;
+            break;
+        }
+    }
+    char *exponent_at = strchr(raw, 'e'); int exponent = exponent_at ? atoi(exponent_at + 1) : 0;
+    if (exponent_at) *exponent_at = 0;
+    char digits[32]; int count = 0, position = 0, dot = 0;
+    for (const char *p = raw; *p; ++p) {
+        if (*p == '.') dot = 1;
+        else { digits[count++] = *p; if (!dot) ++position; }
+    }
+    position += exponent;
+    while (count > 1 && digits[0] == '0') { memmove(digits, digits + 1, (size_t)--count); --position; }
+    while (count > 1 && digits[count - 1] == '0') --count;
+    int power = position - 1; char result[512]; size_t at = 0;
+    if (signbit(value)) result[at++] = '-';
+    if (power >= 7 || power < -3) {
+        result[at++] = digits[0]; result[at++] = '.';
+        if (count == 1) result[at++] = '0';
+        else { memcpy(result + at, digits + 1, (size_t)count - 1); at += (size_t)count - 1; }
+        int n = snprintf(result + at, sizeof result - at, "E%d", power);
+        if (n < 0 || (size_t)n >= sizeof result - at) fatal("आंतरिक दशमलव प्रारूप सीमा।");
+        at += (size_t)n;
+    } else if (position <= 0) {
+        result[at++] = '0'; result[at++] = '.';
+        for (int i = 0; i < -position; ++i) result[at++] = '0';
+        memcpy(result + at, digits, (size_t)count); at += (size_t)count;
+    } else {
+        for (int i = 0; i < position || i < count; ++i) {
+            if (i == position) result[at++] = '.';
+            result[at++] = i < count ? digits[i] : '0';
+        }
+        if (position >= count) { result[at++] = '.'; result[at++] = '0'; }
+    }
+    result[at] = 0; return ascii_text(result, location);
+}
+void bh_print_real(double value) {
+    /* The text print path has no allocation/safepoint after this result. */
+    static const struct { uint64_t n; char data[8]; } location = {7, "runtime"};
+    const void *formatted = bh_text_real(value, &location);
+    for (uint64_t i = 0; i < text_length(formatted); ++i) {
+        unsigned char c = text_data(formatted)[i];
+        if (c >= '0' && c <= '9') {
+            unsigned char utf8[3] = {0xE0, 0xA5, (unsigned char)(0xA6 + c - '0')};
+            fwrite(utf8, 1, 3, stdout);
+        } else fputc(c, stdout);
+    }
+}
+double bh_text_parse_real(const void *input, const void *location) {
+    uint64_t n = text_length(input);
+    void *slots[2] = {(void *)input, NULL}; bh_root_frame frame; bh_roots_push(&frame, slots, 2);
+    slots[1] = new_text(checked_add(n, 1, location), location);
+    char *ascii = (char *)text_data(slots[1]); uint64_t i = 0, out = 0;
+    int script = 0, point = 0, before = 0, after = 0;
+    if (n && (text_data(slots[0])[0] == '+' || text_data(slots[0])[0] == '-')) ascii[out++] = (char)text_data(slots[0])[i++];
+    while (i < n) {
+        uint32_t cp = scalar(text_data(slots[0]), &i); int current, digit;
+        if (cp == '.' && !point && before) { point = 1; ascii[out++] = '.'; continue; }
+        if (cp >= '0' && cp <= '9') { current = 1; digit = (int)(cp - '0'); }
+        else if (cp >= 0x966 && cp <= 0x96F) { current = 2; digit = (int)(cp - 0x966); }
+        else { runtime_error(location, "अमान्य दशमलव पाठ।"); return 0; }
+        if (script && current != script) runtime_error(location, "अमान्य दशमलव पाठ।");
+        script = current; if (point) ++after; else ++before; ascii[out++] = (char)('0' + digit);
+    }
+    if (!before || (point && !after)) runtime_error(location, "अमान्य दशमलव पाठ।");
+    ascii[out] = 0; double result = strtod(ascii, NULL);
+    if (!isfinite(result)) runtime_error(location, "दशमलव परिवर्तन सीमा से बाहर है।");
+    bh_roots_pop(&frame); return result;
+}
+
 void bh_text_fail(const void *message, const void *location) {
     if (exception_descriptor) raise_failure_text(message, location);
     fputs("भाष: ", stderr); fwrite(text_data(location), 1, (size_t)text_length(location), stderr);
@@ -531,7 +636,7 @@ static const bh_type entry_storage[] = {
 static const uint64_t empty_collection_text = 0;
 static uint64_t pointer_bits(const void *value) { return (uint64_t)(uintptr_t)value; }
 static void *bits_pointer(uint64_t value) { return (void *)(uintptr_t)value; }
-static int reference_kind(uint64_t kind) { return kind >= BH_TEXT; }
+static int reference_kind(uint64_t kind) { return kind == BH_TEXT || kind == BH_REFERENCE || kind == BH_ANY; }
 static uint64_t mix_hash(uint64_t value) {
     value ^= value >> 30; value *= UINT64_C(0xbf58476d1ce4e5b9);
     value ^= value >> 27; value *= UINT64_C(0x94d049bb133111eb);
@@ -540,7 +645,7 @@ static uint64_t mix_hash(uint64_t value) {
 static uint64_t boxed_kind(const void *value) {
     const bh_class_info *info; memcpy(&info, value, 8);
     int64_t id = info->type_count ? info->type_ids[0] : 0;
-    return id >= -3 && id <= -1 ? (uint64_t)-id : BH_REFERENCE;
+    return id == -6 ? BH_REAL : id >= -3 && id <= -1 ? (uint64_t)-id : BH_REFERENCE;
 }
 static uint64_t box_payload(const void *value) { uint64_t bits; memcpy(&bits, (const unsigned char *)value + 8, 8); return bits; }
 static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
@@ -551,6 +656,10 @@ static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
         if (ak != bk || ak == BH_REFERENCE) return 0;
         return collection_same(ak, box_payload(bits_pointer(a)), box_payload(bits_pointer(b)));
     }
+    if (kind == BH_REAL) {
+        double x, y; memcpy(&x, &a, 8); memcpy(&y, &b, 8);
+        return x == y || (isnan(x) && isnan(y));
+    }
     if (kind == BH_TEXT) return bh_text_equal(bits_pointer(a), bits_pointer(b));
     return 0;
 }
@@ -559,6 +668,11 @@ static uint64_t collection_hash(uint64_t kind, uint64_t value) {
         uint64_t actual = boxed_kind(bits_pointer(value));
         if (actual != BH_REFERENCE) return collection_hash(actual, box_payload(bits_pointer(value)));
         kind = BH_REFERENCE;
+    }
+    if (kind == BH_REAL) {
+        double x; memcpy(&x, &value, 8);
+        if (x == 0) value = 0;
+        else if (isnan(x)) value = UINT64_C(0x7ff8000000000000);
     }
     if (kind == BH_TEXT) {
         const unsigned char *text = bits_pointer(value);

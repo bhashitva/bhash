@@ -38,7 +38,7 @@ void *bh_instance(void *value, const void *location);
 void bh_reference_store(void *owner, uint64_t offset, void *value);
 /* Collection metadata begins with the same immutable nominal metadata as classes. */
 enum { BH_ARRAY=1, BH_LIST=2, BH_MAP=3 };
-enum { BH_INT=1, BH_BOOL=2, BH_TEXT=3, BH_REFERENCE=4, BH_ANY=5 };
+enum { BH_INT=1, BH_BOOL=2, BH_TEXT=3, BH_REFERENCE=4, BH_ANY=5, BH_REAL=6 };
 enum { BH_SIZE, BH_EMPTY, BH_GET, BH_GET_OR, BH_SET, BH_CONTAINS, BH_ADD,
        BH_INSERT, BH_REMOVE, BH_CLEAR, BH_KEYS, BH_VALUES, BH_VERSION,
        BH_ITER_CHECK, BH_ITER_KEY, BH_ITER_VALUE };
@@ -60,6 +60,11 @@ uint64_t bh_collection_call(void *, uint32_t, uint64_t, uint64_t, const bh_colle
 int bh_print_licenses_if_requested(int argc, char **argv, const void *notices);
 void bh_print_text(const void *);
 void bh_print_int(int64_t);
+void bh_print_real(double);
+int64_t bh_real_to_int(double, const void *);
+void *bh_text_real(double, const void *);
+double bh_text_parse_real(const void *, const void *);
+void *bh_text_fixed(double, int64_t, const void *);
 void bh_print_bool(int);
 void bh_print_space(void);
 void bh_print_end(void);

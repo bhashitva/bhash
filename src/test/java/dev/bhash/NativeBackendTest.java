@@ -38,6 +38,112 @@ class NativeBackendTest {
         var call=(Call)local.value();assertEquals(Type.TEXT,call.type());
         assertEquals("a\0😀",((Constant)call.arguments().get(0)).value());
     }
+    @Test void decimalCoreUsesBinary64AndPreciseNonreferenceSlots()throws Exception{
+        var program=core("""
+            वर्ग माप { मान अंक: दशमलव; }
+            कार्य पहचान(अ: दशमलव) -> दशमलव { लौटाओ -अ / २.०; }
+            कार्य मुख्य() -> शून्य { स्थिर क: दशमलव = पहचान(१.५); लिखो(क); }
+            """);
+        var ir=LlvmEmitter.emit(program);
+        assertTrue(ir.contains("fneg double"));assertTrue(ir.contains("fdiv double"));
+        assertTrue(ir.contains("0x3FF8000000000000"));
+        assertEquals(Type.REAL,program.classes().get(0).fields().get(0).type());
+        assertFalse(Type.REAL.reference());
+    }
+    @Test void nativeDecimalsArithmeticComparisonsAndSpecialValues()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: दशमलव = ५.७; स्थिर ख: दशमलव = ४.२;
+                लिखो(क + ख, क - ख, क * ख, क / ख, -क, +ख);
+                स्थिर न: दशमलव = ०.० / ०.०;
+                स्थिर अ: दशमलव = १.० / ०.०;
+                लिखो(न == न, न != न, न < क, न <= क, न > क, न >= क);
+                लिखो(अ, -अ, न, -०.०, ०.० == -०.०);
+                लिखो(क > ख, क >= क, ख < क, ख <= ख, क != ख, ख == ख);
+            }
+            """,GC_STRESS);
+        assertEquals(0,result.exit());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeDecimalConversionsFormattingAndFailures()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.पाठ्य;
+            कार्य मुख्य() -> शून्य {
+                लिखो(परिवर्तित<दशमलव>(-९२२३३७२०३६८५४७७५८०८), परिवर्तित<दशमलव>(९२२३३७२०३६८५४७७५८०७));
+                लिखो(परिवर्तित<पूर्णांक>(-९.९), परिवर्तित<पूर्णांक>(९.९));
+                लिखो(परिवर्तित<दशमलव>("-१२३.२५"), परिवर्तित<दशमलव>("+42.125"));
+                लिखो(परिवर्तित<पाठ>(-०.०), परिवर्तित<पाठ>(१०००००००.०), परिवर्तित<पाठ>(०.०००१));
+                लिखो(पाठ्य.संख्यापाठ(२.५, ०), पाठ्य.संख्यापाठ(३.५, ०), पाठ्य.संख्यापाठ(-०.०, ३));
+                लिखो(पाठ्य.संख्यापाठ(२.६७५, २), पाठ्य.संख्यापाठ(०.१, १५));
+                प्रयास { लिखो(परिवर्तित<पूर्णांक>(१.० / ०.०)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(परिवर्तित<पूर्णांक>(९२२३३७२०३६८५४७७५८०८.०)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(परिवर्तित<दशमलव>("1.२")); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(परिवर्तित<दशमलव>("1e3")); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(पाठ्य.संख्यापाठ(०.० / ०.०, २)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { लिखो(पाठ्य.संख्यापाठ(१.०, १६)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+            }
+            """,GC_STRESS);
+        assertEquals(0,result.exit());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeDecimalBoxingChecksAndCollectionKeys()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            कार्य मुख्य() -> शून्य {
+                स्थिर न: दशमलव = ०.० / ०.०;
+                स्थिर क: सर्ववस्तु = १.२५;
+                स्थिर श: सर्ववस्तु = -०.०;
+                स्थिर ज: सर्ववस्तु = ०.०;
+                स्थिर अ: सर्ववस्तु = न; स्थिर ब: सर्ववस्तु = -न;
+                लिखो(प्रकारहै<दशमलव>(क), प्रकारहै<पूर्णांक>(क), प्रकारहै<सर्ववस्तु>(१.२५));
+                लिखो(परिवर्तित<दशमलव>(क), श == ज, अ == ब);
+                प्रयास { लिखो(परिवर्तित<पूर्णांक>(क)); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                स्थिर सूचीमान: सूची<दशमलव> = नया सूची<दशमलव>{-०.०, न, १.२५};
+                लिखो(सूचीमान.है(०.०), सूचीमान.है(-न));
+                स्थिर म: मानचित्र<दशमलव, पाठ> = नया मानचित्र<दशमलव, पाठ>{};
+                म.रखो(-०.०, "शून्य"); म.रखो(०.०, "बदला"); म.रखो(न, "अनंक");
+                लिखो(म.आकार(), म.लो(०.०), म.लो(-न));
+                स्थिर व: मानचित्र<सर्ववस्तु, दशमलव> = नया मानचित्र<सर्ववस्तु, दशमलव>{};
+                व.रखो(अ, १.२५); व.रखो(ब, २.५); व.रखो(श, ३.७५);
+                लिखो(व.आकार(), व.लो(अ), व.लो(ज), व.है(१));
+                प्रत्येक (च: दशमलव में म.कुंजियाँ()) { लिखो(म.लो(च)); }
+                स्थिर स: दशमलव[] = नया दशमलव[२]; लिखो(स[०], स[१]);
+            }
+            """,GC_STRESS);
+        assertEquals(0,result.exit());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeDecimalVirtualMethodsAndFinallyResults()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.पाठ्य;
+            अनुबंध मापक { कार्य मानलो(क: दशमलव) -> दशमलव; }
+            वर्ग मूलमाप { सार्वजनिक मान अंक: दशमलव; सार्वजनिक कार्य लो() -> दशमलव { लौटाओ यह.अंक; } }
+            वर्ग विशेष विस्तार मूलमाप पालन मापक {
+                निर्माता(क: दशमलव) { यह.अंक = क; }
+                सार्वजनिक अधिलेखन कार्य लो() -> दशमलव { लौटाओ यह.अंक * २.०; }
+                सार्वजनिक कार्य मानलो(क: दशमलव) -> दशमलव { लौटाओ यह.लो() + क; }
+            }
+            कार्य वापस(क: दशमलव) -> दशमलव {
+                मान द: दशमलव = क;
+                प्रयास { लौटाओ द; } अंततः { स्थिर स: पाठ = पाठ्य.दोहराओ("क", १०००); द = ९.०; }
+            }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: विशेष = नया विशेष(१.२५); स्थिर अ: मूलमाप = क; स्थिर म: मापक = क;
+                लिखो(अ.लो(), म.मानलो(३.०), वापस(-०.०));
+                स्थिर श: मूलमाप = नया मूलमाप(); लिखो(श.लो());
+                मान न: दशमलव = ०.०;
+                जबतक (न < ३.०) { प्रयास { न = न + ०.५; यदि (न == १.०) { जारी; } यदि (न > २.०) { विराम; } } अंततः { लिखो(न); } }
+            }
+            """,GC_STRESS);
+        assertEquals(0,result.exit());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeDecimalStressExercisesBoxingParsingAndCleanup()throws Exception{
+        requireTools();
+        var result=nativeRun(Files.readString(Path.of("examples/native/decimals.bhash")),GC_STRESS);
+        assertEquals(0,result.exit());assertEquals(0L,stats(result).get("live"));
+        assertTrue(stats(result).get("allocations")>4000,result.err());
+        assertTrue(stats(result).get("peak")<200000,result.err());
+    }
     @Test void coreUsesExistingTypeAndImmutableBindingChecks(){
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: पूर्णांक = १; अ = २; }"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: पूर्णांक = सत्य; }"));
@@ -46,7 +152,7 @@ class NativeBackendTest {
     @Test void unsupportedUnusedDeclarationsAndLibraryCallsHaveSourceLocations(){
         for(String source:List.of(
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
-            "कार्य अप्रयुक्त() -> दशमलव { लौटाओ १.२; } कार्य मुख्य() -> शून्य {}",
+            "कार्य अप्रयुक्त() -> बाइट { लौटाओ परिवर्तित<बाइट>(१); } कार्य मुख्य() -> शून्य {}",
             "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
             "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो(\"अ\", \"ब\"); }",
             "कार्य मुख्य() -> शून्य { लिखो(१ << २); }",
@@ -96,7 +202,7 @@ class NativeBackendTest {
             "परिगणना अ { क } कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}",
-            "वर्ग अ { मान न: दशमलव; } कार्य मुख्य() -> शून्य {}")){
+            "वर्ग अ { मान न: बाइट; } कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(s));
             assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
         }
@@ -426,7 +532,7 @@ class NativeBackendTest {
             "अनुबंध अ { कार्य न() -> पूर्णांक; } अनुबंध ब { कार्य न() -> पाठ; } अनुबंध ग विस्तार अ, ब {}"))
             assertThrows(CompilationException.class,()->core(source+" कार्य मुख्य() -> शून्य {}"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { लिखो(सुरक्षितरूप<पूर्णांक>(१)); }"));
-        var unsupported=assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर क: दशमलव = १.५; }"));
+        var unsupported=assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर क: बाइट = परिवर्तित<बाइट>(१); }"));
         assertTrue(unsupported.getMessage().contains("BH9001"));
     }
     @Test void nativeInterfaceDiamondsRedeclarationsAndMultipleContractsMatchJvm()throws Exception{
@@ -743,7 +849,7 @@ class NativeBackendTest {
         assertEquals(1,p.collections().stream().filter(t->t.kind()==CollectionKind.ARRAY).count());
         assertEquals(1,p.collections().stream().filter(t->t.kind()==CollectionKind.LIST && t.valueKind()==3).count());
         assertTrue(LlvmEmitter.emit(p).contains("%CollectionInfo"));
-        assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: दशमलव[] = नया दशमलव[१]; }"));
+        assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: बाइट[] = नया बाइट[१]; }"));
         assertThrows(CompilationException.class,()->core("वर्ग क<त> {} कार्य मुख्य() -> शून्य {}"));
     }
     @Test void nativeArraysDefaultsAliasesInitializersAndJaggedDimensionsMatchJvm()throws Exception{

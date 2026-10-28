@@ -25,7 +25,7 @@ the completed object is still returned to its caller. A constructor cannot expos
 existing declaration initializer. This milestone does not broaden those language rules.
 
 [Arrays, lists and maps](native-collections.md) are supported as reference fields.
-Static fields/methods, records, enums, user-defined generics and decimals remain outside the
+Static fields/methods, records, enums, user-defined generics remain outside the
 native class subset. Unsupported loaded declarations, even unused ones, produce
 source-located `BH9001` diagnostics. Printing an object directly remains invalid;
 print its scalar fields or method results.
@@ -83,7 +83,7 @@ through stable slots in per-class method tables; private methods and explicit ba
 calls use direct calls. Base fields form a prefix of every derived layout. Interface calls use resolved signature slots in a separate
 per-class table; nominal membership metadata drives runtime tests/casts.
 
-The private native object ABI v6 (extended by [boxing](native-boxing.md)) reserves the first eight payload bytes for an
+The private native object ABI v7 (extended by [boxing](native-boxing.md)) reserves the first eight payload bytes for an
 immutable type-metadata pointer. Every field then occupies an eight-byte slot. Integers use 64 bits,
 booleans use the low byte, and text/object fields contain payload-base pointers.
 Descriptors list exactly the text and object reference offsets. Primitive fields
@@ -135,3 +135,5 @@ at shutdown. Full managed/backend regressions guard the shared-analysis hooks.
 A host LLVM 23 development probe executes these programs at both `-O0` and `-O2`
 and compares them with JVM output. This does not establish a supported Windows
 native target; Linux LLVM 18 acceptance remains required before merge.
+
+[Native दशमलव support](native-decimals.md) adds binary64 arithmetic, conversions, formatting, boxing and collection values.

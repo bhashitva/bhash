@@ -132,7 +132,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/exceptions
 
 ## Compiler/runtime contract
 
-Private native ABI v6 reserves nominal type ID -5 for the built-in exception. Its
+Private native ABI v7 reserves nominal type ID -5 for the built-in exception. Its
 payload contains the immutable class metadata pointer, message at offset 8, and a
 private originating-location reference at offset 16. Custom exception fields follow
 that prefix. Both text fields are precisely traced. Ordinary class/collection/box
@@ -189,3 +189,5 @@ example exercises over 16,000 allocations without retaining unreachable objects.
 Independent C tests check pending roots, 100-level unwinding, helper scratch cleanup,
 nested boundaries and runtime restart at both optimization levels and under Linux
 sanitizers. CI also executes the example in a clean deployment container.
+
+[Native दशमलव support](native-decimals.md) adds binary64 arithmetic, conversions, formatting, boxing and collection values.

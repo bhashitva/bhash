@@ -111,7 +111,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/boxing
 
 ## Private representation and collector contract
 
-Private native ABI v6 (extended by [collections](native-collections.md)) retains the ABI v3 class layout: an eight-byte immutable
+Private native ABI v7 (extended by [collections](native-collections.md)) retains the ABI v3 class layout: an eight-byte immutable
 `ClassInfo` pointer followed by eight-byte field slots. Ordinary class and
 interface references remain payload-base pointers with unchanged identity.
 `सर्ववस्तु` is a managed pointer or null, never an interior pointer or tagged word.
@@ -121,7 +121,7 @@ Scalar boxes have 16-byte payloads: the metadata pointer at offset 0, followed b
 an integer, zero-extended boolean, or managed text pointer at offset 8. Integer and
 boolean descriptors trace no fields; text-box descriptors trace offset 8.
 Immutable metadata uses reserved membership IDs -1 (integer), -2 (boolean),
--3 (text), and -4 (universal). User class/interface IDs remain nonnegative; class
+-3 (text), -4 (universal), and -6 (decimal); -5 remains reserved for exceptions. User class/interface IDs remain nonnegative; class
 membership includes -4. Scalar boxes expose no virtual or interface methods.
 Metadata pointers are nonmanaged and never traced.
 
@@ -142,7 +142,7 @@ host reflection is involved.
 ## Scope and validation
 
 [Arrays, lists and maps](native-collections.md) now support these universal values.
-Other numeric widths, decimals, records/enums, user-defined generics, static
+Other numeric widths, records/enums, user-defined generics, static
 members and foreign interoperability remain outside the native profile.
 There are no user-managed allocation/free operations and no new public C ABI.
 
@@ -152,3 +152,5 @@ return boundaries, inheritance/interface dispatch, packages, single evaluation,
 unboxed-text lifetimes, cyclic universal fields and bounded collector retention.
 Linux CI verifies LLVM IR, runs native tests with sanitizers, and executes the
 example under GC stress in a clean container without Java, .NET or build tools.
+
+[Native दशमलव support](native-decimals.md) adds binary64 arithmetic, conversions, formatting, boxing and collection values.
