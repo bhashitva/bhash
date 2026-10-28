@@ -24,6 +24,7 @@ jobs:
       - run: mvn --batch-mode --no-transfer-progress verify
       - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar check examples/hello.bhash
       - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar check examples/factorial.bhash
+      - run: python -m unittest discover -s scripts -p "test_build_examples.py"
       - run: python scripts/smoke_test.py
       - run: python scripts/check_lessons.py --target jvm
       - run: python scripts/check_lessons.py --target clr
@@ -42,31 +43,7 @@ jobs:
             LICENSING.md
             THIRD_PARTY_NOTICES.md
             target/bhash-compiler-0.1.0-SNAPSHOT.jar
-            target/collections.jar
-            target/collections-clr/
-            examples/collections/
-            examples/exceptions.bhash
-            examples/types/
-            target/bitboards.jar
-            target/bitboards-clr/
-            examples/bitboards.bhash
-            target/multi-file.jar
-            target/multi-file-clr/
-            examples/multi-file/
-            target/factorial-console.jar
-            target/factorial-clr/
-            target/switch-console.jar
-            target/switch-console-clr/
-            examples/switch-console.bhash
-            target/contracts-generics.jar
-            target/contracts-generics-clr/
-            examples/contracts-generics.bhash
-            target/objects.jar
-            target/objects-clr/
-            target/factorial-objects.jar
-            target/factorial-objects-clr/
-            examples/factorial-console.bhash
-            examples/objects.bhash
-            examples/factorial-objects.bhash
+            target/examples/
+            examples/
           include-hidden-files: true
           if-no-files-found: error
