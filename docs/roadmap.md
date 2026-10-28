@@ -56,7 +56,7 @@
 
 An experimental direct-LLVM implementation and approved automatic-memory-management
 design are under development. See [native compilation](native-compilation-design.md)
-for scope and the outstanding Linux validation gate.
+for scope, initial successful Linux validation and the remaining regression gate.
 
 - Prototype LLVM IR emission from Java and pin an external LLVM toolchain.
 - x86-64 Linux assembly/object/executable pipeline, then AArch64 cross-build.

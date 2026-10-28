@@ -188,7 +188,7 @@ See [collections](collections.md) for the public language contract.
 | JVM | Implemented | Bhash → checked Java → JVM bytecode → executable JAR |
 | .NET CLR | Implemented | Bhash → checked C# → .NET 10 managed DLL + deployment metadata |
 | Browser WASM | Implemented | Bhash → checked C# → .NET 10 WebAssembly runtime bundle |
-| Native Linux x86-64 | Experimental, awaiting native validation | Bhash → typed core → LLVM 18 IR → object code + Bhash C runtime → executable |
+| Native Linux x86-64 | Experimental, initial Linux CI passed | Bhash → typed core → LLVM 18 IR → object code + Bhash C runtime → executable |
 | WASI | Planned | Standalone command-line WebAssembly runtime/backend |
 | x86-64 | Planned | Proposed LLVM assembly/object emission, initially Linux System V ABI |
 | ARM64 / AArch64 | Planned | Proposed LLVM assembly/object emission, initially Linux AAPCS64 |

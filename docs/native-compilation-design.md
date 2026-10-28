@@ -1,6 +1,6 @@
 # Native LLVM compilation and automatic memory management
 
-Status: **Approved architecture; experimental implementation awaiting Linux/LLVM validation.**
+Status: **Approved architecture; experimental implementation with initial Linux/LLVM validation.**
 Date: 2026-10-27.
 
 ## Decisions and implications
@@ -195,8 +195,17 @@ checks everywhere and native execution tests on supported hosts with LLVM 18.
 `BHASH_REQUIRE_NATIVE=true` makes missing native prerequisites fail CI rather than
 skip. `.github/workflows/native.yml` provisions those tools and the clean-runtime test.
 
-**Current limitation:** the development session has no installed LLVM compiler,
-Linux execution is unavailable, and shell network access is unavailable. Linux/LLVM,
-sanitizer and clean-container execution therefore remain unverified until CI or a
-suitable Linux development environment runs them. The workflow being present is not
-proof that it passed. Do not release this experimental backend until that gate passes.
+### Recorded validation
+
+The first native CI run at `173221f` passed on October 27, 2026:
+[Linux native validation run](https://github.com/bhashitva/bhash/actions/runs/40622557805).
+It verified and executed the LLVM backend (8 tests, no skips), passed debug/optimized
+collector checks with address/undefined-behavior sanitizers, built the factorial
+executable and ran it in a clean Ubuntu container without Java/.NET/development tools.
+The artifact includes the executable, dependency inspection and test reports.
+
+Runtime-only Windows checks also passed in debug and optimized MSVC builds. This is
+not supported Windows Bhash output. The local development environment lacks Linux
+execution/LLVM, so native execution evidence comes from CI. Existing managed/backend
+regression checks and the expanded cross-backend corpus must also pass on the final
+PR revision before this experimental milestone is considered ready to merge.
