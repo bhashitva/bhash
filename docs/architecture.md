@@ -188,17 +188,22 @@ See [collections](collections.md) for the public language contract.
 | JVM | Implemented | Bhash → checked Java → JVM bytecode → executable JAR |
 | .NET CLR | Implemented | Bhash → checked C# → .NET 10 managed DLL + deployment metadata |
 | Browser WASM | Implemented | Bhash → checked C# → .NET 10 WebAssembly runtime bundle |
+| Native Linux x86-64 | Experimental, initial Linux CI passed | Bhash → typed core → LLVM 18 IR → object code + Bhash C runtime → executable |
 | WASI | Planned | Standalone command-line WebAssembly runtime/backend |
 | x86-64 | Planned | Proposed LLVM assembly/object emission, initially Linux System V ABI |
 | ARM64 / AArch64 | Planned | Proposed LLVM assembly/object emission, initially Linux AAPCS64 |
 
 ANTLR generates the compiler's Java parser, not Bhash's application backends.
-LLVM remains a proposal and is not a dependency. CLR uses the .NET SDK/C# compiler and its own runtime helpers. It does not depend
+LLVM 18 is required only for the experimental native executable backend; it is not a dependency of managed builds. See [native design and validation gate](native-compilation-design.md). CLR uses the .NET SDK/C# compiler and its own runtime helpers. It does not depend
 on LLVM.
 32-bit architectures, WASI and other native OS/ABI combinations are separate
 extensions. Native assembly still needs assembling/linking and a target runtime.
 
-Next, extract a source-located typed AST and shared control-flow IR from the current
+The experimental native path captures a source-located typed core for its supported
+subset during existing checking. It currently discards managed source generation;
+see the native design for this transitional boundary.
+
+Next, complete extraction of a source-located typed AST and shared control-flow IR from the current
 backend, then use cross-backend golden tests to preserve evaluation, arithmetic,
 text and I/O semantics when adding another target.
 
