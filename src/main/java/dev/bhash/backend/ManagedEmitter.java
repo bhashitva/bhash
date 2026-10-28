@@ -122,6 +122,36 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         Invalid(String message) { super(message); }
     }
 
+    static final class Analysis {
+        final Map<org.antlr.v4.runtime.tree.ParseTree, Expr> expressions = new IdentityHashMap<>();
+        final Map<ParserRuleContext, Binding> bindings = new IdentityHashMap<>();
+        final Map<PrimaryContext, Binding> reads = new IdentityHashMap<>();
+        final Map<PrimaryContext, Function> calls = new IdentityHashMap<>();
+        final Map<ParserRuleContext, Object> constants = new IdentityHashMap<>();
+    }
+    private Analysis analysis;
+
+    @Override public Expr visit(org.antlr.v4.runtime.tree.ParseTree tree) {
+        Expr result = super.visit(tree);
+        if (analysis != null && result != null) analysis.expressions.put(tree, result);
+        return result;
+    }
+
+    /** Native typed core, using the same checker and overload decisions as managed targets. */
+    public static CoreProgram core(List<SourceFile> sources) throws CompilationException {
+        var resolution = ProjectResolver.resolve(sources);
+        CoreProgram.validateProfile(resolution.tree());
+        try {
+            var emitter = new ManagedEmitter("project", Target.JVM);
+            emitter.analysis = new Analysis();
+            var tree = GenericExpander.expand("project", resolution.tree());
+            emitter.program(tree, true);
+            var functions = emitter.functions.values().stream().flatMap(List::stream).toList();
+            return CoreProgram.build(tree, emitter.analysis, functions);
+        } catch (Invalid e) { throw new CompilationException(resolution.describe(e.getMessage())); }
+          catch (CompilationException e) { throw new CompilationException(resolution.describe(e.getMessage())); }
+    }
+
     private ManagedEmitter(String sourceName, Target target) { this.sourceName = sourceName; this.target = target; }
 
     public static String emit(String sourceName, ProgramContext program, Target target) throws CompilationException {
@@ -596,6 +626,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         var binding = new Binding("v" + variableId++, type, mutable);
         if (scopes.peek().putIfAbsent(Identifiers.key(spelling), binding) != null)
             throw error(at, "Duplicate binding: " + spelling);
+        if (analysis != null) analysis.bindings.put(at, binding);
         return binding;
     }
 
@@ -1389,7 +1420,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 throw error(ctx, "Field initializers must be constant expressions, without names or calls.");
             if (ctx.LPAREN() == null) {
                 var local = find(name);
-                if (local != null) return new Expr(local.type, local.java, new Location(local.mutable));
+                if (local != null) {
+                    if (analysis != null) analysis.reads.put(ctx, local);
+                    return new Expr(local.type, local.java, new Location(local.mutable));
+                }
                 var member=field(currentClass,name);
                 if (member!=null) return readField(ctx,member.shared?classReceiver(currentClass):self(ctx,false),name);
                 var definition=classes.get(Identifiers.key(name));
@@ -1412,6 +1446,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (Identifiers.key(name).equals(Identifiers.key("लंबाई")) && args.size()==1 && args.get(0).type.collection!=null)
                 return new Expr(Type.INT,"BhashRuntime.instance("+args.get(0).java+").size()",true);
             var chosen=select(ctx,function,args,name);
+            if (analysis != null) analysis.calls.put(ctx, chosen);
             return new Expr(chosen.result, chosen.java + "(" + join(args) + ")", true);
         }
         var value = visit(ctx.expression());
@@ -1421,6 +1456,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private Expr integer(ParserRuleContext at, String decimal) {
         var value = new BigInteger(decimal);
         if (value.compareTo(MIN) < 0 || value.compareTo(MAX) > 0) throw error(at, "Integer literal is outside signed 64-bit range.");
+        if (analysis != null) analysis.constants.put(at, value.longValueExact());
         return new Expr(Type.INT, value + "L");
     }
 
@@ -1451,6 +1487,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private Expr textLiteral(ParserRuleContext ctx,String value) {
+        if (analysis != null) analysis.constants.put(ctx, value);
         var codepoints = new StringJoiner(",");
         int count = 0;
         for (int cp : value.codePoints().toArray()) {
