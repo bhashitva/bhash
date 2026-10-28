@@ -25,6 +25,7 @@ void bh_shutdown(void);
 void bh_gc_stress(int enabled);
 uint64_t bh_heap_objects(void);
 uint64_t bh_heap_bytes(void);
+void *bh_instance(void *value, const void *location);
 void bh_reference_store(void *owner, uint64_t offset, void *value);
 /* Text payload: uint64 byte length, then UTF-8 bytes (including embedded NUL). */
 int bh_print_licenses_if_requested(int argc, char **argv, const void *notices);
