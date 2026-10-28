@@ -79,6 +79,16 @@ def main():
             assert result.stderr.startswith('भाष: '.encode('utf-8'))
         print(f'{name}: repeated tracing, scalar precision, collection cycles, growth, hashing, snapshots and failures passed')
 
+        decimal_exe = BUILD / ('decimals-' + name + ('.exe' if os.name == 'nt' else ''))
+        decimal_command = [part.replace('runtime_test.c', 'decimal_runtime_test.c').replace(str(exe), str(decimal_exe)) for part in command]
+        result = run(decimal_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(decimal_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native decimal checks passed.\n'
+        print(f'{name}: binary64 conversions, formatting round trips, scalar tracing, NaN/zero hashing and failures passed')
+
         exception_exe = BUILD / ('exceptions-' + name + ('.exe' if os.name == 'nt' else ''))
         exception_command = [part.replace('runtime_test.c', 'exceptions_runtime_test.c').replace(str(exe), str(exception_exe)) for part in command]
         result = run(exception_command)
