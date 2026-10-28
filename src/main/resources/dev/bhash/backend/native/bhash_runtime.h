@@ -10,6 +10,8 @@ typedef struct bh_type {
     size_t minimum_size;
     size_t reference_count;
     const size_t *reference_offsets;
+    size_t repeated_offset, repeated_stride;
+    uint64_t repeated_reference_mask;
 } bh_type;
 typedef struct bh_root_frame {
     struct bh_root_frame *previous;
@@ -27,6 +29,26 @@ uint64_t bh_heap_objects(void);
 uint64_t bh_heap_bytes(void);
 void *bh_instance(void *value, const void *location);
 void bh_reference_store(void *owner, uint64_t offset, void *value);
+/* Collection metadata begins with the same immutable nominal metadata as classes. */
+enum { BH_ARRAY=1, BH_LIST=2, BH_MAP=3 };
+enum { BH_INT=1, BH_BOOL=2, BH_TEXT=3, BH_REFERENCE=4, BH_ANY=5 };
+enum { BH_SIZE, BH_EMPTY, BH_GET, BH_GET_OR, BH_SET, BH_CONTAINS, BH_ADD,
+       BH_INSERT, BH_REMOVE, BH_CLEAR, BH_KEYS, BH_VALUES, BH_VERSION,
+       BH_ITER_CHECK, BH_ITER_KEY, BH_ITER_VALUE };
+typedef struct bh_class_info {
+    const void *virtual_methods, *interface_methods;
+    uint64_t type_count;
+    const int64_t *type_ids;
+} bh_class_info;
+typedef struct bh_collection_info {
+    bh_class_info nominal;
+    uint64_t kind, key_kind, value_kind;
+    const struct bh_collection_info *element, *key_list, *value_list;
+} bh_collection_info;
+void *bh_collection_new(const bh_collection_info *, int64_t, const void *);
+void *bh_array_dimensions(const bh_collection_info *, uint64_t, const int64_t *, const void *);
+void *bh_collection_literal(const bh_collection_info *, uint64_t, const uint64_t *, const void *);
+uint64_t bh_collection_call(void *, uint32_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
 /* Text payload: uint64 byte length, then UTF-8 bytes (including embedded NUL). */
 int bh_print_licenses_if_requested(int argc, char **argv, const void *notices);
 void bh_print_text(const void *);
