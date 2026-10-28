@@ -47,8 +47,8 @@ class NativeBackendTest {
         for(String source:List.of(
             "वर्ग अ {} कार्य मुख्य() -> शून्य {}",
             "कार्य अप्रयुक्त() -> दशमलव { लौटाओ १.२; } कार्य मुख्य() -> शून्य {}",
-            "कार्य मुख्य() -> शून्य { लिखो(लंबाई(\"अ\")); }",
-            "कार्य मुख्य() -> शून्य { लिखो(\"अ\" + \"ब\"); }",
+            "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
+            "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो(\"अ\", \"ब\"); }",
             "कार्य मुख्य() -> शून्य { लिखो(१ << २); }",
             "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<पूर्णांक>(१)); }")){
             var error=assertThrows(CompilationException.class,()->core(source));
@@ -76,11 +76,16 @@ class NativeBackendTest {
     }
     private record Result(int exit,String out,String err){}
     private Result nativeRun(String source,String...arguments)throws Exception{
+        return nativeRun(source,Map.of(),arguments);
+    }
+    private Result nativeRun(String source,Map<String,String> environment,String...arguments)throws Exception{
         Path exe=temporary.resolve("application");
-        new NativeCompiler().compile(List.of(new SourceFile("native.bhash",source)),exe);
+        new NativeCompiler(true).compile(List.of(new SourceFile("native.bhash",source)),exe);
         var command=new ArrayList<String>();command.add(exe.toString());command.addAll(List.of(arguments));
         Path out=temporary.resolve("out"),err=temporary.resolve("err");
-        var p=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile()).start();
+        var builder=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile());
+        builder.environment().putAll(environment);
+        var p=builder.start();
         assertTrue(p.waitFor(15,TimeUnit.SECONDS));
         var result=new Result(p.exitValue(),Files.readString(out),Files.readString(err));
         if(arguments.length==0){
@@ -152,6 +157,105 @@ class NativeBackendTest {
         assertEquals(0,result.exit());assertTrue(result.out().contains("Apache License"));
         assertFalse(result.out().contains("नहीं"));
     }
+
+    private static final Map<String,String> GC_STRESS=Map.of("BHASH_GC_STRESS","1","BHASH_GC_STATS","1");
+    private static Map<String,Long> stats(Result result){
+        var matcher=java.util.regex.Pattern.compile("bhash-gc: allocations=(\\d+) collections=(\\d+) live=(\\d+) peak_bytes=(\\d+)").matcher(result.err());
+        assertTrue(matcher.find(),result.err());
+        return Map.of("allocations",Long.parseLong(matcher.group(1)),"collections",Long.parseLong(matcher.group(2)),
+            "live",Long.parseLong(matcher.group(3)),"peak",Long.parseLong(matcher.group(4)));
+    }
+    @Test void coreResolvesStandardTextCallsAndConcatenation()throws Exception{
+        var p=core("आयात मानक.पाठ्य उपनाम प; कार्य मुख्य() -> शून्य { लिखो(प.अंश(\"अ\" + \"ब\", ०, १)); }");
+        var main=p.functions().stream().filter(f->f.id()==p.entry()).findFirst().orElseThrow();
+        var print=(Print)main.body().statements().get(0);
+        var call=(TextCall)print.arguments().get(0);
+        assertEquals(TextOperation.SLICE,call.operation());
+        assertEquals(Type.TEXT,call.arguments().get(0).type());
+        assertThrows(CompilationException.class,()->core("आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बदलो(\"अ\", १, \"ब\"); }"));
+    }
+    @Test void nativeHeapTextMatchesJvmUnicodeAndScalarLibraryOperations()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.पाठ्य उपनाम प;
+            कार्य पहचान(शब्द: पाठ) -> पाठ { लौटाओ शब्द; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: पाठ = पहचान("a" + "😀क́");
+                लिखो(प.लंबाई(क), लंबाई(क), प.अंश(क, १, ३), अंश(क, ०, ०));
+                लिखो(प.खोजो(क, "क"), प.है(क, "😀"), प.आरंभ(क, "a"), प.अंत(क, "́"));
+                लिखो(प.खोजो(क, ""), प.खोजो(क, "x"));
+                लिखो(प.बदलो("ab\\u0000abc", "ab", "X"));
+                लिखो(प.छाँटो("\\u00a0\\t ABÉक\\u3000\\n"), प.छोटाअक्षर("ABÉक"), प.बड़ाअक्षर("abÉक"));
+                लिखो(प.दोहराओ("😀क", २), प.दोहराओ("", ९२२३३७२०३६८५४७७५८०७));
+                लिखो(प.अंकदेवनागरी("v12😀"), अंकपाठ(-९२२३३७२०३६८५४७७५८०८));
+                लिखो(पूर्णांकपाठ("-९२२३३७२०३६८५४७७५८०८"), पूर्णांकपाठ("+42"));
+                लिखो(बड़ाअक्षर("abÉक"), प.छाँटो("\\u00a0\\u3000"));
+            }
+            """,GC_STRESS);
+        assertEquals(0,result.exit());assertEquals(0L,stats(result).get("live"));
+        assertTrue(stats(result).get("allocations")>=12,result.err());
+    }
+    @Test void nestedAllocatingArgumentsAndRecursionKeepLiveTextRooted()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.पाठ्य;
+            कार्य जोड़(क: पाठ, ख: पाठ) -> पाठ { लौटाओ क + ख; }
+            कार्य लपेटो(शब्द: पाठ, गहराई: पूर्णांक) -> पाठ {
+                यदि (गहराई == ०) { लौटाओ शब्द; }
+                लौटाओ "[" + लपेटो(शब्द + अंकपाठ(गहराई), गहराई - १) + "]";
+            }
+            कार्य मुख्य() -> शून्य {
+                स्थिर मूल: पाठ = लपेटो("मूल", ३);
+                मान न: पूर्णांक = ०;
+                जबतक (न < २०००) {
+                    स्थिर क्षणिक: पाठ = जोड़(पाठ्य.बड़ाअक्षर("a" + अंकपाठ(न)), पाठ्य.अंश("😀क" + अंकपाठ(न), ०, २));
+                    यदि (लंबाई(क्षणिक) < ४) { त्रुटि("पाठ नष्ट हुआ"); }
+                    न = न + १;
+                }
+                लिखो(मूल, जोड़("अ" + "ब", "क" + "ख"));
+            }
+            """,GC_STRESS);
+        assertEquals("[[[मूल321]]] अबकख\n",result.out());
+        var s=stats(result);assertTrue(s.get("allocations")>10000,result.err());
+        assertTrue(s.get("collections")>=s.get("allocations"),result.err());
+        assertEquals(0L,s.get("live"));assertTrue(s.get("peak")<100000,result.err());
+    }
+    @Test void exitedScopesAndLoopJumpsReleaseLargeTextBeforeNextAllocation()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.पाठ्य;
+            कार्य मुख्य() -> शून्य {
+                मान न: पूर्णांक = ०;
+                जबतक (न < ३) {
+                    { स्थिर अस्थायी: पाठ = पाठ्य.दोहराओ("क", ३००००);
+                      न = न + १;
+                      यदि (न == १) { जारी; }
+                      यदि (न == २) { विराम; }
+                      लिखो(लंबाई(अस्थायी)); }
+                }
+                { स्थिर अस्थायी: पाठ = पाठ्य.दोहराओ("ख", ३००००); लिखो(लंबाई(अस्थायी)); }
+                { स्थिर अस्थायी: पाठ = पाठ्य.दोहराओ("ग", ३००००); लिखो(लंबाई(अस्थायी)); }
+            }
+            """,GC_STRESS);
+        assertEquals("३००००\n३००००\n",result.out());
+        assertTrue(stats(result).get("peak")<100000,result.err());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void explicitHeapTextFailurePreservesMessageAndLocation()throws Exception{
+        requireTools();
+        var result=nativeRun("कार्य मुख्य() -> शून्य { त्रुटि(\"अ\" + \"ब\"); }",GC_STRESS);
+        assertEquals(1,result.exit());assertEquals("",result.out());
+        assertTrue(result.err().contains("native.bhash:1:"));assertTrue(result.err().contains("अब"));
+    }
+    @Test void nativeTextBoundsAndParsingFailuresMatchJvm()throws Exception{
+        requireTools();
+        for(String expression:List.of("अंश(\"क\", -१, १)","अंश(\"क\", ०, २)",
+                "पाठ्य.बदलो(\"abc\", \"\", \"x\")","पाठ्य.दोहराओ(\"क\", -१)",
+                "पाठ्य.दोहराओ(\"😀\", ५२४२८९)","पूर्णांकपाठ(\"1२\")", "पूर्णांकपाठ(\"9223372036854775808\")")){
+            var result=nativeRun("आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { लिखो(\"अधूरा\", "+expression+"); }");
+            assertEquals(1,result.exit());assertEquals("",result.out());assertTrue(result.err().contains("native.bhash:1:"));
+        }
+    }
+
     @Test void invalidSourcePreservesPreviousExecutable()throws Exception{
         Path output=temporary.resolve("previous");Files.writeString(output,"previous executable");
         assertThrows(CompilationException.class,()->new NativeCompiler().compile(
