@@ -121,7 +121,7 @@ jobs:
             grep "live=0" /tmp/math-random-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/math-random-stats
             BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/json-text-native > /tmp/json-text-actual 2> /tmp/json-text-stats
-            printf "४ अ||भारत😀|\n४४८५० ३००\n[[\"साझा\",1.0],[\"साझा\",1.0]]\nचक्रीय संग्रह को जेसन में नहीं लिख सकते।\n" > /tmp/json-text-expected
+            printf "४ अ||भारत😀|\n४४८५० ३००\n{\"नाम\":\"भारत😀\",\"अंक\":[1,2]}\n[[\"साझा\",1.0],[\"साझा\",1.0]]\nचक्रीय संग्रह को जेसन में नहीं लिख सकते।\n" > /tmp/json-text-expected
             cmp /tmp/json-text-actual /tmp/json-text-expected
             grep "live=0" /tmp/json-text-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/json-text-stats
