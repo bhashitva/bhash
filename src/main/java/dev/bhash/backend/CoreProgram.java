@@ -40,6 +40,8 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record StructuredTypes(int texts,int values,int object) {}
     public enum BufferOperation { ENCODE, DECODE, READ_FILE, WRITE_FILE, SLICE, ARRAY, FILL, READ_INT, WRITE_INT, READ_REAL, WRITE_REAL }
     public record BufferCall(Type type, BufferOperation operation, List<Expression> arguments, int descriptor, Source source) implements Expression {}
+    public enum TimeOperation { NOW, READ, WRITE, YEAR, MONTH, DAY }
+    public record TimeCall(Type type, TimeOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public enum FileOperation { SUPPORTED, EXISTS, READ_TEXT, WRITE_TEXT }
     public record FileCall(Type type, FileOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public enum StructuredOperation { SPLIT, JOIN, JSON_READ, JSON_WRITE }
@@ -76,7 +78,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -432,6 +434,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             if(buffer!=null)return new BufferCall(type(f.result,at),buffer,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             TextOperation operation=null;
             if(f.intrinsic!=null) {
+                TimeOperation time=switch(f.intrinsic){case "stdNow"->TimeOperation.NOW;case "stdTimeRead"->TimeOperation.READ;
+                    case "stdTimeWrite"->TimeOperation.WRITE;case "stdYear"->TimeOperation.YEAR;case "stdMonth"->TimeOperation.MONTH;case "stdDay"->TimeOperation.DAY;default->null;};
+                if(time!=null)return new TimeCall(type(f.result,at),time,arguments(args),source(at));
                 FileOperation file=switch(f.intrinsic){case "stdFilesSupported"->FileOperation.SUPPORTED;case "stdFileExists"->FileOperation.EXISTS;
                     case "stdFileReadText"->FileOperation.READ_TEXT;case "stdFileWriteText"->FileOperation.WRITE_TEXT;default->null;};
                 if(file!=null)return new FileCall(type(f.result,at),file,arguments(args),source(at));
