@@ -24,7 +24,7 @@ public final class LlvmEmitter {
     private final Map<Integer,Integer> objectSizes=new HashMap<>();
     private final Map<Expression,Value> values=new IdentityHashMap<>();
     private record Value(Type type,String ir) { String argument(){return llvm(type)+" "+ir;} }
-    private static String llvm(Type t) { return switch(t){case INT->"i64";case BOOL->"i1";case TEXT,OBJECT->"ptr";case VOID->"void";}; }
+    private static String llvm(Type t) { return switch(t){case INT->"i64";case BOOL->"i1";case TEXT,OBJECT,ANY->"ptr";case VOID->"void";}; }
     private String temporary(){return "%x"+next++;}
     private String freshLabel(){return "l"+next++;}
     private void line(String s){code.append("  ").append(s).append('\n');}
@@ -43,6 +43,7 @@ public final class LlvmEmitter {
     public static String emit(CoreProgram program){return emit(program, "");}
     public static String emit(CoreProgram program,String notices){return new LlvmEmitter().program(program,notices);}
     private String program(CoreProgram program,String notices){
+        boxMetadata();
         for(var c:program.classes()){
             objectSizes.put(c.id(),8+c.fields().size()*8);
             globals.append("@vtable").append(c.id()).append(" = private constant [").append(c.virtualMethods().size()).append(" x ptr] [")
@@ -67,7 +68,7 @@ public final class LlvmEmitter {
         }
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v3\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v4\n"+
             "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
@@ -75,7 +76,7 @@ public final class LlvmEmitter {
             "declare void @bh_print_bool(i32)\ndeclare void @bh_print_space()\ndeclare void @bh_print_end()\n"+
             "declare i32 @bh_text_equal(ptr, ptr)\ndeclare i64 @bh_divide(i64, i64, ptr)\n"+
             "declare i64 @bh_remainder(i64, i64, ptr)\n"+
-            textDeclarations()+"\n"+typeTestHelper()+functions+
+            textDeclarations()+"\n"+typeTestHelper()+equalityHelper()+functions+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  call void @bfn"+program.entry()+"()\n  call void @bh_shutdown()\n  br label %done\ndone:\n  ret i32 0\n}\n";
     }
     private static String textDeclarations(){
@@ -121,20 +122,94 @@ public final class LlvmEmitter {
             }
             """;
     }
+    /** Negative membership IDs are reserved for built-in boxed types and सर्ववस्तु. */
+    private void boxMetadata(){
+        for(int kind=1;kind<=3;kind++){
+            globals.append("@box_types").append(kind).append(" = private constant [2 x i64] [i64 -").append(kind).append(", i64 -4]\n");
+            globals.append("@box_info").append(kind).append(" = private constant %ClassInfo { ptr null, ptr null, i64 2, ptr @box_types").append(kind).append(" }, align 8\n");
+            globals.append("@box_refs").append(kind).append(" = private constant [").append(kind==3?1:0).append(" x i64] [").append(kind==3?"i64 8":"").append("]\n");
+            // The collector uses the name only for diagnostics, so share a static UTF-8 name.
+            globals.append("@box_gc").append(kind).append(" = private constant { ptr, i64, i64, ptr } { ptr @box_name, i64 16, i64 ")
+                .append(kind==3?1:0).append(", ptr @box_refs").append(kind).append(" }, align 8\n");
+        }
+        globals.append("@box_name = private constant [4 x i8] c\"box\\00\"\n");
+    }
+    private static String equalityHelper(){
+        return """
+            define internal i1 @bhash_any_equal(ptr %a, ptr %b) {
+            entry:
+              %identical = icmp eq ptr %a, %b
+              br i1 %identical, label %yes, label %nulls
+            nulls:
+              %anull = icmp eq ptr %a, null
+              %bnull = icmp eq ptr %b, null
+              %empty = or i1 %anull, %bnull
+              br i1 %empty, label %no, label %metadata
+            metadata:
+              %ai = load ptr, ptr %a
+              %bi = load ptr, ptr %b
+              %samekind = icmp eq ptr %ai, %bi
+              br i1 %samekind, label %kind, label %no
+            kind:
+              %integer = icmp eq ptr %ai, @box_info1
+              %boolean = icmp eq ptr %ai, @box_info2
+              %scalar = or i1 %integer, %boolean
+              br i1 %scalar, label %numbers, label %textkind
+            numbers:
+              %ap = getelementptr i8, ptr %a, i64 8
+              %bp = getelementptr i8, ptr %b, i64 8
+              %av = load i64, ptr %ap
+              %bv = load i64, ptr %bp
+              %equal = icmp eq i64 %av, %bv
+              ret i1 %equal
+            textkind:
+              %text = icmp eq ptr %ai, @box_info3
+              br i1 %text, label %texts, label %no
+            texts:
+              %atp = getelementptr i8, ptr %a, i64 8
+              %btp = getelementptr i8, ptr %b, i64 8
+              %at = load ptr, ptr %atp
+              %bt = load ptr, ptr %btp
+              %same = call i32 @bh_text_equal(ptr %at, ptr %bt)
+              %result = icmp ne i32 %same, 0
+              ret i1 %result
+            yes:
+              ret i1 true
+            no:
+              ret i1 false
+            }
+            """;
+    }
+    private Value box(Box b){
+        Value input=expression(b.value());
+        if(input.type()==Type.OBJECT || input.type()==Type.ANY)return new Value(Type.ANY,input.ir());
+        int kind=switch(input.type()){case INT->1;case BOOL->2;case TEXT->3;default->throw new IllegalStateException("Unchecked box type");};
+        Value result=instruction(Type.ANY,"call ptr @bh_alloc(ptr @box_gc"+kind+", i64 16)");
+        line("store ptr @box_info"+kind+", ptr "+result.ir());
+        // Publish before the reference-store barrier; reload rooted text after allocation.
+        line("store ptr "+result.ir()+", ptr "+rootAddress(roots.get(b)));
+        input=reload(b.value());
+        if(kind==3)line("call void @bh_reference_store(ptr "+result.ir()+", i64 8, ptr "+input.ir()+")");
+        else {
+            if(kind==2)input=instruction(Type.INT,"zext i1 "+input.ir()+" to i64");
+            String payload=temporary();line(payload+" = getelementptr i8, ptr "+result.ir()+", i64 8");
+            line("store i64 "+input.ir()+", ptr "+payload);
+        }
+        return reload(b);
+    }
     private Value typeOperation(TypeOperation t){
         Value value=expression(t.value());
-        boolean reference=value.type()==Type.OBJECT && t.targetType()==Type.OBJECT;
-        Value matches=reference?instruction(Type.BOOL,"call i1 @bhash_is_type(ptr "+value.ir()+", i64 "+t.targetId()+")")
-            :new Value(Type.BOOL,value.type()==t.targetType() && value.type()!=Type.OBJECT?"true":"false");
+        boolean dynamic=value.type()==Type.OBJECT || value.type()==Type.ANY;
+        Value matches=dynamic?instruction(Type.BOOL,"call i1 @bhash_is_type(ptr "+value.ir()+", i64 "+t.targetId()+")")
+            :new Value(Type.BOOL,value.type()==t.targetType() || t.targetType()==Type.ANY?"true":"false");
         if(t.action()==TypeAction.TEST)return matches;
-        String pointer=value.type()==Type.OBJECT?value.ir():"null";
+        String pointer=dynamic?value.ir():"null";
         if(t.action()==TypeAction.SAFE)
-            return instruction(Type.OBJECT,"select i1 "+matches.ir()+", ptr "+pointer+", ptr null");
-        // Preserve existing scalar conversion rules without introducing boxing.
+            return instruction(t.type(),"select i1 "+matches.ir()+", ptr "+pointer+", ptr null");
         if(t.targetType()==Type.TEXT && value.type()==Type.BOOL)
             return instruction(Type.TEXT,"select i1 "+value.ir()+", ptr "+text("सत्य")+", ptr "+text("असत्य"));
         Value allowed=matches;
-        if(reference){
+        if(dynamic && (t.targetType()==Type.OBJECT || t.targetType()==Type.ANY)){
             Value empty=instruction(Type.BOOL,"icmp eq ptr "+value.ir()+", null");
             allowed=instruction(Type.BOOL,"or i1 "+matches.ir()+", "+empty.ir());
         }
@@ -144,7 +219,15 @@ public final class LlvmEmitter {
         line("call void @bh_text_fail(ptr "+text("रनटाइम प्रकार परिवर्तन असफल हुआ।")+", ptr "+text(t.source().toString())+")");
         line("unreachable");terminated=true;
         block(pass);
-        if(t.targetType()==Type.OBJECT)return new Value(Type.OBJECT,pointer);
+        if(t.targetType()==Type.OBJECT || t.targetType()==Type.ANY)return new Value(t.targetType(),pointer);
+        if(value.type()==Type.ANY){
+            String payload=temporary();line(payload+" = getelementptr i8, ptr "+pointer+", i64 8");
+            if(t.targetType()==Type.BOOL){
+                Value integer=instruction(Type.INT,"load i64, ptr "+payload);
+                return instruction(Type.BOOL,"icmp ne i64 "+integer.ir()+", 0");
+            }
+            return instruction(t.targetType(),"load "+llvm(t.targetType())+", ptr "+payload);
+        }
         return value.type()==t.targetType()?value:new Value(t.targetType(),t.targetType()==Type.BOOL?"false":t.targetType()==Type.TEXT?text(""):"0");
     }
     private void scan(Expression e){
@@ -157,6 +240,7 @@ public final class LlvmEmitter {
         else if(e instanceof TextCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FieldRead f)scan(f.receiver());
         else if(e instanceof TypeOperation t)scan(t.value());
+        else if(e instanceof Box b)scan(b.value());
     }
     private void register(Binding b){
         if(bindings.putIfAbsent(b,true)==null && b.type().reference())bindingRoots.put(b,rootCount++);
@@ -200,7 +284,7 @@ public final class LlvmEmitter {
     }
     private Value expression(Expression e){
         Value result;
-        if(e instanceof Constant c)result=new Value(c.type(),c.type()==Type.TEXT?text((String)c.value()):c.type()==Type.BOOL?((Boolean)c.value()?"true":"false"):c.type()==Type.OBJECT?"null":c.value().toString());
+        if(e instanceof Constant c)result=new Value(c.type(),c.type()==Type.TEXT?text((String)c.value()):c.type()==Type.BOOL?((Boolean)c.value()?"true":"false"):(c.type()==Type.OBJECT || c.type()==Type.ANY)?"null":c.value().toString());
         else if(e instanceof Allocate a){
             result=instruction(Type.OBJECT,"call ptr @bh_alloc(ptr @class"+a.objectType()+", i64 "+objectSizes.get(a.objectType())+")");
             // The immutable type-metadata pointer is not a managed reference or safepoint.
@@ -251,7 +335,8 @@ public final class LlvmEmitter {
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else if(c.type()==Type.BOOL){String value=temporary();line(value+" = "+call);result=instruction(Type.BOOL,"icmp ne i32 "+value+", 0");}
             else result=instruction(c.type(),call);
-        } else if(e instanceof TypeOperation t)result=typeOperation(t);
+        } else if(e instanceof Box b)result=box(b);
+        else if(e instanceof TypeOperation t)result=typeOperation(t);
         else if(e instanceof Binary b)result=binary(b);
         else throw new IllegalStateException("Unknown core expression");
         if(e.type().reference())line("store ptr "+result.ir()+", ptr "+rootAddress(roots.get(e)));
@@ -262,6 +347,7 @@ public final class LlvmEmitter {
         else if(e instanceof Unary u)release(u.value());
         else if(e instanceof FieldRead f)release(f.receiver());
         else if(e instanceof TypeOperation t)release(t.value());
+        else if(e instanceof Box b)release(b.value());
         values.put(e,result);
         return result;
     }
@@ -298,6 +384,11 @@ public final class LlvmEmitter {
         }
         if(op.equals("+") || op.equals("-") || op.equals("*"))return instruction(Type.INT,
             switch(op){case "+"->"add";case "-"->"sub";default->"mul";}+" i64 "+left.ir()+", "+right.ir());
+        if(left.type()==Type.ANY){
+            left=reload(b.left());right=reload(b.right());
+            Value same=instruction(Type.BOOL,"call i1 @bhash_any_equal(ptr "+left.ir()+", ptr "+right.ir()+")");
+            return op.equals("==")?same:instruction(Type.BOOL,"xor i1 "+same.ir()+", true");
+        }
         if(left.type()==Type.TEXT){
             left=reload(b.left());right=reload(b.right());
             Value same=instruction(Type.INT,"call i32 @bh_text_equal(ptr "+left.ir()+", ptr "+right.ir()+")");

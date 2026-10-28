@@ -426,7 +426,7 @@ class NativeBackendTest {
             "अनुबंध अ { कार्य न() -> पूर्णांक; } अनुबंध ब { कार्य न() -> पाठ; } अनुबंध ग विस्तार अ, ब {}"))
             assertThrows(CompilationException.class,()->core(source+" कार्य मुख्य() -> शून्य {}"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { लिखो(सुरक्षितरूप<पूर्णांक>(१)); }"));
-        var unsupported=assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर क: सर्ववस्तु = १; }"));
+        var unsupported=assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर क: दशमलव = १.५; }"));
         assertTrue(unsupported.getMessage().contains("BH9001"));
     }
     @Test void nativeInterfaceDiamondsRedeclarationsAndMultipleContractsMatchJvm()throws Exception{
@@ -574,6 +574,158 @@ class NativeBackendTest {
             }
             """,GC_STRESS);
         assertEquals("५०००\n",result.out());assertEquals(1,stats(result).get("allocations"));
+        assertEquals(0,stats(result).get("live"));
+    }
+
+    @Test void coreUniversalContextsBoxScalarsAndPreserveReferenceViews()throws Exception{
+        var p=core("""
+            वर्ग क { सार्वजनिक मान व: सर्ववस्तु = १; }
+            कार्य पहचान(व: सर्ववस्तु) -> सर्ववस्तु { लौटाओ व; }
+            कार्य मुख्य() -> शून्य {
+                मान व: सर्ववस्तु = १; व = सत्य;
+                स्थिर क: क = नया क(); क.व = "अ";
+                पहचान(२); स्थिर ख: सर्ववस्तु = क;
+            }
+            """);
+        var main=p.functions().stream().filter(f->f.id()==p.entry()).findFirst().orElseThrow();
+        assertInstanceOf(Box.class,((Assign)main.body().statements().get(0)).value());
+        assertEquals(Type.ANY,((Assign)main.body().statements().get(0)).binding().type());
+        String ir=LlvmEmitter.emit(p);
+        assertTrue(ir.contains("@box_gc3"));assertTrue(ir.contains("@bhash_any_equal"));
+        assertTrue(ir.contains("call void @bh_reference_store"));
+        assertTrue(p.classes().get(0).assignableTypes().contains(-4));
+    }
+    @Test void nativeBoxedScalarsExactTypesNullsAndEqualityMatchJvm()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग क {}
+            कार्य मुख्य() -> शून्य {
+                स्थिर न: सर्ववस्तु = -९२२३३७२०३६८५४७७५८०८;
+                स्थिर हाँ: सर्ववस्तु = सत्य; स्थिर नहीं: सर्ववस्तु = असत्य;
+                स्थिर शब्द: सर्ववस्तु = "a\\u0000" + "😀क";
+                स्थिर खाली: सर्ववस्तु = रिक्त;
+                लिखो(परिवर्तित<पूर्णांक>(न), परिवर्तित<तार्किक>(हाँ), परिवर्तित<तार्किक>(नहीं), परिवर्तित<पाठ>(शब्द));
+                लिखो(प्रकारहै<पूर्णांक>(न), प्रकारहै<तार्किक>(न), प्रकारहै<पाठ>(शब्द), प्रकारहै<सर्ववस्तु>(न), प्रकारहै<सर्ववस्तु>(खाली));
+                लिखो(न == -९२२३३७२०३६८५४७७५८०८, -९२२३३७२०३६८५४७७५८०८ == न, हाँ == सत्य, असत्य == नहीं);
+                लिखो(शब्द == "a\\u0000😀क", "a\\u0000😀क" == शब्द, हाँ != न, खाली == रिक्त, रिक्त == खाली);
+                लिखो(न == परिवर्तित<सर्ववस्तु>(-९२२३३७२०३६८५४७७५८०८), हाँ == सुरक्षितरूप<सर्ववस्तु>(सत्य), न != परिवर्तित<सर्ववस्तु>(१));
+                लिखो(सुरक्षितरूप<क>(न) == रिक्त, सुरक्षितरूप<क>(शब्द) == रिक्त, सुरक्षितरूप<सर्ववस्तु>(खाली) == रिक्त);
+                लिखो(परिवर्तित<क>(खाली) == रिक्त, परिवर्तित<सर्ववस्तु>(खाली) == रिक्त);
+            }
+            """,GC_STRESS);
+        assertEquals(0,result.exit());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeBoxingAcrossConstructorsFieldsVirtualAndInterfaceCallsMatchesJvm()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            अनुबंध पेटी { कार्य दो(व: सर्ववस्तु) -> सर्ववस्तु; }
+            वर्ग आधारवर्ग पालन पेटी {
+                सार्वजनिक मान व: सर्ववस्तु;
+                सार्वजनिक मान आरंभ: सर्ववस्तु = "आर" + "ंभ";
+                निर्माता(व: सर्ववस्तु) { यह.व = व; }
+                सार्वजनिक कार्य दो(व: सर्ववस्तु) -> सर्ववस्तु { लौटाओ व; }
+                सार्वजनिक कार्य सीधा() -> सर्ववस्तु { लौटाओ सत्य; }
+            }
+            वर्ग उप विस्तार आधारवर्ग {
+                निर्माता() : आधार(७) {}
+                सार्वजनिक अधिलेखन कार्य दो(व: सर्ववस्तु) -> सर्ववस्तु { यह.व = व; लौटाओ व; }
+            }
+            कार्य पहचान(व: सर्ववस्तु) -> सर्ववस्तु { लौटाओ व; }
+            कार्य पाठदो() -> सर्ववस्तु { लौटाओ "मू" + "ल😀"; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: उप = नया उप(); स्थिर अ: आधारवर्ग = क; स्थिर प: पेटी = क;
+                लिखो(परिवर्तित<पूर्णांक>(क.व), परिवर्तित<पाठ>(क.आरंभ), परिवर्तित<तार्किक>(अ.सीधा()));
+                लिखो(परिवर्तित<पाठ>(प.दो("अ" + "ब")), परिवर्तित<पूर्णांक>(अ.दो(८)), परिवर्तित<पूर्णांक>(क.व));
+                स्थिर व: सर्ववस्तु = प;
+                लिखो(व == क, क == व, व == प, प्रकारहै<उप>(व), प्रकारहै<आधारवर्ग>(व), प्रकारहै<पेटी>(व), प्रकारहै<सर्ववस्तु>(क));
+                लिखो(परिवर्तित<पाठ>(परिवर्तित<पेटी>(व).दो(पाठदो())), परिवर्तित<तार्किक>(पहचान(असत्य)));
+                स्थिर दूसरा: सर्ववस्तु = नया उप(); लिखो(व != दूसरा, सुरक्षितरूप<पेटी>(व) == प);
+            }
+            """,GC_STRESS);
+        assertEquals("७ आरंभ सत्य\nअब ८ ८\nसत्य सत्य सत्य सत्य सत्य सत्य सत्य\nमूल😀 असत्य\nसत्य सत्य\n",result.out());
+        assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeBoxingEvaluationOrderAndUnboxedTextStayRooted()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग गिनक {
+                सार्वजनिक मान न: पूर्णांक;
+                सार्वजनिक कार्य अगला() -> पूर्णांक { न = न + १; लिखो(न); लौटाओ न; }
+                सार्वजनिक कार्य शब्द() -> पाठ { न = न + १; लिखो(न); लौटाओ "क" + अंकपाठ(न); }
+            }
+            कार्य जोड़(अ: सर्ववस्तु, ब: सर्ववस्तु) -> पाठ { लौटाओ परिवर्तित<पाठ>(अ) + परिवर्तित<पाठ>(ब); }
+            कार्य मुख्य() -> शून्य {
+                स्थिर ग: गिनक = नया गिनक();
+                स्थिर व: सर्ववस्तु = १;
+                लिखो(व == ग.अगला(), ग.अगला() == व);
+                लिखो(जोड़(ग.शब्द(), ग.शब्द()));
+                लिखो(प्रकारहै<पूर्णांक>(परिवर्तित<सर्ववस्तु>(ग.अगला())));
+                मान बचा: पाठ = "";
+                { स्थिर डिब्बा: सर्ववस्तु = ग.शब्द(); बचा = परिवर्तित<पाठ>(डिब्बा); }
+                मान न: पूर्णांक = ०;
+                जबतक (न < १०००) { स्थिर क्षण: सर्ववस्तु = "x" + अंकपाठ(न); न = न + १; }
+                लिखो(बचा, ग.न);
+            }
+            """,GC_STRESS);
+        assertEquals("१\n२\nसत्य असत्य\n३\n४\nक3क4\n५\nसत्य\n६\nक6 ६\n",result.out());
+        assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeBoxedReferencesAndCyclicUniversalFieldsSurviveCollection()throws Exception{
+        requireTools();
+        var result=nativeRun(Files.readString(Path.of("examples/native/boxing.bhash")),GC_STRESS);
+        assertEquals("४२ सत्य मूल😀 सत्य\nमूल😀 सत्य २९९९\n",result.out());
+        var s=stats(result);assertTrue(s.get("allocations")>12000,result.err());
+        assertTrue(s.get("collections")>=s.get("allocations"),result.err());
+        assertTrue(s.get("peak")<10000,result.err());assertEquals(0,s.get("live"));
+    }
+    @Test void nativeBoxedCheckedCastFailuresAreExactAndLocated()throws Exception{
+        requireTools();
+        for(String expression:List.of(
+            "परिवर्तित<पूर्णांक>(परिवर्तित<सर्ववस्तु>(\"42\"))",
+            "परिवर्तित<पाठ>(परिवर्तित<सर्ववस्तु>(४२))",
+            "परिवर्तित<तार्किक>(परिवर्तित<सर्ववस्तु>(१))",
+            "परिवर्तित<पूर्णांक>(परिवर्तित<सर्ववस्तु>(सत्य))",
+            "परिवर्तित<पूर्णांक>(परिवर्तित<सर्ववस्तु>(रिक्त))",
+            "परिवर्तित<तार्किक>(परिवर्तित<सर्ववस्तु>(रिक्त))",
+            "परिवर्तित<पाठ>(परिवर्तित<सर्ववस्तु>(रिक्त))",
+            "परिवर्तित<क>(परिवर्तित<सर्ववस्तु>(१))",
+            "परिवर्तित<अ>(परिवर्तित<सर्ववस्तु>(\"अ\"))",
+            "परिवर्तित<पाठ>(परिवर्तित<सर्ववस्तु>(नया क()))")){
+            var result=nativeRun("अनुबंध अ {} वर्ग क {} कार्य मुख्य() -> शून्य { लिखो(\"अधूरा\", प्रकारहै<सर्ववस्तु>("+expression+")); }",GC_STRESS);
+            assertEquals(1,result.exit());assertEquals("",result.out());
+            assertTrue(result.err().contains("native.bhash:1:"));
+            assertTrue(result.err().contains("रनटाइम प्रकार परिवर्तन असफल हुआ।"));
+        }
+    }
+
+    private static List<SourceFile> boxingSources(){
+        return List.of(
+            new SourceFile("library.bhash","संकुल सर्वपुस्तक; सार्वजनिक अनुबंध पेटी { कार्य दो(व: सर्ववस्तु) -> सर्ववस्तु; } सार्वजनिक वर्ग क पालन पेटी { सार्वजनिक कार्य दो(व: सर्ववस्तु) -> सर्ववस्तु { लौटाओ व; } } सार्वजनिक कार्य पहचान(व: सर्ववस्तु) -> सर्ववस्तु { लौटाओ व; }"),
+            new SourceFile("app.bhash","आयात सर्वपुस्तक.पेटी; आयात सर्वपुस्तक.क; आयात सर्वपुस्तक.पहचान; कार्य मुख्य() -> शून्य { स्थिर प: पेटी = नया क(); स्थिर व: सर्ववस्तु = प; लिखो(परिवर्तित<पूर्णांक>(पहचान(७)), परिवर्तित<पाठ>(परिवर्तित<पेटी>(व).दो(\"अ\" + \"ब\")), व == प); }"));
+    }
+    @Test void nativeBoxingAcrossPackagesMatchesJvm()throws Exception{
+        requireTools();var result=nativeRun(boxingSources(),GC_STRESS);
+        assertEquals("७ अब सत्य\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeUnboxingAndReferenceViewsDoNotAllocate()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग क {}
+            कार्य पहचान(व: सर्ववस्तु) -> सर्ववस्तु { लौटाओ व; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: क = नया क(); स्थिर व: सर्ववस्तु = क;
+                स्थिर अंक: सर्ववस्तु = ७; स्थिर हाँ: सर्ववस्तु = सत्य; स्थिर शब्द: सर्ववस्तु = "अ";
+                मान न: पूर्णांक = ०; मान योग: पूर्णांक = ०;
+                जबतक (न < ५०००) {
+                    यदि (परिवर्तित<तार्किक>(हाँ) && प्रकारहै<पूर्णांक>(अंक)) { योग = योग + परिवर्तित<पूर्णांक>(अंक); }
+                    यदि (पहचान(व) != क || परिवर्तित<क>(व) != क || सुरक्षितरूप<क>(व) != क || परिवर्तित<सर्ववस्तु>(व) != व) { त्रुटि("पहचान"); }
+                    यदि (परिवर्तित<पाठ>(शब्द) != "अ") { त्रुटि("पाठ"); }
+                    न = न + १;
+                }
+                लिखो(योग);
+            }
+            """,GC_STRESS);
+        assertEquals("३५०००\n",result.out());assertEquals(4,stats(result).get("allocations"));
         assertEquals(0,stats(result).get("live"));
     }
 
