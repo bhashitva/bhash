@@ -74,7 +74,7 @@ public final class LlvmEmitter {
         }
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v7\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v8\n"+
             "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
@@ -85,9 +85,18 @@ public final class LlvmEmitter {
             "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\n"+
             "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
-            textDeclarations()+"\n"+typeTestHelper()+equalityHelper()+functions+
+            textDeclarations()+numericDeclarations()+"\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
+    }
+    private static String numericDeclarations(){
+        var declarations=new StringBuilder();
+        for(var op:NumericOperation.values()){
+            var parameters=new ArrayList<String>();for(var p:op.parameters())parameters.add(llvm(p));parameters.add("ptr");
+            declarations.append("declare ").append(llvm(op.result())).append(" @bh_numeric_")
+                .append(op.name().toLowerCase(Locale.ROOT)).append("(").append(String.join(", ",parameters)).append(")\n");
+        }
+        return declarations.toString();
     }
     private static String textDeclarations(){
         return "declare ptr @bh_text_concat(ptr, ptr, ptr)\n"+
@@ -318,6 +327,7 @@ public final class LlvmEmitter {
         else if(e instanceof Binary b){scan(b.left());scan(b.right());}
         else if(e instanceof Call c)c.arguments().forEach(this::scan);
         else if(e instanceof TextCall c)c.arguments().forEach(this::scan);
+        else if(e instanceof NumericCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FieldRead f)scan(f.receiver());
         else if(e instanceof TypeOperation t)scan(t.value());
         else if(e instanceof Box b)scan(b.value());
@@ -377,6 +387,7 @@ public final class LlvmEmitter {
         else if(e instanceof Binary b){expressionRoots(b.left(),slots);expressionRoots(b.right(),slots);}
         else if(e instanceof Call c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof TextCall c)c.arguments().forEach(a->expressionRoots(a,slots));
+        else if(e instanceof NumericCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof FieldRead f)expressionRoots(f.receiver(),slots);
         else if(e instanceof TypeOperation t)expressionRoots(t.value(),slots);
         else if(e instanceof Box b)expressionRoots(b.value(),slots);
@@ -540,6 +551,12 @@ public final class LlvmEmitter {
             String call="call "+llvm(c.type())+" "+target+"("+String.join(", ",args)+")";
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else result=instruction(c.type(),call);
+        } else if(e instanceof NumericCall c) {
+            for(var a:c.arguments())expression(a);
+            var args=new ArrayList<String>();for(var a:c.arguments())args.add(reload(a).argument());
+            args.add("ptr "+text(c.source().toString()));
+            String call="call "+llvm(c.type())+" @bh_numeric_"+c.operation().name().toLowerCase(Locale.ROOT)+"("+String.join(", ",args)+")";
+            if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}else result=instruction(c.type(),call);
         } else if(e instanceof TextCall c) {
             for(var a:c.arguments())expression(a);
             var args=new ArrayList<String>();
@@ -558,6 +575,7 @@ public final class LlvmEmitter {
         // Publish the result before releasing inputs: they may alias its storage.
         if(e instanceof Call c)c.arguments().forEach(this::release);
         else if(e instanceof TextCall c)c.arguments().forEach(this::release);
+        else if(e instanceof NumericCall c)c.arguments().forEach(this::release);
         else if(e instanceof Binary b){release(b.left());release(b.right());}
         else if(e instanceof Unary u)release(u.value());
         else if(e instanceof FieldRead f)release(f.receiver());

@@ -50,7 +50,7 @@ public final class NativeCompiler {
             command(work,List.of(opt,"-passes=verify","-disable-output","program.ll"));
             command(work,clangCommand(List.of(clang,"-O2","-c","program.ll","-o","program.o")));
             command(work,clangCommand(List.of(clang,"-std=c17","-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o")));
-            command(work,clangCommand(List.of(clang,"program.o","runtime.o","-o","program")));
+            command(work,clangCommand(List.of(clang,"program.o","runtime.o","-lm","-o","program")));
             Files.createDirectories(destination.getParent());
             staged=Files.createTempFile(destination.getParent(),".bhash-native-",".tmp");
             Files.copy(work.resolve("program"),staged,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.COPY_ATTRIBUTES);
