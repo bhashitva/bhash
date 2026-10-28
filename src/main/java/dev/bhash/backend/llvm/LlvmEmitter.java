@@ -93,7 +93,7 @@ public final class LlvmEmitter {
             "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\n"+
             "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
-            textDeclarations()+numericDeclarations()+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
+            textDeclarations()+numericDeclarations()+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
     }
@@ -346,6 +346,7 @@ public final class LlvmEmitter {
         else if(e instanceof NumericCall c)c.arguments().forEach(this::scan);
         else if(e instanceof StructuredCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FileCall c)c.arguments().forEach(this::scan);
+        else if(e instanceof TimeCall c)c.arguments().forEach(this::scan);
         else if(e instanceof BufferCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FieldRead f)scan(f.receiver());
         else if(e instanceof TypeOperation t)scan(t.value());
@@ -409,6 +410,7 @@ public final class LlvmEmitter {
         else if(e instanceof NumericCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof StructuredCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof FileCall c)c.arguments().forEach(a->expressionRoots(a,slots));
+        else if(e instanceof TimeCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof BufferCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof FieldRead f)expressionRoots(f.receiver(),slots);
         else if(e instanceof TypeOperation t)expressionRoots(t.value(),slots);
@@ -579,6 +581,10 @@ public final class LlvmEmitter {
             while(args.size()<4)args.add("i64 0");
             Value raw=instruction(Type.INT,"call i64 @bh_buffer_call(i32 "+c.operation().ordinal()+", "+String.join(", ",args)+", ptr "+collectionInfo(c.descriptor())+", ptr "+text(c.source().toString())+")");
             result=collectionResult(c.type(),raw);
+        } else if(e instanceof TimeCall c) {
+            for(var a:c.arguments())expression(a);
+            var args=new ArrayList<String>();for(var a:c.arguments())args.add(reload(a).argument());args.add("ptr "+text(c.source().toString()));
+            result=instruction(c.type(),"call "+llvm(c.type())+" @bh_time_"+c.operation().name().toLowerCase(Locale.ROOT)+"("+String.join(", ",args)+")");
         } else if(e instanceof FileCall c) {
             for(var a:c.arguments())expression(a);
             var args=new ArrayList<String>();for(var a:c.arguments())args.add(reload(a).argument());args.add("ptr "+text(c.source().toString()));
@@ -618,6 +624,7 @@ public final class LlvmEmitter {
         else if(e instanceof NumericCall c)c.arguments().forEach(this::release);
         else if(e instanceof StructuredCall c)c.arguments().forEach(this::release);
         else if(e instanceof FileCall c)c.arguments().forEach(this::release);
+        else if(e instanceof TimeCall c)c.arguments().forEach(this::release);
         else if(e instanceof BufferCall c)c.arguments().forEach(this::release);
         else if(e instanceof Binary b){release(b.left());release(b.right());}
         else if(e instanceof Unary u)release(u.value());
