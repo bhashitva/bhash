@@ -123,6 +123,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     static final class Analysis {
+        ClassInfo exceptionClass;
         final Map<org.antlr.v4.runtime.tree.ParseTree, Expr> expressions = new IdentityHashMap<>();
         final Map<ParserRuleContext, Binding> bindings = new IdentityHashMap<>();
         final Map<PrimaryContext, Binding> reads = new IdentityHashMap<>();
@@ -149,6 +150,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         try {
             var emitter = new ManagedEmitter("project", Target.JVM);
             emitter.analysis = new Analysis();
+            emitter.analysis.exceptionClass=emitter.exceptionClass;
             var tree = GenericExpander.expand("project", resolution.tree());
             emitter.program(tree, true);
             var functions = emitter.functions.values().stream().flatMap(List::stream).toList();

@@ -10,7 +10,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
-public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections) {
+public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType) {
     public enum Type { INT, BOOL, TEXT, OBJECT, ANY, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT || this==ANY; }
     }
@@ -32,6 +32,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record IndexWrite(IndexRead destination, Expression value) implements Statement {}
     public record Foreach(Expression collection, Binding owner, Binding index, Binding version,
                           List<Assign> items, Block body, Source source) implements Statement {}
+    public record Catch(int typeId, Binding binding, Block body) {}
+    public record Try(Block body, List<Catch> handlers, Block cleanup, Binding exception, Source source) implements Statement {}
+    public record Throw(Expression value, Source source) implements Statement {}
     public enum TypeAction { TEST, SAFE, CAST }
     public record TypeOperation(Type type, TypeAction action, Expression value, Type targetType, int targetId, Source source) implements Expression {}
     public enum TextOperation {
@@ -67,7 +70,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record TextCall(Type type, TextOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public record Allocate(int objectType, Source source) implements Expression { public Type type(){return Type.OBJECT;} }
     public record FieldRead(Expression receiver, ObjectField field, Source source) implements Expression { public Type type(){return field.type();} }
-    public sealed interface Statement permits Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach {}
+    public sealed interface Statement permits Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach, Try, Throw {}
     public record FieldWrite(FieldRead destination, Expression value) implements Statement {}
     public record Block(List<Statement> statements, List<Binding> locals) implements Statement {}
     public record Assign(Binding binding, Expression value) implements Statement {}
@@ -104,8 +107,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 t.IDENTIFIER()!=null && CollectionTypes.builtin(t.IDENTIFIER().getText())))throw unsupported(c);
         if (c instanceof ValueTypeContext t &&
                 !(t.INT_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null || t.OBJECT_TYPE()!=null || t.IDENTIFIER()!=null)) throw unsupported(c);
-        if (c instanceof StatementContext s && (s.tryStatement()!=null || s.THROW()!=null ||
-                s.switchStatement()!=null)) throw unsupported(c);
+        if (c instanceof StatementContext s && s.switchStatement()!=null) throw unsupported(c);
         if (c instanceof UnaryContext u && u.BIT_NOT()!=null) throw unsupported(c);
         if ((c instanceof ShiftContext || c instanceof BitwiseOrContext || c instanceof BitwiseXorContext ||
                 c instanceof BitwiseAndContext) && c.getChildCount()>1) throw unsupported(c);
@@ -131,6 +133,11 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         final List<ManagedEmitter.Function> interfaceMethods=new ArrayList<>();
         final Map<ManagedEmitter.Function,Integer> interfaceSlots=new IdentityHashMap<>();
         Binding self;
+        final ManagedEmitter.ClassInfo exceptionClass;
+        final Deque<Binding> caught=new ArrayDeque<>();
+        final ObjectField messageField=new ObjectField(-5,8,Type.TEXT), locationField=new ObjectField(-5,16,Type.TEXT);
+        final Source runtimeSource=new Source("runtime",1,1);
+        final boolean exceptionConstructors;
         Type resultType;
         final Map<ManagedEmitter.Type,Integer> collectionIds=new IdentityHashMap<>();
         final List<CollectionType> collections=new ArrayList<>();
@@ -166,10 +173,14 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         final Map<ManagedEmitter.Function,Integer> slots=new IdentityHashMap<>();
         int nextBinding;
         Builder(ManagedEmitter.Analysis analysis,List<ManagedEmitter.Function> checked,List<ManagedEmitter.ClassInfo> allClasses) throws CompilationException {
-            a=analysis;
+            a=analysis;exceptionClass=a.exceptionClass;
             classes=allClasses.stream().filter(c->c.declaration!=null && !library(c.declaration)).toList();
             types=allClasses.stream().filter(c->c.at()!=null && !library(c.at()) && (c.declaration!=null || c.contract!=null)).toList();
             for(var c:types)classIds.put(c,classIds.size());
+            classIds.put(exceptionClass,-5);
+            fields.put(exceptionClass.fields.values().iterator().next(),messageField);
+            layouts.put(exceptionClass,List.of(messageField,locationField));tables.put(exceptionClass,List.of());
+            exceptionConstructors=classes.stream().anyMatch(c->c.parent==exceptionClass) || a.constructors.values().stream().anyMatch(exceptionClass.constructors::contains);
             for(var c:types)if(c.isInterface())for(var methods:c.methods.values())for(var f:methods){
                 interfaceSlots.put(f,interfaceMethods.size());interfaceMethods.add(f);
             }
@@ -198,8 +209,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             for(var f:checked) if(f.declaration!=null && !library(f.declaration)) {
                 ids.put(f,ids.size()); declarations.put(f.declaration,f);
             }
-            for(var c:classes)for(var ctor:c.constructors)constructors.put(ctor,ids.size()+constructors.size());
-            for(var c:classes)for(var ctor:c.constructors)initializers.put(ctor,ids.size()+constructors.size()+initializers.size());
+            var constructed=new ArrayList<>(classes);if(exceptionConstructors)constructed.add(exceptionClass);
+            for(var c:constructed)for(var ctor:c.constructors)constructors.put(ctor,ids.size()+constructors.size());
+            for(var c:constructed)for(var ctor:c.constructors)initializers.put(ctor,ids.size()+constructors.size()+initializers.size());
         }
         Type type(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             if(t.collection!=null){collectionId(t,at);return Type.OBJECT;}
@@ -276,9 +288,24 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     result.add(new Function(initializers.get(ctor),Type.VOID,List.copyOf(initializerParameters),new Block(List.copyOf(statements),List.of()),source(at)));
                 }
             }
+            if(exceptionConstructors)for(var ctor:exceptionClass.constructors){
+                var parameters=new ArrayList<Binding>();
+                if(!ctor.parameters().isEmpty())parameters.add(new Binding(nextBinding++,Type.TEXT));
+                var receiver=new Binding(nextBinding++,Type.OBJECT);
+                var args=new ArrayList<Expression>();args.add(new Read(receiver,runtimeSource));for(var p:parameters)args.add(new Read(p,runtimeSource));
+                var factory=List.<Statement>of(new Assign(receiver,new Allocate(-5,runtimeSource)),
+                    new Evaluate(new Call(Type.VOID,initializers.get(ctor),List.copyOf(args),runtimeSource)),new Return(new Read(receiver,runtimeSource)));
+                result.add(new Function(constructors.get(ctor),Type.OBJECT,List.copyOf(parameters),new Block(factory,List.of(receiver)),runtimeSource));
+                var initParameters=new ArrayList<Binding>();initParameters.add(receiver);initParameters.addAll(parameters);
+                Expression message=parameters.isEmpty()?new Constant(Type.TEXT,"",runtimeSource):new Read(parameters.get(0),runtimeSource);
+                var init=List.<Statement>of(new FieldWrite(new FieldRead(new Read(receiver,runtimeSource),messageField,runtimeSource),message),
+                    new FieldWrite(new FieldRead(new Read(receiver,runtimeSource),locationField,runtimeSource),new Constant(Type.TEXT,"",runtimeSource)));
+                result.add(new Function(initializers.get(ctor),Type.VOID,List.copyOf(initParameters),new Block(init,List.of()),runtimeSource));
+            }
             self=null;
             return new CoreProgram(List.copyOf(result),entry,List.copyOf(objectTypes),types.stream()
-                .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections));
+                .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections),new ObjectType(-5,"अपवाद",List.of(messageField,locationField),List.of(),
+                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)));
         }
         void collectTypes(ManagedEmitter.ClassInfo c, Set<ManagedEmitter.ClassInfo> result) throws CompilationException {
             if(c==null || !result.add(c))return;
@@ -312,6 +339,17 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 if(destination instanceof IndexRead r)return new IndexWrite(r,coerce(expression(d.expression()),r.type()));
                 if(destination instanceof FieldRead f)return new FieldWrite(f,coerce(expression(d.expression()),f.type()));
                 throw unsupported(d);
+            }
+            if(s.THROW()!=null)return new Throw(s.expression()==null?new Read(caught.peek(),source(s)):expression(s.expression()),source(s));
+            if(s.tryStatement()!=null){
+                var t=s.tryStatement();var body=block(t.block(0));var handlers=new ArrayList<Catch>();
+                for(var clause:t.catchClause()){
+                    var parameter=clause.parameter();var bound=a.bindings.get(parameter);var binding=binding(bound,parameter);
+                    caught.push(binding);var handler=block(clause.block());caught.pop();
+                    handlers.add(new Catch(classIds.get(bound.type().object),binding,handler));
+                }
+                var cleanup=t.FINALLY()==null?null:block(t.block(1));
+                return new Try(body,List.copyOf(handlers),cleanup,new Binding(nextBinding++,Type.OBJECT),source(t));
             }
             if(s.ifStatement()!=null)return branch(s.ifStatement());
             if(s.foreachStatement()!=null){
