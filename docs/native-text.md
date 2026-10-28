@@ -27,10 +27,10 @@ import aliases and qualified standard-library calls use the existing compiler's
 resolution and signature checking. Unsupported library functions still fail clearly;
 this is not complete native standard-library support.
 
-Input, decimal formatting, byte buffers, text split/join (which require collections),
-arrays and collection APIs remain outside this milestone. Ordinary classes are
-covered by the subsequent [native objects milestone](native-objects.md). No grammar or
-public function signatures change.
+Subsequent milestones add [decimal formatting](native-decimals.md),
+[collections](native-collections.md), [split/join and JSON](native-json-text.md),
+and [ordinary classes](native-objects.md). Input and byte buffers remain outside
+the current native profile. No grammar or public function signatures change.
 
 The repeat limit intentionally matches existing JVM/CLR behavior, including two
 UTF-16 units per supplementary scalar. Public positions and lengths remain scalar

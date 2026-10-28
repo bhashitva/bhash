@@ -123,7 +123,7 @@ vectors की tolerance है, हर possible input के लिए libm err
 
 ## Runtime और validation (Runtime and validation)
 
-निजी native ABI v8 typed numeric intrinsics जोड़ता है; v7 के object, decimal,
+निजी native ABI v9 typed numeric intrinsics जोड़ता है; v7 के object, decimal,
 collection और root-frame layouts नहीं बदलते। LLVM compiler `double`/`i64` arguments
 और result types सीधे emits करता है। Native linker `libm` जोड़ता है। C generator में
 state updates, multiplication और shifts unsigned 64-bit हैं, ताकि C signed-overflow
@@ -145,5 +145,7 @@ separate golden vectors, ४०,००० mixed bounded/unit iterations, domain 
 unwinding और restart हैं। Debug, optimized तथा Linux ASan/UBSan builds चलते हैं।
 CI example को compiler/JVM/.NET के बिना साफ Linux container में चलाता है।
 
-JSON, UTC time, file operations, बाकी text/buffer helpers और अन्य numeric widths अभी
+UTC time, file operations, बाकी byte-buffer helpers और अन्य numeric widths अभी
 [native profile](native-compilation-design.md) के बाहर हैं।
+
+[Native structured text](native-json-text.md) अब split/join और JSON उपलब्ध करता है।

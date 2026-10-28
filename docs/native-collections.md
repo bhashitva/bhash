@@ -136,7 +136,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/collections
 
 ## Runtime and collector contract
 
-Private native ABI v8 (extended by [exceptions](native-exceptions.md)) extends GC descriptors with a repeated region: byte offset,
+Private native ABI v9 (extended by [exceptions](native-exceptions.md)) extends GC descriptors with a repeated region: byte offset,
 stride, and a bitmap of reference lanes within each stride. The allocator validates
 these regions against payload size. The collector visits only declared pointer
 lanes, and the reference-store barrier accepts those same writable slots. Integer
@@ -188,6 +188,6 @@ Other numeric widths, records/enums, user-defined generics, static members and
 foreign interoperability remain outside the native profile. Built-in
 collection type arguments are supported; this does not add user-defined generic
 classes/functions. Standard-library intrinsics outside the existing native text
-subset remain unsupported, including collection-oriented JSON/text/file APIs.
+subset remain unsupported, including byte-buffer and file APIs. [JSON and text split/join](native-json-text.md) are now supported.
 
 [Native दशमलव support](native-decimals.md) adds binary64 arithmetic, conversions, formatting, boxing and collection values.
