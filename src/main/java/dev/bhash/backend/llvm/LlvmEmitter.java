@@ -44,7 +44,9 @@ public final class LlvmEmitter {
     public static String emit(CoreProgram program,String notices){return new LlvmEmitter().program(program,notices);}
     private String program(CoreProgram program,String notices){
         for(var c:program.classes()){
-            objectSizes.put(c.id(),c.fields().size()*8);
+            objectSizes.put(c.id(),8+c.fields().size()*8);
+            globals.append("@vtable").append(c.id()).append(" = private constant [").append(c.virtualMethods().size()).append(" x ptr] [")
+                .append(String.join(", ",c.virtualMethods().stream().map(id->"ptr @bfn"+id).toList())).append("], align 8\n");
             var refs=c.fields().stream().filter(f->f.type().reference()).toList();
             String offsets="@refs"+c.id();
             globals.append(offsets).append(" = private constant [").append(refs.size()).append(" x i64] [")
@@ -55,11 +57,11 @@ public final class LlvmEmitter {
             for(byte b:nameBytes)globals.append(String.format(Locale.ROOT,"\\%02X",b&255));
             globals.append("\"\n");
             globals.append("@class").append(c.id()).append(" = private constant { ptr, i64, i64, ptr } { ptr ").append(name)
-                .append(", i64 ").append(c.fields().size()*8).append(", i64 ").append(refs.size()).append(", ptr ").append(offsets).append(" }, align 8\n");
+                .append(", i64 ").append(8+c.fields().size()*8).append(", i64 ").append(refs.size()).append(", ptr ").append(offsets).append(" }, align 8\n");
         }
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v1\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v2\n"+
             "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
@@ -134,7 +136,11 @@ public final class LlvmEmitter {
     private Value expression(Expression e){
         Value result;
         if(e instanceof Constant c)result=new Value(c.type(),c.type()==Type.TEXT?text((String)c.value()):c.type()==Type.BOOL?((Boolean)c.value()?"true":"false"):c.type()==Type.OBJECT?"null":c.value().toString());
-        else if(e instanceof Allocate a)result=instruction(Type.OBJECT,"call ptr @bh_alloc(ptr @class"+a.objectType()+", i64 "+objectSizes.get(a.objectType())+")");
+        else if(e instanceof Allocate a){
+            result=instruction(Type.OBJECT,"call ptr @bh_alloc(ptr @class"+a.objectType()+", i64 "+objectSizes.get(a.objectType())+")");
+            // The immutable method-table pointer is not a managed reference or safepoint.
+            line("store ptr @vtable"+a.objectType()+", ptr "+result.ir());
+        }
         else if(e instanceof FieldRead f){
             Value receiver=expression(f.receiver());
             receiver=instance(receiver,f.source());
@@ -156,7 +162,16 @@ public final class LlvmEmitter {
             }
             var args=new ArrayList<String>();
             for(var a:c.arguments())args.add(reload(a).argument());
-            String call="call "+llvm(c.type())+" @bfn"+c.function()+"("+String.join(", ",args)+")";
+            String target="@bfn"+c.function();
+            if(c.virtualSlot()>=0){
+                Value receiver=reload(c.arguments().get(0));
+                String table=temporary(),slot=temporary(),method=temporary();
+                line(table+" = load ptr, ptr "+receiver.ir());
+                line(slot+" = getelementptr ptr, ptr "+table+", i64 "+c.virtualSlot());
+                line(method+" = load ptr, ptr "+slot);
+                target=method;
+            }
+            String call="call "+llvm(c.type())+" "+target+"("+String.join(", ",args)+")";
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else result=instruction(c.type(),call);
         } else if(e instanceof TextCall c) {
