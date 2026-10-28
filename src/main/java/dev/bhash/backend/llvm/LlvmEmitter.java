@@ -28,7 +28,7 @@ public final class LlvmEmitter {
     private final Map<Integer,Integer> objectSizes=new HashMap<>();
     private final Map<Expression,Value> values=new IdentityHashMap<>();
     private record Value(Type type,String ir) { String argument(){return llvm(type)+" "+ir;} }
-    private static String llvm(Type t) { return switch(t){case REAL->"double";case INT->"i64";case BOOL->"i1";case TEXT,OBJECT,ANY->"ptr";case VOID->"void";}; }
+    private static String llvm(Type t) { return switch(t){case REAL->"double";case INT,BYTE->"i64";case BOOL->"i1";case TEXT,OBJECT,ANY->"ptr";case VOID->"void";}; }
     private String temporary(){return "%x"+next++;}
     private String freshLabel(){return "l"+next++;}
     private void line(String s){code.append("  ").append(s).append('\n');}
@@ -82,7 +82,7 @@ public final class LlvmEmitter {
         }
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v9\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v10\n"+
             "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
@@ -93,7 +93,7 @@ public final class LlvmEmitter {
             "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\n"+
             "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
-            textDeclarations()+numericDeclarations()+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
+            textDeclarations()+numericDeclarations()+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
     }
@@ -153,7 +153,7 @@ public final class LlvmEmitter {
     }
     /** Negative membership IDs are reserved for built-in boxed types and सर्ववस्तु. */
     private void boxMetadata(){
-        for(int kind:new int[]{1,2,3,6}){
+        for(int kind:new int[]{1,2,3,6,7}){
             globals.append("@box_types").append(kind).append(" = private constant [2 x i64] [i64 -").append(kind).append(", i64 -4]\n");
             globals.append("@box_info").append(kind).append(" = private constant %ClassInfo { ptr null, ptr null, i64 2, ptr @box_types").append(kind).append(" }, align 8\n");
             globals.append("@box_refs").append(kind).append(" = private constant [").append(kind==3?1:0).append(" x i64] [").append(kind==3?"i64 8":"").append("]\n");
@@ -185,7 +185,7 @@ public final class LlvmEmitter {
         if(type==Type.REAL)return instruction(type,"bitcast i64 "+bits.ir()+" to double");
         if(type==Type.BOOL)return instruction(type,"icmp ne i64 "+bits.ir()+", 0");
         if(type==Type.VOID)return new Value(type,"");
-        return bits;
+        return new Value(type,bits.ir());
     }
     private Value collectionCall(Type result,CollectionOperation operation,Value receiver,List<Value> arguments,int snapshot,Source source){
         var args=new ArrayList<Value>();for(var arg:arguments)args.add(bits(arg));
@@ -209,6 +209,7 @@ public final class LlvmEmitter {
         String location=text(c.source().toString());
         CollectionType type=collectionTypes.get(c.collection());
         if(c.literal())return instruction(Type.OBJECT,"call ptr @bh_collection_literal(ptr "+collectionInfo(c.collection())+", i64 "+(type.kind()==CollectionKind.MAP?count/2:count)+", ptr "+buffer+", ptr "+location+")");
+        if(type.kind()==CollectionKind.BUFFER)return instruction(Type.OBJECT,"call ptr @bh_collection_new(ptr "+collectionInfo(c.collection())+", i64 "+reload(c.arguments().get(0)).ir()+", ptr "+location+")");
         if(type.kind()==CollectionKind.ARRAY)return instruction(Type.OBJECT,"call ptr @bh_array_dimensions(ptr "+collectionInfo(c.collection())+", i64 "+count+", ptr "+buffer+", ptr "+location+")");
         return instruction(Type.OBJECT,"call ptr @bh_collection_new(ptr "+collectionInfo(c.collection())+", i64 0, ptr "+location+")");
     }
@@ -232,7 +233,9 @@ public final class LlvmEmitter {
             kind:
               %integer = icmp eq ptr %ai, @box_info1
               %boolean = icmp eq ptr %ai, @box_info2
-              %scalar = or i1 %integer, %boolean
+              %byte = icmp eq ptr %ai, @box_info7
+              %integral = or i1 %integer, %byte
+              %scalar = or i1 %integral, %boolean
               br i1 %scalar, label %numbers, label %textkind
             numbers:
               %ap = getelementptr i8, ptr %a, i64 8
@@ -276,7 +279,7 @@ public final class LlvmEmitter {
     private Value box(Box b){
         Value input=expression(b.value());
         if(input.type()==Type.OBJECT || input.type()==Type.ANY)return new Value(Type.ANY,input.ir());
-        int kind=switch(input.type()){case REAL->6;case INT->1;case BOOL->2;case TEXT->3;default->throw new IllegalStateException("Unchecked box type");};
+        int kind=switch(input.type()){case BYTE->7;case REAL->6;case INT->1;case BOOL->2;case TEXT->3;default->throw new IllegalStateException("Unchecked box type");};
         Value result=instruction(Type.ANY,"call ptr @bh_alloc(ptr @box_gc"+kind+", i64 16)");
         line("store ptr @box_info"+kind+", ptr "+result.ir());
         // Publish before the reference-store barrier; reload rooted text after allocation.
@@ -292,10 +295,15 @@ public final class LlvmEmitter {
     }
     private Value typeOperation(TypeOperation t){
         Value value=expression(t.value());
-        if(t.action()==TypeAction.CAST && value.type()==Type.INT && t.targetType()==Type.REAL)
+        if(t.action()==TypeAction.CAST && (value.type()==Type.INT || value.type()==Type.BYTE) && t.targetType()==Type.REAL)
             return instruction(Type.REAL,"sitofp i64 "+value.ir()+" to double");
         if(t.action()==TypeAction.CAST && value.type()==Type.REAL && t.targetType()==Type.INT)
             return instruction(Type.INT,"call i64 @bh_real_to_int(double "+value.ir()+", ptr "+text(t.source().toString())+")");
+        if(t.action()==TypeAction.CAST && t.targetType()==Type.INT && value.type()==Type.BYTE)return new Value(Type.INT,value.ir());
+        if(t.action()==TypeAction.CAST && t.targetType()==Type.BYTE && (value.type()==Type.INT || value.type()==Type.REAL)){
+            if(value.type()==Type.REAL)value=instruction(Type.INT,"call i64 @bh_real_to_int(double "+value.ir()+", ptr "+text(t.source().toString())+")");
+            return instruction(Type.BYTE,"call i64 @bh_to_byte(i64 "+value.ir()+", ptr "+text(t.source().toString())+")");
+        }
         boolean dynamic=value.type()==Type.OBJECT || value.type()==Type.ANY;
         Value matches=dynamic?instruction(Type.BOOL,"call i1 @bhash_is_type(ptr "+value.ir()+", i64 "+t.targetId()+")")
             :new Value(Type.BOOL,value.type()==t.targetType() || t.targetType()==Type.ANY?"true":"false");
@@ -338,6 +346,7 @@ public final class LlvmEmitter {
         else if(e instanceof NumericCall c)c.arguments().forEach(this::scan);
         else if(e instanceof StructuredCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FileCall c)c.arguments().forEach(this::scan);
+        else if(e instanceof BufferCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FieldRead f)scan(f.receiver());
         else if(e instanceof TypeOperation t)scan(t.value());
         else if(e instanceof Box b)scan(b.value());
@@ -400,6 +409,7 @@ public final class LlvmEmitter {
         else if(e instanceof NumericCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof StructuredCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof FileCall c)c.arguments().forEach(a->expressionRoots(a,slots));
+        else if(e instanceof BufferCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof FieldRead f)expressionRoots(f.receiver(),slots);
         else if(e instanceof TypeOperation t)expressionRoots(t.value(),slots);
         else if(e instanceof Box b)expressionRoots(b.value(),slots);
@@ -538,7 +548,7 @@ public final class LlvmEmitter {
         else if(e instanceof Unary u){
             Value v=expression(u.value());
             result=switch(u.operator()){
-                case "+"->v;
+                case "+"->new Value(u.type(),v.ir());
                 case "-"->v.type()==Type.REAL?instruction(Type.REAL,"fneg double "+v.ir()):instruction(Type.INT,"sub i64 0, "+v.ir());
                 case "!"->instruction(Type.BOOL,"xor i1 "+v.ir()+", true");
                 default->throw new IllegalStateException("Unchecked unary operator");};
@@ -563,6 +573,12 @@ public final class LlvmEmitter {
             String call="call "+llvm(c.type())+" "+target+"("+String.join(", ",args)+")";
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else result=instruction(c.type(),call);
+        } else if(e instanceof BufferCall c) {
+            for(var a:c.arguments())expression(a);
+            var args=new ArrayList<String>();for(var a:c.arguments())args.add("i64 "+bits(reload(a)).ir());
+            while(args.size()<4)args.add("i64 0");
+            Value raw=instruction(Type.INT,"call i64 @bh_buffer_call(i32 "+c.operation().ordinal()+", "+String.join(", ",args)+", ptr "+collectionInfo(c.descriptor())+", ptr "+text(c.source().toString())+")");
+            result=collectionResult(c.type(),raw);
         } else if(e instanceof FileCall c) {
             for(var a:c.arguments())expression(a);
             var args=new ArrayList<String>();for(var a:c.arguments())args.add(reload(a).argument());args.add("ptr "+text(c.source().toString()));
@@ -602,6 +618,7 @@ public final class LlvmEmitter {
         else if(e instanceof NumericCall c)c.arguments().forEach(this::release);
         else if(e instanceof StructuredCall c)c.arguments().forEach(this::release);
         else if(e instanceof FileCall c)c.arguments().forEach(this::release);
+        else if(e instanceof BufferCall c)c.arguments().forEach(this::release);
         else if(e instanceof Binary b){release(b.left());release(b.right());}
         else if(e instanceof Unary u)release(u.value());
         else if(e instanceof FieldRead f)release(f.receiver());
