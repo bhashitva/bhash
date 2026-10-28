@@ -32,6 +32,8 @@ def main():
             command = [args.cc, '-std=c17', '-Wall', '-Wextra', '-Werror', '-pedantic',
                        '-O2' if optimized else '-O0', '-I', str(RUNTIME),
                        str(ROOT / 'tests/native/runtime_test.c'), str(RUNTIME / 'bhash_runtime.c'), '-o', str(exe)]
+            if os.name != 'nt':
+                command += ['-lm']
             if args.sanitize:
                 command += ['-fsanitize=address,undefined', '-fno-omit-frame-pointer']
         result = run(command)
@@ -78,6 +80,16 @@ def main():
             assert not result.stdout
             assert result.stderr.startswith('भाष: '.encode('utf-8'))
         print(f'{name}: repeated tracing, scalar precision, collection cycles, growth, hashing, snapshots and failures passed')
+
+        numeric_exe = BUILD / ('math-random-' + name + ('.exe' if os.name == 'nt' else ''))
+        numeric_command = [part.replace('runtime_test.c', 'math_random_runtime_test.c').replace(str(exe), str(numeric_exe)) for part in command]
+        result = run(numeric_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(numeric_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native math/random checks passed.\n'
+        print(f'{name}: math domains, signed zeros, rounding, golden mixed random sequences, range rejection and unwinding passed')
 
         decimal_exe = BUILD / ('decimals-' + name + ('.exe' if os.name == 'nt' else ''))
         decimal_command = [part.replace('runtime_test.c', 'decimal_runtime_test.c').replace(str(exe), str(decimal_exe)) for part in command]
