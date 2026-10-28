@@ -61,16 +61,18 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - `यदि`/`अन्यथा`, `जबतक`, `विराम`, `जारी`, `लौटाओ`.
 - Literal and heap-backed text passed, returned, assigned and compared by value.
 - Concatenation and the scalar text-library subset in [native text](native-text.md).
+- Ordinary heap-backed classes, constructors, instance methods and reference fields
+  in [native objects](native-objects.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
 
 Unsupported features produce source-located Hindi diagnostics, including unused
-unsupported declarations. Actual calls to standard-library intrinsics are rejected;
+unsupported declarations. Unsupported calls to standard-library intrinsics are rejected;
 injected compiler metadata alone does not require library execution.
 
 Decimals, other integer widths, conversions, bitwise operations, input, unsupported
-standard-library calls, objects, generics, arrays/collections, exceptions, selection,
+standard-library calls, inheritance/interfaces/static members, generics, arrays/collections, exceptions, selection,
 interop and concurrency are not yet available. The original decimal-area example is
 therefore outside this native profile. Defaults and behavior of managed targets are
 unchanged.
@@ -173,8 +175,8 @@ connected to the public playground. No extension or playground deployment is inc
 
 Local checks can test typed-core extraction and compile the C runtime on Windows as
 an implementation aid. That does not establish a supported Windows native backend.
-The language subset itself does not allocate dynamic objects, so internal runtime
-tests exercise the collector independently with cyclic graphs and forced collection.
+Bhash text and object programs exercise allocation, rooted references, shared graphs
+and cycles under forced collection; internal C tests also validate the collector independently.
 
 The milestone is complete only after:
 
