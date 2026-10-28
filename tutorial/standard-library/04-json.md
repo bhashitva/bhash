@@ -1,5 +1,7 @@
 # जेसन डेटा पढ़ना और बनाना (JSON Parsing and Serialization)
 
+Native Linux x86-64 पर split/join और JSON अब उपलब्ध हैं। [Native scope, limits और GC व्यवहार](../../docs/native-json-text.md) देखें; byte buffers अभी native profile के बाहर हैं।
+
 JSON एक डेटा प्रारूप है, executable code नहीं। जेसन.पढ़ो का परिणाम सर्ववस्तु होता है; उपयोग करने से पहले उसके वास्तविक प्रकार की जाँच या स्पष्ट cast करें। JSON पाठ के भीतर अंक ASCII में होने चाहिए, भले ही भाष के source code में देवनागरी अंक लिखे गए हों।
 
 [मानक पुस्तकालय का सूचकांक](README.md) · [पूरा चलाने योग्य उदाहरण](examples/04-json.bhash) · [पूरे उदाहरण का अपेक्षित आउटपुट](examples/04-json.expected.txt)

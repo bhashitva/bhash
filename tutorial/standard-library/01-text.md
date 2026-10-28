@@ -1,5 +1,7 @@
 # पाठ के साथ काम (Text and Strings)
 
+Native Linux x86-64 पर split/join और JSON अब उपलब्ध हैं। [Native scope, limits और GC व्यवहार](../../docs/native-json-text.md) देखें; byte buffers अभी native profile के बाहर हैं।
+
 पाठ केवल अक्षरों की दिखाई देने वाली संख्या नहीं है। भाष यहाँ Unicode scalar values के अनुसार लंबाई और स्थान गिनती है। स्थान शून्य से शुरू होते हैं; मात्राएँ अलग scalar हो सकती हैं। खोज अक्षरशः होती है; अपने-आप Unicode normalization या नियमित अभिव्यक्ति लागू नहीं होती।
 
 [मानक पुस्तकालय का सूचकांक](README.md) · [पूरा चलाने योग्य उदाहरण](examples/01-text.bhash) · [पूरे उदाहरण का अपेक्षित आउटपुट](examples/01-text.expected.txt)
