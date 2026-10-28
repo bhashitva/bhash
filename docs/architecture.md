@@ -237,3 +237,11 @@ Bhash failures with the same checked boundaries across runtimes.
 Packed buffers use native byte arrays with unsigned Bhash reads. Binary accesses
 explicitly assemble/disassemble bits; endianness never depends on the host. UTF-8
 decoders reject malformed bytes. The browser target reuses the CLR implementation.
+
+## Native heap-backed text
+
+The typed core records explicit checked text intrinsics, shared by legacy globals
+and standard-library static calls. LLVM emits GC-rooted calls into the native text
+runtime and clears consumed temporary and exited-scope roots. Runtime helpers root
+and reload their own arguments across allocation. See [native text](native-text.md)
+for supported APIs, UTF-8 storage, stress tests and current limitations.
