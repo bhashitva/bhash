@@ -71,6 +71,7 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - Arrays, growable lists, insertion-ordered maps and iteration in [native collections](native-collections.md).
 - Typed exceptions, catch/finally, throw/rethrow and safe root unwinding in [native exceptions](native-exceptions.md).
 - Binary64 `दशमलव` arithmetic, comparisons, conversions, formatting and boxing in [native decimals](native-decimals.md).
+- All six UTC time-library functions in [native time](native-time.md), including strict timestamps and full year 0001–9999 calendar ranges.
 - All existing math and random library signatures in [native math/random](native-math-random.md), including exact seeded sequences.
 - Unsigned bytes, packed byte buffers, strict UTF-8 encoding/decoding and binary file I/O in [native bytes](native-bytes.md).
 - UTF-8 whole-file text I/O in [native files](native-files.md), with the existing 16 MiB limit.
