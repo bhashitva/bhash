@@ -8,6 +8,9 @@ This follows [native universal values](native-boxing.md). The existing
 [collection language rules and API reference](collections.md) apply, within the
 native element-type profile below.
 
+Runtime failures are now catchable using [native exceptions](native-exceptions.md);
+exit-1 diagnostics below describe unhandled failures.
+
 ## Supported types and operations
 
 - Elements, keys and values: signed 64-bit `पूर्णांक`, `तार्किक`, `पाठ`, class and
@@ -133,7 +136,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/collections
 
 ## Runtime and collector contract
 
-Private native ABI v5 extends GC descriptors with a repeated region: byte offset,
+Private native ABI v6 (extended by [exceptions](native-exceptions.md)) extends GC descriptors with a repeated region: byte offset,
 stride, and a bitmap of reference lanes within each stride. The allocator validates
 these regions against payload size. The collector visits only declared pointer
 lanes, and the reference-store barrier accepts those same writable slots. Integer
@@ -181,8 +184,8 @@ snapshot lifetimes, rejection of invalid descriptors, and collector restart. Lin
 CI runs LLVM verification and sanitizers and executes the example under GC stress
 inside a clean container without Java, .NET or development tools.
 
-Other numeric widths, decimals, records/enums, user-defined generics, static members,
-exceptions and foreign interoperability remain outside the native profile. Built-in
+Other numeric widths, decimals, records/enums, user-defined generics, static members and
+foreign interoperability remain outside the native profile. Built-in
 collection type arguments are supported; this does not add user-defined generic
 classes/functions. Standard-library intrinsics outside the existing native text
 subset remain unsupported, including collection-oriented JSON/text/file APIs.

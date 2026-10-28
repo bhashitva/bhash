@@ -213,6 +213,11 @@ text and I/O semantics when adding another target.
 
 ## Exception lowering
 
+The experimental native target now supports [exceptions and safe root unwinding](native-exceptions.md)
+through protected LLVM callbacks, C-owned setjmp boundaries, precise pending/return
+roots and completion codes. Applications require neither JVM nor .NET.
+
+
 The shared emitter validates exception subtyping, handler order/scopes and abrupt
 completion before producing host try/catch/finally and throw statements. A built-in
 `अपवाद` class maps to the runtime's unchecked `BException`; existing `Failure`

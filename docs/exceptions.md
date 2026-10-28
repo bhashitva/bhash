@@ -1,7 +1,8 @@
 # Exception handling (v0.8)
 
 `प्रयास` = try, `पकड़ो` = catch, `अंततः` = finally, `फेंको` = throw.
-The same source runs on JVM, .NET CLR and browser .NET WebAssembly.
+The same source runs on JVM, .NET CLR and browser .NET WebAssembly. The
+experimental Linux native target supports the [native exception subset](native-exceptions.md).
 
 ```text
 वर्ग अमान्यअंक विस्तार अपवाद {

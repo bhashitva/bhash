@@ -5,6 +5,9 @@ interface inheritance, interface calls, and runtime tests/casts for native types
 This extends [native inheritance](native-inheritance.md). Compiled applications
 continue to require neither JVM nor .NET; the compiler still uses Java and LLVM.
 
+Runtime failures are now catchable using [native exceptions](native-exceptions.md);
+exit-1 diagnostics below describe unhandled failures.
+
 ## Supported contracts
 
 - `अनुबंध`, signature-only methods, and multiple interface inheritance with `विस्तार`.
@@ -54,7 +57,7 @@ same runtime failure category as managed targets.
 
 [Universal `सर्ववस्तु` boxing/unboxing](native-boxing.md) extends these operations
 to boxed integers, booleans, text and object references. Other numeric widths/decimals,
-records/enums, user-defined generics, static members and exceptions remain outside
+records/enums, user-defined generics and static members remain outside
 the native profile.
 
 ## Hindi reference example
@@ -96,7 +99,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/interfaces
 
 ## Private metadata and collector contract
 
-Private object ABI v5 (including [boxing](native-boxing.md) and [collections](native-collections.md)) keeps the eight-byte nonmanaged prefix and all existing field
+Private object ABI v6 (including [boxing](native-boxing.md) and [collections](native-collections.md)) keeps the eight-byte nonmanaged prefix and all existing field
 offsets. That prefix now points to an immutable metadata record containing pointers
 to class-virtual and interface-dispatch arrays, plus nominal membership IDs. Class
 virtual slots remain inherited prefixes. Each declared interface signature has a
