@@ -25,29 +25,21 @@ jobs:
         run: python3 scripts/test_native_runtime.py --sanitize
       - name: Verify and execute LLVM backend
         run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest package
-      - name: Build independent example
+      - name: Build every applicable native example
         run: |
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/factorial.bhash --target native -o target/factorial-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/heap-text.bhash --target native -o target/heap-text-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/heap-objects.bhash --target native -o target/heap-objects-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/objects.bhash --target native -o target/objects-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/inheritance.bhash --target native -o target/inheritance-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/interfaces.bhash --target native -o target/interfaces-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/boxing.bhash --target native -o target/boxing-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/collections.bhash --target native -o target/collections-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/exceptions.bhash --target native -o target/exceptions-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/decimals.bhash --target native -o target/decimals-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/math-random.bhash --target native -o target/math-random-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/json-text.bhash --target native -o target/json-text-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/hello.bhash --target native -o target/hello-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/files.bhash --target native -o target/files-native
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/bytes.bhash --target native -o target/bytes-native
+          python3 -m unittest discover -s scripts -p "test_build_examples.py"
+          python3 scripts/build_examples.py --target native --require-native
       - name: Inspect executable dependencies
         run: |
-          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native target/math-random-native target/json-text-native target/hello-native target/files-native target/bytes-native; do
-            file "$executable"
-            ldd "$executable"
-          done | tee target/native-dependencies.txt
+          python3 - <<'PY' | tee target/native-dependencies.txt
+          import json, pathlib, subprocess
+          report = json.loads(pathlib.Path("target/examples/build-report.json").read_text(encoding="utf-8"))
+          for entry in report["results"]:
+              if entry["target"] == "native" and entry["status"] == "built":
+                  executable = str(pathlib.Path(report["output_root"]) / entry["artifact"])
+                  subprocess.run(["file", executable], check=True)
+                  subprocess.run(["ldd", executable], check=True)
+          PY
           if grep -Ei 'jvm|libjli|coreclr|hostfxr|mono' target/native-dependencies.txt; then exit 1; fi
       - name: Run in clean deployment environment
         run: |
@@ -56,71 +48,71 @@ jobs:
               if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
             done
             mkdir -p target/native-byte-example
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/bytes-native > /tmp/bytes-actual 2> /tmp/bytes-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/bytes > /tmp/bytes-actual 2> /tmp/bytes-stats
             printf "अमान्य UTF-8 बाइटबफ़र।\n३०० ३३५८६\n२५५ २५५ -१\n" > /tmp/bytes-expected
             cmp /tmp/bytes-actual /tmp/bytes-expected
             grep "live=0" /tmp/bytes-stats
             mkdir -p target/native-file-example
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/files-native > /tmp/files-actual 2> /tmp/files-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/files > /tmp/files-actual 2> /tmp/files-stats
             printf "सत्य\n४९५० सत्य\nफ़ाइल पढ़ी नहीं जा सकी।\nबचा😀\n" > /tmp/files-expected
             cmp /tmp/files-actual /tmp/files-expected
             grep "live=0" /tmp/files-stats
-            /artifacts/hello-native > /tmp/hello-actual
+            /artifacts/examples/native/native/hello > /tmp/hello-actual
             printf "नमस्ते, दुनिया!\n१\nबीच ४\n९\n" > /tmp/hello-expected
             cmp /tmp/hello-actual /tmp/hello-expected
-            /artifacts/factorial-native > /tmp/actual
+            /artifacts/examples/native/factorial > /tmp/actual
             printf "१ १\n२ २\n३ ६\n४ २४\n५ १२०\n" > /tmp/expected
             cmp /tmp/actual /tmp/expected
-            /artifacts/factorial-native --bhash-license | grep "Apache License"
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/heap-text-native > /tmp/text-actual 2> /tmp/gc-stats
+            /artifacts/examples/native/factorial --bhash-license | grep "Apache License"
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/heap-text > /tmp/text-actual 2> /tmp/gc-stats
             printf "[[[मूल321]]]\nनमस्ते, दुनिया!\nभाष-ब-भाष\n२ सत्य\nसत्य सत्य\nabcÉ ककक\nv१२३ -४२\n३००००\n" > /tmp/text-expected
             cmp /tmp/text-actual /tmp/text-expected
             grep "live=0" /tmp/gc-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/gc-stats
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/heap-objects-native > /tmp/objects-actual 2> /tmp/objects-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/heap-objects > /tmp/objects-actual 2> /tmp/objects-stats
             printf "कड़ी22 सत्य सत्य\nकड़ी2 १ सत्य\nसत्य\n" > /tmp/objects-expected
             cmp /tmp/objects-actual /tmp/objects-expected
             grep "live=0" /tmp/objects-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/objects-stats
-            /artifacts/objects-native > /tmp/bank-actual
+            /artifacts/examples/native/objects > /tmp/bank-actual
             printf "मनोज १५० १५ १६५\n" > /tmp/bank-expected
             cmp /tmp/bank-actual /tmp/bank-expected
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/inheritance-native > /tmp/inheritance-actual 2> /tmp/inheritance-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/inheritance > /tmp/inheritance-actual 2> /tmp/inheritance-stats
             printf "मूल😀:आधार:विशेष!\nसाथी:आधार:ख! सत्य\nमूल😀:आधार:विशेष! साथी:आधार:ख!\n" > /tmp/inheritance-expected
             cmp /tmp/inheritance-actual /tmp/inheritance-expected
             grep "live=0" /tmp/inheritance-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/inheritance-stats
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/interfaces-native > /tmp/interfaces-actual 2> /tmp/interfaces-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/interfaces > /tmp/interfaces-actual 2> /tmp/interfaces-stats
             printf "[मूल😀:विशेष!] साथी:ख! सत्य\nसत्य सत्य सत्य सत्य\n[मूल😀:विशेष!] साथी:ख!\n" > /tmp/interfaces-expected
             cmp /tmp/interfaces-actual /tmp/interfaces-expected
             grep "live=0" /tmp/interfaces-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/interfaces-stats
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/boxing-native > /tmp/boxing-actual 2> /tmp/boxing-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/boxing > /tmp/boxing-actual 2> /tmp/boxing-stats
             printf "४२ सत्य मूल😀 सत्य\nमूल😀 सत्य २९९९\n" > /tmp/boxing-expected
             cmp /tmp/boxing-actual /tmp/boxing-expected
             grep "live=0" /tmp/boxing-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/boxing-stats
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/collections-native > /tmp/collections-actual 2> /tmp/collections-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/collections > /tmp/collections-actual 2> /tmp/collections-stats
             printf "३०० ३०० श299 २९९\nश0 श299 सत्य\nसत्य सत्य\n" > /tmp/collections-expected
             cmp /tmp/collections-actual /tmp/collections-expected
             grep "live=0" /tmp/collections-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/collections-stats
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/exceptions-native > /tmp/exceptions-actual 2> /tmp/exceptions-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/exceptions > /tmp/exceptions-actual 2> /tmp/exceptions-stats
             printf "१२४७५० ५००\nबचा😀\n" > /tmp/exceptions-expected
             cmp /tmp/exceptions-actual /tmp/exceptions-expected
             grep "live=0" /tmp/exceptions-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/exceptions-stats
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/decimals-native > /tmp/decimals-actual 2> /tmp/decimals-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/decimals > /tmp/decimals-actual 2> /tmp/decimals-stats
             printf "23.94\n१००० १२४.८७५ १ एक ही कुंजी\nसंख्यात्मक परिवर्तन सीमा से बाहर है।\n-०.० NaN Infinity\n" > /tmp/decimals-expected
             cmp /tmp/decimals-actual /tmp/decimals-expected
             grep "live=0" /tmp/decimals-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/decimals-stats
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/math-random-native > /tmp/math-random-actual 2> /tmp/math-random-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/math-random > /tmp/math-random-actual 2> /tmp/math-random-stats
             printf "४२ ३ ८\n९.० १०२४.० -३.० -२.०\n२.० ४.० ०.०\n1.000000 -1.000000\n0.693147 2.718282\n१००० ७.४ २.४ -४०५८\nएक सीमित दशमलव मान आवश्यक है।\nसाफ\n६\n" > /tmp/math-random-expected
             cmp /tmp/math-random-actual /tmp/math-random-expected
             grep "live=0" /tmp/math-random-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/math-random-stats
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/json-text-native > /tmp/json-text-actual 2> /tmp/json-text-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/json-text > /tmp/json-text-actual 2> /tmp/json-text-stats
             printf "४ अ||भारत😀|\n४४८५० ३००\n{\"नाम\":\"भारत😀\",\"अंक\":[1,2]}\n[[\"साझा\",1.0],[\"साझा\",1.0]]\nचक्रीय संग्रह को जेसन में नहीं लिख सकते।\n" > /tmp/json-text-expected
             cmp /tmp/json-text-actual /tmp/json-text-expected
             grep "live=0" /tmp/json-text-stats
@@ -130,21 +122,7 @@ jobs:
         with:
           name: bhash-experimental-native-linux-x86_64
           path: |
-            target/factorial-native
-            target/hello-native
-            target/objects-native
-            target/exceptions-native
-            target/decimals-native
-            target/math-random-native
-            target/json-text-native
-            target/files-native
-            target/bytes-native
-            target/collections-native
-            target/boxing-native
-            target/interfaces-native
-            target/inheritance-native
-            target/heap-objects-native
-            target/heap-text-native
+            target/examples/
             target/native-dependencies.txt
             target/native-tests/factorial.ll
             target/surefire-reports/

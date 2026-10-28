@@ -20,3 +20,8 @@ Build and run the regression tests with JDK 17+ and Maven: `mvn verify`.
 CLR tests also require the .NET 10 SDK. Browser checks require the .NET WebAssembly
 workload and Chromium; see [browser testing](docs/wasm-browser.md).
 Update the language documentation and examples when changing syntax or semantics.
+
+Build every example application with `python scripts/build_examples.py` after packaging
+the compiler. See [the example build guide](docs/building-examples.md) for target-specific
+outputs and native applicability. Build-script regression checks run with
+`python -m unittest discover -s scripts -p "test_build_examples.py"`.
