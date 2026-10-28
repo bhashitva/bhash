@@ -1390,10 +1390,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (ctx.postfixPart().isEmpty() && constructorBody && value.java.equals("this"))
             throw error(ctx, "Constructors may use यह only as a direct field receiver; the new object cannot escape early.");
         for (var part : ctx.postfixPart()) {
-            if (part.LBRACK()!=null) { value=indexed(part,value,visit(part.expression())); continue; }
+            if (part.LBRACK()!=null) { value=indexed(part,value,visit(part.expression())); if(analysis!=null)analysis.expressions.put(part,value); continue; }
             if (value.type.object == null && value.type.collection==null) throw error(part, "Member access requires a class instance.");
             value = part.LPAREN() == null ? readField(part, value, part.IDENTIFIER().getText())
                     : callMethod(part, value, part.IDENTIFIER().getText(), arguments(part.arguments()));
+            if(analysis!=null)analysis.expressions.put(part,value);
         }
         return value;
     }
