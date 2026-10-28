@@ -136,6 +136,19 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/json-
 BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./target/json-text-native
 ```
 
+इस उदाहरण का standard output:
+
+```text
+४ अ||भारत😀|
+४४८५० ३००
+{"नाम":"भारत😀","अंक":[1,2]}
+[["साझा",1.0],["साझा",1.0]]
+चक्रीय संग्रह को जेसन में नहीं लिख सकते।
+```
+
+तीसरी पंक्ति में `मानचित्र` JSON object (`{}`) बनता है और उसके `अंक` field की
+सूची JSON array (`[]`) बनती है। चौथी पंक्ति साझा nested lists का array दिखाती है।
+
 Runnable example में 300 nested parse/write/reparse iterations, repeated partial
 parse failures, split/join, shared children और cycle detection हैं। Integration tests
 JVM/CLR output और exit status compare करते हैं। Real JSON spelling के बजाय numeric
