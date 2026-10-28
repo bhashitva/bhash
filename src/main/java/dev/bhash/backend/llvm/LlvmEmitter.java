@@ -47,6 +47,12 @@ public final class LlvmEmitter {
             objectSizes.put(c.id(),8+c.fields().size()*8);
             globals.append("@vtable").append(c.id()).append(" = private constant [").append(c.virtualMethods().size()).append(" x ptr] [")
                 .append(String.join(", ",c.virtualMethods().stream().map(id->"ptr @bfn"+id).toList())).append("], align 8\n");
+            globals.append("@itable").append(c.id()).append(" = private constant [").append(c.interfaceMethods().size()).append(" x ptr] [")
+                .append(String.join(", ",c.interfaceMethods().stream().map(id->id<0?"ptr null":"ptr @bfn"+id).toList())).append("], align 8\n");
+            globals.append("@types").append(c.id()).append(" = private constant [").append(c.assignableTypes().size()).append(" x i64] [")
+                .append(String.join(", ",c.assignableTypes().stream().map(id->"i64 "+id).toList())).append("]\n");
+            globals.append("@typeinfo").append(c.id()).append(" = private constant %ClassInfo { ptr @vtable").append(c.id())
+                .append(", ptr @itable").append(c.id()).append(", i64 ").append(c.assignableTypes().size()).append(", ptr @types").append(c.id()).append(" }, align 8\n");
             var refs=c.fields().stream().filter(f->f.type().reference()).toList();
             String offsets="@refs"+c.id();
             globals.append(offsets).append(" = private constant [").append(refs.size()).append(" x i64] [")
@@ -61,15 +67,15 @@ public final class LlvmEmitter {
         }
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v2\n"+
-            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v3\n"+
+            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+
             "declare void @bh_print_bool(i32)\ndeclare void @bh_print_space()\ndeclare void @bh_print_end()\n"+
             "declare i32 @bh_text_equal(ptr, ptr)\ndeclare i64 @bh_divide(i64, i64, ptr)\n"+
             "declare i64 @bh_remainder(i64, i64, ptr)\n"+
-            textDeclarations()+"\n"+functions+
+            textDeclarations()+"\n"+typeTestHelper()+functions+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  call void @bfn"+program.entry()+"()\n  call void @bh_shutdown()\n  br label %done\ndone:\n  ret i32 0\n}\n";
     }
     private static String textDeclarations(){
@@ -83,6 +89,64 @@ public final class LlvmEmitter {
             "declare ptr @bh_text_integer(i64, ptr)\ndeclare i64 @bh_text_parse_integer(ptr, ptr)\n"+
             "declare void @bh_text_fail(ptr, ptr)\n";
     }
+    private static String typeTestHelper(){
+        return """
+            define internal i1 @bhash_is_type(ptr %object, i64 %wanted) {
+            entry:
+              %empty = icmp eq ptr %object, null
+              br i1 %empty, label %no, label %lookup
+            lookup:
+              %info = load ptr, ptr %object
+              %count_address = getelementptr %ClassInfo, ptr %info, i32 0, i32 2
+              %count = load i64, ptr %count_address
+              %types_address = getelementptr %ClassInfo, ptr %info, i32 0, i32 3
+              %types = load ptr, ptr %types_address
+              br label %loop
+            loop:
+              %index = phi i64 [ 0, %lookup ], [ %next, %advance ]
+              %more = icmp ult i64 %index, %count
+              br i1 %more, label %check, label %no
+            check:
+              %address = getelementptr i64, ptr %types, i64 %index
+              %actual = load i64, ptr %address
+              %same = icmp eq i64 %actual, %wanted
+              br i1 %same, label %yes, label %advance
+            advance:
+              %next = add i64 %index, 1
+              br label %loop
+            yes:
+              ret i1 true
+            no:
+              ret i1 false
+            }
+            """;
+    }
+    private Value typeOperation(TypeOperation t){
+        Value value=expression(t.value());
+        boolean reference=value.type()==Type.OBJECT && t.targetType()==Type.OBJECT;
+        Value matches=reference?instruction(Type.BOOL,"call i1 @bhash_is_type(ptr "+value.ir()+", i64 "+t.targetId()+")")
+            :new Value(Type.BOOL,value.type()==t.targetType() && value.type()!=Type.OBJECT?"true":"false");
+        if(t.action()==TypeAction.TEST)return matches;
+        String pointer=value.type()==Type.OBJECT?value.ir():"null";
+        if(t.action()==TypeAction.SAFE)
+            return instruction(Type.OBJECT,"select i1 "+matches.ir()+", ptr "+pointer+", ptr null");
+        // Preserve existing scalar conversion rules without introducing boxing.
+        if(t.targetType()==Type.TEXT && value.type()==Type.BOOL)
+            return instruction(Type.TEXT,"select i1 "+value.ir()+", ptr "+text("सत्य")+", ptr "+text("असत्य"));
+        Value allowed=matches;
+        if(reference){
+            Value empty=instruction(Type.BOOL,"icmp eq ptr "+value.ir()+", null");
+            allowed=instruction(Type.BOOL,"or i1 "+matches.ir()+", "+empty.ir());
+        }
+        String pass=freshLabel(),fail=freshLabel();
+        line("br i1 "+allowed.ir()+", label %"+pass+", label %"+fail);
+        block(fail);
+        line("call void @bh_text_fail(ptr "+text("रनटाइम प्रकार परिवर्तन असफल हुआ।")+", ptr "+text(t.source().toString())+")");
+        line("unreachable");terminated=true;
+        block(pass);
+        if(t.targetType()==Type.OBJECT)return new Value(Type.OBJECT,pointer);
+        return value.type()==t.targetType()?value:new Value(t.targetType(),t.targetType()==Type.BOOL?"false":t.targetType()==Type.TEXT?text(""):"0");
+    }
     private void scan(Expression e){
         if(e==null)return;
         if(e.type().reference() && !roots.containsKey(e))roots.put(e,rootCount++);
@@ -92,6 +156,7 @@ public final class LlvmEmitter {
         else if(e instanceof Call c)c.arguments().forEach(this::scan);
         else if(e instanceof TextCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FieldRead f)scan(f.receiver());
+        else if(e instanceof TypeOperation t)scan(t.value());
     }
     private void register(Binding b){
         if(bindings.putIfAbsent(b,true)==null && b.type().reference())bindingRoots.put(b,rootCount++);
@@ -138,8 +203,8 @@ public final class LlvmEmitter {
         if(e instanceof Constant c)result=new Value(c.type(),c.type()==Type.TEXT?text((String)c.value()):c.type()==Type.BOOL?((Boolean)c.value()?"true":"false"):c.type()==Type.OBJECT?"null":c.value().toString());
         else if(e instanceof Allocate a){
             result=instruction(Type.OBJECT,"call ptr @bh_alloc(ptr @class"+a.objectType()+", i64 "+objectSizes.get(a.objectType())+")");
-            // The immutable method-table pointer is not a managed reference or safepoint.
-            line("store ptr @vtable"+a.objectType()+", ptr "+result.ir());
+            // The immutable type-metadata pointer is not a managed reference or safepoint.
+            line("store ptr @typeinfo"+a.objectType()+", ptr "+result.ir());
         }
         else if(e instanceof FieldRead f){
             Value receiver=expression(f.receiver());
@@ -163,11 +228,13 @@ public final class LlvmEmitter {
             var args=new ArrayList<String>();
             for(var a:c.arguments())args.add(reload(a).argument());
             String target="@bfn"+c.function();
-            if(c.virtualSlot()>=0){
+            if(c.virtualSlot()>=0 || c.interfaceSlot()>=0){
                 Value receiver=reload(c.arguments().get(0));
-                String table=temporary(),slot=temporary(),method=temporary();
-                line(table+" = load ptr, ptr "+receiver.ir());
-                line(slot+" = getelementptr ptr, ptr "+table+", i64 "+c.virtualSlot());
+                String info=temporary(),array=temporary(),table=temporary(),slot=temporary(),method=temporary();
+                line(info+" = load ptr, ptr "+receiver.ir());
+                line(array+" = getelementptr %ClassInfo, ptr "+info+", i32 0, i32 "+(c.interfaceSlot()>=0?1:0));
+                line(table+" = load ptr, ptr "+array);
+                line(slot+" = getelementptr ptr, ptr "+table+", i64 "+(c.interfaceSlot()>=0?c.interfaceSlot():c.virtualSlot()));
                 line(method+" = load ptr, ptr "+slot);
                 target=method;
             }
@@ -184,7 +251,8 @@ public final class LlvmEmitter {
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else if(c.type()==Type.BOOL){String value=temporary();line(value+" = "+call);result=instruction(Type.BOOL,"icmp ne i32 "+value+", 0");}
             else result=instruction(c.type(),call);
-        } else if(e instanceof Binary b)result=binary(b);
+        } else if(e instanceof TypeOperation t)result=typeOperation(t);
+        else if(e instanceof Binary b)result=binary(b);
         else throw new IllegalStateException("Unknown core expression");
         if(e.type().reference())line("store ptr "+result.ir()+", ptr "+rootAddress(roots.get(e)));
         // Publish the result before releasing inputs: they may alias its storage.
@@ -193,6 +261,7 @@ public final class LlvmEmitter {
         else if(e instanceof Binary b){release(b.left());release(b.right());}
         else if(e instanceof Unary u)release(u.value());
         else if(e instanceof FieldRead f)release(f.receiver());
+        else if(e instanceof TypeOperation t)release(t.value());
         values.put(e,result);
         return result;
     }
