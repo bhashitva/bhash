@@ -90,7 +90,8 @@ final class BhashStandard {
     static long stdNow() {return System.currentTimeMillis();}
     static String stdTimeWrite(long value) {return TIME.format(date(value));}
     static long stdTimeRead(String s) {
-        if(!s.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z"))throw failure("अमान्य UTC समय पाठ।");
+        BhashRuntime.instance(s);
+        if(s.startsWith("0000")||!s.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z"))throw failure("अमान्य UTC समय पाठ।");
         try{long value=LocalDateTime.parse(s,TIME).toInstant(ZoneOffset.UTC).toEpochMilli();date(value);return value;}
         catch(DateTimeException e){throw failure("अमान्य UTC समय पाठ।");}
     }
