@@ -1406,6 +1406,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (ctx.REAL_LITERAL() != null) {
             double value = Double.parseDouble(digits(ctx.getText()));
             if (!Double.isFinite(value)) throw error(ctx, "Real literal is outside the finite binary64 range.");
+            if (analysis != null) analysis.constants.put(ctx, value);
             return new Expr(Type.REAL, Double.toString(value));
         }
         if (ctx.STRING_LITERAL() != null) return string(ctx);
