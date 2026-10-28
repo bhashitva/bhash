@@ -30,6 +30,11 @@ mvn clean verify
 java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar run examples/factorial-console.bhash
 ```
 
+To compile every example for JVM, .NET and native where supported, run
+`python scripts/build_examples.py` after packaging the compiler. Outputs are stored
+in `target/examples/jvm`, `target/examples/dotnet` and `target/examples/native`.
+See [building all examples](docs/building-examples.md) for prerequisites and the build report.
+
 At the prompt, enter `5` or `५`, then press Enter:
 
 ```text
@@ -335,6 +340,7 @@ Java method/class limits; optimization and debug source maps remain future work.
 | `examples/factorial-console.bhash` | Interactive factorial application |
 | `examples/objects.bhash` / `examples/factorial-objects.bhash` | Classes, constructors, inheritance and polymorphism |
 | `src/test/java/dev/bhash/` | Frontend and end-to-end tests |
+| `scripts/build_examples.py` | Build all example applications into JVM, .NET and native output trees |
 | `scripts/smoke_test.py` | Packaged compiler checks for CI |
 | `docs/language-spec.md` | Language contract |
 | `docs/architecture.md` | Current pipeline and future targets |
