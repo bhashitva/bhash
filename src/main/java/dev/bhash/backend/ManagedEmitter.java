@@ -127,6 +127,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         final Map<ParserRuleContext, Binding> bindings = new IdentityHashMap<>();
         final Map<PrimaryContext, Binding> reads = new IdentityHashMap<>();
         final Map<ParserRuleContext, Function> calls = new IdentityHashMap<>();
+        final Map<ParserRuleContext, Field> fields = new IdentityHashMap<>();
+        final Map<PrimaryContext, Constructor> constructors = new IdentityHashMap<>();
         final Map<ParserRuleContext, Object> constants = new IdentityHashMap<>();
     }
     private Analysis analysis;
@@ -147,7 +149,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var tree = GenericExpander.expand("project", resolution.tree());
             emitter.program(tree, true);
             var functions = emitter.functions.values().stream().flatMap(List::stream).toList();
-            return CoreProgram.build(tree, emitter.analysis, functions);
+            return CoreProgram.build(tree, emitter.analysis, functions, emitter.classOrder);
         } catch (Invalid e) { throw new CompilationException(resolution.describe(e.getMessage())); }
           catch (CompilationException e) { throw new CompilationException(resolution.describe(e.getMessage())); }
     }
@@ -1353,6 +1355,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (field == null) throw error(at, "Undefined field: " + name);
         if (field.shared!=object.typeReceiver) throw error(at,field.shared?"Static member requires a type receiver.":"Instance member requires an instance receiver.");
         checkAccess(at, field.owner, field.access, object);
+        if (analysis != null) analysis.fields.put(at, field);
         String receiver=field.shared?field.owner.java:memberReceiver(object, field.owner, field.access);
         return new Expr(field.type, receiver + "." + field.java, new Location(field.mutable));
     }
@@ -1366,7 +1369,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (!method.shared && constructorBody && (object.base || object.java.equals("this")))
             throw error(at, "Constructors cannot call instance methods on यह or आधार before construction completes.");
         checkAccess(at, method.owner, method.access, object);
-        if (analysis != null && method.intrinsic != null) analysis.calls.put(at, method);
+        if (analysis != null) analysis.calls.put(at, method);
         if(method.intrinsic!=null)return tagged(new Expr(method.result,"BhashStandard."+method.intrinsic+"("+join(arguments)+")",true));
         String receiver=method.shared?method.owner.java:memberReceiver(object, method.owner, method.access);
         return new Expr(method.result, receiver + "." + method.java + "(" + join(arguments) + ")", true);
@@ -1413,6 +1416,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var constructor=selectConstructor(ctx,definition,arguments);
             if (constructor.access != Access.PUBLIC && currentClass != definition)
                 throw error(ctx, "Constructor is not accessible (" + accessName(constructor.access) + ").");
+            if (analysis != null) analysis.constructors.put(ctx, constructor);
             return new Expr(definition.type, "new " + definition.java + "(" + constructorCallArguments(arguments,constructor) + ")", true);
         }
         if (ctx.IDENTIFIER() != null) {
