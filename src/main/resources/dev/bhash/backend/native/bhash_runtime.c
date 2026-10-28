@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <setjmp.h>
 #ifdef _MSC_VER
 #include <io.h>
 #else
@@ -50,6 +51,24 @@ static void grow_object_index(void) {
     object_index = expanded; index_count = count;
 }
 static bh_root_frame *roots;
+static void *pending_exception;
+static const bh_type *exception_descriptor;
+static const void *exception_info;
+typedef struct bh_cleanup {
+    struct bh_cleanup *previous;
+    void *memory;
+} bh_cleanup;
+static bh_cleanup *cleanups;
+typedef struct bh_handler {
+    jmp_buf jump;
+    struct bh_handler *previous;
+    bh_root_frame *saved_roots;
+    bh_cleanup *saved_cleanups;
+} bh_handler;
+static bh_handler *handlers;
+static _Noreturn void runtime_error(const void *, const char *);
+static _Noreturn void raise_failure_text(const void *, const void *);
+static _Noreturn void raise_failure(const void *, const char *);
 static int stress, collecting, report_stats;
 static uint64_t allocations, collections, peak_bytes, next_identity = 1;
 static void emergency_write(const char *s) {
@@ -90,6 +109,7 @@ void bh_collect(void) {
     if (collecting) fatal("आंतरिक संग्रह पुनः प्रवेश अमान्य है।");
     collecting = 1;
     ++collections;
+    mark(pending_exception);
     for (bh_root_frame *f = roots; f; f = f->previous)
         for (uint64_t i = 0; i < f->count; ++i) mark(f->slots[i]);
     while (work) {
@@ -185,7 +205,7 @@ void bh_runtime_init(void) {
     report_stats = environment_flag("BHASH_GC_STATS");
 }
 void bh_shutdown(void) {
-    if (roots) fatal("आंतरिक मूल-संदर्भ शेष है।");
+    if (roots || handlers || cleanups || pending_exception) fatal("आंतरिक मूल-संदर्भ शेष है।");
     bh_collect();
     if (object_index != initial_index) free(object_index);
     memset(initial_index, 0, sizeof initial_index);
@@ -227,7 +247,8 @@ void bh_print_end(void) {
     fputc('\n', stdout);
     if (fflush(stdout) || ferror(stdout)) fatal("आउटपुट लिखा नहीं जा सका।");
 }
-static void runtime_error(const void *location, const char *message) {
+static _Noreturn void runtime_error(const void *location, const char *message) {
+    if (exception_descriptor) raise_failure(location, message);
     fputs("भाष: ", stderr);
     uint64_t size = text_length(location);
     fwrite((const unsigned char *)location + 8, 1, (size_t)size, stderr);
@@ -424,9 +445,70 @@ int64_t bh_text_parse_integer(const void *s, const void *location) {
     return negative ? -(int64_t)value : (int64_t)value;
 }
 void bh_text_fail(const void *message, const void *location) {
+    if (exception_descriptor) raise_failure_text(message, location);
     fputs("भाष: ", stderr); fwrite(text_data(location), 1, (size_t)text_length(location), stderr);
     fputs(": ", stderr); fwrite(text_data(message), 1, (size_t)text_length(message), stderr);
     fputc('\n', stderr); fflush(stderr); exit(1);
+}
+void bh_exception_configure(const bh_type *descriptor, const void *info) {
+    if (handlers || pending_exception) fatal("आंतरिक अपवाद विन्यास अमान्य है।");
+    exception_descriptor = descriptor; exception_info = info;
+}
+int64_t bh_protect(bh_protected_callback callback, void *environment) {
+    bh_handler handler;
+    handler.previous = handlers; handler.saved_roots = roots; handler.saved_cleanups = cleanups; handlers = &handler;
+    /* Neither saved field changes between setjmp and longjmp. The generated
+       function's environment lives in its caller, outside this C boundary. */
+    if (setjmp(handler.jump) == 0) {
+        int64_t completion = callback(environment);
+        if (roots != handler.saved_roots || cleanups != handler.saved_cleanups) fatal("आंतरिक अपवाद मूल-संदर्भ असंतुलित हैं।");
+        handlers = handler.previous; return completion;
+    }
+    handlers = handler.previous;
+    if (roots != handler.saved_roots || cleanups != handler.saved_cleanups) fatal("आंतरिक अपवाद मूल-संदर्भ असंतुलित हैं।");
+    return -1;
+}
+void *bh_exception_take(void) { void *value = pending_exception; pending_exception = NULL; return value; }
+_Noreturn void bh_throw(void *value, const void *location) {
+    if (!value) runtime_error(location, "रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।");
+    void *original; memcpy(&original, (unsigned char *)value + 16, 8);
+    if (location && (!original || !text_length(original))) bh_reference_store(value, 16, (void *)location);
+    pending_exception = value;
+    if (!handlers) fatal("आंतरिक अपवाद सीमा अनुपस्थित है।");
+    /* Discard every generated/runtime helper frame abandoned by this transfer.
+       The pending object is a precise global root before any frame is removed. */
+    roots = handlers->saved_roots;
+    while (cleanups != handlers->saved_cleanups) {
+        bh_cleanup *entry = cleanups; cleanups = entry->previous; free(entry->memory);
+    }
+    longjmp(handlers->jump, 1);
+}
+static _Noreturn void raise_failure_text(const void *message, const void *location) {
+    void *slots[3] = {(void *)message, (void *)location, NULL}; bh_root_frame frame; bh_roots_push(&frame, slots, 3);
+    slots[2] = bh_alloc(exception_descriptor, 24);
+    memcpy(slots[2], &exception_info, 8);
+    bh_reference_store(slots[2], 8, slots[0]); bh_reference_store(slots[2], 16, slots[1]);
+    bh_throw(slots[2], location);
+}
+static _Noreturn void raise_failure(const void *location, const char *message) {
+    uint64_t length = (uint64_t)strlen(message);
+    void *slots[2] = {(void *)location, NULL}; bh_root_frame frame; bh_roots_push(&frame, slots, 2);
+    slots[1] = bh_alloc(&text_type, length + 8);
+    memcpy(slots[1], &length, 8); memcpy((unsigned char *)slots[1] + 8, message, (size_t)length);
+    raise_failure_text(slots[1], slots[0]);
+}
+int bh_run(bh_protected_callback entry) {
+    int64_t completion = bh_protect(entry, NULL);
+    if (completion != -1) return 0;
+    void *message, *location;
+    memcpy(&message, (unsigned char *)pending_exception + 8, 8);
+    memcpy(&location, (unsigned char *)pending_exception + 16, 8);
+    fputs("भाष: ", stderr);
+    if (location && text_length(location)) {
+        fwrite(text_data(location), 1, (size_t)text_length(location), stderr); fputs(": ", stderr);
+    }
+    fwrite(text_data(message), 1, (size_t)text_length(message), stderr); fputc('\n', stderr); fflush(stderr);
+    pending_exception = NULL; return 1;
 }
 
 /* Arrays first, then growable lists and insertion-ordered hash maps. All backing
@@ -675,6 +757,7 @@ void *bh_collection_literal(const bh_collection_info *info, uint64_t count, cons
     uint64_t words = count*width;
     void **slots = calloc((size_t)words+1, sizeof(void *));
     if (!slots) fatal("स्मृति उपलब्ध नहीं है।");
+    bh_cleanup cleanup = {cleanups, slots}; cleanups = &cleanup;
     for (uint64_t i=0; i<words; ++i) {
         uint64_t kind = width==2 && i%2==0 ? info->key_kind : info->value_kind;
         if (reference_kind(kind)) slots[i+1] = bits_pointer(values[i]);
@@ -692,5 +775,5 @@ void *bh_collection_literal(const bh_collection_info *info, uint64_t count, cons
             bh_collection *c = slots[0]; storage_store(c->data, i, a, reference_kind(info->value_kind));
         }
     }
-    void *result = slots[0]; bh_roots_pop(&frame); free(slots); return result;
+    void *result = slots[0]; bh_roots_pop(&frame); cleanups = cleanup.previous; free(slots); return result;
 }
