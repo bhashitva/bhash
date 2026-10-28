@@ -249,8 +249,17 @@ for supported APIs, UTF-8 storage, stress tests and current limitations.
 ## Native heap-backed objects
 
 The typed core records object layouts, checked field identities, constructor factories
-and direct instance calls. LLVM roots object/text receivers across allocations and
+and checked instance calls. LLVM roots object/text receivers across allocations and
 routes all reference field writes through the runtime barrier boundary. Descriptors
 trace exact reference slots; unreachable cycles are collected by the existing
 nonmoving mark-and-sweep collector. See [native objects](native-objects.md) for the
 class subset, initialization and null behavior, layout and validation.
+
+## Native inheritance and dispatch
+
+Native layouts preserve the full base-field prefix and add a nonmanaged immutable
+method-table pointer. Public/protected method slots are inherited and replaced by
+checked overrides; private and explicit base calls remain direct. Constructor
+factories allocate once and run chained initializers on the same rooted receiver.
+The most-derived GC descriptor traces inherited and derived reference fields.
+See [native inheritance](native-inheritance.md) for semantics, private ABI and tests.

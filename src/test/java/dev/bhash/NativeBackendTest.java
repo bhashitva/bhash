@@ -45,7 +45,7 @@ class NativeBackendTest {
     }
     @Test void unsupportedUnusedDeclarationsAndLibraryCallsHaveSourceLocations(){
         for(String source:List.of(
-            "वर्ग अ विस्तार ब {} वर्ग ब {} कार्य मुख्य() -> शून्य {}",
+            "अनुबंध अ {} कार्य मुख्य() -> शून्य {}",
             "कार्य अप्रयुक्त() -> दशमलव { लौटाओ १.२; } कार्य मुख्य() -> शून्य {}",
             "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
             "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो(\"अ\", \"ब\"); }",
@@ -77,11 +77,11 @@ class NativeBackendTest {
             """);
         assertEquals(1,p.classes().size());
         assertEquals(List.of(Type.INT,Type.BOOL,Type.TEXT,Type.OBJECT),p.classes().get(0).fields().stream().map(ObjectField::type).toList());
-        assertEquals(List.of(0,8,16,24),p.classes().get(0).fields().stream().map(ObjectField::offset).toList());
+        assertEquals(List.of(8,16,24,32),p.classes().get(0).fields().stream().map(ObjectField::offset).toList());
         String ir=LlvmEmitter.emit(p);
-        assertTrue(ir.contains("[2 x i64] [i64 16, i64 24]"),ir);
+        assertTrue(ir.contains("[2 x i64] [i64 24, i64 32]"),ir);
         assertTrue(ir.contains("call void @bh_reference_store"));
-        assertTrue(ir.contains("call ptr @bh_alloc(ptr @class0, i64 32)"));
+        assertTrue(ir.contains("call ptr @bh_alloc(ptr @class0, i64 40)"));
         assertTrue(ir.contains("call ptr @bh_instance"));
     }
     @Test void nativeObjectProfileKeepsExistingAccessTypeAndConstructionRules(){
@@ -93,7 +93,7 @@ class NativeBackendTest {
             assertThrows(CompilationException.class,()->core(s));
         for(String s:List.of(
             "वर्ग अ { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}",
-            "वर्ग अ विस्तार ब {} वर्ग ब {} कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ विस्तार अपवाद {} कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ {} कार्य मुख्य() -> शून्य {}",
             "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}",
             "वर्ग अ { मान न: दशमलव; } कार्य मुख्य() -> शून्य {}")){
@@ -211,6 +211,185 @@ class NativeBackendTest {
         }
     }
 
+    @Test void corePreservesInheritedPrefixesAndStableVirtualSlots()throws Exception{
+        var p=core("""
+            वर्ग अंतिम विस्तार बीच {
+                सार्वजनिक मान साथी: मूल;
+                सार्वजनिक अधिलेखन कार्य फल() -> पूर्णांक { लौटाओ आधार.फल() + ३; }
+            }
+            वर्ग मूल {
+                संरक्षित मान अंक: पूर्णांक = १;
+                सार्वजनिक मान नाम: पाठ;
+                सार्वजनिक कार्य फल() -> पूर्णांक { लौटाओ अंक; }
+                सार्वजनिक कार्य दो() -> पूर्णांक { लौटाओ फल() * २; }
+            }
+            वर्ग बीच विस्तार मूल {
+                सार्वजनिक मान अतिरिक्त: पाठ;
+                निजी कार्य सहायक() -> पूर्णांक { लौटाओ २; }
+                सार्वजनिक अधिलेखन कार्य फल() -> पूर्णांक { लौटाओ सहायक(); }
+                सार्वजनिक कार्य नया_फल() -> पाठ { लौटाओ अतिरिक्त; }
+            }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: मूल = नया अंतिम(); लिखो(क.फल(), क.दो());
+            }
+            """);
+        assertEquals(3,p.classes().size());
+        var base=p.classes().get(0);var middle=p.classes().get(1);var leaf=p.classes().get(2);
+        assertEquals(base.fields(),middle.fields().subList(0,2));
+        assertEquals(middle.fields(),leaf.fields().subList(0,3));
+        assertEquals(List.of(8,16,24,32),leaf.fields().stream().map(ObjectField::offset).toList());
+        assertEquals(List.of(2,3,3),p.classes().stream().map(c->c.virtualMethods().size()).toList());
+        assertEquals(base.virtualMethods().get(1),leaf.virtualMethods().get(1));
+        assertNotEquals(base.virtualMethods().get(0),middle.virtualMethods().get(0));
+        assertNotEquals(middle.virtualMethods().get(0),leaf.virtualMethods().get(0));
+        String ir=LlvmEmitter.emit(p);
+        assertTrue(ir.contains("@vtable2 = private constant [3 x ptr]"));
+        assertTrue(ir.contains("[3 x i64] [i64 16, i64 24, i64 32]"));
+        assertTrue(ir.matches("(?s).*call i64 %x[0-9]+\\(ptr .*"),ir);
+    }
+    private static List<SourceFile> inheritanceSources(){
+        return List.of(
+            new SourceFile("base.bhash","संकुल आधारपुस्तक; सार्वजनिक वर्ग मूल { सार्वजनिक मान नाम: पाठ; निर्माता(नाम: पाठ){ यह.नाम = नाम; } सार्वजनिक कार्य फल() -> पाठ { लौटाओ नाम; } }"),
+            new SourceFile("derived.bhash","संकुल उपपुस्तक; आयात आधारपुस्तक.मूल; सार्वजनिक वर्ग उप विस्तार मूल { निर्माता() : आधार(\"मूल\") {} सार्वजनिक अधिलेखन कार्य फल() -> पाठ { लौटाओ आधार.फल() + \":उप\"; } }"),
+            new SourceFile("app.bhash","आयात आधारपुस्तक.मूल; आयात उपपुस्तक.उप; कार्य मुख्य() -> शून्य { स्थिर क: मूल = नया उप(); लिखो(क.फल()); }"));
+    }
+    @Test void inheritedClassesAcrossPackagesUseCheckedResolution()throws Exception{
+        var p=ManagedEmitter.core(inheritanceSources());
+        assertEquals(2,p.classes().size());assertEquals(p.classes().get(0).fields(),p.classes().get(1).fields());
+        assertTrue(p.functions().stream().anyMatch(f->f.source().file().equals("derived.bhash")));
+    }
+    @Test void nativeInheritedClassesAcrossPackagesMatchJvm()throws Exception{
+        requireTools();
+        var result=nativeRun(inheritanceSources(),GC_STRESS);
+        assertEquals("मूल:उप\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeInheritanceRetainsOverrideAccessAndConstructorDiagnostics(){
+        for(String source:List.of(
+            "वर्ग अ विस्तार ब {} वर्ग ब विस्तार अ {} कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { सार्वजनिक कार्य फल() -> पूर्णांक { लौटाओ १; } } वर्ग ब विस्तार अ { सार्वजनिक कार्य फल() -> पूर्णांक { लौटाओ २; } } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ {} वर्ग ब विस्तार अ { सार्वजनिक अधिलेखन कार्य फल() -> पूर्णांक { लौटाओ १; } } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { सार्वजनिक कार्य फल() -> पूर्णांक { लौटाओ १; } } वर्ग ब विस्तार अ { सार्वजनिक अधिलेखन कार्य फल() -> तार्किक { लौटाओ सत्य; } } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { सार्वजनिक कार्य फल() -> पूर्णांक { लौटाओ १; } } वर्ग ब विस्तार अ { निजी अधिलेखन कार्य फल() -> पूर्णांक { लौटाओ २; } } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { निजी मान न: पूर्णांक; } वर्ग ब विस्तार अ { सार्वजनिक कार्य फल() -> पूर्णांक { लौटाओ यह.न; } } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { निर्माता(न: पूर्णांक){} } वर्ग ब विस्तार अ {} कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { निजी निर्माता(){} } वर्ग ब विस्तार अ {} कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { सार्वजनिक कार्य फल() -> पूर्णांक { लौटाओ १; } } वर्ग ब विस्तार अ { निर्माता(){ आधार.फल(); } } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { निर्माता(न: पूर्णांक){} सार्वजनिक मान न: पूर्णांक; } वर्ग ब विस्तार अ { निर्माता() : आधार(यह.न){} } कार्य मुख्य() -> शून्य {}")){
+            var error=assertThrows(CompilationException.class,()->core(source));
+            assertTrue(error.getMessage().contains("native.bhash:"),error.getMessage());
+        }
+    }
+    @Test void nativeExistingInheritanceExampleMatchesJvm()throws Exception{
+        requireTools();
+        var result=nativeRun(Files.readString(Path.of("examples/objects.bhash")),GC_STRESS);
+        assertEquals("मनोज १५० १५ १६५\n",result.out());
+        assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeVirtualDispatchHandlesOverridesOverloadsAndBaseCalls()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग मूल {
+                सार्वजनिक मान अंक: पूर्णांक;
+                निजी कार्य सहायक() -> पूर्णांक { लौटाओ ५; }
+                सार्वजनिक कार्य निजीफल() -> पूर्णांक { लौटाओ सहायक(); }
+                सार्वजनिक कार्य फल() -> पूर्णांक { लौटाओ १; }
+                सार्वजनिक कार्य फल(शब्द: पाठ) -> पाठ { लौटाओ "B" + शब्द; }
+                सार्वजनिक कार्य दो() -> पूर्णांक { लौटाओ फल() * २; }
+                सार्वजनिक कार्य स्वयं() -> मूल { लौटाओ रिक्त; }
+                सार्वजनिक कार्य सही() -> तार्किक { लौटाओ असत्य; }
+                सार्वजनिक कार्य जमा(न: पूर्णांक) -> शून्य { अंक = न; }
+            }
+            वर्ग बीच विस्तार मूल {
+                सार्वजनिक अधिलेखन कार्य फल() -> पूर्णांक { लौटाओ आधार.फल() + २; }
+            }
+            वर्ग अंतिम विस्तार बीच {
+                सार्वजनिक अधिलेखन कार्य फल() -> पूर्णांक { लौटाओ आधार.फल() + ४; }
+                सार्वजनिक अधिलेखन कार्य फल(शब्द: पाठ) -> पाठ { लौटाओ "G" + आधार.फल(शब्द); }
+                सार्वजनिक कार्य फल(न: पूर्णांक) -> पूर्णांक { लौटाओ १०० + न; }
+                सार्वजनिक अधिलेखन कार्य स्वयं() -> मूल { लौटाओ यह; }
+                सार्वजनिक अधिलेखन कार्य सही() -> तार्किक { लौटाओ सत्य; }
+                सार्वजनिक अधिलेखन कार्य जमा(न: पूर्णांक) -> शून्य { आधार.जमा(न + १०); }
+            }
+            वर्ग अलग { सार्वजनिक कार्य फल() -> पाठ { लौटाओ "अलग"; } }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: मूल = नया अंतिम();
+                क.जमा(५);
+                लिखो(क.फल(), क.दो(), क.फल("!" + "?"), क.स्वयं() == क, क.सही(), क.अंक, क.निजीफल());
+                स्थिर ख: अंतिम = नया अंतिम();
+                लिखो(ख.फल(३), नया अलग().फल());
+            }
+            """,GC_STRESS);
+        assertEquals("७ १४ GB!? सत्य सत्य १५ ५\n१०३ अलग\n",result.out());
+    }
+    @Test void nativeBaseConstructorChainsInitializeOneObjectInManagedOrder()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग मूल {
+                सार्वजनिक मान अंक: पूर्णांक;
+                सार्वजनिक मान नाम: पाठ;
+                निर्माता(){ अंक = १; लौटाओ; }
+                निर्माता(नाम: पाठ){ यह.नाम = नाम; अंक = १०; लिखो("B", नाम); }
+            }
+            वर्ग बीच विस्तार मूल {
+                सार्वजनिक मान अतिरिक्त: पाठ = "अ" + "ब";
+                निर्माता() { अंक = अंक + २; }
+                निर्माता(नाम: पाठ) : आधार(चरण(नाम)) { लिखो("M", अतिरिक्त); }
+            }
+            वर्ग अंतिम विस्तार बीच {
+                निर्माता(){ अंक = अंक + ४; }
+                निर्माता(नाम: पाठ) : आधार(नाम + "G") { लिखो("G", नाम, यह.नाम); }
+            }
+            कार्य चरण(नाम: पाठ) -> पाठ { लिखो("A", नाम); लौटाओ नाम + "!"; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: अंतिम = नया अंतिम();
+                लिखो(क.अंक, क.नाम == "", क.अतिरिक्त);
+                स्थिर ख: मूल = नया अंतिम("x" + "y");
+                लिखो(ख.नाम, ख.अंक);
+            }
+            """,GC_STRESS);
+        assertEquals("७ सत्य अब\nA xyG\nB xyG!\nM अब\nG xy xyG!\nxyG! १०\n",result.out());
+        var single=nativeRun("""
+            वर्ग क { सार्वजनिक मान न: पूर्णांक; निर्माता(){ न = १; लौटाओ; } }
+            वर्ग ख विस्तार क { निर्माता(){ न = न + २; } }
+            वर्ग ग विस्तार ख { निर्माता(){ न = न + ४; } }
+            कार्य मुख्य() -> शून्य { स्थिर क: क = नया ग(); लिखो(क.न); }
+            """,GC_STRESS);
+        assertEquals("७\n",single.out());assertEquals(1,stats(single).get("allocations"));
+    }
+    @Test void nativeVirtualReceiversRemainRootedAcrossAllocatingArguments()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग मूल {
+                सार्वजनिक मान न: पूर्णांक;
+                निर्माता(न: पूर्णांक){ यह.न = न; }
+                सार्वजनिक कार्य जोड़(ख: मूल) -> पूर्णांक { लौटाओ न + ख.न; }
+            }
+            वर्ग उप विस्तार मूल {
+                निर्माता(न: पूर्णांक) : आधार(न) {}
+                सार्वजनिक अधिलेखन कार्य जोड़(ख: मूल) -> पूर्णांक { लौटाओ आधार.जोड़(ख) + १०; }
+            }
+            कार्य पहचान(क: मूल) -> मूल { लिखो(क.न); लौटाओ क; }
+            कार्य मुख्य() -> शून्य { लिखो(पहचान(नया उप(१)).जोड़(पहचान(नया उप(२)))); }
+            """,GC_STRESS);
+        assertEquals("१\n२\n१३\n",result.out());
+        var failure=nativeRun("""
+            वर्ग मूल { सार्वजनिक कार्य जोड़(ख: मूल) -> पूर्णांक { लौटाओ १; } }
+            वर्ग उप विस्तार मूल { सार्वजनिक अधिलेखन कार्य जोड़(ख: मूल) -> पूर्णांक { लौटाओ २; } }
+            कार्य बनाओ() -> मूल { लिखो(९); लौटाओ नया उप(); }
+            कार्य मुख्य() -> शून्य { स्थिर क: मूल = रिक्त; लिखो(क.जोड़(बनाओ())); }
+            """,GC_STRESS);
+        assertEquals(1,failure.exit());assertEquals("",failure.out());
+        assertTrue(failure.err().contains("native.bhash:"));assertTrue(failure.err().contains("रिक्त वस्तु के सदस्य"));
+    }
+    @Test void nativeInheritedReferenceFieldsAndVirtualCallsSurviveCollection()throws Exception{
+        requireTools();
+        var result=nativeRun(Files.readString(Path.of("examples/native/inheritance.bhash")),GC_STRESS);
+        assertEquals("मूल😀:आधार:विशेष!\nसाथी:आधार:ख! सत्य\nमूल😀:आधार:विशेष! साथी:आधार:ख!\n",result.out());
+        var counts=stats(result);assertTrue(counts.get("allocations")>10000,counts.toString());
+        assertTrue(counts.get("collections")>=counts.get("allocations"),counts.toString());
+        assertEquals(0,counts.get("live"));assertTrue(counts.get("peak")<20000,counts.toString());
+    }
+
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));
         boolean supported=System.getProperty("os.name").equals("Linux") && Set.of("amd64","x86_64").contains(System.getProperty("os.arch"));
@@ -227,8 +406,11 @@ class NativeBackendTest {
         return nativeRun(source,Map.of(),arguments);
     }
     private Result nativeRun(String source,Map<String,String> environment,String...arguments)throws Exception{
+        return nativeRun(List.of(new SourceFile("native.bhash",source)),environment,arguments);
+    }
+    private Result nativeRun(List<SourceFile> sources,Map<String,String> environment,String...arguments)throws Exception{
         Path exe=temporary.resolve("application");
-        new NativeCompiler(true).compile(List.of(new SourceFile("native.bhash",source)),exe);
+        new NativeCompiler(true).compile(sources,exe);
         var command=new ArrayList<String>();command.add(exe.toString());command.addAll(List.of(arguments));
         Path out=temporary.resolve("out"),err=temporary.resolve("err");
         var builder=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile());
@@ -238,7 +420,7 @@ class NativeBackendTest {
         var result=new Result(p.exitValue(),Files.readString(out),Files.readString(err));
         if(arguments.length==0){
             Path jar=temporary.resolve("reference.jar");
-            new JvmCompiler().compile(List.of(new SourceFile("native.bhash",source)),jar);
+            new JvmCompiler().compile(sources,jar);
             Path referenceOut=temporary.resolve("reference.out"),referenceErr=temporary.resolve("reference.err");
             var reference=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString())
                 .redirectOutput(referenceOut.toFile()).redirectError(referenceErr.toFile()).start();

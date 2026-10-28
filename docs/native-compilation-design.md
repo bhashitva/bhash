@@ -62,7 +62,8 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - Literal and heap-backed text passed, returned, assigned and compared by value.
 - Concatenation and the scalar text-library subset in [native text](native-text.md).
 - Ordinary heap-backed classes, constructors, instance methods and reference fields
-  in [native objects](native-objects.md).
+  in [native objects](native-objects.md), including single class inheritance and
+  [virtual dispatch](native-inheritance.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
@@ -72,7 +73,7 @@ unsupported declarations. Unsupported calls to standard-library intrinsics are r
 injected compiler metadata alone does not require library execution.
 
 Decimals, other integer widths, conversions, bitwise operations, input, unsupported
-standard-library calls, inheritance/interfaces/static members, generics, arrays/collections, exceptions, selection,
+standard-library calls, interfaces/static members, generics, arrays/collections, exceptions, selection,
 interop and concurrency are not yet available. The original decimal-area example is
 therefore outside this native profile. Defaults and behavior of managed targets are
 unchanged.
