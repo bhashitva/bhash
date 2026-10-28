@@ -203,7 +203,9 @@ The experimental native path captures a source-located typed core for its suppor
 subset during existing checking. It currently discards managed source generation;
 see the native design for this transitional boundary. [Native universal values](native-boxing.md)
 use precise managed scalar boxes and preserve class/interface reference identity;
-exact unboxing and equality match managed language behavior.
+exact unboxing and equality match managed language behavior. [Native collections](native-collections.md)
+add repeated reference descriptors, managed array/list/map storage, nominal
+collection type metadata, and insertion-ordered hash lookup.
 
 Next, complete extraction of a source-located typed AST and shared control-flow IR from the current
 backend, then use cross-backend golden tests to preserve evaluation, arithmetic,

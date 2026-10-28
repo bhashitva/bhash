@@ -1,7 +1,8 @@
 # Arrays, lists, maps and iteration (v0.7)
 
 These features share one type checker and the same behavior on JVM, .NET CLR and
-browser .NET WebAssembly. `प्रत्येक` and `में` are new reserved keywords.
+browser .NET WebAssembly. The experimental Linux native target also supports
+the [integer, boolean, text and reference subset](native-collections.md). `प्रत्येक` and `में` are new reserved keywords.
 `सरणी`, `सूची` and `मानचित्र` are predeclared generic type names; user types and
 import aliases cannot replace them. Generic type parameters can shadow type names.
 
