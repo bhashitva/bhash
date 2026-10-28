@@ -72,6 +72,7 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - Typed exceptions, catch/finally, throw/rethrow and safe root unwinding in [native exceptions](native-exceptions.md).
 - Binary64 `दशमलव` arithmetic, comparisons, conversions, formatting and boxing in [native decimals](native-decimals.md).
 - All existing math and random library signatures in [native math/random](native-math-random.md), including exact seeded sequences.
+- Text split/join and strict JSON parsing/serialization in [native structured text](native-json-text.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.

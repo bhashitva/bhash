@@ -52,6 +52,17 @@ typedef struct bh_collection_info {
     uint64_t kind, key_kind, value_kind;
     const struct bh_collection_info *element, *key_list, *value_list;
 } bh_collection_info;
+/* Immutable compiler metadata. Boxes: int, bool, text, real, in that order. */
+typedef struct bh_data_info {
+    const bh_collection_info *texts, *values, *object;
+    const bh_type *boxes[4];
+    const bh_class_info *box_info[4];
+} bh_data_info;
+void bh_data_configure(const bh_data_info *);
+void *bh_data_split(const void *, const void *, const void *);
+void *bh_data_join(void *, const void *, const void *);
+void *bh_data_json_read(const void *, const void *);
+void *bh_data_json_write(void *, const void *);
 void *bh_collection_new(const bh_collection_info *, int64_t, const void *);
 void *bh_array_dimensions(const bh_collection_info *, uint64_t, const int64_t *, const void *);
 void *bh_collection_literal(const bh_collection_info *, uint64_t, const uint64_t *, const void *);

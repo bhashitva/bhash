@@ -38,9 +38,11 @@ jobs:
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/exceptions.bhash --target native -o target/exceptions-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/decimals.bhash --target native -o target/decimals-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/math-random.bhash --target native -o target/math-random-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/json-text.bhash --target native -o target/json-text-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/hello.bhash --target native -o target/hello-native
       - name: Inspect executable dependencies
         run: |
-          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native target/math-random-native; do
+          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native target/math-random-native target/json-text-native target/hello-native; do
             file "$executable"
             ldd "$executable"
           done | tee target/native-dependencies.txt
@@ -51,6 +53,9 @@ jobs:
             for tool in java dotnet clang gcc; do
               if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
             done
+            /artifacts/hello-native > /tmp/hello-actual
+            printf "नमस्ते, दुनिया!\n१\nबीच ४\n९\n" > /tmp/hello-expected
+            cmp /tmp/hello-actual /tmp/hello-expected
             /artifacts/factorial-native > /tmp/actual
             printf "१ १\n२ २\n३ ६\n४ २४\n५ १२०\n" > /tmp/expected
             cmp /tmp/actual /tmp/expected
@@ -103,16 +108,23 @@ jobs:
             cmp /tmp/math-random-actual /tmp/math-random-expected
             grep "live=0" /tmp/math-random-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/math-random-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/json-text-native > /tmp/json-text-actual 2> /tmp/json-text-stats
+            printf "४ अ||भारत😀|\n४४८५० ३००\n[[\"साझा\",1.0],[\"साझा\",1.0]]\nचक्रीय संग्रह को जेसन में नहीं लिख सकते।\n" > /tmp/json-text-expected
+            cmp /tmp/json-text-actual /tmp/json-text-expected
+            grep "live=0" /tmp/json-text-stats
+            grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/json-text-stats
           '
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-experimental-native-linux-x86_64
           path: |
             target/factorial-native
+            target/hello-native
             target/objects-native
             target/exceptions-native
             target/decimals-native
             target/math-random-native
+            target/json-text-native
             target/collections-native
             target/boxing-native
             target/interfaces-native
@@ -132,3 +144,4 @@ jobs:
             docs/native-exceptions.md
             docs/native-decimals.md
             docs/native-math-random.md
+            docs/native-json-text.md

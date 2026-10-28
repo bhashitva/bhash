@@ -195,6 +195,8 @@ Native LLVM now supports `दशमलव` arithmetic, comparisons, checked conv
 
 The native target also supports every `मानक.गणित` and `मानक.यादृच्छिक` function, including matching seeded streams; see the [native math/random guide](docs/native-math-random.md).
 
+Native text split/join and strict JSON parsing/serialization are also available, with typed nested collections and safe partial-failure cleanup; see [native structured text](docs/native-json-text.md).
+
 ## Standard library
 
 The compiler bundles the `मानक` package on JVM, .NET CLR and browser WASM:

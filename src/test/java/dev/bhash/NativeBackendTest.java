@@ -289,6 +289,149 @@ class NativeBackendTest {
             assertTrue(result.err().contains(operation.startsWith("गणित")?"एक सीमित दशमलव मान आवश्यक है।":"यादृच्छिक पूर्णांक की सीमा अमान्य है।"),result.err());
         }
     }
+    @Test void structuredCoreAddsCanonicalTypesAndBoxesJsonArguments()throws Exception{
+        var program=core("""
+            आयात मानक.पाठ्य उपनाम प; आयात मानक.जेसन उपनाम ज;
+            कार्य मुख्य() -> शून्य { लिखो(ज.पाठबनाओ(१), प.जोड़ो(प.बाँटो("अ,ब",","),"|")); }
+            """);
+        assertNotNull(program.structuredTypes());
+        var main=program.functions().stream().filter(f->f.id()==program.entry()).findFirst().orElseThrow();
+        var write=(StructuredCall)((Print)main.body().statements().get(0)).arguments().get(0);
+        assertInstanceOf(Box.class,write.arguments().get(0));assertEquals(Type.ANY,write.arguments().get(0).type());
+        assertEquals(1,program.collections().stream().filter(c->c.kind()==CollectionKind.LIST&&c.valueKind()==3).count());
+        assertTrue(LlvmEmitter.emit(program).contains("call void @bh_data_configure(ptr @data_info)"));
+    }
+    @Test void nativeSplitJoinMatchManagedLiteralUnicodeAndEmptyRules()throws Exception{
+        requireNumericTargets();
+        var result=numericExact("""
+            आयात मानक.पाठ्य उपनाम प;
+            कार्य मुख्य() -> शून्य {
+                स्थिर अ: सूची<पाठ> = प.बाँटो(".अ..", ".");
+                लिखो(अ.आकार(), प.जोड़ो(अ,"|")); अ.जोड़ो("क"); लिखो(प.जोड़ो(अ,""));
+                लिखो(प.जोड़ो(प.बाँटो("aaa","aa"),"|"));
+                लिखो(प.जोड़ो(प.बाँटो("😀क😀😀ख😀","😀"),"|"));
+                लिखो(प.बाँटो("",",").आकार(), प.जोड़ो(नया सूची<पाठ>(),"-"));
+                लिखो(प.जोड़ो(प.बाँटो("क\\u0000ख\\u0000","\\u0000"),"|"));
+                लिखो(मानक.पाठ्य.जोड़ो(मानक.पाठ्य.बाँटो("x.*y.*", ".*"),":"));
+                प्रयास { प.बाँटो("क",""); } पकड़ो (क: अपवाद) { लिखो(क.संदेश); }
+                प्रयास { स्थिर अ: सूची<पाठ> = रिक्त; प.जोड़ो(अ,","); } पकड़ो (क: अपवाद) { लिखो(क.संदेश); }
+            }
+            """);assertEquals(0,result.exit());
+    }
+    @Test void nativeJsonTypedNestedValuesAndCollectionsMatchManaged()throws Exception{
+        requireNumericTargets();
+        var result=numericExact("""
+            आयात मानक.जेसन उपनाम ज; आयात मानक.पाठ्य उपनाम प;
+            कार्य मुख्य() -> शून्य {
+                स्थिर मूल: सर्ववस्तु = ज.पढ़ो("{\\\"नाम\\\":\\\"क😀\\\\u0000\\\",\\\"अंक\\\":[-9223372036854775808,9223372036854775807,1.25,1.0,true,false,null],\\\"भीतर\\\":{\\\"a\\\":[]}}");
+                स्थिर म: मानचित्र<पाठ,सर्ववस्तु> = परिवर्तित<मानचित्र<पाठ,सर्ववस्तु>>(मूल);
+                स्थिर अ: सूची<सर्ववस्तु> = परिवर्तित<सूची<सर्ववस्तु>>(म["अंक"]);
+                लिखो(प्रकारहै<मानचित्र<पाठ,सर्ववस्तु>>(मूल), प्रकारहै<मानचित्र<पाठ,पूर्णांक>>(मूल), प्रकारहै<सूची<सर्ववस्तु>>(म["अंक"]));
+                लिखो(परिवर्तित<पूर्णांक>(अ[०]), परिवर्तित<पूर्णांक>(अ[१]), परिवर्तित<दशमलव>(अ[२]), प्रकारहै<दशमलव>(अ[३]), प्रकारहै<पूर्णांक>(अ[३]), अ[६] == रिक्त);
+                लिखो(ज.पाठबनाओ(मूल)); म.रखो("नया",प.बाँटो("अ,,ब,",",")); अ.जोड़ो("अंत");
+                लिखो(ज.पाठबनाओ(म), ज.पाठबनाओ(म.कुंजियाँ()));
+                लिखो(ज.पाठबनाओ(नया पूर्णांक[]{-१,२}),ज.पाठबनाओ(नया तार्किक[]{सत्य,असत्य}),ज.पाठबनाओ(नया पाठ[२]));
+                लिखो(ज.पाठबनाओ(रिक्त),ज.पाठबनाओ(सत्य),ज.पाठबनाओ(१),ज.पाठबनाओ(१.०));
+                स्थिर व: मानचित्र<सर्ववस्तु,सर्ववस्तु> = नया मानचित्र<सर्ववस्तु,सर्ववस्तु>{"क":अ}; लिखो(ज.पाठबनाओ(व));
+            }
+            """);assertEquals(0,result.exit());
+    }
+    @Test void nativeJsonNumberKindsAndRoundTripsMatchManaged()throws Exception{
+        requireNumericTargets();
+        var result=numericExact("""
+            आयात मानक.जेसन उपनाम ज;
+            कार्य मुख्य() -> शून्य {
+                स्थिर अ: सूची<सर्ववस्तु> = परिवर्तित<सूची<सर्ववस्तु>>(ज.पढ़ो("[-0,-0.0,1e3,1E-300,-1e-9999,5e-324,9007199254740993,9007199254740993.0]"));
+                लिखो(प्रकारहै<पूर्णांक>(अ[०]),प्रकारहै<दशमलव>(अ[१]),परिवर्तित<दशमलव>(अ[१]),परिवर्तित<दशमलव>(अ[२]),परिवर्तित<दशमलव>(अ[४]));
+                स्थिर ब: सूची<सर्ववस्तु> = परिवर्तित<सूची<सर्ववस्तु>>(ज.पढ़ो(ज.पाठबनाओ(अ)));
+                प्रत्येक (न: सर्ववस्तु में ब) { लिखो(प्रकारहै<पूर्णांक>(न),प्रकारहै<दशमलव>(न)); }
+                मान क: पूर्णांक = ०; जबतक (क < अ.आकार()) { लिखो(अ[क] == ब[क]); क = क + १; }
+                लिखो(परिवर्तित<पूर्णांक>(अ[६]), परिवर्तित<दशमलव>(अ[७]) == ९००७१९९२५४७४०९९२.०);
+            }
+            """);assertEquals(0,result.exit());
+    }
+    private static String bhashString(String value){
+        var result=new StringBuilder("\"");
+        for(char c:value.toCharArray())switch(c){
+            case '"'->result.append("\\\"");case '\\'->result.append("\\\\");
+            case '\n'->result.append("\\n");case '\r'->result.append("\\r");case '\t'->result.append("\\t");
+            default->{if(c<32)result.append(String.format(Locale.ROOT,"\\u%04x",(int)c));else result.append(c);}
+        }
+        return result.append('"').toString();
+    }
+    static String jsonFailuresSource(){
+        var source=new StringBuilder("आयात मानक.जेसन उपनाम ज; कार्य मुख्य() -> शून्य {");
+        for(String text:List.of("", " ", "+1", "01", "-", "1.", "1e", "1e+", "१", "NaN", "null x", "[1,]", "{\"a\":1,}", "{\"a\":1,\"a\":2}", "{\"a\":1,\"\\u0061\":2}", "{\"😀\":[1,2,]}", "\"\\😀\"", "\"\\u😀\"", "\"\\ud800\"", "\"\\udc00\"", "\"\\ud800x\"", "\"\\ud800\\q\"", "\"\\ud800", "\"a\n\"", "9223372036854775808", "-9223372036854775809", "1e9999", "[trueX]", "[", "\"x", "[1\u0000]"))
+            source.append("प्रयास { ज.पढ़ो(").append(bhashString(text)).append("); त्रुटि(\"अपवाद गायब\"); } पकड़ो (क: अपवाद) { लिखो(क.संदेश); } ");
+        source.append("लिखो(ज.पाठबनाओ(ज.पढ़ो(\"\\\"\\\\ud83d\\\\ude00\\\"\"))); }");
+        return source.toString();
+    }
+    @Test void nativeJsonErrorsAndUtf16PositionsMatchManaged()throws Exception{
+        requireNumericTargets();var result=numericExact(jsonFailuresSource());assertEquals(0,result.exit());assertFalse(result.out().contains("अपवाद गायब"));
+    }
+    @Test void nativeJsonCyclesSharedValuesAndRejectedTypesMatchManaged()throws Exception{
+        requireNumericTargets();
+        var result=numericExact("""
+            आयात मानक.जेसन उपनाम ज;
+            वर्ग अ {}
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: सूची<सर्ववस्तु> = नया सूची<सर्ववस्तु>{१,"क"};
+                स्थिर मूल: सूची<सर्ववस्तु> = नया सूची<सर्ववस्तु>{क,क}; लिखो(ज.पाठबनाओ(मूल));
+                क.जोड़ो(क); प्रयास { ज.पाठबनाओ(मूल); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); } क.हटाओ(२);
+                स्थिर म: मानचित्र<पाठ,सर्ववस्तु> = नया मानचित्र<पाठ,सर्ववस्तु>(); म.रखो("चक्र",म);
+                प्रयास { ज.पाठबनाओ(म); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                लिखो(ज.पाठबनाओ(नया मानचित्र<पूर्णांक,पाठ>()));
+                प्रयास { ज.पाठबनाओ(नया मानचित्र<पूर्णांक,पाठ>{१:"क"}); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { ज.पाठबनाओ(नया अ()); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { ज.पाठबनाओ(०.० / ०.०); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { ज.पाठबनाओ(१.० / ०.०); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                लिखो(ज.पाठबनाओ(मूल));
+            }
+            """);assertEquals(0,result.exit());
+    }
+    static String jsonLimitsSource(){
+        return """
+            आयात मानक.जेसन उपनाम ज; आयात मानक.पाठ्य उपनाम प;
+            कार्य मुख्य() -> शून्य {
+                स्थिर ठीक: पाठ = प.दोहराओ("[",६५) + प.दोहराओ("]",६५);
+                लिखो(ज.पाठबनाओ(ज.पढ़ो(ठीक)) == ठीक);
+                प्रयास { ज.पढ़ो(प.दोहराओ("[",६६) + प.दोहराओ("]",६६)); } पकड़ो (क: अपवाद) { लिखो(क.संदेश); }
+                स्थिर मूल: सूची<सर्ववस्तु> = नया सूची<सर्ववस्तु>(); मान चल: सूची<सर्ववस्तु> = मूल;
+                मान न: पूर्णांक = ०; जबतक (न < ६५) { स्थिर अगला: सूची<सर्ववस्तु> = नया सूची<सर्ववस्तु>(); चल.जोड़ो(अगला); चल = अगला; न = न + १; }
+                प्रयास { ज.पाठबनाओ(मूल); } पकड़ो (क: अपवाद) { लिखो(क.संदेश); }
+                { स्थिर शब्द: पाठ = प.दोहराओ("a",१०४८५७४); स्थिर पाठ्य: पाठ = "\\\"" + शब्द + "\\\"";
+                  लिखो(ज.पाठबनाओ(ज.पढ़ो(पाठ्य)) == पाठ्य, लंबाई(पाठ्य)); }
+                { स्थिर शब्द: पाठ = प.दोहराओ("😀",५२४२८७); स्थिर पाठ्य: पाठ = "\\\"" + शब्द + "\\\"";
+                  लिखो(ज.पाठबनाओ(ज.पढ़ो(पाठ्य)) == पाठ्य, लंबाई(पाठ्य)); }
+                { स्थिर शब्द: पाठ = प.दोहराओ("😀",५२४२८८);
+                  प्रयास { ज.पढ़ो("\\\"" + शब्द + "\\\""); } पकड़ो (क: अपवाद) { लिखो(क.संदेश); }
+                  प्रयास { ज.पाठबनाओ(शब्द); } पकड़ो (क: अपवाद) { लिखो(क.संदेश); } }
+            }
+            """;
+    }
+    @Test void nativeJsonLimitsCountUtf16AndRespectDepthBoundaries()throws Exception{
+        requireNumericTargets();var result=numericExact(jsonLimitsSource());assertEquals(0,result.exit());
+    }
+    @Test void nativeJsonNestedGraphsAndRepeatedPartialFailuresStayBounded()throws Exception{
+        requireNumericTargets();var result=numericExact(Files.readString(Path.of("examples/native/json-text.bhash")));
+        assertEquals(0,result.exit());assertTrue(stats(result).get("allocations")>15000,result.err());
+        assertTrue(stats(result).get("peak")<200000,result.err());
+    }
+    static String jsonUnwindSource(){
+        return """
+            आयात मानक.जेसन उपनाम ज; आयात मानक.पाठ्य उपनाम प;
+            कार्य भीतर() -> शून्य { ज.पढ़ो("{\\\"क\\\":[1,2,{\\\"स\\\":\\\"" + प.दोहराओ("क",३००००) + "\\\"}]"); }
+            कार्य मुख्य() -> शून्य {
+                प्रयास { भीतर(); }
+                अंततः { स्थिर स: पाठ = प.दोहराओ("ब",३००००); लिखो(लंबाई(स)); }
+            }
+            """;
+    }
+    @Test void nativeJsonUncaughtFailureUnwindsParserAndFinallyRoots()throws Exception{
+        requireNumericTargets();var result=numericExact(jsonUnwindSource());assertEquals(1,result.exit());
+        assertTrue(result.err().startsWith("भाष: native.bhash:"),result.err());
+        assertEquals("३००००\n",result.out());
+    }
     @Test void coreUsesExistingTypeAndImmutableBindingChecks(){
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: पूर्णांक = १; अ = २; }"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: पूर्णांक = सत्य; }"));
@@ -299,7 +442,7 @@ class NativeBackendTest {
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "कार्य अप्रयुक्त() -> बाइट { लौटाओ परिवर्तित<बाइट>(१); } कार्य मुख्य() -> शून्य {}",
             "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
-            "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो(\"अ\", \"ब\"); }",
+            "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.यूटीएफ८(\"अ\"); }",
             "कार्य मुख्य() -> शून्य { लिखो(१ << २); }",
             "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<लघुपूर्णांक>(१)); }")){
             var error=assertThrows(CompilationException.class,()->core(source));

@@ -99,7 +99,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/interfaces
 
 ## Private metadata and collector contract
 
-Private object ABI v8 (including [boxing](native-boxing.md) and [collections](native-collections.md)) keeps the eight-byte nonmanaged prefix and all existing field
+Private object ABI v9 (including [boxing](native-boxing.md) and [collections](native-collections.md)) keeps the eight-byte nonmanaged prefix and all existing field
 offsets. That prefix now points to an immutable metadata record containing pointers
 to class-virtual and interface-dispatch arrays, plus nominal membership IDs. Class
 virtual slots remain inherited prefixes. Each declared interface signature has a

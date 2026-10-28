@@ -83,7 +83,7 @@ through stable slots in per-class method tables; private methods and explicit ba
 calls use direct calls. Base fields form a prefix of every derived layout. Interface calls use resolved signature slots in a separate
 per-class table; nominal membership metadata drives runtime tests/casts.
 
-The private native object ABI v8 (extended by [boxing](native-boxing.md)) reserves the first eight payload bytes for an
+The private native object ABI v9 (extended by [boxing](native-boxing.md)) reserves the first eight payload bytes for an
 immutable type-metadata pointer. Every field then occupies an eight-byte slot. Integers use 64 bits,
 booleans use the low byte, and text/object fields contain payload-base pointers.
 Descriptors list exactly the text and object reference offsets. Primitive fields

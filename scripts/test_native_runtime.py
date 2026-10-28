@@ -81,6 +81,16 @@ def main():
             assert result.stderr.startswith('भाष: '.encode('utf-8'))
         print(f'{name}: repeated tracing, scalar precision, collection cycles, growth, hashing, snapshots and failures passed')
 
+        structured_exe = BUILD / ('structured-' + name + ('.exe' if os.name == 'nt' else ''))
+        structured_command = [part.replace('runtime_test.c', 'structured_runtime_test.c').replace(str(exe), str(structured_exe)) for part in command]
+        result = run(structured_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(structured_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native structured text checks passed.\n'
+        print(f'{name}: split/join, nested JSON, scalar boxes, Unicode, cycles, depth and partial-failure root cleanup passed')
+
         numeric_exe = BUILD / ('math-random-' + name + ('.exe' if os.name == 'nt' else ''))
         numeric_command = [part.replace('runtime_test.c', 'math_random_runtime_test.c').replace(str(exe), str(numeric_exe)) for part in command]
         result = run(numeric_command)

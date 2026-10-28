@@ -10,7 +10,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
-public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType) {
+public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes) {
     public enum Type { INT, REAL, BOOL, TEXT, OBJECT, ANY, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT || this==ANY; }
     }
@@ -37,6 +37,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record Throw(Expression value, Source source) implements Statement {}
     public enum TypeAction { TEST, SAFE, CAST }
     public record TypeOperation(Type type, TypeAction action, Expression value, Type targetType, int targetId, Source source) implements Expression {}
+    public record StructuredTypes(int texts,int values,int object) {}
+    public enum StructuredOperation { SPLIT, JOIN, JSON_READ, JSON_WRITE }
+    public record StructuredCall(Type type, StructuredOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public enum TextOperation {
         LENGTH("length"), SLICE("slice"), FIND("stdFind"), CONTAINS("stdContains"),
         STARTS("stdStarts"), ENDS("stdEnds"), REPLACE("stdReplace"), TRIM("stdTrim"),
@@ -69,7 +72,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -157,6 +160,14 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         Type resultType;
         final Map<ManagedEmitter.Type,Integer> collectionIds=new IdentityHashMap<>();
         final List<CollectionType> collections=new ArrayList<>();
+        StructuredTypes structuredTypes;
+        void ensureStructuredTypes(ParserRuleContext at)throws CompilationException{
+            if(structuredTypes!=null)return;
+            int texts=collectionId(listType(ManagedEmitter.Type.TEXT),at);
+            int values=collectionId(listType(ManagedEmitter.Type.OBJECT),at);
+            var map=new ManagedEmitter.Type("native-json-map","मानचित्र",ManagedEmitter.CollectionKind.MAP,List.of(ManagedEmitter.Type.TEXT,ManagedEmitter.Type.OBJECT));
+            structuredTypes=new StructuredTypes(texts,values,collectionId(map,at));
+        }
         int valueKind(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             Type value=type(t,at);
             return switch(value){case REAL->6;case INT->1;case BOOL->2;case TEXT->3;case OBJECT->4;case ANY->5;default->throw unsupported(at);};
@@ -322,7 +333,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             self=null;
             return new CoreProgram(List.copyOf(result),entry,List.copyOf(objectTypes),types.stream()
                 .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections),new ObjectType(-5,"अपवाद",List.of(messageField,locationField),List.of(),
-                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)));
+                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes);
         }
         void collectTypes(ManagedEmitter.ClassInfo c, Set<ManagedEmitter.ClassInfo> result) throws CompilationException {
             if(c==null || !result.add(c))return;
@@ -408,6 +419,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         Expression libraryCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
             TextOperation operation=null;
             if(f.intrinsic!=null) {
+                StructuredOperation data=switch(f.intrinsic){case "stdSplit"->StructuredOperation.SPLIT;case "stdJoin"->StructuredOperation.JOIN;
+                    case "stdJsonRead"->StructuredOperation.JSON_READ;case "stdJsonWrite"->StructuredOperation.JSON_WRITE;default->null;};
+                if(data!=null){ensureStructuredTypes(at);return new StructuredCall(type(f.result,at),data,checkedArguments(args,f.parameters),source(at));}
                 boolean integer=f.result==ManagedEmitter.Type.INT;
                 NumericOperation numeric=switch(f.intrinsic){
                     case "stdAbs"->integer?NumericOperation.ABS_INT:NumericOperation.ABS_REAL;
@@ -530,7 +544,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                         previous=result;continue;
                     }
                     var f=a.calls.get(part);
-                    if(f!=null && f.intrinsic!=null){value=libraryCall(f,part,part.arguments());continue;}
+                    if(f!=null && f.intrinsic!=null){value=libraryCall(f,part,part.arguments());previous=a.expressions.get(part).type();continue;}
                     if(value==null)value=expression(p.primary());
                     if(f!=null){
                         if(!ids.containsKey(f) && !interfaceSlots.containsKey(f))throw unsupported(part);
