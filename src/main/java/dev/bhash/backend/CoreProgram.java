@@ -10,8 +10,12 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
-public record CoreProgram(List<Function> functions, int entry) {
-    public enum Type { INT, BOOL, TEXT, VOID }
+public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes) {
+    public enum Type { INT, BOOL, TEXT, OBJECT, VOID;
+        public boolean reference() { return this==TEXT || this==OBJECT; }
+    }
+    public record ObjectField(int owner, int offset, Type type) {}
+    public record ObjectType(int id, String name, List<ObjectField> fields) {}
     public enum TextOperation {
         LENGTH("length"), SLICE("slice"), FIND("stdFind"), CONTAINS("stdContains"),
         STARTS("stdStarts"), ENDS("stdEnds"), REPLACE("stdReplace"), TRIM("stdTrim"),
@@ -28,7 +32,7 @@ public record CoreProgram(List<Function> functions, int entry) {
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, Allocate, FieldRead {
         Type type(); Source source();
     }
     public record Constant(Type type, Object value, Source source) implements Expression {}
@@ -37,9 +41,14 @@ public record CoreProgram(List<Function> functions, int entry) {
     }
     public record Unary(Type type, String operator, Expression value, Source source) implements Expression {}
     public record Binary(Type type, String operator, Expression left, Expression right, Source source) implements Expression {}
-    public record Call(Type type, int function, List<Expression> arguments, Source source) implements Expression {}
+    public record Call(Type type, int function, List<Expression> arguments, Source source, boolean instance) implements Expression {
+        public Call(Type type,int function,List<Expression> arguments,Source source){this(type,function,arguments,source,false);}
+    }
     public record TextCall(Type type, TextOperation operation, List<Expression> arguments, Source source) implements Expression {}
-    public sealed interface Statement permits Block, Assign, Branch, Loop, Return, Jump, Print, Evaluate {}
+    public record Allocate(int objectType, Source source) implements Expression { public Type type(){return Type.OBJECT;} }
+    public record FieldRead(Expression receiver, ObjectField field, Source source) implements Expression { public Type type(){return field.type();} }
+    public sealed interface Statement permits Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate {}
+    public record FieldWrite(FieldRead destination, Expression value) implements Statement {}
     public record Block(List<Statement> statements, List<Binding> locals) implements Statement {}
     public record Assign(Binding binding, Expression value) implements Statement {}
     public record Branch(Expression condition, Block yes, Statement no) implements Statement {}
@@ -63,55 +72,74 @@ public record CoreProgram(List<Function> functions, int entry) {
             var child=tree.getChild(i);
             if (!(child instanceof ParserRuleContext c) || library(c)) continue;
             if (c instanceof PackageDeclContext || c instanceof ImportDeclContext) continue;
-            if (!(c instanceof FunctionDeclContext)) throw unsupported(c);
+            if (!(c instanceof FunctionDeclContext) && !(c instanceof ClassDeclContext)) throw unsupported(c);
             validate(c);
         }
     }
     private static void validate(ParserRuleContext c) throws CompilationException {
+        if(c instanceof ClassDeclContext d && (d.RECORD()!=null || d.EXTENDS()!=null || d.IMPLEMENTS()!=null))throw unsupported(c);
+        if(c instanceof ClassMemberContext m && (m.STATIC()!=null || m.OVERRIDE()!=null))throw unsupported(c);
         if (c instanceof TypeParametersContext || c instanceof TypeArgumentsContext) throw unsupported(c);
         if (c instanceof ValueTypeContext t && (!t.arraySuffix().isEmpty() ||
-                !(t.INT_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null))) throw unsupported(c);
+                !(t.INT_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null || t.IDENTIFIER()!=null))) throw unsupported(c);
         if (c instanceof StatementContext s && (s.tryStatement()!=null || s.THROW()!=null ||
                 s.switchStatement()!=null || s.foreachStatement()!=null)) throw unsupported(c);
-        if (c instanceof PostfixContext p && !p.postfixPart().isEmpty()) {
-            if(p.postfixPart().size()!=1 || p.postfixPart(0).LBRACK()!=null ||
-                    p.postfixPart(0).LPAREN()==null || p.primary().IDENTIFIER()==null ||
-                    p.primary().LPAREN()!=null) throw unsupported(c);
-        }
+        if(c instanceof PostfixPartContext p && p.LBRACK()!=null)throw unsupported(c);
         if (c instanceof UnaryContext u && u.BIT_NOT()!=null) throw unsupported(c);
         if ((c instanceof ShiftContext || c instanceof BitwiseOrContext || c instanceof BitwiseXorContext ||
                 c instanceof BitwiseAndContext) && c.getChildCount()>1) throw unsupported(c);
         if (c instanceof PrimaryContext p && !(p.INTEGER_LITERAL()!=null || p.STRING_LITERAL()!=null ||
-                p.TRUE()!=null || p.FALSE()!=null || p.IDENTIFIER()!=null ||
+                p.TRUE()!=null || p.FALSE()!=null || p.IDENTIFIER()!=null || p.NEW()!=null || p.THIS()!=null || p.NULL()!=null ||
                 p.expression()!=null && p.LPAREN()!=null && p.CONVERT()==null && p.TYPE_TEST()==null && p.SAFE_CAST()==null))
             throw unsupported(c);
         for (int i=0;i<c.getChildCount();i++) if (c.getChild(i) instanceof ParserRuleContext p) validate(p);
     }
     static CoreProgram build(ProgramContext tree, ManagedEmitter.Analysis analysis,
-                             List<ManagedEmitter.Function> checked) throws CompilationException {
-        return new Builder(analysis,checked).program(tree);
+                             List<ManagedEmitter.Function> checked, List<ManagedEmitter.ClassInfo> classes) throws CompilationException {
+        return new Builder(analysis,checked,classes).program(tree);
     }
     private static final class Builder {
         final ManagedEmitter.Analysis a;
         final Map<ManagedEmitter.Binding,Binding> bindings=new IdentityHashMap<>();
         final Map<ManagedEmitter.Function,Integer> ids=new IdentityHashMap<>();
         final Map<FunctionDeclContext,ManagedEmitter.Function> declarations=new IdentityHashMap<>();
-        Builder(ManagedEmitter.Analysis analysis,List<ManagedEmitter.Function> checked) {
+        final Map<ManagedEmitter.ClassInfo,Integer> classIds=new IdentityHashMap<>();
+        final Map<ManagedEmitter.Field,ObjectField> fields=new IdentityHashMap<>();
+        final Map<ManagedEmitter.Constructor,Integer> constructors=new IdentityHashMap<>();
+        final List<ManagedEmitter.ClassInfo> classes;
+        Binding self;
+        boolean constructing;
+        int nextBinding;
+        Builder(ManagedEmitter.Analysis analysis,List<ManagedEmitter.Function> checked,List<ManagedEmitter.ClassInfo> allClasses) throws CompilationException {
             a=analysis;
+            classes=allClasses.stream().filter(c->c.declaration!=null && !library(c.declaration)).toList();
+            for(var c:classes)classIds.put(c,classIds.size());
+            for(var c:classes){
+                int offset=0;
+                for(var f:c.fields.values()){
+                    fields.put(f,new ObjectField(classIds.get(c),offset,type(f.type(),f.declaration())));
+                    offset+=8;
+                }
+            }
+            var allFunctions=new ArrayList<>(checked);
+            for(var c:classes)for(var methods:c.methods.values())allFunctions.addAll(methods);
+            checked=allFunctions;
             for(var f:checked) if(f.declaration!=null && !library(f.declaration)) {
                 ids.put(f,ids.size()); declarations.put(f.declaration,f);
             }
+            for(var c:classes)for(var ctor:c.constructors)constructors.put(ctor,ids.size()+constructors.size());
         }
         Type type(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             if(t==ManagedEmitter.Type.INT)return Type.INT;
             if(t==ManagedEmitter.Type.BOOL)return Type.BOOL;
             if(t==ManagedEmitter.Type.TEXT)return Type.TEXT;
             if(t==ManagedEmitter.Type.VOID)return Type.VOID;
+            if(t==ManagedEmitter.Type.NULL || classIds.containsKey(t.object))return Type.OBJECT;
             throw unsupported(at);
         }
         Binding binding(ManagedEmitter.Binding b,ParserRuleContext at) throws CompilationException {
             Binding result=bindings.get(b);
-            if(result==null) { result=new Binding(bindings.size(),type(b.type(),at)); bindings.put(b,result); }
+            if(result==null) { result=new Binding(nextBinding++,type(b.type(),at)); bindings.put(b,result); }
             return result;
         }
         CoreProgram program(ProgramContext tree) throws CompilationException {
@@ -126,7 +154,35 @@ public record CoreProgram(List<Function> functions, int entry) {
                 result.add(new Function(id,type(f.result,d),List.copyOf(parameters),block(d.block()),source(d)));
             }
             if(entry<0)throw new CompilationException("Native core has no checked entry point.");
-            return new CoreProgram(List.copyOf(result),entry);
+            var layouts=new ArrayList<ObjectType>();
+            for(var c:classes){
+                layouts.add(new ObjectType(classIds.get(c),c.spelling,c.fields.values().stream().map(fields::get).toList()));
+                for(var methods:c.methods.values())for(var f:methods){
+                    self=new Binding(nextBinding++,Type.OBJECT);
+                    var parameters=new ArrayList<Binding>();parameters.add(self);
+                    if(f.declaration.parameters()!=null)for(var p:f.declaration.parameters().parameter())parameters.add(binding(a.bindings.get(p),p));
+                    result.add(new Function(ids.get(f),type(f.result,f.declaration),List.copyOf(parameters),block(f.declaration.block()),source(f.declaration)));
+                }
+                for(var ctor:c.constructors){
+                    self=new Binding(nextBinding++,Type.OBJECT); constructing=true;
+                    var at=ctor.declaration()==null?c.declaration:ctor.declaration();
+                    var parameters=new ArrayList<Binding>();
+                    if(ctor.declaration()!=null && ctor.declaration().parameters()!=null)for(var p:ctor.declaration().parameters().parameter())parameters.add(binding(a.bindings.get(p),p));
+                    var statements=new ArrayList<Statement>();
+                    statements.add(new Assign(self,new Allocate(classIds.get(c),source(at))));
+                    for(var f:c.fields.values()){
+                        Type t=type(f.type(),f.declaration());
+                        Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(t,t==Type.TEXT?"":t==Type.BOOL?false:t==Type.INT?0L:null,source(f.declaration()));
+                        statements.add(new FieldWrite(new FieldRead(new Read(self,source(at)),fields.get(f),source(f.declaration())),value));
+                    }
+                    if(ctor.declaration()!=null)statements.add(block(ctor.declaration().block()));
+                    statements.add(new Return(new Read(self,source(at))));
+                    result.add(new Function(constructors.get(ctor),Type.OBJECT,List.copyOf(parameters),new Block(List.copyOf(statements),List.of(self)),source(at)));
+                    constructing=false;
+                }
+            }
+            self=null;
+            return new CoreProgram(List.copyOf(result),entry,List.copyOf(layouts));
         }
         Block block(BlockContext c) throws CompilationException {
             var result=new ArrayList<Statement>();
@@ -148,13 +204,16 @@ public record CoreProgram(List<Function> functions, int entry) {
             }
             if(s.assignment()!=null) {
                 var d=s.assignment();
-                return new Assign(binding(a.reads.get(d.postfix().primary()),d),expression(d.expression()));
+                Expression destination=expression(d.postfix());
+                if(destination instanceof Read r)return new Assign(r.binding(),expression(d.expression()));
+                if(destination instanceof FieldRead f)return new FieldWrite(f,expression(d.expression()));
+                throw unsupported(d);
             }
             if(s.ifStatement()!=null)return branch(s.ifStatement());
             if(s.whileStatement()!=null) {
                 var w=s.whileStatement(); return new Loop(expression(w.expression()),block(w.block()));
             }
-            if(s.RETURN()!=null)return new Return(s.expression()==null?null:expression(s.expression()));
+            if(s.RETURN()!=null)return new Return(s.expression()==null?(constructing?new Read(self,source(s)):null):expression(s.expression()));
             if(s.BREAK()!=null || s.CONTINUE()!=null)return new Jump(s.BREAK()!=null);
             if(s.PRINT()!=null)return new Print(arguments(s.arguments()));
             if(s.block()!=null)return block(s.block());
@@ -179,12 +238,21 @@ public record CoreProgram(List<Function> functions, int entry) {
             Object constant=a.constants.get(c);
             if(constant!=null)return new Constant(constant instanceof Long?Type.INT:Type.TEXT,constant,source(c));
             if(c instanceof PrimaryContext p) {
+                if(p.NULL()!=null)return new Constant(Type.OBJECT,null,source(c));
+                if(p.THIS()!=null)return new Read(self,source(c));
+                if(p.NEW()!=null){
+                    var ctor=a.constructors.get(p);
+                    if(ctor==null || !constructors.containsKey(ctor))throw unsupported(p);
+                    return new Call(Type.OBJECT,constructors.get(ctor),arguments(p.arguments()),source(c));
+                }
+                if(a.fields.containsKey(p))return new FieldRead(new Read(self,source(c)),fields.get(a.fields.get(p)),source(c));
                 if(p.TRUE()!=null || p.FALSE()!=null)return new Constant(Type.BOOL,p.TRUE()!=null,source(c));
                 if(p.IDENTIFIER()!=null) {
                     if(p.LPAREN()==null)return new Read(binding(a.reads.get(p),p),source(c));
                     var f=a.calls.get(p);
                     if(f==null)throw unsupported(p);
                     if(!ids.containsKey(f))return textCall(f,p,p.arguments());
+                    if(f.owner!=null){var args=new ArrayList<Expression>();args.add(new Read(self,source(p)));args.addAll(arguments(p.arguments()));return new Call(type(f.result,p),ids.get(f),List.copyOf(args),source(p),true);}
                     return new Call(type(f.result,p),ids.get(f),arguments(p.arguments()),source(c));
                 }
                 if(p.expression()!=null)return expression(p.expression());
@@ -195,9 +263,21 @@ public record CoreProgram(List<Function> functions, int entry) {
                 return new Unary(type(a.expressions.get(c).type(),c),u.getChild(0).getText(),expression(u.unary()),source(c));
             }
             if(c instanceof PostfixContext p && !p.postfixPart().isEmpty()) {
-                var part=p.postfixPart(0);var f=a.calls.get(part);
-                if(f==null || f.intrinsic==null)throw unsupported(part);
-                return textCall(f,part,part.arguments());
+                Expression value=null;
+                for(var part:p.postfixPart()){
+                    var f=a.calls.get(part);
+                    if(f!=null && f.intrinsic!=null){value=textCall(f,part,part.arguments());continue;}
+                    if(value==null)value=expression(p.primary());
+                    if(f!=null){
+                        if(!ids.containsKey(f))throw unsupported(part);
+                        var args=new ArrayList<Expression>();args.add(value);args.addAll(arguments(part.arguments()));
+                        value=new Call(type(f.result,part),ids.get(f),List.copyOf(args),source(part),true);
+                    }else{
+                        var field=fields.get(a.fields.get(part));if(field==null)throw unsupported(part);
+                        value=new FieldRead(value,field,source(part));
+                    }
+                }
+                return value;
             }
             if(c.getChildCount()==1)return expression((ParserRuleContext)c.getChild(0));
             if(c instanceof PostfixContext p)return expression(p.primary());

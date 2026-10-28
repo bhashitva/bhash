@@ -245,3 +245,12 @@ and standard-library static calls. LLVM emits GC-rooted calls into the native te
 runtime and clears consumed temporary and exited-scope roots. Runtime helpers root
 and reload their own arguments across allocation. See [native text](native-text.md)
 for supported APIs, UTF-8 storage, stress tests and current limitations.
+
+## Native heap-backed objects
+
+The typed core records object layouts, checked field identities, constructor factories
+and direct instance calls. LLVM roots object/text receivers across allocations and
+routes all reference field writes through the runtime barrier boundary. Descriptors
+trace exact reference slots; unreachable cycles are collected by the existing
+nonmoving mark-and-sweep collector. See [native objects](native-objects.md) for the
+class subset, initialization and null behavior, layout and validation.

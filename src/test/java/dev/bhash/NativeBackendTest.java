@@ -45,7 +45,7 @@ class NativeBackendTest {
     }
     @Test void unsupportedUnusedDeclarationsAndLibraryCallsHaveSourceLocations(){
         for(String source:List.of(
-            "वर्ग अ {} कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ विस्तार ब {} वर्ग ब {} कार्य मुख्य() -> शून्य {}",
             "कार्य अप्रयुक्त() -> दशमलव { लौटाओ १.२; } कार्य मुख्य() -> शून्य {}",
             "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
             "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो(\"अ\", \"ब\"); }",
@@ -63,6 +63,154 @@ class NativeBackendTest {
         assertEquals(2,p.functions().size());
         assertTrue(p.functions().stream().anyMatch(f->f.source().file().equals("library.bhash")));
     }
+    @Test void coreBuildsPreciseObjectLayoutsAndUsesBarrierStores()throws Exception{
+        var p=core("""
+            वर्ग अ {
+                सार्वजनिक मान न: पूर्णांक;
+                सार्वजनिक मान हाँ: तार्किक;
+                सार्वजनिक मान पाठ्य: पाठ;
+                सार्वजनिक मान अगला: अ;
+                निर्माता(न: पूर्णांक){ यह.न = न; }
+                सार्वजनिक कार्य स्वयं() -> अ { लौटाओ यह; }
+            }
+            कार्य मुख्य() -> शून्य { स्थिर क: अ = नया अ(३); क.अगला = क.स्वयं(); लिखो(क.न); }
+            """);
+        assertEquals(1,p.classes().size());
+        assertEquals(List.of(Type.INT,Type.BOOL,Type.TEXT,Type.OBJECT),p.classes().get(0).fields().stream().map(ObjectField::type).toList());
+        assertEquals(List.of(0,8,16,24),p.classes().get(0).fields().stream().map(ObjectField::offset).toList());
+        String ir=LlvmEmitter.emit(p);
+        assertTrue(ir.contains("[2 x i64] [i64 16, i64 24]"),ir);
+        assertTrue(ir.contains("call void @bh_reference_store"));
+        assertTrue(ir.contains("call ptr @bh_alloc(ptr @class0, i64 32)"));
+        assertTrue(ir.contains("call ptr @bh_instance"));
+    }
+    @Test void nativeObjectProfileKeepsExistingAccessTypeAndConstructionRules(){
+        for(String s:List.of(
+            "वर्ग अ { निजी मान न: पूर्णांक; } कार्य मुख्य() -> शून्य { स्थिर क: अ = नया अ(); लिखो(क.न); }",
+            "वर्ग अ { सार्वजनिक स्थिर न: पूर्णांक = १; } कार्य मुख्य() -> शून्य { स्थिर क: अ = नया अ(); क.न = २; }",
+            "वर्ग अ {} वर्ग ब {} कार्य मुख्य() -> शून्य { स्थिर क: अ = नया ब(); }",
+            "वर्ग अ { मान न: पूर्णांक; निर्माता(){ यह.क(); } कार्य क() -> शून्य {} } कार्य मुख्य() -> शून्य {}"))
+            assertThrows(CompilationException.class,()->core(s));
+        for(String s:List.of(
+            "वर्ग अ { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ विस्तार ब {} वर्ग ब {} कार्य मुख्य() -> शून्य {}",
+            "अनुबंध अ {} कार्य मुख्य() -> शून्य {}",
+            "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { मान न: दशमलव; } कार्य मुख्य() -> शून्य {}")){
+            var error=assertThrows(CompilationException.class,()->core(s));
+            assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
+        }
+    }
+    @Test void heapObjectGraphsAndCyclesSurviveAndAreReclaimed()throws Exception{
+        requireTools();
+        var result=nativeRun(Files.readString(Path.of("examples/native/heap-objects.bhash")),GC_STRESS);
+        assertEquals("कड़ी22 सत्य सत्य\nकड़ी2 १ सत्य\nसत्य\n",result.out());
+        var counts=stats(result);
+        assertTrue(counts.get("allocations")>10000,counts.toString());
+        assertTrue(counts.get("collections")>=counts.get("allocations"),counts.toString());
+        assertEquals(0,counts.get("live"));
+        assertTrue(counts.get("peak")<10000,counts.toString());
+    }
+    @Test void objectConstructorsOverloadsDefaultsAndNestedAllocationsMatchJvm()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग खाली {}
+            वर्ग अ {
+                सार्वजनिक मान न: पूर्णांक;
+                सार्वजनिक मान चिह्न: तार्किक;
+                सार्वजनिक मान शब्द: पाठ;
+                सार्वजनिक मान अगला: अ;
+                निर्माता() { लौटाओ; }
+                निर्माता(न: पूर्णांक, शब्द: पाठ) { यह.न = न; यह.शब्द = शब्द; }
+                सार्वजनिक कार्य स्वयं() -> अ { लौटाओ यह; }
+                सार्वजनिक कार्य फल(न: पूर्णांक) -> पूर्णांक { लौटाओ न + यह.न; }
+                सार्वजनिक कार्य फल(शब्द: पाठ) -> पाठ { लौटाओ यह.शब्द + शब्द; }
+            }
+            कार्य पहचान(क: अ, ख: अ) -> अ { लौटाओ क; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर ख: खाली = नया खाली();
+                लिखो(ख == ख, ख != नया खाली());
+                स्थिर क: अ = नया अ();
+                लिखो(क.न, क.चिह्न, लंबाई(क.शब्द), क.अगला == रिक्त);
+                क.अगला = पहचान(नया अ(७, "अ" + "ब"), नया अ(८, "क" + "ख"));
+                लिखो(क.अगला.स्वयं().फल(३), क.अगला.फल("ग" + "घ"));
+                लिखो(क.अगला == क.अगला.स्वयं(), क != क.अगला);
+            }
+            """,GC_STRESS);
+        assertEquals("सत्य सत्य\n० असत्य ० सत्य\n१० अबगघ\nसत्य सत्य\n",result.out());
+        assertEquals(0,stats(result).get("live"));
+    }
+    @Test void objectFieldReceiversAndArgumentsAreEvaluatedOnceInOrder()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग अ {
+                सार्वजनिक मान न: पूर्णांक;
+                सार्वजनिक मान बच्चा: अ;
+                निर्माता(न: पूर्णांक){ यह.न = न; }
+                सार्वजनिक कार्य लो(ख: अ) -> पूर्णांक { लौटाओ यह.न + ख.न; }
+            }
+            कार्य पहचान(क: अ) -> अ { लिखो(क.न); लौटाओ क; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: अ = नया अ(१);
+                पहचान(क).बच्चा = पहचान(नया अ(२));
+                लिखो(पहचान(क).लो(पहचान(नया अ(३))));
+                लिखो(क.बच्चा.न);
+            }
+            """,GC_STRESS);
+        assertEquals("१\n२\n१\n३\n४\n२\n",result.out());
+    }
+    @Test void objectGraphTracingHandlesSharingChainsAndRecursiveReceivers()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            वर्ग क {
+                सार्वजनिक मान अगला: ख;
+                सार्वजनिक मान नाम: पाठ;
+                निर्माता(नाम: पाठ){ यह.नाम = नाम; }
+                सार्वजनिक कार्य गिनो(न: पूर्णांक) -> पूर्णांक {
+                    यदि (न == ०){ लौटाओ लंबाई(यह.नाम); }
+                    स्थिर अस्थायी: क = नया क("x" + अंकपाठ(न));
+                    लौटाओ यह.गिनो(न - १) + लंबाई(अस्थायी.नाम);
+                }
+            }
+            वर्ग ख { सार्वजनिक मान बायाँ: क; सार्वजनिक मान दायाँ: क; }
+            कार्य मुख्य() -> शून्य {
+                स्थिर मूल: क = नया क("मूल" + "😀");
+                मान प: क = मूल;
+                मान न: पूर्णांक = ०;
+                जबतक (न < १२८){
+                    स्थिर खंड: ख = नया ख();
+                    खंड.बायाँ = नया क("अ" + "ब");
+                    खंड.दायाँ = खंड.बायाँ;
+                    प.अगला = खंड;
+                    प = खंड.बायाँ;
+                    न = न + १;
+                }
+                लिखो(मूल.अगला.बायाँ == मूल.अगला.दायाँ, प.नाम, मूल.गिनो(३२));
+                मूल.अगला = रिक्त;
+                न = ०;
+                जबतक (न < ५०){
+                    स्थिर अस्थायी: क = नया क("अ" + अंकपाठ(न));
+                    न = न + १;
+                    यदि (न == ५०){ विराम; }
+                }
+                लिखो(मूल.नाम);
+            }
+            """,GC_STRESS);
+        assertTrue(result.out().startsWith("सत्य अब "),result.out());
+        assertTrue(result.out().endsWith("मूल😀\n"),result.out());
+        assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nullObjectFieldAndMethodFailuresAreLocatedAndMatchJvm()throws Exception{
+        requireTools();
+        String prefix="वर्ग अ { सार्वजनिक मान न: पूर्णांक; सार्वजनिक कार्य लो(न: पूर्णांक) -> पूर्णांक { लौटाओ न; } } कार्य अंक() -> पूर्णांक { लिखो(९); लौटाओ १; } कार्य मुख्य() -> शून्य { मान क: अ = रिक्त; ";
+        for(String use:List.of("लिखो(क.न);","क.न = अंक();","लिखो(क.लो(अंक()));")){
+            var result=nativeRun(prefix+use+"}",GC_STRESS);
+            assertEquals(1,result.exit());
+            assertTrue(result.err().contains("native.bhash:1:"),result.err());
+            assertTrue(result.err().contains("रिक्त वस्तु के सदस्य"),result.err());
+        }
+    }
+
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));
         boolean supported=System.getProperty("os.name").equals("Linux") && Set.of("amd64","x86_64").contains(System.getProperty("os.arch"));

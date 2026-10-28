@@ -28,7 +28,8 @@ resolution and signature checking. Unsupported library functions still fail clea
 this is not complete native standard-library support.
 
 Input, decimal formatting, byte buffers, text split/join (which require collections),
-objects, arrays and collection APIs remain outside this milestone. No grammar or
+arrays and collection APIs remain outside this milestone. Ordinary classes are
+covered by the subsequent [native objects milestone](native-objects.md). No grammar or
 public function signatures change.
 
 The repeat limit intentionally matches existing JVM/CLR behavior, including two

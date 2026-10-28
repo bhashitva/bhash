@@ -185,6 +185,10 @@ static void runtime_error(const void *location, const char *message) {
     fputs(": ", stderr); fputs(message, stderr); fputc('\n', stderr);
     fflush(stderr); exit(1);
 }
+void *bh_instance(void *value, const void *location) {
+    if (!value) runtime_error(location, "रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।");
+    return value;
+}
 int64_t bh_divide(int64_t a, int64_t b, const void *location) {
     if (!b) runtime_error(location, "शून्य से भाग देना संभव नहीं है।");
     return a == INT64_MIN && b == -1 ? INT64_MIN : a / b;

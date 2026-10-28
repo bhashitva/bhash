@@ -24,10 +24,13 @@ jobs:
         run: |
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/factorial.bhash --target native -o target/factorial-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/heap-text.bhash --target native -o target/heap-text-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/heap-objects.bhash --target native -o target/heap-objects-native
       - name: Inspect executable dependencies
         run: |
-          file target/factorial-native
-          ldd target/factorial-native | tee target/native-dependencies.txt
+          for executable in target/factorial-native target/heap-text-native target/heap-objects-native; do
+            file "$executable"
+            ldd "$executable"
+          done | tee target/native-dependencies.txt
           if grep -Ei 'jvm|libjli|coreclr|hostfxr|mono' target/native-dependencies.txt; then exit 1; fi
       - name: Run in clean deployment environment
         run: |
@@ -44,15 +47,22 @@ jobs:
             cmp /tmp/text-actual /tmp/text-expected
             grep "live=0" /tmp/gc-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/gc-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/heap-objects-native > /tmp/objects-actual 2> /tmp/objects-stats
+            printf "कड़ी22 सत्य सत्य\nकड़ी2 १ सत्य\nसत्य\n" > /tmp/objects-expected
+            cmp /tmp/objects-actual /tmp/objects-expected
+            grep "live=0" /tmp/objects-stats
+            grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/objects-stats
           '
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-experimental-native-linux-x86_64
           path: |
             target/factorial-native
+            target/heap-objects-native
             target/heap-text-native
             target/native-dependencies.txt
             target/native-tests/factorial.ll
             target/surefire-reports/
             docs/native-compilation-design.md
             docs/native-text.md
+            docs/native-objects.md
