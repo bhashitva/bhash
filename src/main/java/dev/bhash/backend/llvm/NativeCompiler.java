@@ -12,6 +12,15 @@ import java.util.concurrent.TimeUnit;
 /** Experimental Linux x86-64 executable backend using LLVM 18 directly. */
 public final class NativeCompiler {
     private static final int TIMEOUT_SECONDS=120, LOG_LIMIT=65536;
+    private final boolean sanitize;
+    public NativeCompiler(){this(false);}
+    /** Internal conformance-build option; normal CLI builds have no sanitizer dependency. */
+    public NativeCompiler(boolean sanitize){this.sanitize=sanitize;}
+    private List<String> clangCommand(List<String> args){
+        var command=new ArrayList<>(args);
+        if(sanitize)command.addAll(List.of("-fsanitize=address,undefined","-fno-omit-frame-pointer"));
+        return command;
+    }
     public void compile(List<SourceFile> sources,Path output) throws IOException,CompilationException {
         var core=ManagedEmitter.core(sources); // Diagnose source before invoking external tools.
         if(!System.getProperty("os.name").equals("Linux") ||
@@ -39,9 +48,9 @@ public final class NativeCompiler {
                 Files.copy(in,work.resolve(name));
             }
             command(work,List.of(opt,"-passes=verify","-disable-output","program.ll"));
-            command(work,List.of(clang,"-O2","-c","program.ll","-o","program.o"));
-            command(work,List.of(clang,"-std=c17","-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"));
-            command(work,List.of(clang,"program.o","runtime.o","-o","program"));
+            command(work,clangCommand(List.of(clang,"-O2","-c","program.ll","-o","program.o")));
+            command(work,clangCommand(List.of(clang,"-std=c17","-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o")));
+            command(work,clangCommand(List.of(clang,"program.o","runtime.o","-o","program")));
             Files.createDirectories(destination.getParent());
             staged=Files.createTempFile(destination.getParent(),".bhash-native-",".tmp");
             Files.copy(work.resolve("program"),staged,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.COPY_ATTRIBUTES);
