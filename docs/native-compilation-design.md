@@ -69,6 +69,7 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - `सर्ववस्तु` boxing/unboxing of integers, booleans, text and object/interface references
   in [native universal values](native-boxing.md).
 - Arrays, growable lists, insertion-ordered maps and iteration in [native collections](native-collections.md).
+- Typed exceptions, catch/finally, throw/rethrow and safe root unwinding in [native exceptions](native-exceptions.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
@@ -78,7 +79,7 @@ unsupported declarations. Unsupported calls to standard-library intrinsics are r
 injected compiler metadata alone does not require library execution.
 
 Decimals, other integer widths, unsupported conversions, bitwise operations, input, unsupported
-standard-library calls, static members, user-defined generics, exceptions, selection,
+standard-library calls, static members, user-defined generics, selection,
 interop and concurrency are not yet available. The original decimal-area example is
 therefore outside this native profile. Defaults and behavior of managed targets are
 unchanged.
@@ -94,8 +95,8 @@ Text points to a payload containing a 64-bit byte length and UTF-8 bytes. Static
 literal payloads and future managed text use compatible layouts. Equality compares
 length/content, without normalization or pointer identity. Embedded NUL, supplementary
 characters and combining marks are preserved. Integer output uses Devanagari digits;
-booleans use `सत्य`/`असत्य`. Successful execution exits 0; arithmetic failures report
-Hindi diagnostics with Bhash locations and exit 1. Stack exhaustion and OS faults are
+booleans use `सत्य`/`असत्य`. Successful execution exits 0; arithmetic failures raise catchable `अपवाद` values.
+Unhandled failures report Hindi diagnostics with Bhash locations and exit 1. Stack exhaustion and OS faults are
 not covered by that clean-error guarantee.
 
 ## Heap and collector contract
@@ -115,7 +116,9 @@ Compiler-generated root frames identify reference slots precisely. Frames are pu
 on function entry and popped on every normal return. Parameters, text bindings and
 text temporaries have initialized slots. Consumed temporary slots are released after their parent result is rooted. Block-local
 slots are cleared when control leaves their scope, including loop jumps; function
-frames are popped on return. Bindings that remain in scope may outlive their last
+frames are popped on return. Exception transfer restores the saved chain head and
+clears abandoned region roots as described in [native exceptions](native-exceptions.md).
+Bindings that remain in scope may outlive their last
 use. [Heap-backed text](native-text.md) exercises these rules through real programs.
 
 Allocation is the initial collection safepoint. Before allocation, callers must root

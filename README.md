@@ -188,6 +188,9 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/exceptions.b
 
 See [exception rules and cleanup behavior](docs/exceptions.md).
 
+The experimental Linux native target also supports try/catch/finally, throw/rethrow,
+custom exceptions and safe GC-root unwinding. See [native exceptions](docs/native-exceptions.md).
+
 ## Standard library
 
 The compiler bundles the `मानक` package on JVM, .NET CLR and browser WASM:

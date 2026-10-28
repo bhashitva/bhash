@@ -23,6 +23,13 @@ void bh_roots_pop(bh_root_frame *);
 void *bh_alloc(const bh_type *, uint64_t bytes);
 void bh_collect(void);
 void bh_runtime_init(void);
+/* Protection is wholly inside C: generated callbacks never resume after longjmp. */
+typedef int64_t (*bh_protected_callback)(void *);
+void bh_exception_configure(const bh_type *, const void *);
+int64_t bh_protect(bh_protected_callback, void *);
+void *bh_exception_take(void);
+_Noreturn void bh_throw(void *, const void *);
+int bh_run(bh_protected_callback);
 void bh_shutdown(void);
 void bh_gc_stress(int enabled);
 uint64_t bh_heap_objects(void);

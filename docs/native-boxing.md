@@ -5,6 +5,9 @@ The experimental Linux x86-64 / LLVM 18 backend supports `सर्ववस्�
 class/interface references, and `रिक्त`. Compiled applications require neither
 JVM nor .NET. The compiler still requires Java and LLVM.
 
+Runtime failures are now catchable using [native exceptions](native-exceptions.md);
+exit-1 diagnostics below describe unhandled failures.
+
 ## Language behavior
 
 Universal values preserve the same language behavior as managed targets:
@@ -108,7 +111,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/boxing
 
 ## Private representation and collector contract
 
-Private native ABI v5 (extended by [collections](native-collections.md)) retains the ABI v3 class layout: an eight-byte immutable
+Private native ABI v6 (extended by [collections](native-collections.md)) retains the ABI v3 class layout: an eight-byte immutable
 `ClassInfo` pointer followed by eight-byte field slots. Ordinary class and
 interface references remain payload-base pointers with unchanged identity.
 `सर्ववस्तु` is a managed pointer or null, never an interior pointer or tagged word.
@@ -140,7 +143,7 @@ host reflection is involved.
 
 [Arrays, lists and maps](native-collections.md) now support these universal values.
 Other numeric widths, decimals, records/enums, user-defined generics, static
-members, exceptions and foreign interoperability remain outside the native profile.
+members and foreign interoperability remain outside the native profile.
 There are no user-managed allocation/free operations and no new public C ABI.
 
 `NativeBackendTest` compares native execution with JVM output and exit status,
