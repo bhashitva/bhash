@@ -442,7 +442,7 @@ class NativeBackendTest {
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "कार्य अप्रयुक्त() -> लघुपूर्णांक { लौटाओ परिवर्तित<लघुपूर्णांक>(१); } कार्य मुख्य() -> शून्य {}",
             "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
-            "आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { मानक.समय.अभी(); }",
+            "कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो()); }",
             "कार्य मुख्य() -> शून्य { लिखो(१ << २); }",
             "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<लघुपूर्णांक>(१)); }")){
             var error=assertThrows(CompilationException.class,()->core(source));
@@ -1732,6 +1732,71 @@ class NativeBackendTest {
         requireNumericTargets();Files.createDirectories(Path.of("target/native-byte-example"));
         var result=numericExact(Files.readString(Path.of("examples/native/bytes.bhash")));
         assertEquals(0,result.exit());assertTrue(stats(result).get("allocations")>3000,result.err());
+    }
+    @Test void timeCoreRecognizesAllSixSignaturesAndAliases()throws Exception{
+        var p=core("""
+            आयात मानक.समय उपनाम स;
+            कार्य मुख्य() -> शून्य { स्थिर त: पूर्णांक = स.अभी(); लिखो(स.पढ़ो(स.पाठबनाओ(त)),स.वर्ष(त),स.माह(त),स.दिन(त)); }
+            """);
+        var ir=LlvmEmitter.emit(p);
+        for(String name:List.of("now","read","write","year","month","day"))assertTrue(ir.contains("@bh_time_"+name+"("));
+    }
+    @Test void nativeUtcCalendarGoldenDatesAndPreEpochMillisecondsMatchManaged()throws Exception{
+        requireNumericTargets();var result=numericExact("""
+            आयात मानक.समय उपनाम स;
+            कार्य मुख्य() -> शून्य {
+                स्थिर क्षणसूची: पूर्णांक[] = नया पूर्णांक[]{-६२१३५५९६८०००००,२५३४०२३००७९९९९९,-१,-१०००,-१००१,-८६४०००००,-८६४००००१,०,१,९५१८२७६९६७८९,२१४७४८३६४८०००};
+                प्रत्येक (क: पूर्णांक में क्षणसूची) { स्थिर प: पाठ = स.पाठबनाओ(क);लिखो(प,स.पढ़ो(प)==क,स.वर्ष(क),स.माह(क),स.दिन(क)); }
+                स्थिर दिनांक: पाठ[] = नया पाठ[]{"0001-01-01T00:00:00.000Z","0400-02-29T23:59:59.999Z","1600-02-29T00:00:00.000Z","1900-03-01T00:00:00.000Z","2000-02-29T12:34:56.789Z","2100-03-01T00:00:00.000Z","2400-02-29T00:00:00.000Z","9999-12-31T23:59:59.999Z"};
+                प्रत्येक (प: पाठ में दिनांक) { लिखो(स.पढ़ो(प),स.पाठबनाओ(स.पढ़ो(प))==प); }
+            }
+            """);assertEquals(0,result.exit());
+        assertTrue(result.out().contains("1969-12-31T23:59:59.999Z सत्य १९६९ १२ ३१"));
+    }
+    @Test void nativeUtcEveryYearMatchesManagedCalendar()throws Exception{
+        requireNumericTargets();assertEquals(0,numericExact("""
+            आयात मानक.समय उपनाम स;
+            आयात मानक.पाठ्य उपनाम प;
+            कार्य मुख्य() -> शून्य {
+                मान वर्षमान: पूर्णांक = १;मान योग: पूर्णांक = ०;
+                जबतक (वर्षमान <= ९९९९) {
+                    स्थिर अंक: पाठ = परिवर्तित<पाठ>(वर्षमान);
+                    स्थिर मूल: पाठ = प.दोहराओ("0",४-प.लंबाई(अंक))+अंक+"-03-01T12:34:56.789Z";
+                    स्थिर त: पूर्णांक = स.पढ़ो(मूल);
+                    यदि (स.पाठबनाओ(त)!=मूल || स.वर्ष(त)!=वर्षमान || स.माह(त)!=३ || स.दिन(त)!=१) { त्रुटि("calendar mismatch"); }
+                    योग=योग+त;वर्षमान=वर्षमान+१;
+                }
+                लिखो(योग);
+            }
+            """).exit());
+    }
+    @Test void nativeUtcInvalidTextAndRangesMatchManaged()throws Exception{
+        requireNumericTargets();var code=new StringBuilder("आयात मानक.समय उपनाम स; कार्य मुख्य() -> शून्य { ");
+        for(String value:List.of("","0000-01-01T00:00:00.000Z","10000-01-01T00:00:00.000Z","1900-02-29T00:00:00.000Z",
+            "2001-02-29T00:00:00.000Z","2024-04-31T00:00:00.000Z","2000-00-01T00:00:00.000Z","2000-13-01T00:00:00.000Z",
+            "2000-01-00T00:00:00.000Z","2000-01-01T24:00:00.000Z","2000-01-01T23:60:00.000Z","2000-01-01T23:59:60.000Z",
+            "2000-01-01T00:00:00Z","2000-01-01T00:00:00.00Z","2000-01-01T00:00:00.0000Z","2000-01-01t00:00:00.000Z",
+            "2000-01-01T00:00:00.000z","2000-01-01T00:00:00.000+00:00","2000-01-01T00:00:00.000Z\n",
+            "२०००-01-01T00:00:00.000Z","2000-01-01T00:00:00.00xZ","2000-01-01T00:00:00.000Z\0")){
+            code.append("प्रयास { स.पढ़ो(").append(StandardLibraryTest.literal(value)).append("); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); } ");
+        }
+
+        for(String operation:List.of("पाठबनाओ","वर्ष","माह","दिन"))for(String value:List.of("-६२१३५५९६८००००१","२५३४०२३००८०००००","-९२२३३७२०३६८५४७७५८०८","९२२३३७२०३६८५४७७५८०७"))
+            code.append("प्रयास { स.").append(operation).append("(").append(value).append("); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); } ");
+        code.append("}");var result=numericExact(code.toString());assertEquals(0,result.exit());
+        assertEquals(22,result.out().lines().filter(x->x.equals("अमान्य UTC समय पाठ।")).count());
+        assertEquals(16,result.out().lines().filter(x->x.equals("समय सीमा से बाहर है।")).count());
+    }
+    @Test void nativeUtcClockUsesCurrentEpochMilliseconds()throws Exception{
+        requireTools();long before=System.currentTimeMillis();
+        var result=nativeOnlyRun(List.of(new SourceFile("clock.bhash","कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<पाठ>(मानक.समय.अभी())); }")),GC_STRESS);
+        long after=System.currentTimeMillis(),actual=Long.parseLong(result.out().strip());
+        assertEquals(0,result.exit());assertTrue(actual>=before&&actual<=after,result.out());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeUtcStressAndPortableLibraryExampleMatchManaged()throws Exception{
+        requireNumericTargets();var result=numericExact(Files.readString(Path.of("examples/native/time.bhash")));
+        assertEquals(0,result.exit());assertTrue(stats(result).get("allocations")>3000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());
+        assertEquals(0,numericExact(Files.readString(Path.of("examples/standard-library/portable.bhash"))).exit());
     }
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));
