@@ -946,3 +946,259 @@ void *bh_collection_literal(const bh_collection_info *info, uint64_t count, cons
     }
     void *result = slots[0]; bh_roots_pop(&frame); cleanups = cleanup.previous; free(slots); return result;
 }
+
+/* Structured text: all working buffers, partial collections and active paths use
+   precise roots. No malloc scratch survives an exception or an allocation. */
+static const bh_data_info *data_info;
+_Static_assert(sizeof(bh_data_info) == 88, "Structured metadata ABI");
+void bh_data_configure(const bh_data_info *info) {
+    if (roots || handlers || pending_exception) fatal("आंतरिक डेटा विन्यास अमान्य है।");
+    data_info = info;
+}
+static uint64_t data_units(const void *text) {
+    uint64_t i=0,n=text_length(text),units=0;
+    while(i<n) units += scalar(text_data(text),&i)>0xffff?2:1;
+    return units;
+}
+typedef struct data_buffer {
+    void *slots[2]; bh_root_frame frame;
+    uint64_t size,capacity,units,limit;
+    const void *location; const char *limit_error;
+} data_buffer;
+static void buffer_init(data_buffer *b,uint64_t limit,const char *error,const void *location) {
+    memset(b,0,sizeof *b); b->limit=limit;b->limit_error=error;b->location=location;
+    bh_roots_push(&b->frame,b->slots,2);
+}
+static void buffer_reserve(data_buffer *b,uint64_t n,uint64_t units) {
+    if(units>b->limit-b->units) runtime_error(b->location,b->limit_error);
+    uint64_t required=checked_add(b->size,n,b->location);
+    if(required<=b->capacity)return;
+    uint64_t capacity=b->capacity?b->capacity:64;
+    while(capacity<required){if(capacity>UINT64_MAX/2){capacity=required;break;}capacity*=2;}
+    b->slots[1]=new_text(capacity,b->location);
+    if(b->size)memcpy(text_data(b->slots[1]),text_data(b->slots[0]),(size_t)b->size);
+    b->slots[0]=b->slots[1];b->slots[1]=NULL;b->capacity=capacity;
+}
+/* Bytes here are stack/static, never an interior pointer into managed storage. */
+static void buffer_bytes(data_buffer *b,const void *bytes,uint64_t n,uint64_t units) {
+    buffer_reserve(b,n,units);
+    if(n)memcpy(text_data(b->slots[0])+b->size,bytes,(size_t)n);
+    b->size+=n;b->units+=units;
+}
+static void buffer_text(data_buffer *b,void **slot,uint64_t n,uint64_t units) {
+    buffer_reserve(b,n,units);
+    if(n)memcpy(text_data(b->slots[0])+b->size,text_data(*slot),(size_t)n);
+    b->size+=n;b->units+=units;
+}
+static void buffer_scalar(data_buffer *b,uint32_t cp) {
+    unsigned char bytes[4];uint64_t n;
+    if(cp<0x80){bytes[0]=(unsigned char)cp;n=1;}
+    else if(cp<0x800){bytes[0]=(unsigned char)(0xc0|(cp>>6));bytes[1]=(unsigned char)(0x80|(cp&63));n=2;}
+    else if(cp<0x10000){bytes[0]=(unsigned char)(0xe0|(cp>>12));bytes[1]=(unsigned char)(0x80|((cp>>6)&63));bytes[2]=(unsigned char)(0x80|(cp&63));n=3;}
+    else{bytes[0]=(unsigned char)(0xf0|(cp>>18));bytes[1]=(unsigned char)(0x80|((cp>>12)&63));bytes[2]=(unsigned char)(0x80|((cp>>6)&63));bytes[3]=(unsigned char)(0x80|(cp&63));n=4;}
+    buffer_bytes(b,bytes,n,cp>0xffff?2:1);
+}
+static void *buffer_finish(data_buffer *b) {
+    b->slots[1]=new_text(b->size,b->location);
+    if(b->size)memcpy(text_data(b->slots[1]),text_data(b->slots[0]),(size_t)b->size);
+    void *result=b->slots[1];bh_roots_pop(&b->frame);return result;
+}
+void *bh_data_split(const void *text,const void *separator,const void *location) {
+    void *slots[4]={(void *)text,(void *)separator,NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,4);
+    uint64_t n=text_length(text),m=text_length(separator),start=0,i=0;
+    if(!m)runtime_error(location,"विभाजक या बदलने वाला पाठ खाली नहीं हो सकता।");
+    slots[2]=bh_collection_new(data_info->texts,0,location);
+    for(;;){
+        if(i==n||matches(slots[0],i,slots[1])){
+            slots[3]=new_text(i-start,location);
+            if(i>start)memcpy(text_data(slots[3]),text_data(slots[0])+start,(size_t)(i-start));
+            bh_collection_call(slots[2],BH_ADD,pointer_bits(slots[3]),0,NULL,location);slots[3]=NULL;
+            if(i==n)break;
+            i+=m;start=i;
+        }else ++i;
+    }
+    void *result=slots[2];bh_roots_pop(&frame);return result;
+}
+void *bh_data_join(void *values,const void *separator,const void *location) {
+    void *slots[3]={bh_instance(values,location),(void *)separator,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,3);
+    uint64_t n=((bh_collection *)slots[0])->size;
+    data_buffer buffer;buffer_init(&buffer,UINT64_MAX,"पाठ सीमा से बाहर है।",location);
+    for(uint64_t i=0;i<n;++i){
+        if(i)buffer_text(&buffer,&slots[1],text_length(slots[1]),data_units(slots[1]));
+        slots[2]=bits_pointer(((bh_collection *)slots[0])->data[i]);
+        buffer_text(&buffer,&slots[2],text_length(slots[2]),data_units(slots[2]));slots[2]=NULL;
+    }
+    void *result=buffer_finish(&buffer);bh_roots_pop(&frame);return result;
+}
+static void *json_box(uint64_t kind,uint64_t bits) {
+    int index=kind==BH_INT?0:kind==BH_BOOL?1:kind==BH_TEXT?2:3;
+    void *slots[2]={kind==BH_TEXT?bits_pointer(bits):NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
+    slots[1]=bh_alloc(data_info->boxes[index],16);
+    memcpy(slots[1],&data_info->box_info[index],8);
+    if(kind==BH_TEXT)bh_reference_store(slots[1],8,slots[0]);
+    else memcpy((unsigned char *)slots[1]+8,&bits,8);
+    void *result=slots[1];bh_roots_pop(&frame);return result;
+}
+typedef struct json_reader {void *input;const void *location;uint64_t at,units;} json_reader;
+static _Noreturn void json_invalid(json_reader *r) {
+    char message[160];snprintf(message,sizeof message,"अमान्य जेसन पाठ, स्थान %llu।",(unsigned long long)r->units);
+    runtime_error(r->location,message);
+}
+static int json_take(json_reader *r,unsigned char c) {
+    if(r->at<text_length(r->input)&&text_data(r->input)[r->at]==c){++r->at;++r->units;return 1;}return 0;
+}
+static void json_need(json_reader *r,unsigned char c){if(!json_take(r,c))json_invalid(r);}
+static void json_space(json_reader *r) {
+    while(r->at<text_length(r->input)){
+        unsigned char c=text_data(r->input)[r->at];if(c!=' '&&c!='\t'&&c!='\r'&&c!='\n')break;
+        ++r->at;++r->units;
+    }
+}
+static int json_digit(json_reader *r){return r->at<text_length(r->input)&&text_data(r->input)[r->at]>='0'&&text_data(r->input)[r->at]<='9';}
+/* Escape syntax consumes a single UTF-16 code unit before reporting a bad character. */
+static uint32_t json_escape_char(json_reader *r) {
+    if(r->at>=text_length(r->input))json_invalid(r);
+    uint32_t c=scalar(text_data(r->input),&r->at);++r->units;return c;
+}
+static void *json_string(json_reader *r) {
+    json_need(r,'"');data_buffer b;buffer_init(&b,UINT64_MAX,"पाठ सीमा से बाहर है।",r->location);
+    uint32_t high=0;int invalid_unicode=0;
+    while(r->at<text_length(r->input)){
+        uint32_t c=scalar(text_data(r->input),&r->at);r->units+=c>0xffff?2:1;
+        if(c=='"'){
+            if(high||invalid_unicode)runtime_error(r->location,"अमान्य यूनिकोड पाठ।");
+            return buffer_finish(&b);
+        }
+        if(c<32)json_invalid(r);
+        if(c=='\\'){
+            c=json_escape_char(r);
+            switch(c){
+                case '"':case '\\':case '/':break;
+                case 'b':c=8;break;case 'f':c=12;break;case 'n':c=10;break;case 'r':c=13;break;case 't':c=9;break;
+                case 'u':{
+                    c=0;for(int i=0;i<4;++i){uint32_t digit=json_escape_char(r);int n=digit>='0'&&digit<='9'?(int)(digit-'0'):digit>='a'&&digit<='f'?(int)(digit-'a'+10):digit>='A'&&digit<='F'?(int)(digit-'A'+10):-1;if(n<0)json_invalid(r);c=c*16+(uint32_t)n;}
+                    break;
+                }
+                default:json_invalid(r);
+            }
+        }
+        if(c>=0xd800&&c<=0xdbff){if(high)invalid_unicode=1;high=c;continue;}
+        if(c>=0xdc00&&c<=0xdfff){if(!high){invalid_unicode=1;continue;}c=0x10000+((high-0xd800)<<10)+(c-0xdc00);high=0;}
+        else if(high){invalid_unicode=1;high=0;}
+        buffer_scalar(&b,c);
+    }
+    json_invalid(r);
+}
+static void *json_number(json_reader *r) {
+    uint64_t start=r->at;int negative=json_take(r,'-'),real=0;
+    if(json_take(r,'0')){if(json_digit(r))json_invalid(r);}
+    else{if(!json_digit(r))json_invalid(r);while(json_digit(r)){++r->at;++r->units;}}
+    if(json_take(r,'.')){real=1;if(!json_digit(r))json_invalid(r);while(json_digit(r)){++r->at;++r->units;}}
+    if(json_take(r,'e')||json_take(r,'E')){real=1;if(!json_take(r,'+'))json_take(r,'-');if(!json_digit(r))json_invalid(r);while(json_digit(r)){++r->at;++r->units;}}
+    uint64_t n=r->at-start;
+    if(!real){
+        uint64_t value=0,limit=negative?UINT64_C(9223372036854775808):INT64_MAX;
+        for(uint64_t i=start+(negative?1:0);i<r->at;++i){uint64_t digit=text_data(r->input)[i]-'0';if(value>(limit-digit)/10)json_invalid(r);value=value*10+digit;}
+        int64_t integer=negative?(value==UINT64_C(9223372036854775808)?INT64_MIN:-(int64_t)value):(int64_t)value;
+        uint64_t bits;memcpy(&bits,&integer,8);return json_box(BH_INT,bits);
+    }
+    void *slot=new_text(n+1,r->location);bh_root_frame frame;bh_roots_push(&frame,&slot,1);
+    memcpy(text_data(slot),text_data(r->input)+start,(size_t)n);text_data(slot)[n]=0;
+    double number=numeric_finite(strtod((char *)text_data(slot),NULL),r->location);uint64_t bits;memcpy(&bits,&number,8);
+    slot=NULL;void *result=json_box(BH_REAL,bits);bh_roots_pop(&frame);return result;
+}
+static void *json_value(json_reader *r,unsigned depth) {
+    json_space(r);if(depth>64||r->at>=text_length(r->input))json_invalid(r);
+    void *slots[3]={NULL,NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,3);
+    unsigned char c=text_data(r->input)[r->at];
+    if(c=='"'){slots[0]=json_string(r);slots[0]=json_box(BH_TEXT,pointer_bits(slots[0]));}
+    else if(json_take(r,'{')){
+        slots[0]=bh_collection_new(data_info->object,0,r->location);json_space(r);
+        if(!json_take(r,'}'))for(;;){
+            json_space(r);if(r->at>=text_length(r->input)||text_data(r->input)[r->at]!='"')json_invalid(r);
+            slots[1]=json_string(r);json_space(r);json_need(r,':');
+            if(bh_collection_call(slots[0],BH_CONTAINS,pointer_bits(slots[1]),0,NULL,r->location))json_invalid(r);
+            slots[2]=json_value(r,depth+1);
+            bh_collection_call(slots[0],BH_SET,pointer_bits(slots[1]),pointer_bits(slots[2]),NULL,r->location);slots[1]=NULL;slots[2]=NULL;
+            json_space(r);if(json_take(r,'}'))break;json_need(r,',');
+        }
+    }else if(json_take(r,'[')){
+        slots[0]=bh_collection_new(data_info->values,0,r->location);json_space(r);
+        if(!json_take(r,']'))for(;;){
+            slots[1]=json_value(r,depth+1);bh_collection_call(slots[0],BH_ADD,pointer_bits(slots[1]),0,NULL,r->location);slots[1]=NULL;
+            json_space(r);if(json_take(r,']'))break;json_need(r,',');
+        }
+    }else{
+        const char *literal=NULL;uint64_t n=0;
+        if(c=='t'){literal="true";n=4;}else if(c=='f'){literal="false";n=5;}else if(c=='n'){literal="null";n=4;}
+        if(literal&&n<=text_length(r->input)-r->at&&!memcmp(text_data(r->input)+r->at,literal,(size_t)n)){
+            r->at+=n;r->units+=n;slots[0]=c=='n'?NULL:json_box(BH_BOOL,c=='t'?1:0);
+        }else slots[0]=json_number(r);
+    }
+    void *result=slots[0];bh_roots_pop(&frame);return result;
+}
+void *bh_data_json_read(const void *text,const void *location) {
+    json_reader reader={(void *)text,location,0,0};bh_root_frame frame;bh_roots_push(&frame,&reader.input,1);
+    if(data_units(reader.input)>1048576)runtime_error(location,"जेसन पाठ सीमा से बाहर है।");
+    void *result=json_value(&reader,0); /* No allocation between this result and return. */
+    json_space(&reader);if(reader.at!=text_length(reader.input))json_invalid(&reader);
+    bh_roots_pop(&frame);return result;
+}
+typedef struct json_writer {data_buffer buffer;void *active[65];bh_root_frame frame;const void *location;} json_writer;
+static void json_write_string(json_writer *w,void *text) {
+    void *slot=text;bh_root_frame frame;bh_roots_push(&frame,&slot,1);
+    buffer_bytes(&w->buffer,"\"",1,1);uint64_t at=0,n=text_length(slot);
+    while(at<n){
+        uint32_t c=scalar(text_data(slot),&at);
+        if(c=='"'||c=='\\'){char escaped[2]={'\\',(char)c};buffer_bytes(&w->buffer,escaped,2,2);}
+        else if(c<32){char escaped[7];snprintf(escaped,sizeof escaped,"\\u%04x",(unsigned)c);buffer_bytes(&w->buffer,escaped,6,6);}
+        else buffer_scalar(&w->buffer,c);
+    }
+    buffer_bytes(&w->buffer,"\"",1,1);bh_roots_pop(&frame);
+}
+static void json_write_value(json_writer *w,uint64_t kind,uint64_t bits,unsigned depth) {
+    void *slots[2]={reference_kind(kind)?bits_pointer(bits):NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
+    if(depth>64)runtime_error(w->location,"जेसन की गहराई सीमा पार हो गई।");
+    if(kind==BH_ANY){
+        if(!slots[0]){buffer_bytes(&w->buffer,"null",4,4);bh_roots_pop(&frame);return;}
+        kind=boxed_kind(slots[0]);if(kind!=BH_REFERENCE){bits=box_payload(slots[0]);if(kind==BH_TEXT)slots[1]=bits_pointer(bits);}
+    }else if(kind==BH_TEXT)slots[1]=slots[0];
+    if(kind==BH_TEXT)json_write_string(w,slots[1]);
+    else if(kind==BH_BOOL)buffer_bytes(&w->buffer,bits?"true":"false",bits?4:5,bits?4:5);
+    else if(kind==BH_INT||kind==BH_REAL){
+        if(kind==BH_INT){int64_t value;memcpy(&value,&bits,8);slots[1]=bh_text_integer(value,w->location);}
+        else{double value;memcpy(&value,&bits,8);slots[1]=bh_text_real(numeric_finite(value,w->location),w->location);}
+        uint64_t n=text_length(slots[1]);buffer_text(&w->buffer,&slots[1],n,n);
+    }else{
+        if(!slots[0])buffer_bytes(&w->buffer,"null",4,4);
+        else{
+            bh_object *allocation=find_object(slots[0]);
+            if(!allocation||allocation->type!=&collection_type)runtime_error(w->location,"यह प्रकार जेसन में समर्थित नहीं है।");
+            for(unsigned i=0;i<65;++i)if(w->active[i]==slots[0])runtime_error(w->location,"चक्रीय संग्रह को जेसन में नहीं लिख सकते।");
+            w->active[depth]=slots[0];bh_collection *c=slots[0];int map=c->info->kind==BH_MAP;uint64_t n=c->size;
+            buffer_bytes(&w->buffer,map?"{":"[",1,1);
+            for(uint64_t i=0;i<n;++i){
+                if(i)buffer_bytes(&w->buffer,",",1,1);
+                c=slots[0];
+                if(map){
+                    uint64_t key=c->data[i*4];
+                    if(c->info->key_kind==BH_TEXT)slots[1]=bits_pointer(key);
+                    else if(c->info->key_kind==BH_ANY&&boxed_kind(bits_pointer(key))==BH_TEXT)slots[1]=bits_pointer(box_payload(bits_pointer(key)));
+                    else runtime_error(w->location,"जेसन मानचित्र की कुंजी पाठ होनी चाहिए।");
+                    json_write_string(w,slots[1]);slots[1]=NULL;buffer_bytes(&w->buffer,":",1,1);c=slots[0];
+                }
+                uint64_t value=c->data[map?i*4+1:i],value_kind=c->info->value_kind;
+                json_write_value(w,value_kind,value,depth+1);
+            }
+            buffer_bytes(&w->buffer,map?"}":"]",1,1);w->active[depth]=NULL;
+        }
+    }
+    bh_roots_pop(&frame);
+}
+void *bh_data_json_write(void *value,const void *location) {
+    void *slot=value;bh_root_frame frame;bh_roots_push(&frame,&slot,1);
+    json_writer writer;memset(&writer,0,sizeof writer);writer.location=location;
+    buffer_init(&writer.buffer,1048576,"जेसन पाठ सीमा से बाहर है।",location);
+    bh_roots_push(&writer.frame,writer.active,65);json_write_value(&writer,BH_ANY,pointer_bits(slot),0);bh_roots_pop(&writer.frame);
+    void *result=buffer_finish(&writer.buffer);bh_roots_pop(&frame);return result;
+}
