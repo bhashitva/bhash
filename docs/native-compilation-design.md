@@ -68,6 +68,7 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
   [native interfaces and casts](native-interfaces.md).
 - `सर्ववस्तु` boxing/unboxing of integers, booleans, text and object/interface references
   in [native universal values](native-boxing.md).
+- Arrays, growable lists, insertion-ordered maps and iteration in [native collections](native-collections.md).
 - `लिखो` with multiple arguments and blank lines.
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
@@ -77,7 +78,7 @@ unsupported declarations. Unsupported calls to standard-library intrinsics are r
 injected compiler metadata alone does not require library execution.
 
 Decimals, other integer widths, unsupported conversions, bitwise operations, input, unsupported
-standard-library calls, static members, generics, arrays/collections, exceptions, selection,
+standard-library calls, static members, user-defined generics, exceptions, selection,
 interop and concurrency are not yet available. The original decimal-area example is
 therefore outside this native profile. Defaults and behavior of managed targets are
 unchanged.
@@ -102,8 +103,8 @@ not covered by that clean-error guarantee.
 Every managed allocation has an internal header recording its descriptor, payload
 size, mark state and collector links. Descriptors provide minimum size and exact
 reference-field offsets. The initial fixed-offset descriptor is sufficient for the
-runtime graph tests; variable-length reference arrays will need a descriptor
-extension before collection support is added to the language. This is not a stable
+runtime graph tests; variable-length reference storage now uses the repeated-region descriptor
+extension described in [native collections](native-collections.md). This is not a stable
 public binary ABI. All packages are still compiled from source together.
 
 Objects are zero-initialized before being returned. All managed references are base

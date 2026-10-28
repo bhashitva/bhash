@@ -64,5 +64,20 @@ def main():
             assert result.stderr.startswith('भाष: runtime-test:1:1: '.encode('utf-8'))
         print(f'{name}: heap text, helper rooting, Unicode, limits and failure checks passed')
 
+        collection_exe = BUILD / ('collections-' + name + ('.exe' if os.name == 'nt' else ''))
+        collection_command = [part.replace('runtime_test.c', 'collections_runtime_test.c').replace(str(exe), str(collection_exe)) for part in command]
+        result = run(collection_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(collection_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native collection checks passed.\n'
+        for scenario in ('negative-size', 'huge-size', 'invalid-repeat', 'array-bounds', 'null-key', 'missing-key', 'mutation'):
+            result = run([str(collection_exe), scenario])
+            assert result.returncode == 1, (scenario, result.returncode)
+            assert not result.stdout
+            assert result.stderr.startswith('भाष: '.encode('utf-8'))
+        print(f'{name}: repeated tracing, scalar precision, collection cycles, growth, hashing, snapshots and failures passed')
+
 if __name__ == '__main__':
     main()

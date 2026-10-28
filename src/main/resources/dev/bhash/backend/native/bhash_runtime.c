@@ -18,18 +18,40 @@ typedef union { long double real; void *reference; int64_t integer; } bh_alignme
 typedef max_align_t bh_alignment;
 #endif
 typedef struct bh_object {
-    struct bh_object *next, *work_next;
+    struct bh_object *next, *work_next, *hash_next;
     const bh_type *type;
     size_t bytes;
     unsigned marked;
+    uint64_t identity;
     bh_alignment alignment;
     unsigned char payload[];
 } bh_object;
 static bh_object *objects, *work;
-static bh_root_frame *roots;
 static uint64_t live_bytes, live_objects, threshold = 1048576;
+/* Membership index only: it is never a root or a source of reachability. */
+static bh_object *initial_index[1024];
+static bh_object **object_index = initial_index;
+static size_t index_count = 1024;
+static size_t object_bucket(const void *payload, size_t count) {
+    uint64_t hash = (uint64_t)(uintptr_t)payload >> 3;
+    hash ^= hash >> 30; hash *= UINT64_C(0xbf58476d1ce4e5b9); hash ^= hash >> 27;
+    return (size_t)hash & (count - 1);
+}
+static void grow_object_index(void) {
+    if (live_objects <= index_count || index_count > SIZE_MAX / 2 / sizeof(bh_object *)) return;
+    size_t count = index_count * 2;
+    bh_object **expanded = calloc(count, sizeof(bh_object *));
+    if (!expanded) return; /* Existing chains remain correct under memory pressure. */
+    for (bh_object *o = objects; o; o = o->next) {
+        size_t bucket = object_bucket(o->payload, count);
+        o->hash_next = expanded[bucket]; expanded[bucket] = o;
+    }
+    if (object_index != initial_index) free(object_index);
+    object_index = expanded; index_count = count;
+}
+static bh_root_frame *roots;
 static int stress, collecting, report_stats;
-static uint64_t allocations, collections, peak_bytes;
+static uint64_t allocations, collections, peak_bytes, next_identity = 1;
 static void emergency_write(const char *s) {
     size_t remaining = strlen(s);
     while (remaining) {
@@ -48,7 +70,7 @@ static void fatal(const char *message) {
     _Exit(1); /* No managed allocation, stdio initialization or exit callbacks. */
 }
 static bh_object *find_object(const void *payload) {
-    for (bh_object *o = objects; o; o = o->next)
+    for (bh_object *o = object_index[object_bucket(payload, index_count)]; o; o = o->hash_next)
         if (o->payload == payload) return o;
     return NULL; /* Also covers immortal literal text and NULL roots. */
 }
@@ -77,12 +99,21 @@ void bh_collect(void) {
             memcpy(&value, o->payload + o->type->reference_offsets[i], sizeof value);
             mark(value);
         }
+        const bh_type *t = o->type;
+        if (t->repeated_stride) for (size_t at = t->repeated_offset; at < o->bytes; at += t->repeated_stride)
+            for (size_t lane = 0; lane < t->repeated_stride / 8; ++lane)
+                if (t->repeated_reference_mask & (UINT64_C(1) << lane)) {
+                    void *value; memcpy(&value, o->payload + at + lane * 8, sizeof value); mark(value);
+                }
     }
     bh_object **link = &objects;
     while (*link) {
         bh_object *o = *link;
         if (o->marked) { o->marked = 0; link = &o->next; }
         else {
+            bh_object **bucket = &object_index[object_bucket(o->payload, index_count)];
+            while (*bucket != o) bucket = &(*bucket)->hash_next;
+            *bucket = o->hash_next;
             *link = o->next; live_bytes -= o->bytes + offsetof(bh_object, payload); --live_objects; free(o);
         }
     }
@@ -101,14 +132,25 @@ void *bh_alloc(const bh_type *type, uint64_t requested) {
     for (size_t i = 0; i < type->reference_count; ++i)
         if (bytes < sizeof(void *) || type->reference_offsets[i] > bytes - sizeof(void *))
             fatal("आंतरिक संदर्भ क्षेत्र अमान्य है।");
+    if (type->repeated_stride) {
+        if (type->repeated_stride % 8 || type->repeated_stride > 512 || type->repeated_offset % 8 ||
+            type->repeated_offset > bytes || (bytes - type->repeated_offset) % type->repeated_stride ||
+            (type->repeated_stride < 512 && (type->repeated_reference_mask >> (type->repeated_stride / 8))))
+            fatal("आंतरिक आवंटन विवरण अमान्य है।");
+    } else if (type->repeated_offset || type->repeated_reference_mask) fatal("आंतरिक आवंटन विवरण अमान्य है।");
     if (stress || live_bytes + requested + offsetof(bh_object, payload) > threshold) bh_collect();
     bh_object *o = calloc(1, offsetof(bh_object, payload) + bytes);
     if (!o) {
         bh_collect(); o = calloc(1, offsetof(bh_object, payload) + bytes);
         if (!o) fatal("स्मृति उपलब्ध नहीं है।");
     }
+    if (!next_identity) fatal("वस्तु पहचान सीमा से बाहर है।");
+    o->identity = next_identity++;
     o->type = type; o->bytes = bytes; o->next = objects; objects = o;
     live_bytes += requested + offsetof(bh_object, payload); ++live_objects;
+    size_t bucket = object_bucket(o->payload, index_count);
+    o->hash_next = object_index[bucket]; object_index[bucket] = o;
+    grow_object_index();
     ++allocations;
     if (live_bytes > peak_bytes) peak_bytes = live_bytes;
     return o->payload;
@@ -120,6 +162,10 @@ void bh_reference_store(void *owner, uint64_t offset, void *value) {
     int declared = 0;
     for (size_t i = 0; i < o->type->reference_count; ++i)
         if (o->type->reference_offsets[i] == offset) declared = 1;
+    if (o->type->repeated_stride && offset >= o->type->repeated_offset && offset % 8 == 0) {
+        size_t lane = ((size_t)offset - o->type->repeated_offset) % o->type->repeated_stride / 8;
+        if (o->type->repeated_reference_mask & (UINT64_C(1) << lane)) declared = 1;
+    }
     if (!declared) fatal("आंतरिक संदर्भ क्षेत्र अमान्य है।");
     memcpy(o->payload + offset, &value, sizeof value);
 }
@@ -141,6 +187,9 @@ void bh_runtime_init(void) {
 void bh_shutdown(void) {
     if (roots) fatal("आंतरिक मूल-संदर्भ शेष है।");
     bh_collect();
+    if (object_index != initial_index) free(object_index);
+    memset(initial_index, 0, sizeof initial_index);
+    object_index = initial_index; index_count = 1024;
     if (report_stats) fprintf(stderr, "bhash-gc: allocations=%llu collections=%llu live=%llu peak_bytes=%llu\n",
         (unsigned long long)allocations, (unsigned long long)collections,
         (unsigned long long)live_objects, (unsigned long long)peak_bytes);
@@ -210,7 +259,7 @@ int bh_print_licenses_if_requested(int argc, char **argv, const void *notices) {
 /* Heap-backed immutable text. Every allocating helper protects/reloads its own
    arguments as well as relying on compiler roots. No interior pointer survives
    an allocation; offsets and lengths do. Literal text uses the same payload ABI. */
-static const bh_type text_type = {"text", sizeof(uint64_t), 0, NULL};
+static const bh_type text_type = {"text", sizeof(uint64_t), 0, NULL, 0, 0, 0};
 static unsigned char *text_data(const void *s) { return (unsigned char *)s + 8; }
 static void *new_text(uint64_t size, const void *location) {
     if (size > SIZE_MAX - 8 || size > UINT64_MAX - 8)
@@ -378,4 +427,270 @@ void bh_text_fail(const void *message, const void *location) {
     fputs("भाष: ", stderr); fwrite(text_data(location), 1, (size_t)text_length(location), stderr);
     fputs(": ", stderr); fwrite(text_data(message), 1, (size_t)text_length(message), stderr);
     fputc('\n', stderr); fflush(stderr); exit(1);
+}
+
+/* Arrays first, then growable lists and insertion-ordered hash maps. All backing
+   storage is managed and traced precisely; allocation is the only safepoint. */
+typedef struct bh_collection {
+    const bh_collection_info *info;
+    uint64_t size, version, capacity;
+    uint64_t *data, *buckets;
+} bh_collection;
+_Static_assert(sizeof(void *) == 8 && offsetof(bh_collection, data) == 32 && sizeof(bh_collection_info) == 80,
+               "Native collection ABI requires 64-bit pointers");
+static const size_t collection_refs[] = {32, 40};
+static const bh_type collection_type = {"collection", sizeof(bh_collection), 2, collection_refs, 0, 0, 0};
+static const bh_type scalar_storage = {"scalar storage", 0, 0, NULL, 0, 0, 0};
+static const bh_type reference_storage = {"reference storage", 0, 0, NULL, 0, 8, 1};
+static const bh_type entry_storage[] = {
+    {"map entries", 0, 0, NULL, 0, 32, 0}, {"map entries", 0, 0, NULL, 0, 32, 1},
+    {"map entries", 0, 0, NULL, 0, 32, 2}, {"map entries", 0, 0, NULL, 0, 32, 3}
+};
+static const uint64_t empty_collection_text = 0;
+static uint64_t pointer_bits(const void *value) { return (uint64_t)(uintptr_t)value; }
+static void *bits_pointer(uint64_t value) { return (void *)(uintptr_t)value; }
+static int reference_kind(uint64_t kind) { return kind >= BH_TEXT; }
+static uint64_t mix_hash(uint64_t value) {
+    value ^= value >> 30; value *= UINT64_C(0xbf58476d1ce4e5b9);
+    value ^= value >> 27; value *= UINT64_C(0x94d049bb133111eb);
+    return value ^ (value >> 31);
+}
+static uint64_t boxed_kind(const void *value) {
+    const bh_class_info *info; memcpy(&info, value, 8);
+    int64_t id = info->type_count ? info->type_ids[0] : 0;
+    return id >= -3 && id <= -1 ? (uint64_t)-id : BH_REFERENCE;
+}
+static uint64_t box_payload(const void *value) { uint64_t bits; memcpy(&bits, (const unsigned char *)value + 8, 8); return bits; }
+static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
+    if (a == b) return 1;
+    if (kind == BH_ANY) {
+        if (!a || !b) return 0;
+        uint64_t ak = boxed_kind(bits_pointer(a)), bk = boxed_kind(bits_pointer(b));
+        if (ak != bk || ak == BH_REFERENCE) return 0;
+        return collection_same(ak, box_payload(bits_pointer(a)), box_payload(bits_pointer(b)));
+    }
+    if (kind == BH_TEXT) return bh_text_equal(bits_pointer(a), bits_pointer(b));
+    return 0;
+}
+static uint64_t collection_hash(uint64_t kind, uint64_t value) {
+    if (kind == BH_ANY) {
+        uint64_t actual = boxed_kind(bits_pointer(value));
+        if (actual != BH_REFERENCE) return collection_hash(actual, box_payload(bits_pointer(value)));
+        kind = BH_REFERENCE;
+    }
+    if (kind == BH_TEXT) {
+        const unsigned char *text = bits_pointer(value);
+        uint64_t hash = UINT64_C(14695981039346656037), size = text_length(text);
+        for (uint64_t i=0; i<size; ++i) { hash ^= text[8+i]; hash *= UINT64_C(1099511628211); }
+        return mix_hash(hash ^ BH_TEXT);
+    }
+    if (kind == BH_REFERENCE) {
+        bh_object *o = find_object(bits_pointer(value));
+        if (!o) fatal("आंतरिक वस्तु पहचान अमान्य है।");
+        value = o->identity; /* Retained with the object if a future collector moves it. */
+    }
+    return mix_hash(value ^ (kind * UINT64_C(0x9e3779b97f4a7c15)));
+}
+static uint64_t checked_length(int64_t length, const void *location) {
+    if (length < 0 || length > INT32_MAX) runtime_error(location, "सरणी की लंबाई सीमा से बाहर है।");
+    return (uint64_t)length;
+}
+static uint64_t checked_index(uint64_t index, uint64_t size, int end, const void *location) {
+    if (index > INT64_MAX || (end ? index > size : index >= size))
+        runtime_error(location, "संग्रह सूचकांक सीमा से बाहर है।");
+    return index;
+}
+static void storage_store(uint64_t *storage, uint64_t index, uint64_t bits, int reference) {
+    if (reference) bh_reference_store(storage, index * 8, bits_pointer(bits));
+    else storage[index] = bits;
+}
+static void rehash(bh_collection *c) {
+    memset(c->buckets, 0, (size_t)(c->capacity * 2 * 8));
+    for (uint64_t i=0; i<c->size; ++i) {
+        uint64_t bucket = c->data[i*4+2] & (c->capacity*2-1);
+        c->data[i*4+3] = c->buckets[bucket]; c->buckets[bucket] = i+1;
+    }
+}
+static void collection_reserve(bh_collection *owner, uint64_t needed, const void *location) {
+    if (needed <= owner->capacity) return;
+    checked_length((int64_t)needed, location);
+    uint64_t capacity = owner->capacity ? owner->capacity : 4;
+    while (capacity < needed) capacity *= 2;
+    /* Capacity is an internal power of two; logical sizes retain the signed-32-bit limit. */
+    void *slots[3] = {owner, NULL, NULL}; bh_root_frame frame; bh_roots_push(&frame, slots, 3);
+    int map = owner->info->kind == BH_MAP;
+    unsigned mask = (reference_kind(owner->info->key_kind)?1u:0u) | (reference_kind(owner->info->value_kind)?2u:0u);
+    const bh_type *storage_type = map ? &entry_storage[mask]
+        : reference_kind(owner->info->value_kind) ? &reference_storage : &scalar_storage;
+    slots[1] = bh_alloc(storage_type, capacity * (map ? 32 : 8));
+    if (map) slots[2] = bh_alloc(&scalar_storage, capacity * 2 * 8);
+    owner = slots[0]; uint64_t *data = slots[1];
+    for (uint64_t i=0; i<owner->size; ++i) {
+        if (map) for (uint64_t lane=0; lane<4; ++lane)
+            storage_store(data, i*4+lane, owner->data[i*4+lane], lane<2 && (mask & (1u<<lane)));
+        else storage_store(data, i, owner->data[i], reference_kind(owner->info->value_kind));
+    }
+    bh_reference_store(owner, offsetof(bh_collection, data), data);
+    bh_reference_store(owner, offsetof(bh_collection, buckets), slots[2]);
+    owner->capacity = capacity;
+    if (map) rehash(owner);
+    bh_roots_pop(&frame);
+}
+void *bh_collection_new(const bh_collection_info *info, int64_t length, const void *location) {
+    uint64_t size = checked_length(length, location);
+    bh_collection *c = bh_alloc(&collection_type, sizeof(bh_collection)); c->info = info;
+    void *slots[1] = {c}; bh_root_frame frame; bh_roots_push(&frame, slots, 1);
+    collection_reserve(c, size, location); c = slots[0];
+    if (info->value_kind == BH_TEXT) for (uint64_t i=0; i<size; ++i)
+        storage_store(c->data, i, pointer_bits(&empty_collection_text), 1);
+    c->size = size;
+    bh_roots_pop(&frame); return c;
+}
+static void *array_dimensions(const bh_collection_info *info, uint64_t count, const int64_t *sizes, const void *location) {
+    void *slots[2] = {bh_collection_new(info, sizes[0], location), NULL};
+    bh_root_frame frame; bh_roots_push(&frame, slots, 2);
+    if (count > 1) for (uint64_t i=0; i<((bh_collection *)slots[0])->size; ++i) {
+        slots[1] = array_dimensions(info->element, count-1, sizes+1, location);
+        bh_collection *c = slots[0]; storage_store(c->data, i, pointer_bits(slots[1]), 1);
+        slots[1] = NULL;
+    }
+    void *result = slots[0]; bh_roots_pop(&frame); return result;
+}
+void *bh_array_dimensions(const bh_collection_info *info, uint64_t count, const int64_t *sizes, const void *location) {
+    if (!count) fatal("आंतरिक सरणी आयाम अमान्य है।");
+    for (uint64_t i=0; i<count; ++i) checked_length(sizes[i], location);
+    return array_dimensions(info, count, sizes, location);
+}
+static uint64_t map_find(bh_collection *c, uint64_t key, uint64_t hash) {
+    if (!c->capacity) return UINT64_MAX;
+    uint64_t index = c->buckets[hash & (c->capacity*2-1)];
+    while (index) {
+        uint64_t i = index-1;
+        if (c->data[i*4+2] == hash && collection_same(c->info->key_kind, c->data[i*4], key)) return i;
+        index = c->data[i*4+3];
+    }
+    return UINT64_MAX;
+}
+uint64_t bh_collection_call(void *receiver, uint32_t operation, uint64_t a, uint64_t b,
+                            const bh_collection_info *snapshot, const void *location) {
+    bh_collection *c = bh_instance(receiver, location);
+    int map = c->info->kind == BH_MAP;
+    uint64_t value_kind = c->info->value_kind, key_kind = c->info->key_kind;
+    uint64_t ak = 0, bk = 0;
+    switch (operation) {
+        case BH_GET: case BH_GET_OR: case BH_SET: case BH_REMOVE: ak = map ? key_kind : BH_INT; break;
+        case BH_CONTAINS: ak = map ? key_kind : value_kind; break;
+        case BH_ADD: ak = value_kind; break;
+        case BH_INSERT: ak = BH_INT; break;
+        default: break;
+    }
+    if (operation == BH_GET_OR || operation == BH_SET || operation == BH_INSERT) bk = value_kind;
+    void *slots[4] = {c, reference_kind(ak)?bits_pointer(a):NULL, reference_kind(bk)?bits_pointer(b):NULL, NULL};
+    bh_root_frame frame; bh_roots_push(&frame, slots, 4);
+    uint64_t result = 0, index = 0, hash = 0;
+    if (map && (operation == BH_GET || operation == BH_GET_OR || operation == BH_SET || operation == BH_CONTAINS || operation == BH_REMOVE)) {
+        if (reference_kind(key_kind) && !a) runtime_error(location, "मानचित्र की कुंजी रिक्त नहीं हो सकती।");
+        hash = collection_hash(key_kind, a); index = map_find(c, a, hash);
+    }
+    switch (operation) {
+        case BH_SIZE: result = c->size; break;
+        case BH_EMPTY: result = c->size == 0; break;
+        case BH_VERSION: result = c->version; break;
+        case BH_ITER_CHECK:
+            if (a != c->version) runtime_error(location, "पुनरावृत्ति के दौरान संग्रह का आकार बदला गया।");
+            result = b < c->size; break;
+        case BH_ITER_KEY: case BH_ITER_VALUE:
+            index = checked_index(a, c->size, 0, location);
+            result = c->data[map ? index*4+(operation == BH_ITER_VALUE ? 1 : 0) : index]; break;
+        case BH_GET: case BH_GET_OR:
+            if (map) {
+                if (index == UINT64_MAX && operation == BH_GET) runtime_error(location, "मानचित्र में कुंजी नहीं मिली।");
+                result = index == UINT64_MAX ? b : c->data[index*4+1];
+            } else result = c->data[checked_index(a, c->size, 0, location)];
+            break;
+        case BH_CONTAINS:
+            if (map) result = index != UINT64_MAX;
+            else for (uint64_t i=0; i<c->size; ++i) if (collection_same(value_kind, c->data[i], a)) { result = 1; break; }
+            break;
+        case BH_SET:
+            if (map) {
+                if (index == UINT64_MAX) {
+                    collection_reserve(c, c->size+1, location); c = slots[0];
+                    if (reference_kind(ak)) a = pointer_bits(slots[1]);
+                    if (reference_kind(bk)) b = pointer_bits(slots[2]);
+                    index = c->size++; c->version++;
+                    storage_store(c->data, index*4, a, reference_kind(key_kind));
+                    c->data[index*4+2] = hash;
+                    uint64_t bucket = hash & (c->capacity*2-1);
+                    c->data[index*4+3] = c->buckets[bucket]; c->buckets[bucket] = index+1;
+                }
+                storage_store(c->data, index*4+1, b, reference_kind(value_kind));
+            } else storage_store(c->data, checked_index(a, c->size, 0, location), b, reference_kind(value_kind));
+            break;
+        case BH_ADD: case BH_INSERT:
+            index = operation == BH_ADD ? c->size : checked_index(a, c->size, 1, location);
+            collection_reserve(c, c->size+1, location); c = slots[0];
+            if (reference_kind(ak)) a = pointer_bits(slots[1]);
+            if (reference_kind(bk)) b = pointer_bits(slots[2]);
+            for (uint64_t i=c->size; i>index; --i) storage_store(c->data, i, c->data[i-1], reference_kind(value_kind));
+            storage_store(c->data, index, operation == BH_ADD ? a : b, reference_kind(value_kind));
+            c->size++; c->version++; break;
+        case BH_REMOVE:
+            if (!map) index = checked_index(a, c->size, 0, location);
+            if (index != UINT64_MAX) {
+                result = map ? 1 : c->data[index];
+                uint64_t width = map ? 4 : 1;
+                for (uint64_t i=index; i+1<c->size; ++i) for (uint64_t lane=0; lane<width; ++lane)
+                    storage_store(c->data, i*width+lane, c->data[(i+1)*width+lane],
+                        map ? (lane==0 && reference_kind(key_kind)) || (lane==1 && reference_kind(value_kind)) : reference_kind(value_kind));
+                for (uint64_t lane=0; lane<width; ++lane) storage_store(c->data, (c->size-1)*width+lane, 0,
+                    map ? (lane==0 && reference_kind(key_kind)) || (lane==1 && reference_kind(value_kind)) : reference_kind(value_kind));
+                c->size--; c->version++; if (map) rehash(c);
+            }
+            break;
+        case BH_CLEAR:
+            if (c->size) {
+                /* Drop entire managed buffers: no stale references retain removed entries. */
+                bh_reference_store(c, offsetof(bh_collection, data), NULL);
+                bh_reference_store(c, offsetof(bh_collection, buckets), NULL);
+                c->size = c->capacity = 0; c->version++;
+            }
+            break;
+        case BH_KEYS: case BH_VALUES:
+            slots[3] = bh_collection_new(snapshot, 0, location);
+            c = slots[0]; collection_reserve(slots[3], c->size, location); c = slots[0];
+            for (uint64_t i=0; i<c->size; ++i) {
+                bh_collection *copy = slots[3];
+                storage_store(copy->data, i, c->data[i*4+(operation == BH_VALUES ? 1 : 0)], reference_kind(copy->info->value_kind));
+                copy->size++;
+            }
+            result = pointer_bits(slots[3]); break;
+        default: fatal("आंतरिक संग्रह क्रिया अमान्य है।");
+    }
+    bh_roots_pop(&frame); return result;
+}
+void *bh_collection_literal(const bh_collection_info *info, uint64_t count, const uint64_t *values, const void *location) {
+    uint64_t width = info->kind == BH_MAP ? 2 : 1;
+    if (count > INT32_MAX || count > (SIZE_MAX / sizeof(void *) - 1) / width) runtime_error(location, "सरणी की लंबाई सीमा से बाहर है।");
+    uint64_t words = count*width;
+    void **slots = calloc((size_t)words+1, sizeof(void *));
+    if (!slots) fatal("स्मृति उपलब्ध नहीं है।");
+    for (uint64_t i=0; i<words; ++i) {
+        uint64_t kind = width==2 && i%2==0 ? info->key_kind : info->value_kind;
+        if (reference_kind(kind)) slots[i+1] = bits_pointer(values[i]);
+    }
+    bh_root_frame frame; bh_roots_push(&frame, slots, words+1);
+    slots[0] = bh_collection_new(info, info->kind == BH_ARRAY ? (int64_t)count : 0, location);
+    for (uint64_t i=0; i<count; ++i) {
+        uint64_t ak = width==2 ? info->key_kind : info->value_kind;
+        uint64_t a = reference_kind(ak) ? pointer_bits(slots[i*width+1]) : values[i*width];
+        if (width==2) {
+            uint64_t b = reference_kind(info->value_kind) ? pointer_bits(slots[i*2+2]) : values[i*2+1];
+            bh_collection_call(slots[0], BH_SET, a, b, NULL, location);
+        } else if (info->kind == BH_LIST) bh_collection_call(slots[0], BH_ADD, a, 0, NULL, location);
+        else {
+            bh_collection *c = slots[0]; storage_store(c->data, i, a, reference_kind(info->value_kind));
+        }
+    }
+    void *result = slots[0]; bh_roots_pop(&frame); free(slots); return result;
 }

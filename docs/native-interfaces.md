@@ -30,7 +30,7 @@ implementations and explicit interface implementation syntax are not introduced.
 | Operation | Behavior |
 | --- | --- |
 | `प्रकारहै<T>(मूल्य)` | False for null; otherwise test actual class/interface membership or exact supported scalar type |
-| `सुरक्षितरूप<T>(मूल्य)` | Return the same reference on success, otherwise null; target must be a class/interface or `सर्ववस्तु` |
+| `सुरक्षितरूप<T>(मूल्य)` | Return the same reference on success, otherwise null; target must be a supported reference type |
 | `परिवर्तित<T>(मूल्य)` | Checked class/interface cast; preserve null and identity, or report a located Hindi failure and exit 1 |
 
 Each operand executes exactly once. Tests and reference casts introduce no managed
@@ -54,7 +54,7 @@ same runtime failure category as managed targets.
 
 [Universal `सर्ववस्तु` boxing/unboxing](native-boxing.md) extends these operations
 to boxed integers, booleans, text and object references. Other numeric widths/decimals,
-collections, records/enums, generics, static members and exceptions remain outside
+records/enums, user-defined generics, static members and exceptions remain outside
 the native profile.
 
 ## Hindi reference example
@@ -96,7 +96,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/interfaces
 
 ## Private metadata and collector contract
 
-Private object ABI v4 (including [boxing metadata](native-boxing.md)) keeps the eight-byte nonmanaged prefix and all existing field
+Private object ABI v5 (including [boxing](native-boxing.md) and [collections](native-collections.md)) keeps the eight-byte nonmanaged prefix and all existing field
 offsets. That prefix now points to an immutable metadata record containing pointers
 to class-virtual and interface-dispatch arrays, plus nominal membership IDs. Class
 virtual slots remain inherited prefixes. Each declared interface signature has a

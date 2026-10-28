@@ -6,8 +6,8 @@
 #include <stdlib.h>
 typedef struct Node { void *next; uint64_t marker; } Node;
 static const size_t offsets[] = { offsetof(Node, next) };
-static const bh_type node_type = {"test.node", sizeof(Node), 1, offsets};
-static const bh_type scalar_type = {"test.scalar", sizeof(uint64_t), 0, NULL};
+static const bh_type node_type = {"test.node", sizeof(Node), 1, offsets, 0, 0, 0};
+static const bh_type scalar_type = {"test.scalar", sizeof(uint64_t), 0, NULL, 0, 0, 0};
 static void nested(void *outer) {
     void *slots[2] = {NULL, outer}; bh_root_frame frame;
     bh_roots_push(&frame, slots, 2);
@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
     }
     if (argc > 1 && strcmp(argv[1], "invalid-descriptor") == 0) {
         const size_t bad_offsets[] = {sizeof(Node)};
-        const bh_type bad_type = {"bad", sizeof(Node), 1, bad_offsets};
+        const bh_type bad_type = {"bad", sizeof(Node), 1, bad_offsets, 0, 0, 0};
         bh_alloc(&bad_type, sizeof(Node)); return 9;
     }
     if (argc > 1 && strcmp(argv[1], "output") == 0) {
@@ -77,6 +77,10 @@ int main(int argc, char **argv) {
     assert(bh_remainder(INT64_MIN, -1, &a) == 0);
     assert(bh_divide(-7, 3, &a) == -2 && bh_remainder(-7, 3, &a) == -1);
     bh_roots_pop(&frame); bh_shutdown();
+    /* A grown membership index must also be safe across shutdown/reinitialization. */
+    slots[0] = slots[1] = NULL; bh_roots_push(&frame, slots, 2);
+    slots[0] = bh_alloc(&scalar_type, sizeof(uint64_t)); bh_collect(); assert(bh_heap_objects() == 1);
+    slots[0] = NULL; bh_roots_pop(&frame); bh_shutdown(); assert(bh_heap_objects() == 0);
     puts("Native runtime checks passed.");
     return 0;
 }

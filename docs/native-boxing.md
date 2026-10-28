@@ -108,7 +108,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/boxing
 
 ## Private representation and collector contract
 
-Private native ABI v4 retains the ABI v3 class layout: an eight-byte immutable
+Private native ABI v5 (extended by [collections](native-collections.md)) retains the ABI v3 class layout: an eight-byte immutable
 `ClassInfo` pointer followed by eight-byte field slots. Ordinary class and
 interface references remain payload-base pointers with unchanged identity.
 `सर्ववस्तु` is a managed pointer or null, never an interior pointer or tagged word.
@@ -138,7 +138,8 @@ host reflection is involved.
 
 ## Scope and validation
 
-Other numeric widths, decimals, arrays/collections, records/enums, generics, static
+[Arrays, lists and maps](native-collections.md) now support these universal values.
+Other numeric widths, decimals, records/enums, user-defined generics, static
 members, exceptions and foreign interoperability remain outside the native profile.
 There are no user-managed allocation/free operations and no new public C ABI.
 
