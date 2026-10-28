@@ -21,7 +21,9 @@ jobs:
       - name: Verify and execute LLVM backend
         run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest package
       - name: Build independent example
-        run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/factorial.bhash --target native -o target/factorial-native
+        run: |
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/factorial.bhash --target native -o target/factorial-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/heap-text.bhash --target native -o target/heap-text-native
       - name: Inspect executable dependencies
         run: |
           file target/factorial-native
@@ -37,13 +39,20 @@ jobs:
             printf "१ १\n२ २\n३ ६\n४ २४\n५ १२०\n" > /tmp/expected
             cmp /tmp/actual /tmp/expected
             /artifacts/factorial-native --bhash-license | grep "Apache License"
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/heap-text-native > /tmp/text-actual 2> /tmp/gc-stats
+            printf "[[[मूल321]]]\nनमस्ते, दुनिया!\nभाष-ब-भाष\n२ सत्य\nसत्य सत्य\nabcÉ ककक\nv१२३ -४२\n३००००\n" > /tmp/text-expected
+            cmp /tmp/text-actual /tmp/text-expected
+            grep "live=0" /tmp/gc-stats
+            grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/gc-stats
           '
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-experimental-native-linux-x86_64
           path: |
             target/factorial-native
+            target/heap-text-native
             target/native-dependencies.txt
             target/native-tests/factorial.ll
             target/surefire-reports/
             docs/native-compilation-design.md
+            docs/native-text.md
