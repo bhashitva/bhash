@@ -132,7 +132,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/exceptions
 
 ## Compiler/runtime contract
 
-Private native ABI v7 reserves nominal type ID -5 for the built-in exception. Its
+Private native ABI v8 reserves nominal type ID -5 for the built-in exception. Its
 payload contains the immutable class metadata pointer, message at offset 8, and a
 private originating-location reference at offset 16. Custom exception fields follow
 that prefix. Both text fields are precisely traced. Ordinary class/collection/box

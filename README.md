@@ -193,6 +193,8 @@ custom exceptions and safe GC-root unwinding. See [native exceptions](docs/nativ
 
 Native LLVM now supports `दशमलव` arithmetic, comparisons, checked conversions, formatting, and boxing/unboxing; see the [native decimal guide](docs/native-decimals.md) and [runnable example](examples/native/decimals.bhash).
 
+The native target also supports every `मानक.गणित` and `मानक.यादृच्छिक` function, including matching seeded streams; see the [native math/random guide](docs/native-math-random.md).
+
 ## Standard library
 
 The compiler bundles the `मानक` package on JVM, .NET CLR and browser WASM:

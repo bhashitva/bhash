@@ -1,5 +1,7 @@
 # यादृच्छिक अनुक्रम (Pseudorandom Numbers)
 
+यह पूरा module experimental native Linux x86-64 target पर भी उपलब्ध है। [Native व्यवहार, errors और cross-target जाँच](../../docs/native-math-random.md) देखें।
+
 ये फ़ंक्शन SplitMix64 छद्म-यादृच्छिक अनुक्रम पर आधारित हैं। खेल और simulation के लिए उपयोगी हैं; पासवर्ड, सुरक्षा token या cryptography के लिए नहीं। बीज पूरे चल रहे कार्यक्रम की library अवस्था बदलता है। एक ही बीज और एक ही क्रम में किए गए calls JVM, CLR और browser पर एक ही अनुक्रम देते हैं।
 
 [मानक पुस्तकालय का सूचकांक](README.md) · [पूरा चलाने योग्य उदाहरण](examples/03-random.bhash) · [पूरे उदाहरण का अपेक्षित आउटपुट](examples/03-random.expected.txt)

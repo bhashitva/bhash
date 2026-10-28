@@ -7,6 +7,8 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       BHASH_REQUIRE_NATIVE: 'true'
+      BHASH_REQUIRE_CLR: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -14,6 +16,9 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
       - name: Install LLVM 18 tools
         run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18
       - name: Check collector under sanitizers and optimization
@@ -32,9 +37,10 @@ jobs:
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/collections.bhash --target native -o target/collections-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/exceptions.bhash --target native -o target/exceptions-native
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/decimals.bhash --target native -o target/decimals-native
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/native/math-random.bhash --target native -o target/math-random-native
       - name: Inspect executable dependencies
         run: |
-          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native; do
+          for executable in target/factorial-native target/heap-text-native target/heap-objects-native target/objects-native target/inheritance-native target/interfaces-native target/boxing-native target/collections-native target/exceptions-native target/decimals-native target/math-random-native; do
             file "$executable"
             ldd "$executable"
           done | tee target/native-dependencies.txt
@@ -92,6 +98,11 @@ jobs:
             cmp /tmp/decimals-actual /tmp/decimals-expected
             grep "live=0" /tmp/decimals-stats
             grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/decimals-stats
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/math-random-native > /tmp/math-random-actual 2> /tmp/math-random-stats
+            printf "४२ ३ ८\n९.० १०२४.० -३.० -२.०\n२.० ४.० ०.०\n1.000000 -1.000000\n0.693147 2.718282\n१००० ७.४ २.४ -४०५८\nएक सीमित दशमलव मान आवश्यक है।\nसाफ\n६\n" > /tmp/math-random-expected
+            cmp /tmp/math-random-actual /tmp/math-random-expected
+            grep "live=0" /tmp/math-random-stats
+            grep -E "allocations=[1-9][0-9]* collections=[1-9][0-9]*" /tmp/math-random-stats
           '
       - uses: actions/upload-artifact@v4
         with:
@@ -101,6 +112,7 @@ jobs:
             target/objects-native
             target/exceptions-native
             target/decimals-native
+            target/math-random-native
             target/collections-native
             target/boxing-native
             target/interfaces-native
@@ -119,3 +131,4 @@ jobs:
             docs/native-collections.md
             docs/native-exceptions.md
             docs/native-decimals.md
+            docs/native-math-random.md

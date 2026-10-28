@@ -111,7 +111,7 @@ BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./build/boxing
 
 ## Private representation and collector contract
 
-Private native ABI v7 (extended by [collections](native-collections.md)) retains the ABI v3 class layout: an eight-byte immutable
+Private native ABI v8 (extended by [collections](native-collections.md)) retains the ABI v3 class layout: an eight-byte immutable
 `ClassInfo` pointer followed by eight-byte field slots. Ordinary class and
 interface references remain payload-base pointers with unchanged identity.
 `सर्ववस्तु` is a managed pointer or null, never an interior pointer or tagged word.

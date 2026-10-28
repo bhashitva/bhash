@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <float.h>
 #include <math.h>
+#include <time.h>
 _Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024, "binary64 required");
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,6 +73,7 @@ static bh_handler *handlers;
 static _Noreturn void runtime_error(const void *, const char *);
 static _Noreturn void raise_failure_text(const void *, const void *);
 static _Noreturn void raise_failure(const void *, const char *);
+static uint64_t random_state;
 static int stress, collecting, report_stats;
 static uint64_t allocations, collections, peak_bytes, next_identity = 1;
 static void emergency_write(const char *s) {
@@ -204,6 +206,8 @@ static int environment_flag(const char *name) {
 #endif
 }
 void bh_runtime_init(void) {
+    struct timespec now = {0,0}; (void)timespec_get(&now, TIME_UTC);
+    random_state = (uint64_t)now.tv_sec ^ ((uint64_t)now.tv_nsec << 32) ^ (uint64_t)clock();
     stress = environment_flag("BHASH_GC_STRESS");
     report_stats = environment_flag("BHASH_GC_STATS");
 }
@@ -447,6 +451,57 @@ int64_t bh_text_parse_integer(const void *s, const void *location) {
     if (negative && value == UINT64_C(9223372036854775808)) return INT64_MIN;
     return negative ? -(int64_t)value : (int64_t)value;
 }
+
+/* libm results may differ in their last bits from Java StrictMath/.NET.
+   Domain, range, finite-input and signed-zero rules remain explicit here. */
+static double numeric_finite(double value, const void *location) {
+    if (!isfinite(value)) runtime_error(location, "एक सीमित दशमलव मान आवश्यक है।");
+    return value;
+}
+int64_t bh_numeric_abs_int(int64_t value, const void *location) {
+    if (value == INT64_MIN) runtime_error(location, "निरपेक्ष पूर्णांक सीमा से बाहर है।");
+    return value < 0 ? -value : value;
+}
+double bh_numeric_abs_real(double value, const void *location) { return fabs(numeric_finite(value, location)); }
+int64_t bh_numeric_min_int(int64_t a, int64_t b, const void *location) { (void)location; return a < b ? a : b; }
+int64_t bh_numeric_max_int(int64_t a, int64_t b, const void *location) { (void)location; return a > b ? a : b; }
+double bh_numeric_min_real(double a, double b, const void *location) {
+    numeric_finite(a, location); numeric_finite(b, location);
+    if (a == 0 && b == 0) return signbit(a) || signbit(b) ? -0.0 : 0.0;
+    return a < b ? a : b;
+}
+double bh_numeric_max_real(double a, double b, const void *location) {
+    numeric_finite(a, location); numeric_finite(b, location);
+    if (a == 0 && b == 0) return signbit(a) && signbit(b) ? -0.0 : 0.0;
+    return a > b ? a : b;
+}
+double bh_numeric_sqrt(double x, const void *location) { return numeric_finite(sqrt(numeric_finite(x, location)), location); }
+double bh_numeric_pow(double a, double b, const void *location) {
+    numeric_finite(a, location); numeric_finite(b, location); return numeric_finite(pow(a, b), location);
+}
+double bh_numeric_floor(double x, const void *location) { return floor(numeric_finite(x, location)); }
+double bh_numeric_ceil(double x, const void *location) { return ceil(numeric_finite(x, location)); }
+double bh_numeric_round(double x, const void *location) { return rint(numeric_finite(x, location)); }
+double bh_numeric_sin(double x, const void *location) { return sin(numeric_finite(x, location)); }
+double bh_numeric_cos(double x, const void *location) { return cos(numeric_finite(x, location)); }
+double bh_numeric_log(double x, const void *location) { return numeric_finite(log(numeric_finite(x, location)), location); }
+double bh_numeric_exp(double x, const void *location) { return numeric_finite(exp(numeric_finite(x, location)), location); }
+double bh_numeric_pi(const void *location) { (void)location; return 0x1.921fb54442d18p1; }
+void bh_numeric_seed(int64_t seed, const void *location) { (void)location; random_state = (uint64_t)seed; }
+static uint64_t next_random(void) {
+    uint64_t z = (random_state += UINT64_C(0x9e3779b97f4a7c15));
+    z = (z ^ (z >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)) * UINT64_C(0x94d049bb133111eb);
+    return z ^ (z >> 31);
+}
+int64_t bh_numeric_random_int(int64_t lower, int64_t upper, const void *location) {
+    uint64_t bound = (uint64_t)upper - (uint64_t)lower;
+    if (lower >= upper || bound > INT64_MAX) runtime_error(location, "यादृच्छिक पूर्णांक की सीमा अमान्य है।");
+    uint64_t u, r;
+    do { u = next_random() >> 1; r = u % bound; } while (u + (bound - 1) - r > INT64_MAX);
+    return lower + (int64_t)r;
+}
+double bh_numeric_random_unit(const void *location) { (void)location; return (double)(next_random() >> 11) * 0x1p-53; }
 
 /* Default process C locale and round-to-nearest are retained: no locale mutation
    or fast-math flags are used by this runtime or generated programs. */

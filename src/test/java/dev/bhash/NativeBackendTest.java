@@ -5,6 +5,7 @@ import dev.bhash.backend.*;
 import dev.bhash.backend.CoreProgram.*;
 import dev.bhash.backend.llvm.*;
 import dev.bhash.backend.jvm.JvmCompiler;
+import dev.bhash.backend.clr.ClrCompiler;
 import dev.bhash.frontend.SourceFile;
 import java.nio.file.*;
 import java.nio.charset.StandardCharsets;
@@ -143,6 +144,150 @@ class NativeBackendTest {
         assertEquals(0,result.exit());assertEquals(0L,stats(result).get("live"));
         assertTrue(stats(result).get("allocations")>4000,result.err());
         assertTrue(stats(result).get("peak")<200000,result.err());
+    }
+    @Test void numericCoreRecognizesBothOverloadsAndLibraryAliases()throws Exception{
+        var p=core("""
+            आयात मानक.गणित उपनाम ग;
+            आयात मानक.यादृच्छिक उपनाम य;
+            कार्य मुख्य() -> शून्य { य.बीज(१); लिखो(ग.निरपेक्ष(-२), ग.निरपेक्ष(-२.०), य.पूर्णांकचुनो(०, १०), य.अंश()); }
+            """);
+        var main=p.functions().stream().filter(f->f.id()==p.entry()).findFirst().orElseThrow();
+        var seed=(NumericCall)((Evaluate)main.body().statements().get(0)).value();
+        assertEquals(NumericOperation.SEED,seed.operation());
+        var print=(Print)main.body().statements().get(1);
+        assertEquals(NumericOperation.ABS_INT,((NumericCall)print.arguments().get(0)).operation());
+        assertEquals(NumericOperation.ABS_REAL,((NumericCall)print.arguments().get(1)).operation());
+        assertTrue(LlvmEmitter.emit(p).contains("call double @bh_numeric_random_unit(ptr"));
+    }
+    @Test void nativeMathCatalogAndSignedZerosMatchBothManagedTargets()throws Exception{
+        requireNumericTargets();
+        var result=numericExact("""
+            आयात मानक.गणित उपनाम ग;
+            कार्य मुख्य() -> शून्य {
+                लिखो(ग.निरपेक्ष(-९२२३३७२०३६८५४७७५८०७), ग.न्यूनतम(-९२२३३७२०३६८५४७७५८०८, ९२२३३७२०३६८५४७७५८०७), ग.अधिकतम(-७, ९));
+                लिखो(ग.निरपेक्ष(-२.५), ग.न्यूनतम(२.५, ३.५), ग.अधिकतम(२.५, ३.५));
+                लिखो(ग.वर्गमूल(८१.०), ग.घात(२.०, १०.०), ग.फर्श(-२.२५), ग.छत(-२.२५));
+                लिखो(ग.निकटतम(२.५), ग.निकटतम(३.५), ग.निकटतम(-२.५), ग.निकटतम(-३.५));
+                लिखो(ग.ज्या(०.०), ग.कोज्या(०.०), ग.लघुगणक(१.०), ग.घातांक(०.०), ग.पाई() > ३.१४);
+                लिखो(ग.न्यूनतम(०.०, -०.०), ग.न्यूनतम(-०.०, ०.०), ग.अधिकतम(०.०, -०.०), ग.अधिकतम(-०.०, ०.०));
+                लिखो(ग.अधिकतम(-०.०, -०.०), ग.न्यूनतम(०.०, ०.०), ग.निरपेक्ष(-०.०));
+                लिखो(ग.वर्गमूल(-०.०), ग.घात(-०.०, ३.०), ग.फर्श(-०.०), ग.छत(-०.२५), ग.निकटतम(-०.५), ग.ज्या(-०.०));
+                लिखो(ग.घात(०.०, ०.०), ग.घात(-२.०, ३.०), ग.घातांक(-१०००.०));
+                लिखो(मानक.गणित.वर्गमूल(२५.०), मानक.गणित.पाई() == ग.पाई());
+            }
+            """);assertEquals(0,result.exit());
+    }
+    @Test void nativeSeededRandomMixedSequencesMatchBothManagedTargets()throws Exception{
+        requireNumericTargets();
+        var result=numericExact("""
+            आयात मानक.यादृच्छिक उपनाम य;
+            कार्य जाँच(बीज: पूर्णांक) -> शून्य {
+                य.बीज(बीज);
+                लिखो(य.पूर्णांकचुनो(-१०, १०), य.पूर्णांकचुनो(०, ४६११६८६०१८४२७३८७९०५), य.पूर्णांकचुनो(-९२२३३७२०३६८५४७७५८०८, -१), य.पूर्णांकचुनो(१, ९२२३३७२०३६८५४७७५८०७), य.पूर्णांकचुनो(१७, १८));
+                लिखो(परिवर्तित<पूर्णांक>(य.अंश() * ९००७१९९२५४७४०९९२.०));
+                मान न: पूर्णांक = ०; मान योग: पूर्णांक = ०;
+                जबतक (न < २०००) {
+                    योग = योग * ३१ + य.पूर्णांकचुनो(-१०००, १००१);
+                    स्थिर अ: दशमलव = य.अंश(); यदि (अ < ०.० || अ >= १.०) { त्रुटि("अंश सीमा"); }
+                    योग = योग + परिवर्तित<पूर्णांक>(अ * ९००७१९९२५४७४०९९२.०); न = न + १;
+                }
+                लिखो(योग);
+            }
+            कार्य मुख्य() -> शून्य { जाँच(०); जाँच(-१); जाँच(-९२२३३७२०३६८५४७७५८०८); जाँच(९२२३३७२०३६८५४७७५८०७); जाँच(०); }
+            """);assertEquals(0,result.exit());
+    }
+    @Test void nativeMathAndRandomErrorsMatchBothManagedTargets()throws Exception{
+        requireNumericTargets();
+        var source=new StringBuilder("आयात मानक.गणित उपनाम ग; आयात मानक.यादृच्छिक उपनाम य; कार्य मुख्य() -> शून्य { य.बीज(४२); ");
+        var calls=new ArrayList<>(List.of("ग.निरपेक्ष(-९२२३३७२०३६८५४७७५८०८)","ग.वर्गमूल(-१.०)","ग.लघुगणक(०.०)","ग.लघुगणक(-१.०)","ग.घात(-१.०,०.५)","ग.घात(०.०,-१.०)","ग.घात(१०.०,१०००.०)","ग.घातांक(१०००.०)","य.पूर्णांकचुनो(१,१)","य.पूर्णांकचुनो(२,१)","य.पूर्णांकचुनो(-९२२३३७२०३६८५४७७५८०८,०)","य.पूर्णांकचुनो(-१,९२२३३७२०३६८५४७७५८०७)"));
+        for(String name:List.of("निरपेक्ष","वर्गमूल","फर्श","छत","निकटतम","ज्या","कोज्या","लघुगणक","घातांक")){
+            calls.add("ग."+name+"(०.० / ०.०)");calls.add("ग."+name+"(१.० / ०.०)");
+        }
+        for(String name:List.of("न्यूनतम","अधिकतम","घात")){
+            calls.add("ग."+name+"(०.० / ०.०,१.०)");calls.add("ग."+name+"(१.०,-१.० / ०.०)");
+        }
+        for(String call:calls)source.append("प्रयास { ").append(call).append("; त्रुटि(\"अपवाद गायब\"); } पकड़ो (क: अपवाद) { लिखो(क.संदेश); } अंततः { स्थिर क: पाठ = \"जीवित\" + \"😀\"; } ");
+        source.append("लिखो(य.पूर्णांकचुनो(०,१००)); य.बीज(४२); लिखो(य.पूर्णांकचुनो(०,१००)); }");
+        var result=numericExact(source.toString());assertEquals(0,result.exit());
+        assertFalse(result.out().contains("अपवाद गायब"));
+    }
+    @Test void nativeTranscendentalsMatchManagedTargetsWithinFourUlps()throws Exception{
+        requireNumericTargets();
+        var source="""
+            आयात मानक.गणित उपनाम ग;
+            कार्य मुख्य() -> शून्य {
+                लिखो(परिवर्तित<पाठ>(ग.वर्गमूल(२.०)));
+                लिखो(परिवर्तित<पाठ>(ग.घात(१.२५, ३.७५)));
+                लिखो(परिवर्तित<पाठ>(ग.घात(-२.०, -३.०)));
+                लिखो(परिवर्तित<पाठ>(ग.ज्या(१.०)));
+                लिखो(परिवर्तित<पाठ>(ग.ज्या(-१०००.०)));
+                लिखो(परिवर्तित<पाठ>(ग.ज्या(१००००००००००००००००००००.०)));
+                लिखो(परिवर्तित<पाठ>(ग.कोज्या(१.०)));
+                लिखो(परिवर्तित<पाठ>(ग.कोज्या(ग.पाई())));
+                लिखो(परिवर्तित<पाठ>(ग.लघुगणक(२.०)));
+                लिखो(परिवर्तित<पाठ>(ग.लघुगणक(०.००००००१)));
+                लिखो(परिवर्तित<पाठ>(ग.घातांक(१.०)));
+                लिखो(परिवर्तित<पाठ>(ग.घातांक(-७००.०)));
+                लिखो(परिवर्तित<पाठ>(ग.घातांक(-१०००.०)));
+                लिखो(परिवर्तित<पाठ>(ग.वर्गमूल(-०.०)));
+                लिखो(परिवर्तित<पाठ>(ग.पाई()));
+            }
+            """;
+        var sources=List.of(new SourceFile("native.bhash",source));var result=nativeOnlyRun(sources,GC_STRESS);
+        assertEquals(0,result.exit(),result.err());String[] actual=result.out().strip().split("\n");
+        for(boolean clr:new boolean[]{false,true}){
+            var reference=numericManagedRun(sources,clr);assertEquals(0,reference.exit(),reference.err());
+            String[] expected=reference.out().strip().split("\n");assertEquals(expected.length,actual.length);
+            for(int i=0;i<actual.length;i++){
+                double a=Double.parseDouble(actual[i]),e=Double.parseDouble(expected[i]);
+                assertTrue(Double.isFinite(a)&&Double.isFinite(e));
+                if(e==0)assertEquals(Double.doubleToRawLongBits(e),Double.doubleToRawLongBits(a));
+                else assertEquals(e,a,4*Math.ulp(e),"Math mismatch index="+i+" clr="+clr);
+            }
+        }
+        assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeNumericArgumentsEvaluateOnceInOrderAcrossCleanup()throws Exception{
+        requireNumericTargets();
+        var result=numericExact("""
+            आयात मानक.गणित उपनाम ग;
+            आयात मानक.यादृच्छिक उपनाम य;
+            वर्ग क्रम {
+                सार्वजनिक मान अंक: पूर्णांक;
+                सार्वजनिक कार्य अगला() -> दशमलव {
+                    यह.अंक = यह.अंक + १; लिखो(यह.अंक);
+                    लौटाओ परिवर्तित<दशमलव>(यह.अंक);
+                }
+            }
+            कार्य सीमा(क: पूर्णांक) -> पूर्णांक { लिखो(क); लौटाओ क; }
+            कार्य लौटना(क: क्रम) -> दशमलव {
+                प्रयास { लौटाओ ग.घात(क.अगला(), क.अगला()); }
+                अंततः { स्थिर स: पाठ = "अ" + "😀"; क.अंक = ७; }
+            }
+            कार्य मुख्य() -> शून्य {
+                स्थिर क: क्रम = नया क्रम();
+                लिखो(ग.न्यूनतम(क.अगला(), क.अगला()), क.अंक);
+                लिखो(लौटना(क), क.अंक);
+                य.बीज(०); लिखो(य.पूर्णांकचुनो(सीमा(-१०), सीमा(१०)));
+                प्रयास { लिखो("अधूरा", ग.वर्गमूल(-क.अगला())); }
+                पकड़ो (अ: अपवाद) { लिखो(अ.संदेश); }
+            }
+            """);assertEquals(0,result.exit());assertFalse(result.out().contains("अधूरा"));
+    }
+    @Test void nativeMathRandomStandaloneExampleMatchesBothManagedTargets()throws Exception{
+        requireNumericTargets();
+        var result=numericExact(Files.readString(Path.of("examples/native/math-random.bhash")));
+        assertEquals(0,result.exit());assertTrue(stats(result).get("allocations")>1000,result.err());
+        assertTrue(stats(result).get("peak")<200000,result.err());
+    }
+    @Test void nativeUncaughtNumericErrorsRunFinallyAndKeepSourceLocations()throws Exception{
+        requireNumericTargets();
+        for(String operation:List.of("गणित.वर्गमूल(-१.०)","यादृच्छिक.पूर्णांकचुनो(२,१)")){
+            String source="आयात मानक.गणित; आयात मानक.यादृच्छिक; कार्य भीतर() -> शून्य { स्थिर स: पाठ = \"जड़\" + \"😀\"; "+operation+"; } कार्य मुख्य() -> शून्य { प्रयास { भीतर(); } अंततः { लिखो(\"साफ\"); } }";
+            var result=numericExact(source);assertEquals(1,result.exit());assertEquals("साफ\n",result.out());
+            assertTrue(result.err().startsWith("भाष: native.bhash:1:"),result.err());
+            assertTrue(result.err().contains(operation.startsWith("गणित")?"एक सीमित दशमलव मान आवश्यक है।":"यादृच्छिक पूर्णांक की सीमा अमान्य है।"),result.err());
+        }
     }
     @Test void coreUsesExistingTypeAndImmutableBindingChecks(){
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: पूर्णांक = १; अ = २; }"));
@@ -1269,15 +1414,7 @@ class NativeBackendTest {
         return nativeRun(List.of(new SourceFile("native.bhash",source)),environment,arguments);
     }
     private Result nativeRun(List<SourceFile> sources,Map<String,String> environment,String...arguments)throws Exception{
-        Path exe=temporary.resolve("application");
-        new NativeCompiler(true).compile(sources,exe);
-        var command=new ArrayList<String>();command.add(exe.toString());command.addAll(List.of(arguments));
-        Path out=temporary.resolve("out"),err=temporary.resolve("err");
-        var builder=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile());
-        builder.environment().putAll(environment);
-        var p=builder.start();
-        assertTrue(p.waitFor(15,TimeUnit.SECONDS));
-        var result=new Result(p.exitValue(),Files.readString(out),Files.readString(err));
+        var result=nativeOnlyRun(sources,environment,arguments);
         if(arguments.length==0){
             Path jar=temporary.resolve("reference.jar");
             new JvmCompiler().compile(sources,jar);
@@ -1290,6 +1427,43 @@ class NativeBackendTest {
             if(result.exit()!=0)assertTrue(Files.readString(referenceErr).startsWith("भाष: "));
         }
         return result;
+    }
+    private Result nativeOnlyRun(List<SourceFile> sources,Map<String,String> environment,String...arguments)throws Exception{
+        Path exe=temporary.resolve("application");
+        new NativeCompiler(true).compile(sources,exe);
+        var command=new ArrayList<String>();command.add(exe.toString());command.addAll(List.of(arguments));
+        Path out=temporary.resolve("out"),err=temporary.resolve("err");
+        var builder=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile());
+        builder.environment().putAll(environment);
+        var p=builder.start();
+        assertTrue(p.waitFor(15,TimeUnit.SECONDS));
+        var result=new Result(p.exitValue(),Files.readString(out),Files.readString(err));
+        return result;
+    }
+    private Result numericManagedRun(List<SourceFile> sources,boolean clr)throws Exception{
+        Path application=temporary.resolve(clr?"numeric-clr":"numeric.jar");
+        if(clr)new ClrCompiler().compile(sources,application);else new JvmCompiler().compile(sources,application);
+        List<String> command=clr?List.of(ClrCompiler.executable(),application.resolve("BhashProgram.dll").toString())
+            :List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",application.toString());
+        Path out=temporary.resolve("numeric-"+clr+".out"),err=temporary.resolve("numeric-"+clr+".err");
+        var process=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile()).start();
+        try{process.getOutputStream().close();assertTrue(process.waitFor(30,TimeUnit.SECONDS));
+            return new Result(process.exitValue(),Files.readString(out).replace("\r\n","\n"),Files.readString(err));
+        }finally{if(process.isAlive())process.destroyForcibly();}
+    }
+    private void requireNumericTargets()throws Exception{
+        requireTools();boolean clr=ClrCompilerTest.dotnetAvailable();
+        if("true".equalsIgnoreCase(System.getenv("BHASH_REQUIRE_NATIVE")))assertTrue(clr,"Missing .NET 10 SDK for cross-target validation");
+        else assumeTrue(clr,"Missing .NET 10 SDK for cross-target validation");
+    }
+    private Result numericExact(String source)throws Exception{
+        var sources=List.of(new SourceFile("native.bhash",source));
+        var result=nativeOnlyRun(sources,GC_STRESS);
+        for(boolean clr:new boolean[]{false,true}){
+            var managed=numericManagedRun(sources,clr);assertEquals(managed.exit(),result.exit(),"Exit mismatch clr="+clr);
+            assertEquals(managed.out(),result.out(),"Output mismatch clr="+clr);
+        }
+        assertEquals(0L,stats(result).get("live"));return result;
     }
     @Test void llvmPreservesTextOverloadsNestedLogicAndArgumentEvaluationOrder()throws Exception{
         requireTools();
