@@ -258,8 +258,18 @@ class subset, initialization and null behavior, layout and validation.
 ## Native inheritance and dispatch
 
 Native layouts preserve the full base-field prefix and add a nonmanaged immutable
-method-table pointer. Public/protected method slots are inherited and replaced by
+type-metadata pointer. Public/protected method slots are inherited and replaced by
 checked overrides; private and explicit base calls remain direct. Constructor
 factories allocate once and run chained initializers on the same rooted receiver.
 The most-derived GC descriptor traces inherited and derived reference fields.
 See [native inheritance](native-inheritance.md) for semantics, private ABI and tests.
+
+## Native interfaces and runtime types
+
+Interface references retain the ordinary payload-base pointer. Immutable class
+metadata separates virtual and interface-signature dispatch arrays from nominal
+membership IDs. Checked analysis records destination types and interface method
+identities before erasure; no structural matching grants interface membership.
+Tests/casts evaluate once, allocate no wrappers, and preserve existing null/failure
+semantics. The same precise descriptors and roots cover class and interface fields.
+See [native interfaces and casts](native-interfaces.md) for scope, ABI and validation.
