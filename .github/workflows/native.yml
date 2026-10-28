@@ -1,0 +1,49 @@
+name: Bhash experimental native LLVM checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    env:
+      BHASH_REQUIRE_NATIVE: 'true'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Install LLVM 18 tools
+        run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18
+      - name: Check collector under sanitizers and optimization
+        run: python3 scripts/test_native_runtime.py --sanitize
+      - name: Verify and execute LLVM backend
+        run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest package
+      - name: Build independent example
+        run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/factorial.bhash --target native -o target/factorial-native
+      - name: Inspect executable dependencies
+        run: |
+          file target/factorial-native
+          ldd target/factorial-native | tee target/native-dependencies.txt
+          if grep -Ei 'jvm|libjli|coreclr|hostfxr|mono' target/native-dependencies.txt; then exit 1; fi
+      - name: Run in clean deployment environment
+        run: |
+          docker run --rm --network none -v "$PWD/target:/artifacts:ro" ubuntu:24.04 sh -eu -c '
+            for tool in java dotnet clang gcc; do
+              if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
+            done
+            /artifacts/factorial-native > /tmp/actual
+            printf "१ १\n२ २\n३ ६\n४ २४\n५ १२०\n" > /tmp/expected
+            cmp /tmp/actual /tmp/expected
+            /artifacts/factorial-native --bhash-license | grep "Apache License"
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bhash-experimental-native-linux-x86_64
+          path: |
+            target/factorial-native
+            target/native-dependencies.txt
+            target/native-tests/factorial.ll
+            target/surefire-reports/
+            docs/native-compilation-design.md
