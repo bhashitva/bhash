@@ -93,7 +93,7 @@ class NativeBackendTest {
             assertThrows(CompilationException.class,()->core(s));
         for(String s:List.of(
             "वर्ग अ { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}",
-            "वर्ग अ विस्तार अपवाद {} कार्य मुख्य() -> शून्य {}",
+            "परिगणना अ { क } कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}",
             "वर्ग अ { मान न: दशमलव; } कार्य मुख्य() -> शून्य {}")){
@@ -895,6 +895,253 @@ class NativeBackendTest {
             "स्थिर म: मानचित्र<पाठ,पूर्णांक> = नया मानचित्र<पाठ,पूर्णांक>(); म.जोड़ो(१);",
             "स्थिर अ: पूर्णांक[] = नया पूर्णांक[]{१}; अ.साफ़();"))
             assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { "+body+" }"));
+    }
+
+    @Test void nativeExceptionsPreserveSubtypeIdentityAndRethrow()throws Exception{
+        requireTools();var result=nativeRun("""
+            वर्ग विशेष विस्तार अपवाद { सार्वजनिक निर्माता(क: पाठ) : आधार(क) {} }
+            कार्य मुख्य() -> शून्य {
+                स्थिर मूल: विशेष = नया विशेष("मूल");
+                प्रयास {
+                    प्रयास { फेंको मूल; }
+                    पकड़ो (गलती: विशेष) { लिखो(गलती == मूल, गलती.संदेश); फेंको; }
+                    अंततः { लिखो("भीतर"); }
+                } पकड़ो (गलती: अपवाद) { लिखो(गलती == मूल, गलती.संदेश); }
+                अंततः { लिखो("बाहर"); }
+                प्रयास { फेंको नया अपवाद(); } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश == ""); }
+                प्रयास {
+                    प्रयास { फेंको नया विशेष("भीतर"); }
+                    पकड़ो (ग: विशेष) { फेंको नया अपवाद("बाहर पहुँचा"); }
+                    पकड़ो (ग: अपवाद) { त्रुटि("सहचर पकड़ो चला"); }
+                    अंततः { लिखो("साफ"); }
+                } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+            }
+            """,GC_STRESS);
+        assertEquals("सत्य मूल\nभीतर\nसत्य मूल\nबाहर\nसत्य\nसाफ\nबाहर पहुँचा\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeFinallyRunsForReturnsAndLoopControl()throws Exception{
+        requireTools();var result=nativeRun("""
+            कार्य फल() -> पूर्णांक {
+                प्रयास { लौटाओ ७; } अंततः { लिखो("वापसी"); }
+            }
+            कार्य दूसरा() -> पूर्णांक {
+                प्रयास { फेंको नया अपवाद("क"); }
+                पकड़ो (गलती: अपवाद) { लौटाओ ८; }
+                अंततः { लिखो("पकड़"); }
+            }
+            कार्य मुख्य() -> शून्य {
+                लिखो(फल(), दूसरा());
+                मान क: पूर्णांक = ०;
+                जबतक (क < ३) {
+                    क = क + १;
+                    प्रयास { यदि (क == १) { जारी; } विराम; }
+                    अंततः { लिखो("चक्र",क); }
+                }
+                प्रयास {
+                    प्रयास { फेंको नया अपवाद("पहला"); }
+                    पकड़ो (गलती: अपवाद) { फेंको नया अपवाद("दूसरा"); }
+                    अंततः { लिखो("सफाई"); }
+                } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
+                प्रयास { लिखो("सामान्य"); } अंततः { जबतक (सत्य) { विराम; } }
+            }
+            """,GC_STRESS);
+        assertEquals("वापसी\nपकड़\n७ ८\nचक्र १\nचक्र २\nसफाई\nदूसरा\nसामान्य\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeFinallyReplacesPendingCompletions()throws Exception{
+        requireTools();var result=nativeRun("""
+            कार्य फल() -> पूर्णांक {
+                प्रयास { लौटाओ १; } अंततः { फेंको नया अपवाद("सफाई"); }
+            }
+            कार्य मुख्य() -> शून्य {
+                प्रयास { लिखो(फल()); } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
+                प्रयास {
+                    प्रयास { फेंको नया अपवाद("पहला"); } अंततः { फेंको नया अपवाद("अंतिम"); }
+                } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
+            }
+            """,GC_STRESS);
+        assertEquals("सफाई\nअंतिम\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeRuntimeFailuresAreCatchable()throws Exception{
+        requireTools();var result=nativeRun("""
+            कार्य मुख्य() -> शून्य {
+                प्रयास { लिखो(१ / ०); } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
+                प्रयास { लिखो(नया पूर्णांक[०].लो(०)); } पकड़ो (गलती: अपवाद) { लिखो("सीमा"); }
+                प्रयास { त्रुटि("स्वयं"); } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
+                प्रयास { लिखो(पूर्णांकपाठ("abc")); } पकड़ो (गलती: अपवाद) { लिखो("पाठ"); }
+                स्थिर खाली: अपवाद = रिक्त;
+                प्रयास { फेंको खाली; } पकड़ो (गलती: अपवाद) { लिखो("रिक्त"); }
+                लिखो("चालू");
+            }
+            """,GC_STRESS);
+        assertEquals("शून्य से भाग देना संभव नहीं है।\nसीमा\nस्वयं\nपाठ\nरिक्त\nचालू\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void coreSupportsExceptionLayoutsAndPreservesExceptionChecking()throws Exception{
+        var p=core("""
+            वर्ग विशेष विस्तार अपवाद { निर्माता(व: पाठ) : आधार(व) {} }
+            कार्य मुख्य() -> शून्य {
+                प्रयास { फेंको नया विशेष("क"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); } अंततः { लिखो("अंत"); }
+            }
+            """);
+        assertEquals(-5,p.exceptionType().id());assertEquals(List.of(8,16),p.exceptionType().fields().stream().map(ObjectField::offset).toList());
+        assertTrue(p.classes().get(0).assignableTypes().contains(-5));assertTrue(LlvmEmitter.emit(p).contains("@bh_protect"));
+        for(String body:List.of("फेंको १;","फेंको रिक्त;","फेंको;",
+            "प्रयास {} पकड़ो (क: पूर्णांक) {}", "प्रयास {} पकड़ो (क: अपवाद) {} पकड़ो (ख: अपवाद) {}",
+            "प्रयास {} पकड़ो (क: अपवाद) { क = नया अपवाद(); }", "प्रयास {} पकड़ो (क: अपवाद) { क.संदेश = \"ब\"; }",
+            "प्रयास {} अंततः { लौटाओ; }", "जबतक (सत्य) { प्रयास {} अंततः { जारी; } }"))
+            assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { "+body+" }"));
+    }
+    @Test void nativeFinallyPreservesEvaluatedReturnValuesAndOuterBindings()throws Exception{
+        requireTools();var result=nativeRun("""
+            कार्य फल() -> पाठ {
+                मान व: पाठ = "अ"+"ब";
+                प्रयास { लौटाओ व; } अंततः {
+                    व = "क"+"ख";
+                    प्रयास { त्रुटि("भीतर"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                    लिखो(व);
+                }
+            }
+            कार्य मुख्य() -> शून्य {
+                मान न: पूर्णांक = ०; मान शब्द: पाठ = "";
+                प्रयास { न = ७; शब्द = "मू"+"ल"; त्रुटि("क"); } पकड़ो (ग: अपवाद) { न = न + १; }
+                लिखो(न,शब्द,फल());
+            }
+            """,GC_STRESS);assertEquals("भीतर\nकख\n८ मूल अब\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeExceptionStressDiscardsAbandonedRootsAndKeepsPendingValues()throws Exception{
+        requireTools();var result=nativeRun(Files.readString(Path.of("examples/native/exceptions.bhash")),GC_STRESS);
+        assertEquals("१२४७५० ५००\nबचा😀\n",result.out());
+        var s=stats(result);assertTrue(s.get("allocations")>5000,result.err());assertEquals(0,s.get("live"));assertTrue(s.get("peak")<100000,result.err());
+    }
+    @Test void nativeUncaughtExceptionRunsFinallyAndReclaimsRoots()throws Exception{
+        requireTools();var result=nativeRun("""
+            कार्य मुख्य() -> शून्य {
+                प्रयास { प्रयास { फेंको नया अपवाद("अ"+"ब"); } अंततः { लिखो("भीतर"); } }
+                अंततः { लिखो("बाहर"); }
+            }
+            """,GC_STRESS);
+        assertEquals(1,result.exit());assertEquals("भीतर\nबाहर\n",result.out());assertTrue(result.err().contains("अब"));
+        assertTrue(result.err().contains("native.bhash:"));assertEquals(0,stats(result).get("live"));
+    }
+
+    @Test void nativeNestedCleanupTransportsForeachAndLocalLoopExits()throws Exception{
+        requireTools();var result=nativeRun("""
+            कार्य मुख्य() -> शून्य {
+                मान योग: पूर्णांक = ०;
+                प्रत्येक (न: पूर्णांक में नया पूर्णांक[]{१,२,३,४}) {
+                    प्रयास {
+                        प्रयास { यदि (न == १) { जारी; } यदि (न == ३) { विराम; } योग = योग + न; }
+                        अंततः { लिखो("भीतर",न); }
+                    } अंततः {
+                        मान क: पूर्णांक = ०;
+                        जबतक (क < २) {
+                            प्रयास { क = क + १; यदि (क == १) { जारी; } विराम; }
+                            अंततः { लिखो("स्थानीय",क); }
+                        }
+                        लिखो("बाहर",न);
+                    }
+                }
+                लिखो(योग);
+            }
+            """,GC_STRESS);
+        assertEquals("भीतर १\nस्थानीय १\nस्थानीय २\nबाहर १\nभीतर २\nस्थानीय १\nस्थानीय २\nबाहर २\nभीतर ३\nस्थानीय १\nस्थानीय २\nबाहर ३\n२\n",result.out());
+        assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeCancelledReturnsAndAbandonedRegionsReleaseLargeText()throws Exception{
+        requireTools();var result=nativeRun("""
+            आयात मानक.पाठ्य;
+            कार्य फल() -> पाठ {
+                प्रयास {
+                    प्रयास { लौटाओ पाठ्य.दोहराओ("क",३००००); }
+                    अंततः { फेंको नया अपवाद("बदला"); }
+                } पकड़ो (ग: अपवाद) {
+                    स्थिर ताजा: पाठ = पाठ्य.दोहराओ("ख",३००००); लिखो(लंबाई(ताजा)); लौटाओ "बचा";
+                }
+            }
+            कार्य मुख्य() -> शून्य {
+                मान न: पूर्णांक = ०;
+                जबतक (न < ५) {
+                    प्रयास { स्थिर भारी: पाठ = पाठ्य.दोहराओ("क",३००००); त्रुटि("दोष"); }
+                    पकड़ो (ग: अपवाद) { स्थिर अगला: पाठ = पाठ्य.दोहराओ("ख",३००००); यदि (लंबाई(अगला) != ३००००) { त्रुटि("पाठ"); } }
+                    न = न + १;
+                }
+                लिखो(फल());
+            }
+            """,GC_STRESS);
+        assertEquals("३००००\nबचा\n",result.out());assertEquals(0,stats(result).get("live"));
+        assertTrue(stats(result).get("peak")<130000,result.err());
+    }
+    @Test void nativeCustomExceptionsSupportInterfacesCollectionsAndConstructorUnwinding()throws Exception{
+        requireTools();var result=nativeRun("""
+            आयात मानक.पाठ्य;
+            अनुबंध नामी { कार्य नाम() -> पाठ; }
+            वर्ग विशेष विस्तार अपवाद पालन नामी {
+                सार्वजनिक मान अंश: सूची<सर्ववस्तु>;
+                निर्माता(व: पाठ) : आधार(व) { अंश = नया सूची<सर्ववस्तु>{यह.संदेश,७}; }
+                सार्वजनिक कार्य नाम() -> पाठ { लौटाओ संदेश; }
+            }
+            वर्ग अधूरा {
+                सार्वजनिक मान भारी: पाठ;
+                निर्माता() { भारी = पाठ्य.दोहराओ("क",३००००); फेंको नया विशेष("मू"+"ल"); }
+            }
+            कार्य लेआओ() -> सर्ववस्तु[] {
+                प्रयास { लौटाओ नया सर्ववस्तु[]{नया विशेष("क"+"ख"),सत्य}; }
+                अंततः { स्थिर क्षण: पाठ = "अ"+"ब"; }
+            }
+            कार्य मुख्य() -> शून्य {
+                प्रयास { स्थिर क: अधूरा = नया अधूरा(); }
+                पकड़ो (ग: विशेष) {
+                    स्थिर न: नामी = ग; स्थिर व: सर्ववस्तु = ग;
+                    स्थिर म: मानचित्र<अपवाद,पाठ> = नया मानचित्र<अपवाद,पाठ>{ग:"है"};
+                    लिखो(न.नाम(), प्रकारहै<अपवाद>(व), परिवर्तित<विशेष>(व) == ग, म[ग], परिवर्तित<पूर्णांक>(ग.अंश[१]));
+                    स्थिर ताजा: पाठ = पाठ्य.दोहराओ("ख",३००००); लिखो(लंबाई(ताजा));
+                }
+                स्थिर अ: सर्ववस्तु[] = लेआओ(); लिखो(परिवर्तित<विशेष>(अ[०]).संदेश, परिवर्तित<तार्किक>(अ[१]));
+            }
+            """,GC_STRESS);
+        assertEquals("मूल सत्य सत्य है ७\n३००००\nकख सत्य\n",result.out());assertEquals(0,stats(result).get("live"));
+        assertTrue(stats(result).get("peak")<130000,result.err());
+    }
+    private static List<SourceFile> exceptionSources(){
+        return List.of(new SourceFile("types.bhash","संकुल दोषपुस्तक; सार्वजनिक वर्ग विशेष विस्तार अपवाद { निर्माता(व: पाठ) : आधार(व) {} } सार्वजनिक कार्य चलाओ() -> शून्य { फेंको नया विशेष(\"मू\"+\"ल\"); }"),
+            new SourceFile("app.bhash","आयात दोषपुस्तक.विशेष; आयात दोषपुस्तक.चलाओ; कार्य मुख्य() -> शून्य { प्रयास { चलाओ(); } पकड़ो (ग: विशेष) { लिखो(ग.संदेश, प्रकारहै<अपवाद>(ग)); } अंततः { लिखो(\"अंत\"); } }"));
+    }
+    @Test void nativeExceptionsAcrossPackagesMatchJvm()throws Exception{
+        requireTools();var result=nativeRun(exceptionSources(),GC_STRESS);
+        assertEquals("मूल सत्य\nअंत\n",result.out());assertEquals(0,stats(result).get("live"));
+    }
+
+    @Test void nativeExceptionsCoverSupportedRuntimeFailureCategories()throws Exception{
+        requireTools();var result=nativeRun("""
+            आयात मानक.पाठ्य;
+            कार्य मुख्य() -> शून्य {
+                प्रयास { लिखो("अधूरा",१ % ०); } पकड़ो (ग: अपवाद) { लिखो(१,ग.संदेश); }
+                प्रयास { लिखो(अंश("क",०,२)); } पकड़ो (ग: अपवाद) { लिखो(२,ग.संदेश); }
+                प्रयास { लिखो(पाठ्य.बदलो("क","","ख")); } पकड़ो (ग: अपवाद) { लिखो(३,ग.संदेश); }
+                प्रयास { लिखो(पाठ्य.दोहराओ("क",-१)); } पकड़ो (ग: अपवाद) { लिखो(४,ग.संदेश); }
+                प्रयास { लिखो(पूर्णांकपाठ("9223372036854775808")); } पकड़ो (ग: अपवाद) { लिखो(५,ग.संदेश); }
+                प्रयास { स्थिर म: मानचित्र<पाठ,पूर्णांक> = नया मानचित्र<पाठ,पूर्णांक>(); लिखो(म["क"]); }
+                पकड़ो (ग: अपवाद) { लिखो(६,ग.संदेश); }
+                प्रयास { स्थिर म: मानचित्र<अपवाद,पाठ> = नया मानचित्र<अपवाद,पाठ>(); स्थिर क: अपवाद = रिक्त; म[क] = "ख"; }
+                पकड़ो (ग: अपवाद) { लिखो(७,ग.संदेश); }
+                प्रयास { स्थिर अ: सूची<पूर्णांक> = नया सूची<पूर्णांक>{१}; प्रत्येक (न: पूर्णांक में अ) { अ.साफ़(); } }
+                पकड़ो (ग: अपवाद) { लिखो(८,ग.संदेश); }
+                प्रयास { स्थिर व: सर्ववस्तु = "१"; लिखो(परिवर्तित<पूर्णांक>(व)); }
+                पकड़ो (ग: अपवाद) { लिखो(९,ग.संदेश); }
+                प्रयास { स्थिर अ: सूची<पूर्णांक> = रिक्त; अ.जोड़ो(१); }
+                पकड़ो (ग: अपवाद) { लिखो(१०,ग.संदेश); }
+                प्रयास { स्थिर अ: पूर्णांक[][] = नया पूर्णांक[०][-१]; }
+                पकड़ो (ग: अपवाद) { लिखो(११,ग.संदेश); }
+            }
+            """,GC_STRESS);
+        assertEquals(0,result.exit());assertFalse(result.out().contains("अधूरा"));assertEquals(11,result.out().lines().count());assertEquals(0,stats(result).get("live"));
+    }
+    @Test void nativeProtectedReturnsPreserveBooleanUniversalAndObjectResults()throws Exception{
+        requireTools();var result=nativeRun("""
+            कार्य हाँ() -> तार्किक { प्रयास { लौटाओ सत्य; } अंततः { स्थिर क: पाठ = "अ"+"ब"; } }
+            कार्य अंक() -> सर्ववस्तु { प्रयास { लौटाओ ७; } अंततः { स्थिर क: पाठ = "क"+"ख"; } }
+            कार्य वस्तु() -> अपवाद { प्रयास { लौटाओ नया अपवाद("मू"+"ल"); } अंततः { स्थिर क: पाठ = "ग"+"घ"; } }
+            कार्य मुख्य() -> शून्य { लिखो(हाँ(),परिवर्तित<पूर्णांक>(अंक()),वस्तु().संदेश); }
+            """,GC_STRESS);assertEquals("सत्य ७ मूल\n",result.out());assertEquals(0,stats(result).get("live"));
     }
 
     private void requireTools()throws Exception{
