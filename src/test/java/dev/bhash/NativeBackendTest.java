@@ -4,6 +4,7 @@ package dev.bhash;
 import dev.bhash.backend.*;
 import dev.bhash.backend.CoreProgram.*;
 import dev.bhash.backend.llvm.*;
+import dev.bhash.backend.jvm.JvmCompiler;
 import dev.bhash.frontend.SourceFile;
 import java.nio.file.*;
 import java.nio.charset.StandardCharsets;
@@ -81,7 +82,34 @@ class NativeBackendTest {
         Path out=temporary.resolve("out"),err=temporary.resolve("err");
         var p=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile()).start();
         assertTrue(p.waitFor(15,TimeUnit.SECONDS));
-        return new Result(p.exitValue(),Files.readString(out),Files.readString(err));
+        var result=new Result(p.exitValue(),Files.readString(out),Files.readString(err));
+        if(arguments.length==0){
+            Path jar=temporary.resolve("reference.jar");
+            new JvmCompiler().compile(List.of(new SourceFile("native.bhash",source)),jar);
+            Path referenceOut=temporary.resolve("reference.out"),referenceErr=temporary.resolve("reference.err");
+            var reference=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString())
+                .redirectOutput(referenceOut.toFile()).redirectError(referenceErr.toFile()).start();
+            assertTrue(reference.waitFor(15,TimeUnit.SECONDS));
+            assertEquals(reference.exitValue(),result.exit(),"Native/JVM exit mismatch");
+            assertEquals(Files.readString(referenceOut),result.out(),"Native/JVM output mismatch");
+            if(result.exit()!=0)assertTrue(Files.readString(referenceErr).startsWith("भाष: "));
+        }
+        return result;
+    }
+    @Test void llvmPreservesTextOverloadsNestedLogicAndArgumentEvaluationOrder()throws Exception{
+        requireTools();
+        var result=nativeRun("""
+            कार्य पहचान(अ: पाठ) -> पाठ { लौटाओ अ; }
+            कार्य पहचान(अ: पूर्णांक) -> पूर्णांक { लौटाओ अ; }
+            कार्य अंक(अ: पूर्णांक) -> पूर्णांक { लिखो(अ); लौटाओ अ; }
+            कार्य मुख्य() -> शून्य {
+                लिखो(अंक(१), अंक(२));
+                स्थिर अ: पाठ = पहचान("a\\u0000😀");
+                { स्थिर अ: पूर्णांक = पहचान(३); लिखो(अ); }
+                लिखो(अ, सत्य && (असत्य || सत्य), असत्य || (सत्य && सत्य));
+            }
+            """);
+        assertEquals("१\n२\n१ २\n३\na\0😀 सत्य सत्य\n",result.out());
     }
     @Test void llvmExecutesFunctionsControlFlowUnicodeAndBoundaries()throws Exception{
         requireTools();
