@@ -1538,6 +1538,105 @@ class NativeBackendTest {
             """,GC_STRESS);assertEquals("सत्य ७ मूल\n",result.out());assertEquals(0,stats(result).get("live"));
     }
 
+    @Test void fileCoreRecognizesAliasesAndTypedOperations()throws Exception{
+        var p=core("""
+            आयात मानक.फ़ाइल उपनाम फ;
+            कार्य मुख्य() -> शून्य { लिखो(फ.समर्थित(),फ.है("x")); फ.पाठलिखो("x",फ.पाठपढ़ो("y")); }
+            """);
+        var ir=LlvmEmitter.emit(p);
+        for(String operation:List.of("supported","exists","read_text","write_text"))assertTrue(ir.contains("call "+(operation.equals("write_text")?"void":operation.equals("read_text")?"ptr":"i32")+" @bh_file_"+operation));
+        assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { मानक.फ़ाइल.बाइटपढ़ो(\"x\"); }"));
+    }
+    private String fileLiteral(Path path){return "\""+path.toString().replace("\\","/").replace("\"","\\\"")+"\"";}
+    @Test void nativeFileTextRoundTripsAndErrorsMatchBothManagedTargets()throws Exception{
+        requireNumericTargets();
+        Path data=temporary.resolve("पाठ😀.txt"),bad=temporary.resolve("invalid.bin");
+        Files.write(bad,new byte[]{(byte)0xe0,(byte)0x80,(byte)0xaf});
+        String source="""
+            आयात मानक.फ़ाइल उपनाम फ;
+            कार्य मुख्य() -> शून्य {
+                लिखो(फ.समर्थित(),फ.है(DIR),फ.है(MISSING));
+                फ.पाठलिखो(DATA,"पुराना"); फ.पाठलिखो(DATA,"\\uFEFFभारत😀\\r\\nशून्य\\u0000अंत\\n");
+                लिखो(फ.पाठपढ़ो(DATA)=="\\uFEFFभारत😀\\r\\nशून्य\\u0000अंत\\n",फ.है(DATA));
+                फ.पाठलिखो(DATA,"");लिखो(फ.पाठपढ़ो(DATA)=="");
+                प्रयास { फ.पाठपढ़ो(MISSING); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.पाठपढ़ो(DIR); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.पाठलिखो(DIR,"x"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.पाठलिखो(NO_PARENT,"x"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.पाठपढ़ो(BAD); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.है(""); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.पाठपढ़ो("x\\u0000y"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                प्रयास { फ.पाठलिखो("","x"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+            }
+            """.replace("NO_PARENT",fileLiteral(temporary.resolve("absent/child.txt"))).replace("MISSING",fileLiteral(temporary.resolve("missing")))
+            .replace("DATA",fileLiteral(data)).replace("DIR",fileLiteral(temporary)).replace("BAD",fileLiteral(bad));
+        assertEquals(0,numericExact(source).exit());
+        assertEquals(0,Files.size(data));
+    }
+    @Test void nativeFileByteLimitsAndFailureCleanupMatchManaged()throws Exception{
+        requireNumericTargets();Path large=temporary.resolve("large"),kept=temporary.resolve("kept");
+        try(var f=new java.io.RandomAccessFile(large.toFile(),"rw")){f.setLength(16777217);}
+        String source="""
+            आयात मानक.फ़ाइल उपनाम फ;
+            आयात मानक.पाठ्य उपनाम प;
+            कार्य मुख्य() -> शून्य {
+                मान सीमा: पाठ = प.दोहराओ("😀",५२४२८८);
+                मान दोगुना: पूर्णांक = ०;
+                जबतक (दोगुना < ३) { सीमा=सीमा+सीमा; दोगुना=दोगुना+१; }
+                फ.पाठलिखो(KEPT,सीमा); लिखो(फ.पाठपढ़ो(KEPT)==सीमा);
+                फ.पाठलिखो(KEPT,"बचा");
+                प्रयास { फ.पाठलिखो(KEPT,सीमा+"x"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                लिखो(फ.पाठपढ़ो(KEPT));
+                मान गिनती: पूर्णांक = ०;
+                जबतक (गिनती < ८) {
+                    प्रयास { फ.पाठपढ़ो(LARGE); } पकड़ो (ग: अपवाद) { यदि (गिनती == ०) { लिखो(ग.संदेश); } }
+                    अंततः { स्थिर अ: पाठ = प.दोहराओ("मूल",१०); }
+                    गिनती=गिनती+१;
+                }
+                लिखो(गिनती);
+            }
+            """.replace("KEPT",fileLiteral(kept)).replace("LARGE",fileLiteral(large));
+        assertEquals(0,numericExact(source).exit());assertEquals("बचा",Files.readString(kept));
+    }
+    @Test void nativeFileInvalidUtf8AndSymlinksMatchManaged()throws Exception{
+        requireNumericTargets();
+        byte[][] invalid={{(byte)0x80},{(byte)0xc0,(byte)0xaf},{(byte)0xe0,(byte)0x80,(byte)0xaf},
+            {(byte)0xed,(byte)0xa0,(byte)0x80},{(byte)0xf4,(byte)0x90,(byte)0x80,(byte)0x80},
+            {(byte)0xf5,(byte)0x80,(byte)0x80,(byte)0x80},{(byte)0xe2,(byte)0x82},{(byte)0xf0,(byte)0x80,(byte)0x80,(byte)0x80},
+            {(byte)0xe2,(byte)0x28,(byte)0xa1}};
+        var code=new StringBuilder("आयात मानक.फ़ाइल उपनाम फ; कार्य मुख्य() -> शून्य { ");
+        for(int i=0;i<invalid.length;i++){
+            Path file=temporary.resolve("bad-"+i);Files.write(file,invalid[i]);
+            code.append("प्रयास { फ.पाठपढ़ो(").append(fileLiteral(file)).append("); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); } ");
+        }
+        Path target=temporary.resolve("target.txt"),link=temporary.resolve("link.txt"),broken=temporary.resolve("broken");
+        Files.writeString(target,"लिंक😀");Files.createSymbolicLink(link,target);Files.createSymbolicLink(broken,temporary.resolve("missing"));
+        code.append("लिखो(फ.है(").append(fileLiteral(link)).append("),फ.है(").append(fileLiteral(broken)).append("),फ.पाठपढ़ो(").append(fileLiteral(link)).append(")); }");
+        var result=numericExact(code.toString());assertEquals(0,result.exit());
+        assertEquals("अमान्य UTF-8 बाइटबफ़र।\n".repeat(invalid.length)+"सत्य असत्य लिंक😀\n",result.out());
+    }
+    @Test void nativeFilePermissionsAndCloseFailureMatchManaged()throws Exception{
+        requireNumericTargets();Path denied=temporary.resolve("denied");Files.writeString(denied,"kept");
+        var permissions=Files.getPosixFilePermissions(denied);
+        try{
+            Files.setPosixFilePermissions(denied,Set.of());assumeFalse(Files.isReadable(denied),"Privileged user bypasses permission test");
+            String source="""
+                आयात मानक.फ़ाइल उपनाम फ;
+                कार्य मुख्य() -> शून्य {
+                    प्रयास { फ.पाठपढ़ो(DENIED); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                    प्रयास { फ.पाठलिखो(DENIED,"x"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                    प्रयास { फ.पाठलिखो("/dev/full","x"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+                }
+                """.replace("DENIED",fileLiteral(denied));
+            var result=numericExact(source);assertEquals(0,result.exit());
+            assertEquals("फ़ाइल पढ़ी नहीं जा सकी।\nफ़ाइल लिखी नहीं जा सकी।\nफ़ाइल लिखी नहीं जा सकी।\n",result.out());
+        }finally{Files.setPosixFilePermissions(denied,permissions);}
+        assertEquals("kept",Files.readString(denied));
+    }
+    @Test void nativeFileStressExampleMatchesBothManagedTargets()throws Exception{
+        requireNumericTargets();Files.createDirectories(Path.of("target/native-file-example"));
+        assertEquals(0,numericExact(Files.readString(Path.of("examples/native/files.bhash"))).exit());
+    }
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));
         boolean supported=System.getProperty("os.name").equals("Linux") && Set.of("amd64","x86_64").contains(System.getProperty("os.arch"));
