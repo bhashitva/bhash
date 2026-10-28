@@ -79,5 +79,18 @@ def main():
             assert result.stderr.startswith('भाष: '.encode('utf-8'))
         print(f'{name}: repeated tracing, scalar precision, collection cycles, growth, hashing, snapshots and failures passed')
 
+        exception_exe = BUILD / ('exceptions-' + name + ('.exe' if os.name == 'nt' else ''))
+        exception_command = [part.replace('runtime_test.c', 'exceptions_runtime_test.c').replace(str(exe), str(exception_exe)) for part in command]
+        result = run(exception_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(exception_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native exception checks passed.\n'
+        result = run([str(exception_exe), 'uncaught'])
+        assert result.returncode == 1 and not result.stdout
+        assert result.stderr.startswith('भाष: exception-test:1:1: '.encode('utf-8'))
+        print(f'{name}: protected callbacks, pending exceptions, root/scratch unwinding, identity and restart passed')
+
 if __name__ == '__main__':
     main()
