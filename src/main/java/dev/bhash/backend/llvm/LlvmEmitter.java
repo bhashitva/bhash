@@ -81,11 +81,25 @@ public final class LlvmEmitter {
             globals.append("@class").append(c.id()).append(" = private constant { ptr, i64, i64, ptr, i64, i64, i64 } { ptr ").append(name)
                 .append(", i64 ").append(8+c.fields().size()*8).append(", i64 ").append(refs.size()).append(", ptr ").append(offsets).append(", i64 0, i64 0, i64 0 }, align 8\n");
         }
+        var staticRoots=new ArrayList<String>();
+        for(var field:program.staticFields()){
+            globals.append("@static").append(field.id()).append(" = internal global ").append(llvm(field.type())).append(" zeroinitializer, align 8\n");
+            if(field.type().reference())staticRoots.add("ptr @static"+field.id());
+        }
+        for(var init:program.initializations()){
+            globals.append("@init_state").append(init.owner()).append(" = internal global i32 0, align 4\n")
+                .append("@init_failure").append(init.owner()).append(" = internal global ptr null, align 8\n");
+            staticRoots.add("ptr @init_failure"+init.owner());
+            functions.append("define internal i64 @class_init").append(init.owner()).append("(ptr %unused) {\nentry:\n  call void @bfn")
+                .append(init.function()).append("()\n  ret i64 0\n}\n");
+        }
+        globals.append("@static_roots = private constant [").append(staticRoots.size()).append(" x ptr] [")
+            .append(String.join(", ",staticRoots)).append("], align 8\n");
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v11\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v12\n"+
             "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
-            globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
+            globals+"\ndeclare void @bh_static_roots_configure(ptr, i64)\ndeclare void @bh_static_reference_store(ptr, ptr)\ndeclare void @bh_class_initialize(ptr, ptr, ptr)\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+
             "declare void @bh_print_bool(i32)\ndeclare void @bh_print_space()\ndeclare void @bh_print_end()\n"+
@@ -96,7 +110,7 @@ public final class LlvmEmitter {
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
             textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_to_int32(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
-            "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
+            "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  call void @bh_static_roots_configure(ptr @static_roots, i64 "+staticRoots.size()+")\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
     }
     private static String numericDeclarations(){
         var declarations=new StringBuilder();
@@ -365,6 +379,7 @@ public final class LlvmEmitter {
         if(s==null)return;
         if(s instanceof Block b)b.statements().forEach(this::scan);
         else if(s instanceof Assign a){register(a.binding());scan(a.value());}
+        else if(s instanceof StaticWrite f)scan(f.value());
         else if(s instanceof FieldWrite f){scan(f.destination().receiver());scan(f.value());}
         else if(s instanceof Branch b){scan(b.condition());scan(b.yes());scan(b.no());}
         else if(s instanceof Loop l){scan(l.condition());scan(l.body());}
@@ -428,6 +443,7 @@ public final class LlvmEmitter {
         if(s==null)return;
         if(s instanceof Block b){b.locals().forEach(v->bindingRoot(v,slots));b.statements().forEach(v->statementRoots(v,slots));}
         else if(s instanceof Assign a)expressionRoots(a.value(),slots);
+        else if(s instanceof StaticWrite f)expressionRoots(f.value(),slots);
         else if(s instanceof FieldWrite f){expressionRoots(f.destination().receiver(),slots);expressionRoots(f.value(),slots);}
         else if(s instanceof IndexWrite w){expressionRoots(w.destination().receiver(),slots);expressionRoots(w.destination().index(),slots);expressionRoots(w.value(),slots);}
         else if(s instanceof Branch b){expressionRoots(b.condition(),slots);statementRoots(b.yes(),slots);statementRoots(b.no(),slots);}
@@ -527,13 +543,18 @@ public final class LlvmEmitter {
             var b=f.parameters().get(i);line("store "+llvm(b.type())+" %arg"+i+", ptr "+address(b));
         }
         line("call void @bh_roots_push(ptr %frame, ptr %roots, i64 "+rootCount+")");
+        if(f.initialization()>=0)initialize(f.initialization());
         statement(f.body());
         if(!terminated){line("call void @bh_roots_pop(ptr %frame)");line(f.result()==Type.VOID?"ret void":"unreachable");}
         code.append("}\n\n");functions.append(code);
     }
+    private void initialize(int id){if(id>=0)line("call void @bh_class_initialize(ptr @init_state"+id+", ptr @init_failure"+id+", ptr @class_init"+id+")");}
     private Value expression(Expression e){
         Value result;
         if(e instanceof Constant c)result=new Value(c.type(),c.type()==Type.TEXT?text((String)c.value()):c.type()==Type.BOOL?((Boolean)c.value()?"true":"false"):(c.type()==Type.OBJECT || c.type()==Type.ANY)?"null":c.type()==Type.REAL?String.format(Locale.ROOT,"0x%016X",Double.doubleToRawLongBits((Double)c.value())):c.value().toString());
+        else if(e instanceof StaticRead r){
+            initialize(r.field().owner());result=instruction(r.type(),"load "+llvm(r.type())+", ptr @static"+r.field().id());
+        }
         else if(e instanceof Allocate a){
             result=instruction(Type.OBJECT,"call ptr @bh_alloc(ptr @class"+a.objectType()+", i64 "+objectSizes.get(a.objectType())+")");
             // The immutable type-metadata pointer is not a managed reference or safepoint.
@@ -561,6 +582,7 @@ public final class LlvmEmitter {
                 case "~"->instruction(Type.INT,"xor i64 "+v.ir()+", -1");
                 default->throw new IllegalStateException("Unchecked unary operator");};
         } else if(e instanceof Call c){
+            initialize(c.constructionClass());
             for(int i=0;i<c.arguments().size();i++){
                 Value value=expression(c.arguments().get(i));
                 if(i==0 && c.instance())instance(value,c.source());
@@ -758,6 +780,13 @@ public final class LlvmEmitter {
             var target=w.destination();instance(expression(target.receiver()),target.source());expression(target.index());expression(w.value());
             collectionCall(Type.VOID,CollectionOperation.SET,reload(target.receiver()),List.of(reload(target.index()),reload(w.value())),-1,target.source());
             release(target.receiver());release(target.index());release(w.value());
+        }
+        else if(s instanceof Initialize i)initialize(i.owner());
+        else if(s instanceof StaticWrite f){
+            expression(f.value());initialize(f.field().owner());Value value=reload(f.value());
+            if(f.field().type().reference())line("call void @bh_static_reference_store(ptr @static"+f.field().id()+", ptr "+value.ir()+")");
+            else line("store "+value.argument()+", ptr @static"+f.field().id());
+            release(f.value());
         }
         else if(s instanceof FieldWrite f){
             var target=f.destination();
