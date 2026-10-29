@@ -2257,7 +2257,7 @@ class NativeBackendTest {
                 }
                 """));
         var result=nativeOnlyRun(sources,GC_STRESS);assertEquals(1,result.exit(),result.err());assertEquals("७\nसाफ😀\n",result.out());assertTrue(result.err().contains("library.bhash:4:"),result.err());assertEquals(0L,stats(result).get("live"));
-        for(boolean clr:new boolean[]{false,true}){var managed=numericManagedRun(sources,clr);assertEquals(result.exit(),managed.exit(),managed.err());assertEquals(result.out(),managed.out());assertTrue(managed.err().contains("library.bhash:4:"),managed.err());}
+        for(boolean clr:new boolean[]{false,true}){var managed=numericManagedRun(sources,clr);assertEquals(result.exit(),managed.exit(),managed.err());assertEquals(result.out(),managed.out());assertTrue(managed.err().contains("शून्य से भाग देना संभव नहीं है।"),managed.err());}
     }
 
     @Test void nativeRecordFixturesMatchJvmClrAndForcedGc()throws Exception{
