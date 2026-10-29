@@ -64,7 +64,7 @@ public final class ManagedToolchain {
         try(var zip=new ZipInputStream(Files.newInputStream(archive))){
             ZipEntry entry;while((entry=zip.getNextEntry())!=null){
                 String name=entry.getName();if(entry.isDirectory())throw invalid("Toolchain ZIP must contain regular files only");
-                Path file=safe(root,name);if(name.equals(".installed.json") || !names.add(name.toLowerCase(Locale.ROOT)) || names.size()>MAX_FILES)throw invalid("Duplicate/reserved archive entry or too many files: "+name);
+                Path file=safe(root,name);if(name.equals(".installed.json") || !names.add(NativePlatform.windows()?name.toLowerCase(Locale.ROOT):name) || names.size()>MAX_FILES)throw invalid("Duplicate/reserved archive entry or too many files: "+name);
                 Files.createDirectories(file.getParent());long length=0;try(var out=Files.newOutputStream(file,StandardOpenOption.CREATE_NEW)){
                     byte[] buffer=new byte[65536];int n;while((n=zip.read(buffer))!=-1){length+=n;total+=n;if(length>512L*1024*1024 || total>MAX_EXPANDED || name.equals("toolchain.json") && length>MAX_MANIFEST)throw invalid("Toolchain archive exceeds extraction limits");out.write(buffer,0,n);}
                 }zip.closeEntry();
