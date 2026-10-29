@@ -44,6 +44,9 @@ public final class NativeCompiler {
         try {
             var tools=NativeToolchain.require(work);String clang=tools.clang(),opt=tools.opt();
             String buildInfo=NativeBuildInfo.describe(debug,sanitize,tools.version(),tools.linkerVersion(),tools.libcVersion());
+            if(tools.managed()){
+                var metadata=com.google.gson.JsonParser.parseString(buildInfo).getAsJsonObject();metadata.addProperty("toolchain_id",tools.toolchainId());metadata.addProperty("toolchain_sha256",tools.toolchainSha256());buildInfo=NativeBuildInfo.JSON.toJson(metadata);
+            }
             StringBuilder notices=new StringBuilder();
             for(String name:Licensing.APPLICATION_FILES)try(var in=NativeCompiler.class.getResourceAsStream("/META-INF/bhash/"+name)){
                 if(in==null)throw new IOException("Missing native licensing resource: "+name);
