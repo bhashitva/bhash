@@ -2,7 +2,7 @@
   "name": "bhash",
   "displayName": "Bhash (भाष)",
   "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "bhashitva",
   "license": "Apache-2.0",
   "repository": {
@@ -199,7 +199,7 @@
           ],
           "default": "managed",
           "scope": "machine",
-          "description": "Managed downloads a pinned Linux x86-64 SDK on first Native build/run (glibc 2.39+, Java 17+). System uses an existing LLVM 18 toolchain."
+          "description": "Managed downloads a pinned Linux x86-64 SDK on first Native build/run (glibc 2.35+, Java 17+). System uses an existing LLVM 18 toolchain."
         },
         "bhash.native.toolchainHome": {
           "type": "string",
@@ -271,7 +271,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.cjs",
     "test:integration": "node test/run.cjs",
-    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.5.1.vsix"
+    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.5.2.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"
