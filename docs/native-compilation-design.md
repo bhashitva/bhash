@@ -93,6 +93,7 @@ Static fields/methods and lazy class initialization now use the shared contract 
 persistent roots described in [native static members](native-static-members.md).
 
 Native enums and typed selection are described in [native enums](native-enums.md).
+Native immutable records and structural equality/hash contracts are described in [native records](native-records.md).
 
 Unsupported conversions and standard-library calls, user-defined generics,
 interop and concurrency are not yet available. The decimal-area calculation is supported;
