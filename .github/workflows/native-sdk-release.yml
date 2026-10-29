@@ -1,0 +1,54 @@
+name: Publish native SDK assets
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/vscode-native]
+    paths: [.github/workflows/native-sdk-release.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-native-sdk-1
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Verify tested artifact provenance
+        run: |
+          gh api repos/$GH_REPO/actions/runs/40930684203 > run.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('run.json'))
+          assert r['head_sha']=='9d3920d113f7afe926ee0e15909290289aa9e560'
+          assert r['conclusion']=='success'
+          assert r['path']=='.github/workflows/managed-native.yml'
+          PY
+      - name: Download and verify SDK and corresponding sources
+        run: |
+          gh run download 40930684203 -n bhash-managed-native-toolchain-linux-x86_64 -D sdk
+          cd sdk/managed-toolchain
+          echo '34ffca6772eb7747bbfcd85fc1675e6104daf26fc3ce39178202cd1cf39cc922  bhash-linux-x86_64-llvm18-v1.zip' | sha256sum -c -
+          echo '022082ccdaaa6d6bbe928aa4fb70b6eefc02a58272afcc74562577079f5c1bf8  bhash-linux-x86_64-llvm18-v1-sources.zip' | sha256sum -c -
+      - name: Publish immutable versioned download assets
+        run: |
+          cat > notes.md <<'NOTES'
+          Managed Linux x86-64 native SDK for Bhash (LLVM 18.1.3).
+
+          Compiler host: Linux x86-64 with glibc 2.39+ (Ubuntu 24.04+, including WSL) and Java 17+. No separate LLVM, linker, C compiler or development packages are required. Native compilation remains experimental. Generated applications do not require Java or LLVM.
+
+          The sources archive contains corresponding sources for redistributed components; copyright and license notices are included in the SDK. Keep these files available with this release.
+
+          Verified binary SHA-256: `34ffca6772eb7747bbfcd85fc1675e6104daf26fc3ce39178202cd1cf39cc922`
+
+          Verified sources SHA-256: `022082ccdaaa6d6bbe928aa4fb70b6eefc02a58272afcc74562577079f5c1bf8`
+
+          Built and tested by managed-native workflow run 40930684203. This release is a toolchain distribution, not a new compiler version.
+          NOTES
+          gh release create native-sdk-1.0.0 --draft --target main --title 'Bhash native Linux SDK 1.0.0 (LLVM 18)' --notes-file notes.md
+          gh release upload native-sdk-1.0.0 sdk/managed-toolchain/*.zip sdk/managed-toolchain/*.sha256
+          gh release edit native-sdk-1.0.0 --draft=false --latest=false
