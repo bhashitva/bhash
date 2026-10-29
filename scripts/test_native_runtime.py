@@ -189,6 +189,20 @@ def main():
         assert result.stdout.replace(b'\r\n', b'\n') == b'Native decimal checks passed.\n'
         print(f'{name}: binary64 conversions, formatting round trips, scalar tracing, NaN/zero hashing and failures passed')
 
+        trace_exe = BUILD / ('diagnostics-' + name + ('.exe' if os.name == 'nt' else ''))
+        trace_command = [part.replace('runtime_test.c', 'diagnostics_runtime_test.c').replace(str(exe), str(trace_exe)) for part in command]
+        result = run(trace_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        for arguments in ([], ['deep'], ['dynamic']):
+            result = run([str(trace_exe), *arguments])
+            assert result.returncode == 0, result.stderr
+            error = result.stderr.decode('utf-8')
+            assert 'बाद' not in error and 'trace.bhash:7:3' in error, error
+            assert error.count('  में ') == (256 if arguments == ['deep'] else 2), error
+            assert ('२५६ फ्रेम' in error) == (arguments == ['deep']), error
+        print(f'{name}: first-throw traces, GC retention, rethrow, bounded recursion and unwind cleanup passed')
+
         exception_exe = BUILD / ('exceptions-' + name + ('.exe' if os.name == 'nt' else ''))
         exception_command = [part.replace('runtime_test.c', 'exceptions_runtime_test.c').replace(str(exe), str(exception_exe)) for part in command]
         result = run(exception_command)
