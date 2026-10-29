@@ -34,7 +34,7 @@ class NativeReleaseTest {
     }
     @Test void inspectionEnforcesAbiDependenciesMetadataAndFingerprints()throws Exception{
         var report=NativeCompatibility.parse(elf(),metadata(),true);assertEquals("2.34",report.minimumGlibc());assertTrue(report.runtimeMatchesCompiler());
-        for(String changed:List.of(elf().replace("libm.so.6","libjvm.so"),elf().replace("ld-linux-x86-64.so.2","ld-musl-x86_64.so.1"),elf()+" GLIBC_PRIVATE",elf().replace("GLIBC_","OTHER_")))assertThrows(CompilationException.class,()->NativeCompatibility.parse(changed,metadata(),false));
+        for(String changed:List.of(elf().replace("libm.so.6","libjvm.so"),elf().replace("ld-linux-x86-64.so.2","ld-musl-x86_64.so.1"),elf()+" GLIBC_PRIVATE",elf()+" GLIBC_ABI_DT_RELR",elf()+" (RUNPATH) Library runpath: [/tmp]",elf().replace("GLIBC_","OTHER_")))assertThrows(CompilationException.class,()->NativeCompatibility.parse(changed,metadata(),false));
         for(String changed:List.of(metadata().replace("\"runtime_abi\":15","\"runtime_abi\":14"),metadata().replace("\"runtime_abi\":15","\"runtime_abi\":15.5"),metadata().replace("\"sanitized\":false","\"sanitized\":true"),"", " [ 0] {bad}"))assertThrows(CompilationException.class,()->NativeCompatibility.parse(elf(),changed,false));
         var json=NativeBuildInfo.JSON.fromJson(NativeBuildInfo.describe(false,false,"18.1.8"),com.google.gson.JsonObject.class);json.addProperty("runtime_sha256","0".repeat(64));String altered=" [ 0] "+json;
         assertFalse(NativeCompatibility.parse(elf(),altered,false).runtimeMatchesCompiler());assertThrows(CompilationException.class,()->NativeCompatibility.parse(elf(),altered,true));
@@ -57,10 +57,12 @@ class NativeReleaseTest {
         assertEquals("0000644",new String(tar,100,7,StandardCharsets.US_ASCII));assertEquals("0000755",new String(tar,1124,7,StandardCharsets.US_ASCII));assertEquals("00000002322",new String(tar,136,11,StandardCharsets.US_ASCII));
         files.put("../escape",new byte[0]);assertThrows(IOException.class,()->NativePackage.writeArchive(new ByteArrayOutputStream(),"root",files,0));
         assertThrows(IllegalArgumentException.class,()->NativePackage.validateName("../bad","1"));
+        assertThrows(IOException.class,()->NativePackage.build(List.of(),temporary,temporary.getRoot(),"hello","1",false,"2.39"));
     }
     @Test void cliRejectsInappropriateOptionsBeforeStartingTools(){
         var error=new ByteArrayOutputStream();var stream=new PrintStream(error);
         assertEquals(2,Main.run(new String[]{"native","doctor","--bad"},stream,stream));
+        if(!System.getProperty("os.name").equals("Linux")){assertEquals(1,Main.run(new String[]{"native","doctor"},stream,stream));assertTrue(error.toString().contains("BH9101"));}
         assertEquals(2,Main.run(new String[]{"native","package","hello.bhash"},stream,stream));
         assertEquals(2,Main.run(new String[]{"compile","hello.bhash","--source-root","."},stream,stream));
     }
