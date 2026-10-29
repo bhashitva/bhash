@@ -790,6 +790,7 @@ static int record_same(uint64_t a,uint64_t b) {
     free(work);return equal;
 }
 static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
+    if(kind==BH_BOOL){a&=1;b&=1;}
     if (a == b) return 1;
     if (kind == BH_ANY) {
         if (!a || !b) return 0;
@@ -809,6 +810,7 @@ static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
 static uint64_t record_hash(void *);
 int bh_value_same(uint64_t kind,uint64_t a,uint64_t b){return collection_same(kind,a,b);}
 static uint64_t collection_hash(uint64_t kind, uint64_t value) {
+    if(kind==BH_BOOL)value&=1;
     if(!value && reference_kind(kind))return mix_hash(kind);
     void *record=record_value(kind,value);if(record)return record_hash(record);
     if (kind == BH_ANY) {
