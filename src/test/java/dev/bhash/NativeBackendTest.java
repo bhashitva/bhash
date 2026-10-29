@@ -441,8 +441,6 @@ class NativeBackendTest {
         for(String source:List.of(
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "कार्य अप्रयुक्त() -> लघुपूर्णांक { लौटाओ परिवर्तित<लघुपूर्णांक>(१); } कार्य मुख्य() -> शून्य {}",
-            "कार्य मुख्य() -> शून्य { लिखो(पढ़ो()); }",
-            "कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो()); }",
             "कार्य मुख्य() -> शून्य { लिखो(१ << २); }",
             "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<लघुपूर्णांक>(१)); }")){
             var error=assertThrows(CompilationException.class,()->core(source));
@@ -1797,6 +1795,59 @@ class NativeBackendTest {
         requireNumericTargets();var result=numericExact(Files.readString(Path.of("examples/native/time.bhash")));
         assertEquals(0,result.exit());assertTrue(stats(result).get("allocations")>3000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());
         assertEquals(0,numericExact(Files.readString(Path.of("examples/standard-library/portable.bhash"))).exit());
+    }
+    @Test void coreRecognizesBothConsoleInputFunctions()throws Exception{
+        String ir=LlvmEmitter.emit(core("कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो(),पढ़ो()); }"));
+        assertTrue(ir.contains("call ptr @bh_console_text("));assertTrue(ir.contains("call i64 @bh_console_integer("));
+    }
+    private Result consoleRun(List<String> command,byte[] input,boolean nativeProgram)throws Exception{
+        Path stdin=temporary.resolve("console-input"),out=temporary.resolve("console-out"),err=temporary.resolve("console-err");
+        Files.write(stdin,input);var builder=new ProcessBuilder(command).redirectInput(stdin.toFile()).redirectOutput(out.toFile()).redirectError(err.toFile());
+        if(nativeProgram)builder.environment().putAll(GC_STRESS);var process=builder.start();
+        try{assertTrue(process.waitFor(30,TimeUnit.SECONDS),"Console program timed out");
+            return new Result(process.exitValue(),Files.readString(out).replace("\r\n","\n"),Files.readString(err));
+        }finally{if(process.isAlive())process.destroyForcibly();}
+    }
+    @Test void nativeConsoleMatchesJvmClrAndExactFixturesUnderForcedGc()throws Exception{
+        requireNumericTargets();int index=0;
+        for(var fixture:ConsoleFixtures.cases()){
+            var sources=List.of(new SourceFile("console.bhash",fixture.source()));
+            Path exe=temporary.resolve("console"+index),jar=temporary.resolve("console"+index+".jar"),clr=temporary.resolve("console-clr"+index++);
+            new NativeCompiler(true).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+            var nativeResult=consoleRun(List.of(exe.toString()),fixture.input(),true);
+            assertEquals(0,nativeResult.exit(),fixture.name()+nativeResult.err());assertEquals(fixture.expected(),nativeResult.out(),fixture.name());
+            assertEquals(0L,stats(nativeResult).get("live"));
+            if(fixture.name().equals("stress")){assertTrue(stats(nativeResult).get("allocations")>5000);assertTrue(stats(nativeResult).get("peak")<2500000);}
+            for(var command:List.of(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
+                var managed=consoleRun(command,fixture.input(),false);assertEquals(nativeResult.exit(),managed.exit(),managed.err());assertEquals(nativeResult.out(),managed.out(),fixture.name());
+            }
+        }
+    }
+    @Test void nativeConsoleCrReturnsBeforeNextInputByteAndFlushesOutput()throws Exception{
+        requireNumericTargets();var sources=List.of(new SourceFile("console.bhash","कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो()); लिखो(पाठपढ़ो()); }"));
+        Path exe=temporary.resolve("interactive"),jar=temporary.resolve("interactive.jar"),clr=temporary.resolve("interactive-clr");
+        new NativeCompiler(true).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+        for(var command:List.of(List.of(exe.toString()),List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
+            var process=new ProcessBuilder(command).redirectError(temporary.resolve("interactive.err").toFile()).start();
+            var executor=java.util.concurrent.Executors.newSingleThreadExecutor();
+            try{
+                var reader=new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream(),StandardCharsets.UTF_8));
+                var first=executor.submit(()->reader.readLine());process.getOutputStream().write(ConsoleFixtures.utf8("पहला\r"));process.getOutputStream().flush();
+                assertEquals("पहला",first.get(5,TimeUnit.SECONDS),"CR must finish the line without waiting for LF");
+                process.getOutputStream().write(ConsoleFixtures.utf8("\nदूसरा"));process.getOutputStream().close();
+                assertEquals("दूसरा",executor.submit(()->reader.readLine()).get(5,TimeUnit.SECONDS));assertTrue(process.waitFor(10,TimeUnit.SECONDS));assertEquals(0,process.exitValue());
+            }finally{process.destroyForcibly();executor.shutdownNow();}
+        }
+    }
+    @Test void nativeConsoleFactorialAndExampleMatchManaged()throws Exception{
+        requireNumericTargets();
+        for(String file:List.of("examples/factorial-console.bhash","examples/native/console.bhash")){
+            var sources=List.of(new SourceFile("console.bhash",Files.readString(Path.of(file))));Path exe=temporary.resolve("example"),jar=temporary.resolve("example.jar");
+            new NativeCompiler(true).compile(sources,exe);new JvmCompiler().compile(sources,jar);
+            byte[] input=ConsoleFixtures.utf8(file.contains("factorial")?"५\n":"भारत😀\n+४२\n");
+            var result=consoleRun(List.of(exe.toString()),input,true);var managed=consoleRun(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),input,false);
+            assertEquals(0,result.exit(),result.err());assertEquals(managed.out(),result.out());assertEquals(0L,stats(result).get("live"));
+        }
     }
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));
