@@ -751,6 +751,8 @@ public final class LlvmEmitter {
             if(target.type().reference())line("call void @bh_reference_store(ptr "+owner.ir()+", i64 "+target.field().offset()+", ptr "+value.ir()+")");
             else {
                 String pointer=temporary();line(pointer+" = getelementptr i8, ptr "+owner.ir()+", i64 "+target.field().offset());
+                // Fields use full 8-byte carriers; canonicalize i1 before C value inspection.
+                if(value.type()==Type.BOOL)value=bits(value);
                 line("store "+value.argument()+", ptr "+pointer);
             }
             release(target.receiver());release(f.value());
