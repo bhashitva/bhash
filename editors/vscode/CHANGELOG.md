@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.2 — 2026-10-29
+
+- Support managed native tools on Ubuntu 22.04/WSL with glibc 2.35 using a pinned Jammy LLVM 18 SDK.
+- Verify all bundled host binaries meet that baseline, and test clean Ubuntu 22.04 and 24.04 hosts, online setup, offline reuse, and real VS Code tasks.
+- Report the detected glibc version in unsupported-host errors.
+
+## 0.5.1 — 2026-10-29
+
+- Restore the Hindi display name and language alias in Marketplace/package metadata.
+- Reject packaging when the Hindi name or alias is incorrectly encoded.
+
 ## 0.5.0 — 2026-10-29
 
 - Add Native build/run choices and configured native tasks on Linux x86-64 and WSL.

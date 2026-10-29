@@ -15,8 +15,8 @@ import tempfile
 import zipfile
 
 ID = 'bhash-linux-x86_64-llvm18-v1'
-ARCHIVE = ID + '.zip'
-SOURCES = ID + '-sources.zip'
+ARCHIVE = ID + '-jammy.zip'
+SOURCES = ID + '-jammy-sources.zip'
 PACKAGES = {}
 COPYRIGHTS = set()
 
@@ -134,7 +134,7 @@ def main():
                 pkg = resource_owners.get(str(path.resolve())) or owner(path)
                 copy_file(path, root/'resource'/path.relative_to(resource), pkg)
         assert (root/'resource/include/stddef.h').is_file()
-        for pkg in ('libc6', 'libc6-dev', 'linux-libc-dev', 'libgcc-13-dev', 'libgcc-s1'):
+        for pkg in ('libc6', 'libc6-dev', 'linux-libc-dev', 'libgcc-11-dev', 'libgcc-s1'):
             for name in run('dpkg-query', '-L', pkg).splitlines():
                 path = Path(name)
                 if not path.is_file():
@@ -160,9 +160,17 @@ unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH OBJC_INCLUDE_PATH LIBRARY_PATH GCC
             path = root/'bin'/name;path.parent.mkdir(exist_ok=True)
             command = 'exec "$bhash_sdk/libexec/'+name+'" "$@"\n'
             if name == 'clang-18':
-                command = '''exec "$bhash_sdk/libexec/clang-18" -Wno-unused-command-line-argument --sysroot="$bhash_sdk/sysroot" --gcc-toolchain="$bhash_sdk/sysroot/usr" -resource-dir "$bhash_sdk/resource" --ld-path="$bhash_sdk/bin/ld.lld" "-ffile-prefix-map=$bhash_sdk=/bhash/toolchain" "-fdebug-prefix-map=$bhash_sdk=/bhash/toolchain" "$@"
+                command = '''exec "$bhash_sdk/libexec/clang-18" -Wno-unused-command-line-argument -gno-record-command-line -fno-record-command-line --sysroot="$bhash_sdk/sysroot" --gcc-toolchain="$bhash_sdk/sysroot/usr" -resource-dir "$bhash_sdk/resource" --ld-path="$bhash_sdk/bin/ld.lld" "-ffile-prefix-map=$bhash_sdk=/bhash/toolchain" "-fdebug-prefix-map=$bhash_sdk=/bhash/toolchain" "$@"
 '''
             path.write_text(common+command, encoding='utf-8');path.chmod(0o755)
+        # Declaring a lower minimum is insufficient: inspect every host-side ELF.
+        for directory in ('libexec', 'lib'):
+            for binary in sorted((root/directory).iterdir()):
+                if binary.read_bytes()[:4] != b'\x7fELF':
+                    continue
+                versions = re.findall(r'\bGLIBC_(\d+)\.(\d+)\b', run('readelf', '--version-info', '--wide', str(binary)))
+                if any((int(major), int(minor)) > (2, 35) for major, minor in versions):
+                    raise RuntimeError('SDK host binary exceeds glibc 2.35 baseline: '+str(binary))
         # Retain notices for every package whose files were actually copied.
         for pkg in sorted(PACKAGES):
             binary = PACKAGES[pkg]['binary']
@@ -172,20 +180,20 @@ unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH OBJC_INCLUDE_PATH LIBRARY_PATH GCC
             target = root/'licenses'/(binary+'.copyright')
             target.parent.mkdir(exist_ok=True)
             shutil.copyfile(copyright, target)
-        write_json(root/'packages.json', {'snapshot': os.environ['BHASH_UBUNTU_SNAPSHOT'], 'packages': PACKAGES})
+        write_json(root/'packages.json', {'snapshot': os.environ['BHASH_UBUNTU_SNAPSHOT'], 'llvm_repository': 'https://apt.llvm.org/jammy/', 'llvm_version': os.environ['BHASH_LLVM_DEB_VERSION'], 'packages': PACKAGES})
         source_packages = sorted({(p['source'], p['source_version']) for p in PACKAGES.values()})
         for source, version in source_packages:
             print('Corresponding source:', source, version, flush=True)
             subprocess.run(['apt-get', 'source', '--download-only', '-y', source+'='+version], cwd=sources, check=True)
-        write_json(sources/'packages.json', {'snapshot': os.environ['BHASH_UBUNTU_SNAPSHOT'], 'packages': PACKAGES})
+        write_json(sources/'packages.json', {'snapshot': os.environ['BHASH_UBUNTU_SNAPSHOT'], 'llvm_repository': 'https://apt.llvm.org/jammy/', 'llvm_version': os.environ['BHASH_LLVM_DEB_VERSION'], 'packages': PACKAGES})
         write_zip(sources, output/SOURCES)
         source_info = {'file': SOURCES, 'sha256': sha(output/SOURCES), 'packages': [{'name': name, 'version': version} for name, version in source_packages]}
         write_json(root/'sources.json', source_info)
         shutil.copyfile('/builder/LICENSE', root/'LICENSE')
         shutil.copyfile('/builder/NOTICE', root/'NOTICE')
-        (root/'README.txt').write_text('Bhash managed Linux x86-64 LLVM 18 toolchain.\nRequires host glibc >= 2.39 and /bin/sh.\nInstall through native toolchain install with the published archive SHA-256.\nThe matching -sources.zip contains corresponding upstream/distribution sources.\nRedistribute both archives together; retain licenses/ and packages.json.\nThe SDK contains third-party components with their own licenses.\n', encoding='utf-8')
+        (root/'README.txt').write_text('Bhash managed Linux x86-64 LLVM 18 toolchain.\nRequires host glibc >= 2.35 and /bin/sh.\nInstall through native toolchain install with the published archive SHA-256.\nThe matching -sources.zip contains corresponding upstream/distribution sources.\nRedistribute both archives together; retain licenses/ and packages.json.\nThe SDK contains third-party components with their own licenses.\n', encoding='utf-8')
         files = {p.relative_to(root).as_posix(): {'sha256': sha(p), 'size': p.stat().st_size, 'executable': os.access(p, os.X_OK)} for p in sorted(root.rglob('*')) if p.is_file()}
-        write_json(root/'toolchain.json', {'format': 1, 'id': ID, 'target': 'x86_64-unknown-linux-gnu', 'llvm_version': llvm, 'minimum_glibc': '2.39', 'files': files, 'sources': source_info})
+        write_json(root/'toolchain.json', {'format': 1, 'id': ID, 'target': 'x86_64-unknown-linux-gnu', 'llvm_version': llvm, 'minimum_glibc': '2.35', 'files': files, 'sources': source_info})
         write_zip(root, output/ARCHIVE)
         # Rebuild the ZIP from the same immutable payload to verify packaging determinism.
         again = Path(temporary)/'again.zip';write_zip(root, again)

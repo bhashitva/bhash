@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 const {sdk,ensureNative,nativeEnvironment,requireNativeHost,capture}=require('../dist/native.js');
 const options={java:'java with spaces',jar:'/compiler हिन्दी.jar',mode:'managed'};
-function fake({installed=false,libc='glibc 2.39',busy=false,fail=false,wrong=false}={}) {
+function fake({installed=false,libc='glibc 2.35',busy=false,fail=false,wrong=false}={}) {
     const calls=[];let active=installed;
     const run=async(command,args,env)=>{
         calls.push({command,args,env});
@@ -37,7 +37,7 @@ test('first use installs only trusted versioned HTTPS URL with bundled SHA',asyn
     const f=fake();await ensureNative(options,()=>{},undefined,false,f.run);
     const install=f.calls.find(c=>c.args.includes('install'));assert.ok(install);
     assert.deepEqual(install.args,['-Dfile.encoding=UTF-8','-jar',options.jar,'native','toolchain','install','--url',sdk.url,'--sha256',sdk.sha256,'--json']);
-    assert.match(sdk.url,/^https:\/\/github.com\/bhashitva\/bhash\/releases\/download\/native-sdk-1.0.0\//);
+    assert.match(sdk.url,/^https:\/\/github.com\/bhashitva\/bhash\/releases\/download\/native-sdk-1.1.0\//);
     assert.equal(f.calls.filter(c=>c.args.includes('status')).length,2);
 });
 test('cached SDK avoids network and repair explicitly reinstalls',async()=>{
@@ -58,9 +58,15 @@ test('download failure propagates without compile or hidden fallback',async()=>{
     const f=fake({fail:true});await assert.rejects(ensureNative(options,()=>{},undefined,false,f.run),/SHA-256/);
     assert.ok(!f.calls.some(c=>c.args.includes('doctor')));
 });
+test('Ubuntu 22.04 and newer hosts accept the managed SDK',async()=>{
+    for(const libc of ['glibc 2.35','glibc 2.39','glibc 2.41']){
+        const f=fake({libc});await ensureNative(options,()=>{},undefined,false,f.run);
+        assert.equal(f.calls.filter(c=>c.args.includes('install')).length,1);
+    }
+});
 test('older glibc and musl fail before download',async()=>{
-    for(const libc of ['glibc 2.35','musl 1.2.5']){
-        const f=fake({libc});await assert.rejects(ensureNative(options,()=>{},undefined,false,f.run),/glibc 2.39/);assert.equal(f.calls.length,1);
+    for(const libc of ['glibc 2.34','glibc 2.31','musl 1.2.5']){
+        const f=fake({libc});await assert.rejects(ensureNative(options,()=>{},undefined,false,f.run),/glibc 2.35/);assert.equal(f.calls.length,1);
     }
 });
 test('system mode never downloads an SDK',async()=>{

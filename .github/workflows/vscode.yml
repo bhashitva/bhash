@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest]
+        os: [ubuntu-22.04, ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -29,7 +29,7 @@ jobs:
       - name: Test shipped native launcher without LLVM or C development packages
         if: runner.os == 'Linux'
         run: |
-          docker build -f scripts/native-vscode-clean.Dockerfile -t bhash-vscode-clean .
+          docker build --build-arg UBUNTU_VERSION=${{ matrix.os == 'ubuntu-22.04' && '22.04' || '24.04' }} -f scripts/native-vscode-clean.Dockerfile -t bhash-vscode-clean .
           docker volume create bhash-vscode-cache
           docker run --rm -v bhash-vscode-cache:/home/bhash/.cache -v "$PWD:/repo:ro" bhash-vscode-clean node /repo/editors/vscode/test/native-clean.cjs
           docker run --rm --network none -v bhash-vscode-cache:/home/bhash/.cache -v "$PWD:/repo:ro" bhash-vscode-clean node /repo/editors/vscode/test/native-clean.cjs --offline
@@ -43,5 +43,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-vscode-${{ runner.os }}
-          path: target/bhash-vscode-0.5.0.vsix
+          path: target/bhash-vscode-0.5.2.vsix
           if-no-files-found: error

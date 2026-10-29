@@ -5,13 +5,13 @@ import * as path from 'node:path';
 // Trusted catalog bundled with the extension; never taken from workspace content.
 export const sdk = Object.freeze({
     id: 'bhash-linux-x86_64-llvm18-v1',
-    url: 'https://github.com/bhashitva/bhash/releases/download/native-sdk-1.0.0/bhash-linux-x86_64-llvm18-v1.zip',
-    sha256: '34ffca6772eb7747bbfcd85fc1675e6104daf26fc3ce39178202cd1cf39cc922'
+    url: 'https://github.com/bhashitva/bhash/releases/download/native-sdk-1.1.0/bhash-linux-x86_64-llvm18-v1-jammy.zip',
+    sha256: '52e8a1c7bd1b71082c0c9d7364776a53f5d7a3b8b87d6501f1cf0894ed09e844'
 });
 export interface NativeOptions {java: string; jar: string; mode: 'managed' | 'system'; home?: string;}
 export type Runner = (command: string, args: string[], env: NodeJS.ProcessEnv, signal?: AbortSignal) => Promise<string>;
 export function requireNativeHost(platform = process.platform, arch = process.arch): void {
-    if (platform !== 'linux' || arch !== 'x64') throw new Error('Native requires a Linux x86-64 extension host. On Windows, open this folder in WSL (Ubuntu 24.04+) and install Bhash in WSL. macOS, Windows and ARM native hosts are not supported yet.');
+    if (platform !== 'linux' || arch !== 'x64') throw new Error('Native requires a Linux x86-64 extension host. On Windows, open this folder in WSL (Ubuntu 22.04+) and install Bhash in WSL. macOS, Windows and ARM native hosts are not supported yet.');
 }
 export function nativeEnvironment(options: NativeOptions, base = process.env): NodeJS.ProcessEnv {
     if (!['managed', 'system'].includes(options.mode)) throw new Error('bhash.native.toolchainMode must be managed or system.');
@@ -60,8 +60,8 @@ export async function ensureNative(options: NativeOptions, log: (message: string
     if (options.mode === 'system') {await compiler(['native', 'doctor', '--json']); return;}
     const libc = (await run('getconf', ['GNU_LIBC_VERSION'], env, signal)).trim();
     const match = /^glibc (\d+)\.(\d+)$/.exec(libc);
-    if (!match || Number(match[1]) < 2 || Number(match[1]) === 2 && Number(match[2]) < 39)
-        throw new Error('The managed native SDK requires glibc 2.39+ (Ubuntu 24.04+). Upgrade the Linux/WSL distribution, or select bhash.native.toolchainMode = system and install a compatible LLVM 18 toolchain.');
+    if (!match || Number(match[1]) < 2 || Number(match[1]) === 2 && Number(match[2]) < 35)
+        throw new Error(`Your host reports ${libc}. The managed native SDK requires glibc 2.35+ (Ubuntu 22.04+). Upgrade the Linux/WSL distribution, or select bhash.native.toolchainMode = system and install a compatible LLVM 18 toolchain.`);
     const status = async (): Promise<Status> => {
         const result = JSON.parse(await compiler(['native', 'toolchain', 'status', '--json']));
         if (typeof result.installed !== 'boolean') throw new Error('Unsupported compiler toolchain status. Update bhash.compilerPath or use the bundled compiler.');
@@ -70,7 +70,7 @@ export async function ensureNative(options: NativeOptions, log: (message: string
     // Repair must also work when the old installation receipt or manifest is corrupt.
     let current = repair ? {installed: false} : await status();
     if (!repair && current.installed && current.archiveSha256 === sdk.sha256) return;
-    log(`Downloading Bhash native SDK (115 MiB) from GitHub Releases. SHA-256: ${sdk.sha256}`);
+    log(`Downloading Bhash native SDK (110 MiB) from GitHub Releases. SHA-256: ${sdk.sha256}`);
     log('Setup includes LLVM, the linker, and C runtime headers/libraries. No administrator access is required.');
     const deadline = Date.now() + 6 * 60 * 1000;
     for (;;) {

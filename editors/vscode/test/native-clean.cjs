@@ -6,7 +6,7 @@ const {sdk}=require('../dist/native.js');
 const offline=process.argv.includes('--offline');
 for(const tool of ['clang','clang-18','opt','opt-18','gcc','cc','ld','ld.lld','readelf','llvm-readelf'])assert.notEqual(spawnSync('sh',['-c','command -v "$1"','sh',tool]).status,0,`unexpected ${tool}`);
 assert.ok(!fs.existsSync('/usr/include/stdio.h'));
-for(const pkg of ['libc6-dev','libgcc-13-dev','linux-libc-dev','clang-18','llvm-18','binutils'])assert.ok(!spawnSync('dpkg-query',['-W','-f=${Status}',pkg],{encoding:'utf8'}).stdout.includes('install ok installed'),`unexpected ${pkg}`);
+for(const pkg of ['libc6-dev','libgcc-11-dev','libgcc-13-dev','linux-libc-dev','clang-18','llvm-18','binutils'])assert.ok(!spawnSync('dpkg-query',['-W','-f=${Status}',pkg],{encoding:'utf8'}).stdout.includes('install ok installed'),`unexpected ${pkg}`);
 const home=fs.mkdtempSync(path.join(os.tmpdir(),'bhash native भारत '));
 const launcher=path.resolve(__dirname,'../dist/native-task.js');
 const request={java:'java',jar:'/repo/target/bhash-compiler-0.1.0-SNAPSHOT.jar',mode:'managed'};

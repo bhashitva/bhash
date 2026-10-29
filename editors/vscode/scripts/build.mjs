@@ -4,6 +4,10 @@ import {spawnSync} from 'node:child_process';
 import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
 const root = new URL('../../../', import.meta.url);
+const manifest = JSON.parse(await readFile('package.json', 'utf8'));
+const hindiName = '\u092d\u093e\u0937';
+if (manifest.displayName !== `Bhash (${hindiName})` || !manifest.contributes.languages.find(language => language.id === 'bhash')?.aliases.includes(hindiName))
+    throw new Error('The Bhash Hindi display name and language alias must be valid UTF-8 before packaging.');
 // Refuse to produce a deceptively installable VSIX from a missing/interrupted Maven build.
 const compiler = new URL('target/bhash-compiler-0.1.0-SNAPSHOT.jar', root);
 const sanity = spawnSync('java', ['-Dfile.encoding=UTF-8', '-jar', fileURLToPath(compiler), 'targets'], {encoding: 'utf8'});

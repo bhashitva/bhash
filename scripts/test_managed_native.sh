@@ -3,12 +3,12 @@
 # Run as an unprivileged user in scripts/native-toolchain-clean.Dockerfile, with --network none.
 set -eu
 jar=/artifacts/bhash-compiler-0.1.0-SNAPSHOT.jar
-bundle=/artifacts/managed-toolchain/bhash-linux-x86_64-llvm18-v1.zip
+bundle=/artifacts/managed-toolchain/bhash-linux-x86_64-llvm18-v1-jammy.zip
 for tool in clang clang-18 opt opt-18 gcc cc ld ld.lld readelf llvm-readelf; do
     if command -v "$tool"; then echo "Unexpected system development tool: $tool"; exit 1; fi
 done
 [ ! -e /usr/include/stdio.h ]
-for package in libc6-dev libgcc-13-dev linux-libc-dev clang-18 llvm-18 binutils; do
+for package in libc6-dev libgcc-11-dev linux-libc-dev clang-18 llvm-18 binutils; do
     if dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then echo "Unexpected system package: $package"; exit 1; fi
 done
 read -r sha name < "$bundle.sha256"
@@ -41,7 +41,15 @@ original_home=$BHASH_TOOLCHAIN_HOME
 export BHASH_TOOLCHAIN_HOME="/home/bhash/second cache भारत"
 cli native toolchain install --archive "$bundle" --sha256 "$sha"
 cli compile /repo/examples/native/hello.bhash --target native --debug --source-root /repo -o debug-2
-cmp debug-1 debug-2
+if ! cmp debug-1 debug-2; then
+    reader=$(find "$original_home/installations" -path '*/bin/llvm-readelf' -type f | head -n 1)
+    for executable in debug-1 debug-2; do
+        echo "Debug path diagnostics: $executable"
+        "$reader" --string-dump=.debug_str "$executable" | grep -E '/home/bhash|toolchain|installations' | head -n 35 || true
+        "$reader" --string-dump=.debug_line_str "$executable" | grep -E '/home/bhash|toolchain|installations' | head -n 35 || true
+    done
+    exit 1
+fi
 export BHASH_TOOLCHAIN_HOME=$original_home
 # Failed/corrupt archives never replace the active installation.
 cp "$BHASH_TOOLCHAIN_HOME/active.json" active-before.json
