@@ -83,8 +83,8 @@ public final class Main {
     private static int usage(PrintStream err) {
         err.println("Usage: java -jar bhash-compiler.jar check <file.bhash|project-directory|bhash.project>");
         err.println("       java -jar bhash-compiler.jar parse <file.bhash>");
-        err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser|native]");
-        err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr|native]");
+        err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser|native] [--debug]");
+        err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr|native] [--debug]");
         err.println("       java -jar bhash-compiler.jar deps lock|restore|verify <project> [--offline]");
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");
@@ -94,14 +94,14 @@ public final class Main {
         return 2;
     }
 
-    private record Options(Path source, Path output, Target target) {}
+    private record Options(Path source, Path output, Target target, boolean debug) {}
 
     private static Options options(String[] args, boolean allowOutput) throws IOException {
         Path source = Path.of(args[1]);
         if (source.getFileName() == null) throw new IOException("Expected a Bhash source file.");
         Path output = null;
         Target target = Target.JVM;
-        boolean targetSet = false;
+        boolean targetSet = false, debug = false;
         for (int i = 2; i < args.length; i++) {
             if (args[i].equals("-o") && allowOutput && output == null && i + 1 < args.length) {
                 output = Path.of(args[++i]);
@@ -114,8 +114,10 @@ public final class Main {
                     case "wasm-browser", "wasm" -> Target.WASM;
                     default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm), native (experimental Linux x86-64).");
                 };
+            } else if(args[i].equals("--debug") && !debug){debug=true;
             } else throw new IllegalArgumentException("Invalid or incomplete option: " + args[i]);
         }
+        if(debug && target!=Target.NATIVE)throw new IllegalArgumentException("--debug currently requires --target native.");
         if (output == null && allowOutput) {
             var project = ProjectLoader.load(source);
             String suffix = target == Target.JVM ? ".jar" : target == Target.CLR ? "-clr" : target == Target.NATIVE ? "-native" : "-web";
@@ -123,7 +125,7 @@ public final class Main {
                     ? project.root().resolve("build").resolve(project.name() + suffix)
                     : source.resolveSibling(project.name() + suffix);
         }
-        return new Options(source, output, target);
+        return new Options(source, output, target, debug);
     }
 
     private static void build(Options options) throws IOException, CompilationException {
@@ -132,7 +134,7 @@ public final class Main {
         project.protectOutput(options.output,options.target == Target.CLR || options.target == Target.WASM);
         if (options.target == Target.JVM) new JvmCompiler().compile(project.sources(), options.output);
         else if (options.target == Target.WASM) new WasmCompiler().compile(project.sources(), options.output);
-        else if (options.target == Target.NATIVE) new NativeCompiler().compile(project.sources(), options.output);
+        else if (options.target == Target.NATIVE) new NativeCompiler(false,options.debug).compile(project.sources(), options.output);
         else new ClrCompiler().compile(project.sources(), options.output);
     }
 
@@ -185,7 +187,7 @@ public final class Main {
             }
             temporary = Files.createTempDirectory("bhash-run-");
             Path output = temporary.resolve(requested.target == Target.JVM ? "program.jar" : "clr");
-            var options = new Options(requested.source, output, requested.target);
+            var options = new Options(requested.source, output, requested.target, requested.debug);
             build(options);
             ProcessBuilder builder;
             if (options.target == Target.JVM) {
