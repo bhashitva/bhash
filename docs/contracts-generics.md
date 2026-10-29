@@ -1,6 +1,8 @@
 # Interfaces, generics, overloads and static members (v0.3)
 
 These features use the same semantic rules on JVM, .NET CLR and browser WebAssembly.
+The Linux native target also supports these explicit generics through the same specialization
+pipeline; see [native generics](native-generics.md) for GC layouts and deployment validation.
 The complete runnable example is [contracts-generics.bhash](../examples/contracts-generics.bhash).
 
 ## Vocabulary

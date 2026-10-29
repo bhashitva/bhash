@@ -86,7 +86,8 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
   loaded user/dependency declarations fit this profile.
 
 Unsupported features produce source-located Hindi diagnostics, including unused
-unsupported declarations. Unsupported calls to standard-library intrinsics are rejected;
+concrete unsupported declarations. Generic templates follow shared lazy specialization:
+unused template bodies are not semantically checked until instantiated. Unsupported calls to standard-library intrinsics are rejected;
 injected compiler metadata alone does not require library execution.
 
 Static fields/methods and lazy class initialization now use the shared contract and precise
@@ -94,8 +95,10 @@ persistent roots described in [native static members](native-static-members.md).
 
 Native enums and typed selection are described in [native enums](native-enums.md).
 Native immutable records and structural equality/hash contracts are described in [native records](native-records.md).
+User-defined generics use shared concrete specialization before native profile validation;
+see [native generics](native-generics.md) for layouts, static roots and limits.
 
-Unsupported conversions and standard-library calls, user-defined generics,
+Unsupported conversions and standard-library calls,
 interop and concurrency are not yet available. The decimal-area calculation is supported;
 math and seeded random library calls are supported. Other unsupported library calls receive diagnostics. Defaults and behavior of managed targets are unchanged.
 

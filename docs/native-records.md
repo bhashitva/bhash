@@ -1,6 +1,6 @@
 # मूल-मशीन अपरिवर्तनीय अभिलेख (Native Immutable Records)
 
-Linux x86-64 / LLVM 18 पर non-generic `अभिलेख` उपलब्ध हैं। Generated executables
+Linux x86-64 / LLVM 18 पर `अभिलेख` उपलब्ध हैं, [generic records](native-generics.md) सहित। Generated executables
 को JVM/.NET नहीं चाहिए। [पूरा GC उदाहरण](../examples/native/records.bhash) देखें।
 
 ## निर्माण और क्षेत्र (Construction and Fields)
@@ -25,8 +25,7 @@ inheritance shared checker से अस्वीकार होते है�
 
 Native scalar, text, enum, record, ordinary object/interface, `सर्ववस्तु`, array, list, map
 और byte-buffer fields समर्थित हैं। Nullable reference fields `रिक्त` रख सकती हैं।
-`पाठ` की existing non-nullability लागू रहती है। Generic records और अन्य user-defined
-generics अभी native profile के बाहर हैं; builtin generic collections fields में रख सकते हैं।
+`पाठ` की existing non-nullability लागू रहती है। [User-defined generics](native-generics.md) और builtin generic collections fields में रख सकते हैं।
 
 ## समानता और हैशिंग (Equality and Hashing)
 
