@@ -741,12 +741,61 @@ static uint64_t boxed_kind(const void *value) {
     return id == -8 ? BH_INT32 : id == -7 ? BH_BYTE : id == -6 ? BH_REAL : id >= -3 && id <= -1 ? (uint64_t)-id : BH_REFERENCE;
 }
 static uint64_t box_payload(const void *value) { uint64_t bits; memcpy(&bits, (const unsigned char *)value + 8, 8); return bits; }
+static const bh_record_info *record_info(const void *value) {
+    if(!value)return NULL;
+    const bh_class_info *info;memcpy(&info,value,8);
+    for(uint64_t i=0;i<info->type_count;++i)if(info->type_ids[i]==-9)return (const bh_record_info *)info;
+    return NULL;
+}
+static void *record_value(uint64_t kind,uint64_t bits) {
+    if(!bits || (kind!=BH_REFERENCE && kind!=BH_ANY))return NULL;
+    if(kind==BH_ANY && boxed_kind(bits_pointer(bits))!=BH_REFERENCE)return NULL;
+    void *value=bits_pointer(bits);return record_info(value)?value:NULL;
+}
+static void *record_scratch(void *memory,size_t *capacity,size_t needed,size_t unit) {
+    if(needed<=*capacity)return memory;
+    if(needed>SIZE_MAX/unit)fatal("अभिलेख तुलना कार्य-स्थान सीमा से बाहर है।");
+    size_t next=*capacity?*capacity:16;
+    while(next<needed){if(next>SIZE_MAX/2){next=needed;break;}next*=2;}
+    if(next>SIZE_MAX/unit)next=needed;
+    void *result=realloc(memory,next*unit);if(!result)fatal("अभिलेख तुलना के लिए स्मृति उपलब्ध नहीं है।");
+    *capacity=next;return result;
+}
+static int collection_same(uint64_t,uint64_t,uint64_t);
+typedef struct record_pair {uint64_t kind,a,b;} record_pair;
+static int record_same(uint64_t a,uint64_t b) {
+    record_pair *work=NULL;size_t count=1,capacity=0;int equal=1;
+    work=record_scratch(work,&capacity,count,sizeof(*work));work[0]=(record_pair){BH_REFERENCE,a,b};
+    for(size_t cursor=0;cursor<count;++cursor){
+        record_pair item=work[cursor];if(item.a==item.b)continue;
+        if(item.kind==BH_ANY){
+            if(!item.a || !item.b){equal=0;break;}
+            uint64_t ak=boxed_kind(bits_pointer(item.a)),bk=boxed_kind(bits_pointer(item.b));
+            if(ak!=bk){equal=0;break;}item.kind=ak;
+            if(ak!=BH_REFERENCE){item.a=box_payload(bits_pointer(item.a));item.b=box_payload(bits_pointer(item.b));}
+        }
+        if(item.kind!=BH_REFERENCE){if(!collection_same(item.kind,item.a,item.b)){equal=0;break;}continue;}
+        const bh_record_info *ai=record_info(bits_pointer(item.a)),*bi=record_info(bits_pointer(item.b));
+        if(!ai || ai!=bi){equal=0;break;}
+        /* Memoize expanded pairs: shared immutable DAGs must not expand exponentially. */
+        int seen=0;for(size_t j=0;j<cursor;++j)if(work[j].kind==BH_REFERENCE && work[j].a==item.a && work[j].b==item.b){seen=1;break;}
+        work[cursor]=item;if(seen)continue;
+        if(ai->field_count>SIZE_MAX-count)fatal("अभिलेख तुलना कार्य-स्थान सीमा से बाहर है।");
+        work=record_scratch(work,&capacity,count+(size_t)ai->field_count,sizeof(*work));
+        for(uint64_t j=0;j<ai->field_count;++j){
+            uint64_t av,bv;memcpy(&av,(const unsigned char *)bits_pointer(item.a)+8+j*8,8);memcpy(&bv,(const unsigned char *)bits_pointer(item.b)+8+j*8,8);
+            work[count++]=(record_pair){ai->field_kinds[j],av,bv};
+        }
+    }
+    free(work);return equal;
+}
 static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
     if (a == b) return 1;
     if (kind == BH_ANY) {
         if (!a || !b) return 0;
         uint64_t ak = boxed_kind(bits_pointer(a)), bk = boxed_kind(bits_pointer(b));
-        if (ak != bk || ak == BH_REFERENCE) return 0;
+        if (ak != bk) return 0;
+        if(ak==BH_REFERENCE)return record_same(a,b);
         return collection_same(ak, box_payload(bits_pointer(a)), box_payload(bits_pointer(b)));
     }
     if (kind == BH_REAL) {
@@ -754,9 +803,14 @@ static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
         return x == y || (isnan(x) && isnan(y));
     }
     if (kind == BH_TEXT) return bh_text_equal(bits_pointer(a), bits_pointer(b));
+    if(kind==BH_REFERENCE && a && b)return record_same(a,b);
     return 0;
 }
+static uint64_t record_hash(void *);
+int bh_value_same(uint64_t kind,uint64_t a,uint64_t b){return collection_same(kind,a,b);}
 static uint64_t collection_hash(uint64_t kind, uint64_t value) {
+    if(!value && reference_kind(kind))return mix_hash(kind);
+    void *record=record_value(kind,value);if(record)return record_hash(record);
     if (kind == BH_ANY) {
         uint64_t actual = boxed_kind(bits_pointer(value));
         if (actual != BH_REFERENCE) return collection_hash(actual, box_payload(bits_pointer(value)));
@@ -779,6 +833,33 @@ static uint64_t collection_hash(uint64_t kind, uint64_t value) {
         value = o->identity; /* Retained with the object if a future collector moves it. */
     }
     return mix_hash(value ^ (kind * UINT64_C(0x9e3779b97f4a7c15)));
+}
+typedef struct record_hash_frame {
+    void *value;const bh_record_info *info;
+    uint64_t hash,field;size_t parent;int ready;
+} record_hash_frame;
+static uint64_t record_hash(void *value) {
+    record_hash_frame *work=NULL;size_t count=1,capacity=0,cursor=0;
+    work=record_scratch(work,&capacity,count,sizeof(*work));
+    work[0]=(record_hash_frame){value,record_info(value),mix_hash((uint64_t)(uintptr_t)record_info(value)),0,0,0};
+    for(;;){
+        record_hash_frame frame=work[cursor];
+        if(frame.field==frame.info->field_count){
+            work[cursor].ready=1;if(cursor==0)break;cursor=frame.parent;continue;
+        }
+        uint64_t bits,kind=frame.info->field_kinds[frame.field];memcpy(&bits,(unsigned char *)frame.value+8+frame.field*8,8);
+        void *child=record_value(kind,bits);uint64_t hash;
+        if(child){
+            size_t index=0;while(index<count && work[index].value!=child)++index;
+            if(index==count){
+                work=record_scratch(work,&capacity,count+1,sizeof(*work));const bh_record_info *info=record_info(child);
+                work[count++]=(record_hash_frame){child,info,mix_hash((uint64_t)(uintptr_t)info),0,cursor,0};cursor=index;continue;
+            }
+            if(!work[index].ready)fatal("आंतरिक अभिलेख चक्र अमान्य है।");hash=work[index].hash;
+        }else hash=collection_hash(kind,bits);
+        work[cursor].hash=31*frame.hash+hash;++work[cursor].field;
+    }
+    uint64_t result=work[0].hash;free(work);return result;
 }
 static uint64_t checked_length(int64_t length, const void *location) {
     if (length < 0 || length > INT32_MAX) runtime_error(location, "सरणी की लंबाई सीमा से बाहर है।");
