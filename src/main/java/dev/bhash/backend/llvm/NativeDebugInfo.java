@@ -11,10 +11,10 @@ final class NativeDebugInfo {
     private final List<String> nodes=new ArrayList<>();
     private final Map<String,Integer> files=new LinkedHashMap<>(),locations=new HashMap<>();
     private final Map<Type,Integer> types=new EnumMap<>(Type.class);
-    private final int unit,signature,expression;
+    private final int unit,expression;
     NativeDebugInfo(Source source){
         int file=file(source);unit=add("distinct !DICompileUnit(language: DW_LANG_C, file: !"+file+", producer: "+quote("Bhash native LLVM")+", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)");
-        signature=add("!DISubroutineType(types: !"+add("!{}")+")");expression=add("!DIExpression()");
+        expression=add("!DIExpression()");
     }
     static String quote(String value){
         var out=new StringBuilder("\"");for(byte b:value.getBytes(StandardCharsets.UTF_8)){int c=b&255;if(c>=32 && c<127 && c!=34 && c!=92)out.append((char)c);else out.append(String.format(Locale.ROOT,"\\%02X",c));}return out.append('"').toString();
@@ -25,6 +25,10 @@ final class NativeDebugInfo {
     });}
     int function(Function f,String linkage,boolean artificial){
         String name=f.name().isEmpty()?"<निर्मित सहायक>":f.name()+(artificial?".<सहायक>":"");
+        boolean callback=linkage.startsWith("btry");
+        var arguments=new ArrayList<String>();Type result=callback?Type.INT:f.result();arguments.add(result==Type.VOID?"null":"!"+type(result));
+        if(callback)arguments.add("!"+type(Type.OBJECT));else for(var parameter:f.parameters())arguments.add("!"+type(parameter.type()));
+        int signature=add("!DISubroutineType(types: !"+add("!{"+String.join(", ",arguments)+"}")+")");
         return add("distinct !DISubprogram(name: "+quote(name)+", linkageName: "+quote(linkage)+", scope: !"+file(f.source())+", file: !"+file(f.source())+", line: "+f.source().line()+", type: !"+signature+", scopeLine: "+f.source().line()+", flags: DIFlagPrototyped"+(artificial?" | DIFlagArtificial":"")+", spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !"+unit+")");
     }
     int location(int scope,Source source){return locations.computeIfAbsent(scope+":"+source,k->{
