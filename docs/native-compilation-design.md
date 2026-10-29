@@ -76,7 +76,8 @@ automatically. Build-time JDK/LLVM requirements do not carry over to the executa
 - Unsigned bytes, packed byte buffers, strict UTF-8 encoding/decoding and binary file I/O in [native bytes](native-bytes.md).
 - UTF-8 whole-file text I/O in [native files](native-files.md), with the existing 16 MiB limit.
 - Text split/join and strict JSON parsing/serialization in [native structured text](native-json-text.md).
-- `लिखो` with multiple arguments and blank lines.
+- `लिखो` with multiple arguments and blank lines, plus UTF-8 console input using
+  `पाठपढ़ो()` and `पढ़ो()` in [native console input](native-console.md).
 - Existing multi-file/package resolution and lockfile verification, provided all
   loaded user/dependency declarations fit this profile.
 
@@ -84,7 +85,7 @@ Unsupported features produce source-located Hindi diagnostics, including unused
 unsupported declarations. Unsupported calls to standard-library intrinsics are rejected;
 injected compiler metadata alone does not require library execution.
 
-Other integer widths except unsigned byte, unsupported conversions, bitwise operations, input, unsupported
+Other integer widths except unsigned byte, unsupported conversions, bitwise operations, unsupported
 standard-library calls, static members, user-defined generics, selection,
 interop and concurrency are not yet available. The decimal-area calculation is supported;
 math and seeded random library calls are supported. Other unsupported library calls receive diagnostics. Defaults and behavior of managed targets are unchanged.

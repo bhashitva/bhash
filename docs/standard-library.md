@@ -36,7 +36,8 @@ retain their existing behavior.
 The experimental native Linux target supports a [scalar text subset](native-text.md),
 including concatenation and garbage-collected text results, [decimal formatting](native-decimals.md),
 all [math/random functions](native-math-random.md), and [split/join plus JSON](native-json-text.md).
-UTC time, files and byte-buffer text functions remain unsupported on native.
+Native also supports [UTC time](native-time.md), [text files](native-files.md),
+[byte buffers and binary files](native-bytes.md), and [console input](native-console.md).
 
 ## Portable contracts
 
@@ -263,3 +264,7 @@ Native byte-buffer encoding/decoding and binary file APIs are also available; se
 
 Native Linux supports all six UTC time functions with the same timestamp format,
 calendar range and error messages; see [native time](native-time.md).
+
+Native Linux supports the existing console globals `पाठपढ़ो()` and `पढ़ो()`; see
+[native console input](native-console.md) for UTF-8 lines, integer syntax, errors,
+and line-local malformed-input recovery shared with JVM/CLR.
