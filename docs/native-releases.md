@@ -54,7 +54,7 @@ Inspector `readelf` से ELF header, loader, dynamic libraries, GLIBC symbol r
 
 Metadata में format/target, internal ABI **15**, runtime C/header SHA-256, compiler version/JAR SHA-256, LLVM patch, linker, build glibc और debug/release mode हैं। यह embedded C runtime है; अलग shared Bhash runtime installation की जरूरत नहीं। `bh_runtime_abi_v15` link guard compiler/runtime version का गलत संयोजन link करते समय रोकता है। ABI बदलने पर पुराने executable को वर्तमान compiler से inspect/package करने के बजाय फिर build करें।
 
-Allowed system dependencies: libc, libm, libgcc_s, libpthread, libdl, librt। Sanitizer builds वितरण में स्वीकार नहीं होते। Runtime fingerprints का अंतर सामान्य inspection में report होता है; `--require-runtime-match` और packaging में अस्वीकार होता है। Metadata/checksums provenance बताते हैं, publisher authentication नहीं; इन्हें digital signature न मानें। Inspector loader/dependencies/ABI की जाँच है, arbitrary program की सुरक्षा या प्रत्येक Linux kernel की compatibility का प्रमाण नहीं।
+Allowed system dependencies: libc, libm, libgcc_s, libpthread, libdl, librt। Sanitizer builds, embedded RPATH/RUNPATH और अपरिचित GLIBC version extensions वितरण में स्वीकार नहीं होते; निरीक्षण अनुमान लगाकर minimum version नहीं बताता। Runtime fingerprints का अंतर सामान्य inspection में report होता है; `--require-runtime-match` और packaging में अस्वीकार होता है। Metadata/checksums provenance बताते हैं, publisher authentication नहीं; इन्हें digital signature न मानें। Inspector loader/dependencies/ABI की जाँच है, arbitrary program की सुरक्षा या प्रत्येक Linux kernel की compatibility का प्रमाण नहीं।
 
 ## वितरण पैकेज (Distribution package)
 
