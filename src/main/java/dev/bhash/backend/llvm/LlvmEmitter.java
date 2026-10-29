@@ -30,6 +30,7 @@ public final class LlvmEmitter {
     private final Map<Expression,Value> values=new IdentityHashMap<>();
     private record Value(Type type,String ir) { String argument(){return llvm(type)+" "+ir;} }
     private static String llvm(Type t) { return switch(t){case REAL->"double";case INT,BYTE,INT32->"i64";case BOOL->"i1";case TEXT,OBJECT,ANY->"ptr";case VOID->"void";}; }
+    private static int valueKind(Type t){return switch(t){case INT->1;case BOOL->2;case TEXT->3;case OBJECT->4;case ANY->5;case REAL->6;case BYTE->7;case INT32->8;default->throw new IllegalArgumentException("Void field");};}
     private String temporary(){return "%x"+next++;}
     private String freshLabel(){return "l"+next++;}
     private void line(String s){code.append("  ").append(s).append('\n');}
@@ -67,8 +68,13 @@ public final class LlvmEmitter {
                 .append(String.join(", ",c.interfaceMethods().stream().map(id->id<0?"ptr null":"ptr @bfn"+id).toList())).append("], align 8\n");
             globals.append("@types").append(c.id()).append(" = private constant [").append(c.assignableTypes().size()).append(" x i64] [")
                 .append(String.join(", ",c.assignableTypes().stream().map(id->"i64 "+id).toList())).append("]\n");
-            globals.append("@typeinfo").append(c.id()).append(" = private constant %ClassInfo { ptr @vtable").append(c.id())
-                .append(", ptr @itable").append(c.id()).append(", i64 ").append(c.assignableTypes().size()).append(", ptr @types").append(c.id()).append(" }, align 8\n");
+            boolean record=c.assignableTypes().contains(-9);
+            if(record)globals.append("@record_kinds").append(c.id()).append(" = private constant [").append(c.fields().size()).append(" x i64] [")
+                .append(String.join(", ",c.fields().stream().map(f->"i64 "+valueKind(f.type())).toList())).append("]\n");
+            globals.append("@typeinfo").append(c.id()).append(" = private constant ").append(record?"%RecordInfo { %ClassInfo {":"%ClassInfo {")
+                .append(" ptr @vtable").append(c.id()).append(", ptr @itable").append(c.id()).append(", i64 ").append(c.assignableTypes().size()).append(", ptr @types").append(c.id()).append(" }");
+            if(record)globals.append(", i64 ").append(c.fields().size()).append(", ptr @record_kinds").append(c.id()).append(" }");
+            globals.append(", align 8\n");
             var refs=c.fields().stream().filter(f->f.type().reference()).toList();
             String offsets="@refs"+c.id();
             globals.append(offsets).append(" = private constant [").append(refs.size()).append(" x i64] [")
@@ -97,8 +103,8 @@ public final class LlvmEmitter {
             .append(String.join(", ",staticRoots)).append("], align 8\n");
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v12\n"+
-            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v13\n"+
+            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%RecordInfo = type { %ClassInfo, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
             globals+"\ndeclare void @bh_static_roots_configure(ptr, i64)\ndeclare void @bh_static_reference_store(ptr, ptr)\ndeclare void @bh_class_initialize(ptr, ptr, ptr)\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+
@@ -230,68 +236,8 @@ public final class LlvmEmitter {
     }
     private final Map<Integer,CollectionType> collectionTypes=new HashMap<>();
     private static String equalityHelper(){
-        return """
-            define internal i1 @bhash_any_equal(ptr %a, ptr %b) {
-            entry:
-              %identical = icmp eq ptr %a, %b
-              br i1 %identical, label %yes, label %nulls
-            nulls:
-              %anull = icmp eq ptr %a, null
-              %bnull = icmp eq ptr %b, null
-              %empty = or i1 %anull, %bnull
-              br i1 %empty, label %no, label %metadata
-            metadata:
-              %ai = load ptr, ptr %a
-              %bi = load ptr, ptr %b
-              %samekind = icmp eq ptr %ai, %bi
-              br i1 %samekind, label %kind, label %no
-            kind:
-              %integer = icmp eq ptr %ai, @box_info1
-              %boolean = icmp eq ptr %ai, @box_info2
-              %byte = icmp eq ptr %ai, @box_info7
-              %small = icmp eq ptr %ai, @box_info8
-              %wideorbyte = or i1 %integer, %byte
-              %integral = or i1 %wideorbyte, %small
-              %scalar = or i1 %integral, %boolean
-              br i1 %scalar, label %numbers, label %textkind
-            numbers:
-              %ap = getelementptr i8, ptr %a, i64 8
-              %bp = getelementptr i8, ptr %b, i64 8
-              %av = load i64, ptr %ap
-              %bv = load i64, ptr %bp
-              %equal = icmp eq i64 %av, %bv
-              ret i1 %equal
-            textkind:
-              %text = icmp eq ptr %ai, @box_info3
-              br i1 %text, label %texts, label %realkind
-            realkind:
-              %real = icmp eq ptr %ai, @box_info6
-              br i1 %real, label %reals, label %no
-            reals:
-              %arp = getelementptr i8, ptr %a, i64 8
-              %brp = getelementptr i8, ptr %b, i64 8
-              %ar = load double, ptr %arp
-              %br = load double, ptr %brp
-              %arnan = fcmp uno double %ar, %ar
-              %brnan = fcmp uno double %br, %br
-              %bothnan = and i1 %arnan, %brnan
-              %samebits = fcmp oeq double %ar, %br
-              %realequal = or i1 %bothnan, %samebits
-              ret i1 %realequal
-            texts:
-              %atp = getelementptr i8, ptr %a, i64 8
-              %btp = getelementptr i8, ptr %b, i64 8
-              %at = load ptr, ptr %atp
-              %bt = load ptr, ptr %btp
-              %same = call i32 @bh_text_equal(ptr %at, ptr %bt)
-              %result = icmp ne i32 %same, 0
-              ret i1 %result
-            yes:
-              ret i1 true
-            no:
-              ret i1 false
-            }
-            """;
+        return "declare i32 @bh_value_same(i64, i64, i64)\n"+
+            "define internal i1 @bhash_any_equal(ptr %a, ptr %b) {\nentry:\n  %ab = ptrtoint ptr %a to i64\n  %bb = ptrtoint ptr %b to i64\n  %same = call i32 @bh_value_same(i64 5, i64 %ab, i64 %bb)\n  %result = icmp ne i32 %same, 0\n  ret i1 %result\n}\n";
     }
     private Value box(Box b){
         Value input=expression(b.value());
@@ -724,7 +670,11 @@ public final class LlvmEmitter {
             Value same=instruction(Type.INT,"call i32 @bh_text_equal(ptr "+left.ir()+", ptr "+right.ir()+")");
             return instruction(Type.BOOL,"icmp "+(op.equals("==")?"ne":"eq")+" i32 "+same.ir()+", 0");
         }
-        if(left.type()==Type.OBJECT){left=reload(b.left());right=reload(b.right());}
+        if(left.type()==Type.OBJECT){
+            left=bits(reload(b.left()));right=bits(reload(b.right()));
+            Value same=instruction(Type.INT,"call i32 @bh_value_same(i64 4, i64 "+left.ir()+", i64 "+right.ir()+")");
+            return instruction(Type.BOOL,"icmp "+(op.equals("==")?"ne":"eq")+" i32 "+same.ir()+", 0");
+        }
         String predicate=switch(op){case "=="->"eq";case "!="->"ne";case "<"->"slt";case "<="->"sle";case ">"->"sgt";case ">="->"sge";default->throw new IllegalStateException("Unchecked binary operator");};
         return instruction(Type.BOOL,"icmp "+predicate+" "+left.argument()+", "+right.ir());
     }
