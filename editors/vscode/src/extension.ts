@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import {NativeOptions, requireNativeHost} from './native';
 import {LanguageClient, LanguageClientOptions, ServerOptions} from 'vscode-languageclient/node';
 
 let client: LanguageClient | undefined;
@@ -9,7 +10,7 @@ let context: vscode.ExtensionContext;
 let output: vscode.OutputChannel;
 let serverWatcher: vscode.FileSystemWatcher | undefined;
 const schemes = [{scheme: 'file', language: 'bhash'}, {scheme: 'file', language: 'bhash-project'}];
-const targets = ['jvm', 'clr', 'wasm-browser'] as const;
+const targets = ['jvm', 'clr', 'wasm-browser', 'native'] as const;
 type Target = typeof targets[number];
 interface BhashTask extends vscode.TaskDefinition {type: 'bhash'; command: 'build' | 'run'; project?: string; target?: Target;}
 
@@ -63,13 +64,29 @@ async function activeInput(): Promise<{input: string; folder?: vscode.WorkspaceF
 function taskFor(definition: BhashTask, folder: vscode.WorkspaceFolder | undefined, input: string): vscode.Task {
     if (!['build','run'].includes(definition.command)) throw new Error('Bhash task command must be build or run.');
     const target = definition.target || vscode.workspace.getConfiguration('bhash', folder?.uri).get<Target>('target', 'jvm');
-    if (!targets.includes(target) || definition.command === 'run' && target === 'wasm-browser') throw new Error('Use Build for wasm-browser, then serve the output directory over HTTP. Run supports JVM and CLR.');
+    if (!targets.includes(target) || definition.command === 'run' && target === 'wasm-browser') throw new Error('Use Build for wasm-browser, then serve the output directory over HTTP. Run supports JVM, CLR and Native.');
     const {java,jar} = tools();
-    const execution = new vscode.ProcessExecution(java, ['-Dfile.encoding=UTF-8', '-jar', jar, definition.command === 'build' ? 'compile' : 'run', input, '--target', target], {cwd: folder?.uri.fsPath || path.dirname(input)});
+    const execution = target === 'native' ? nativeExecution(definition.command, input, folder) : new vscode.ProcessExecution(java, ['-Dfile.encoding=UTF-8', '-jar', jar, definition.command === 'build' ? 'compile' : 'run', input, '--target', target], {cwd: folder?.uri.fsPath || path.dirname(input)});
     const task = new vscode.Task(definition, folder || vscode.TaskScope.Global, `${definition.command} ${path.basename(input)} (${target})`, 'Bhash', execution, ['$bhash']);
     task.group = definition.command === 'build' ? vscode.TaskGroup.Build : undefined;
     task.presentationOptions = {reveal: vscode.TaskRevealKind.Always, focus: definition.command === 'run', panel: vscode.TaskPanelKind.Dedicated, clear: true};
     return task;
+}
+function nativeExecution(operation: 'build' | 'run' | 'setup' | 'check' | 'repair', input?: string, folder?: vscode.WorkspaceFolder): vscode.ProcessExecution {
+    requireNativeHost();
+    const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
+    const {java, jar} = tools();
+    const options: NativeOptions = {java, jar, mode: config.get('native.toolchainMode', 'managed'), home: config.get('native.toolchainHome', '')};
+    return new vscode.ProcessExecution(process.execPath, [context.asAbsolutePath('dist/native-task.js'), JSON.stringify({...options, operation, input})],
+        {cwd: folder?.uri.fsPath || (input ? path.dirname(input) : path.dirname(jar)), env: {ELECTRON_RUN_AS_NODE: '1'}});
+}
+async function nativeTools(operation: 'setup' | 'check' | 'repair') {
+    if (!trusted()) return;
+    const folder = vscode.workspace.workspaceFolders?.find(f => f.uri.scheme === 'file');
+    const task = new vscode.Task({type:'bhash-native-tools', operation}, folder || vscode.TaskScope.Global,
+        `${operation} native tools`, 'Bhash', nativeExecution(operation, undefined, folder));
+    task.presentationOptions = {reveal:vscode.TaskRevealKind.Always, panel:vscode.TaskPanelKind.Dedicated, clear:true};
+    await vscode.tasks.executeTask(task);
 }
 async function execute(command: 'build' | 'run') {
     if (!trusted()) return;
@@ -126,6 +143,9 @@ export function activate(extensionContext: vscode.ExtensionContext) {
     output = vscode.window.createOutputChannel('Bhash');context.subscriptions.push(output);
     const command = (id: string, action: () => unknown) => context.subscriptions.push(vscode.commands.registerCommand(id, async () => {try {await action();}catch(error){void vscode.window.showErrorMessage(`Bhash: ${error instanceof Error ? error.message : String(error)}`);}}));
     command('bhash.build', () => execute('build'));command('bhash.run', () => execute('run'));command('bhash.newProject',newProject);
+    command('bhash.setupNativeTools',()=>nativeTools('setup'));
+    command('bhash.checkNativeSetup',()=>nativeTools('check'));
+    command('bhash.repairNativeTools',()=>nativeTools('repair'));
     command('bhash.lockDependencies',()=>dependencies('lock'));
     command('bhash.restoreDependencies',()=>dependencies('restore'));
     command('bhash.verifyDependencies',()=>dependencies('verify'));
