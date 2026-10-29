@@ -4,7 +4,7 @@
 
 ## आवश्यकता और दायरा (Requirements and scope)
 
-Managed bundle के लिए **Linux x86-64, host glibc 2.39+ और Java 17+** चाहिए। Windows पर VS Code/terminal को Ubuntu 24.04+ WSL workspace में चलाएँ। LLVM, GCC, binutils, C development headers या administrator/root access उपभोक्ता मशीन पर आवश्यक नहीं हैं। Java अभी Bhash compiler/language server के लिए आवश्यक है; बने हुए executable को Java/LLVM की जरूरत नहीं होती। ARM, musl, native Windows और macOS compiler hosts इस bundle में समर्थित नहीं हैं। पुराने glibc वाले Linux पर compatible system toolchain विकल्प बना रहता है।
+Managed bundle के लिए **Linux x86-64, host glibc 2.35+ और Java 17+** चाहिए। Windows पर VS Code/terminal को Ubuntu 22.04+ WSL workspace में चलाएँ। LLVM, GCC, binutils, C development headers या administrator/root access उपभोक्ता मशीन पर आवश्यक नहीं हैं। Java अभी Bhash compiler/language server के लिए आवश्यक है; बने हुए executable को Java/LLVM की जरूरत नहीं होती। ARM, musl, native Windows और macOS compiler hosts इस bundle में समर्थित नहीं हैं। पुराने glibc वाले Linux पर compatible system toolchain विकल्प बना रहता है।
 
 Bundle में matching LLVM 18 clang/opt, LLD linker, llvm-readelf, इन tools की private runtime libraries, Clang resource files तथा glibc/GCC/Linux headers और startup/link libraries का sysroot है। केवल LLVM libraries देना पर्याप्त नहीं होता। Tools की private libraries `LD_LIBRARY_PATH` में केवल उनके child process के लिए लगती हैं; generated application में LLVM dependency नहीं जुड़ती। Managed clang system include/library override variables साफ करके अपने sysroot का प्रयोग करता है।
 
@@ -14,7 +14,7 @@ Bundle में matching LLVM 18 clang/opt, LLD linker, llvm-readelf, इन to
 
 ```sh
 java -jar bhash-compiler.jar native toolchain install \
-  --archive bhash-linux-x86_64-llvm18-v1.zip --sha256 <trusted-64-digit-sha256>
+  --archive bhash-linux-x86_64-llvm18-v1-jammy.zip --sha256 <trusted-64-digit-sha256>
 java -jar bhash-compiler.jar native toolchain status --json
 java -jar bhash-compiler.jar native toolchain verify
 java -jar bhash-compiler.jar native doctor --json
@@ -72,9 +72,9 @@ Executable वितरण की जानकारी [native releases](native
 
 ## Permanent SDK distribution and VS Code
 
-The tested Linux SDK is published as [native-sdk-1.0.0](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.0.0).
-The binary archive SHA-256 is `34ffca6772eb7747bbfcd85fc1675e6104daf26fc3ce39178202cd1cf39cc922`.
-The corresponding source archive SHA-256 is `022082ccdaaa6d6bbe928aa4fb70b6eefc02a58272afcc74562577079f5c1bf8`.
+The tested Linux SDK is published as [native-sdk-1.1.0](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.1.0).
+The binary archive SHA-256 is `52e8a1c7bd1b71082c0c9d7364776a53f5d7a3b8b87d6501f1cf0894ed09e844`.
+The corresponding source archive SHA-256 is `5b6c13538b4748b21182ec71d2165a1fcac089370efa987f56295d37991d8627`.
 Both archives and checksum sidecars are Release assets; ordinary repository files
 hold the build scripts, notices, and trusted extension catalog. Keep binary and
 corresponding sources together; do not overwrite a published SDK version.
@@ -82,8 +82,8 @@ The binary archive exceeds GitHub's ordinary 100 MiB file limit and the sources
 are larger still, so these downloads belong in Releases rather than Git history.
 No VPS hosting is needed.
 
-VS Code extension 0.5.0 offers Native build/run and automatic setup on Linux
-x86-64/glibc 2.39+ extension hosts, including WSL Ubuntu 24.04+. It delegates
+VS Code extension 0.5.2 offers Native build/run and automatic setup on Linux
+x86-64/glibc 2.35+ extension hosts, including WSL Ubuntu 22.04+. It delegates
 installation to this same verified, atomic CLI installer and shares its cache.
 Task resolution and opening a workspace do not download tools. Java 17+ remains
 required for compilation; applications run without Java or LLVM.
@@ -97,3 +97,31 @@ first installing from the permanent HTTPS asset and then building/running with
 network access disabled. The Linux VS Code host suite also executes a configured
 Native task and its generated executable. WSL uses that Linux workspace extension;
 these CI checks do not claim to launch a Windows WSL distribution.
+
+## Ubuntu 22.04 / WSL compatibility
+
+The replacement SDK is built on Ubuntu 22.04 (Jammy), with glibc 2.35 and GCC 11
+headers/startup files from the pinned Ubuntu snapshot. LLVM 18.1.8 comes from
+the official LLVM Jammy repository, with the complete Debian package version
+(including its epoch) pinned and its repository signature verified using the
+published LLVM signing-key fingerprint. Every host-side ELF in `libexec/` and
+`lib/` is inspected for GLIBC symbol versions above 2.35 before packaging.
+
+The toolchain format ID remains `bhash-linux-x86_64-llvm18-v1`; this identifies
+the compatible layout and LLVM major version, not the archive contents. The new
+release uses distinct `-jammy.zip` / `-jammy-sources.zip` asset names and a new
+archive hash. Existing cache installations migrate through the same atomic,
+checksum-pinned installer. The original SDK 1.0.0 archives remain available and
+continue to require glibc 2.39. Changing an extension preflight check cannot make
+those original binaries compatible with an older host.
+
+Clean-consumer and extension CI cover both Ubuntu 22.04 and 24.04. Source archives
+include the exact LLVM and Ubuntu sources recorded for the new payload. The host
+uses its own glibc/loader; the SDK does not replace or upgrade system libraries.
+
+The LLVM Jammy package records compiler command lines in DWARF producer strings
+by default. The managed clang wrapper disables command-line recording while
+retaining source/line debug information and path-prefix mappings. This prevents
+private SDK cache paths and temporary build directories from changing executable
+bytes after relocation. CI compares complete debug executables across an ASCII
+cache and a cache containing spaces and Hindi characters.
