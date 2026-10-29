@@ -30,7 +30,7 @@ await writeFile('syntaxes/bhash.tmLanguage.json',JSON.stringify(syntax,null,2)+'
 const tsc=spawnSync(process.execPath,['node_modules/typescript/bin/tsc','--project','.'],{stdio:'inherit'});
 if(tsc.status!==0)process.exit(tsc.status || 1);
 await mkdir('dist',{recursive:true});await mkdir('server',{recursive:true});
-await build({entryPoints:['src/extension.ts'],bundle:true,platform:'node',format:'cjs',target:'node20',external:['vscode'],outfile:'dist/extension.js',legalComments:'eof'});
+await build({entryPoints:['src/extension.ts','src/native-task.ts','src/native.ts'],bundle:true,platform:'node',format:'cjs',target:'node20',external:['vscode'],outdir:'dist',legalComments:'eof'});
 await copyFile(new URL('target/bhash-compiler-0.1.0-SNAPSHOT.jar',root),'server/bhash-compiler.jar');
 for(const file of ['LICENSE','NOTICE','LICENSING.md','THIRD_PARTY_NOTICES.md'])await copyFile(new URL(file,root),file);
 const lock=JSON.parse(await readFile('package-lock.json','utf8')), notices=[];

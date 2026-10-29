@@ -69,3 +69,31 @@ Binary ZIP के साथ **matching `-sources.zip`** और checksum files �
 CI consumer Ubuntu image में केवल Java runtime स्थापित करता है, root से अलग user चलता है और container network disabled रहता है। Test पहले system clang/opt/GCC/ld/readelf और C headers/development packages की अनुपस्थिति assert करता है। फिर archive install करके native build/run/package, inspection, real text/objects/generics/records/JSON/bytes/files/math/exceptions programs तथा forced-GC cleanup जाँचता है। अलग cache path पर debug executable के identical bytes और failed installation के बाद पुराने active pointer का बने रहना भी जाँचा जाता है।
 
 Executable वितरण की जानकारी [native releases](native-releases.md) में है।
+
+## Permanent SDK distribution and VS Code
+
+The tested Linux SDK is published as [native-sdk-1.0.0](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.0.0).
+The binary archive SHA-256 is `34ffca6772eb7747bbfcd85fc1675e6104daf26fc3ce39178202cd1cf39cc922`.
+The corresponding source archive SHA-256 is `022082ccdaaa6d6bbe928aa4fb70b6eefc02a58272afcc74562577079f5c1bf8`.
+Both archives and checksum sidecars are Release assets; ordinary repository files
+hold the build scripts, notices, and trusted extension catalog. Keep binary and
+corresponding sources together; do not overwrite a published SDK version.
+The binary archive exceeds GitHub's ordinary 100 MiB file limit and the sources
+are larger still, so these downloads belong in Releases rather than Git history.
+No VPS hosting is needed.
+
+VS Code extension 0.5.0 offers Native build/run and automatic setup on Linux
+x86-64/glibc 2.39+ extension hosts, including WSL Ubuntu 24.04+. It delegates
+installation to this same verified, atomic CLI installer and shares its cache.
+Task resolution and opening a workspace do not download tools. Java 17+ remains
+required for compilation; applications run without Java or LLVM.
+See the [extension guide](../editors/vscode/README.md#native-on-linux-and-wsl).
+
+The pinned publication workflow records the successful SDK build run and expected
+hashes. For a new SDK release, update its tested artifact provenance, hashes and
+tag together with the extension catalog. Publishing refuses to overwrite assets.
+CI tests the shipped launcher in an unprivileged Java/Node-only Linux container,
+first installing from the permanent HTTPS asset and then building/running with
+network access disabled. The Linux VS Code host suite also executes a configured
+Native task and its generated executable. WSL uses that Linux workspace extension;
+these CI checks do not claim to launch a Windows WSL distribution.
