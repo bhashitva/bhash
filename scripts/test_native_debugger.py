@@ -29,6 +29,8 @@ def main():
     for expected in ('दुगुना', 'मुख्य', 'debugging.bhash:4', 'उत्तर = 42', 'मूल = 21', 'फल = 42', 'exited normally'):
         if expected not in transcript:
             raise AssertionError(expected + '\n' + transcript)
+    if 'bfn0' in transcript or 'bfn1' in transcript:
+        raise AssertionError('GDB displayed internal function names\n' + transcript)
     print('Native GDB source breakpoints, step/next/finish, Hindi function names and scalar variables passed.')
 
 if __name__ == '__main__':
