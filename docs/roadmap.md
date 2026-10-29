@@ -80,3 +80,7 @@ Abstract/final members, generic member methods, constraints/inference, construct
 immutable fields, record bodies/patterns, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, broader standard
 library coverage, debugger support, editor tooling, dependency package management and FFI. Changes require a spec update,
 examples and tests. Generated code, JVM JARs, CLR deployment folders and browser bundles remain build products.
+
+## Native deployment milestone
+
+Linux x86-64 release tooling now includes LLVM setup checks, source-root mapping, embedded ABI/runtime provenance, static ELF/glibc inspection and deterministic distribution archives. See [native releases](native-releases.md). Remaining deployment work includes signed/public releases, fully pinned builder images, additional architectures and platforms.

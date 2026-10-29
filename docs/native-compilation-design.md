@@ -243,3 +243,7 @@ PR revision before this experimental milestone is considered ready to merge.
 Native runtime stack traces and optional DWARF/source debugging are described in
 [native diagnostics](native-diagnostics.md). Internal ABI v14 adds precise exception-header
 trace ownership and unwindable logical frames without changing user object payload layouts.
+
+## Deployment/runtime contract update
+
+The current internal native ABI is 15. A versioned link guard rejects mismatched runtime objects; embedded build metadata and static compatibility inspection support distribution. See [native releases](native-releases.md) for source-root mapping, reproducibility boundaries and glibc requirements.
