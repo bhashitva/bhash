@@ -40,6 +40,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record Catch(int typeId, Binding binding, Block body) {}
     public record Try(Block body, List<Catch> handlers, Block cleanup, Binding exception, Source source) implements Statement {}
     public record Throw(Expression value, Source source) implements Statement {}
+    public record Fail(Expression message, Expression location) implements Statement {}
     public enum TypeAction { TEST, SAFE, CAST }
     public record TypeOperation(Type type, TypeAction action, Expression value, Type targetType, int targetId, Source source) implements Expression {}
     public record StructuredTypes(int texts,int values,int object) {}
@@ -104,13 +105,13 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record TextCall(Type type, TextOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public record Allocate(int objectType, Source source) implements Expression { public Type type(){return Type.OBJECT;} }
     public record FieldRead(Expression receiver, ObjectField field, Source source) implements Expression { public Type type(){return field.type();} }
-    public sealed interface Statement permits Initialize, StaticWrite, Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach, Try, Throw, Selection {}
+    public sealed interface Statement permits Fail, Initialize, StaticWrite, Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach, Try, Throw, Selection {}
     public record FieldWrite(FieldRead destination, Expression value) implements Statement {}
     public record Block(List<Statement> statements, List<Binding> locals) implements Statement {}
     public record Assign(Binding binding, Expression value) implements Statement {}
     public record Branch(Expression condition, Block yes, Statement no) implements Statement {}
     public record Loop(Expression condition, Block body) implements Statement {}
-    public record SelectionCase(List<Constant> labels, Block body) {}
+    public record SelectionCase(List<Expression> labels, Block body) {}
     public record Selection(Expression value, Binding selector, List<SelectionCase> cases, Block fallback) implements Statement {}
     public record Return(Expression value) implements Statement {}
     public record Jump(boolean breaking) implements Statement {}
@@ -131,7 +132,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             var child=tree.getChild(i);
             if (!(child instanceof ParserRuleContext c) || library(c)) continue;
             if (c instanceof PackageDeclContext || c instanceof ImportDeclContext) continue;
-            if (!(c instanceof FunctionDeclContext) && !(c instanceof ClassDeclContext) && !(c instanceof InterfaceDeclContext)) throw unsupported(c);
+            if (!(c instanceof FunctionDeclContext) && !(c instanceof ClassDeclContext) && !(c instanceof InterfaceDeclContext) && !(c instanceof EnumDeclContext)) throw unsupported(c);
             validate(c);
         }
     }
@@ -161,6 +162,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         final Map<ManagedEmitter.Field,ObjectField> fields=new IdentityHashMap<>();
         final Map<ManagedEmitter.Field,StaticField> statics=new LinkedHashMap<>();
         final Map<ManagedEmitter.ClassInfo,Integer> classInitializers=new IdentityHashMap<>();
+        final Map<ManagedEmitter.ClassInfo,Integer> enumLookups=new IdentityHashMap<>();
         final Map<ManagedEmitter.Constructor,Integer> constructors=new IdentityHashMap<>();
         final List<ManagedEmitter.ClassInfo> classes, types;
         final List<ManagedEmitter.Function> interfaceMethods=new ArrayList<>();
@@ -214,8 +216,8 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         int nextBinding;
         Builder(ManagedEmitter.Analysis analysis,List<ManagedEmitter.Function> checked,List<ManagedEmitter.ClassInfo> allClasses) throws CompilationException {
             a=analysis;exceptionClass=a.exceptionClass;
-            classes=allClasses.stream().filter(c->c.declaration!=null && !library(c.declaration)).toList();
-            types=allClasses.stream().filter(c->c.at()!=null && !library(c.at()) && (c.declaration!=null || c.contract!=null)).toList();
+            classes=allClasses.stream().filter(c->(c.declaration!=null || c.enumeration!=null) && !library(c.at())).toList();
+            types=allClasses.stream().filter(c->c.at()!=null && !library(c.at()) && (c.declaration!=null || c.contract!=null || c.enumeration!=null)).toList();
             for(var c:types)classIds.put(c,classIds.size());
             classIds.put(exceptionClass,-5);
             fields.put(exceptionClass.fields.values().iterator().next(),messageField);
@@ -254,6 +256,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             for(var c:constructed)for(var ctor:c.constructors)constructors.put(ctor,ids.size()+constructors.size());
             for(var c:constructed)for(var ctor:c.constructors)initializers.put(ctor,ids.size()+constructors.size()+initializers.size());
             for(var c:classes)classInitializers.put(c,ids.size()+constructors.size()+initializers.size()+classInitializers.size());
+            for(var c:classes)if(c.enumeration!=null)enumLookups.put(c,ids.size()+constructors.size()+initializers.size()+classInitializers.size()+enumLookups.size());
         }
         Type type(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
             if(t.collection!=null){collectionId(t,at);return Type.OBJECT;}
@@ -336,6 +339,25 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             }
             for(var c:classes){
                 self=null;resultType=Type.VOID;var statements=new ArrayList<Statement>();
+                if(c.enumeration!=null){
+                    var receiver=new Binding(nextBinding++,Type.OBJECT);var at=source(c.at());
+                    var name=fields.get(c.fields.get(Identifiers.key("नाम")));var code=fields.get(c.fields.get(Identifiers.key("अंक")));
+                    for(var member:c.enumValues.entrySet()){
+                        statements.add(new Assign(receiver,new Allocate(classIds.get(c),at)));
+                        statements.add(new FieldWrite(new FieldRead(new Read(receiver,at),name,at),new Constant(Type.TEXT,member.getKey(),at)));
+                        statements.add(new FieldWrite(new FieldRead(new Read(receiver,at),code,at),new Constant(Type.INT,member.getValue(),at)));
+                        statements.add(new StaticWrite(statics.get(c.fields.get(member.getKey())),new Read(receiver,at)));
+                    }
+                    result.add(new Function(classInitializers.get(c),Type.VOID,List.of(),new Block(List.copyOf(statements),List.of(receiver)),at));
+                    var input=new Binding(nextBinding++,Type.INT);var location=new Binding(nextBinding++,Type.TEXT);var lookup=new ArrayList<Statement>();
+                    for(var member:c.enumValues.entrySet())lookup.add(new Branch(new Binary(Type.BOOL,"==",new Read(input,at),new Constant(Type.INT,member.getValue(),at),at),
+                        new Block(List.of(new Return(new StaticRead(statics.get(c.fields.get(member.getKey())),at))),List.of()),null));
+                    // Carry the call-site location into the existing runtime error helper.
+                    lookup.add(new Fail(new Constant(Type.TEXT,"अमान्य गणना अंक।",at),new Read(location,at)));
+                    lookup.add(new Return(new Constant(Type.OBJECT,null,at)));
+                    result.add(new Function(enumLookups.get(c),Type.OBJECT,List.of(input,location),new Block(List.copyOf(lookup),List.of()),at,classIds.get(c)));
+                    continue;
+                }
                 if(c.parent!=null && c.parent!=exceptionClass)statements.add(new Initialize(classIds.get(c.parent)));
                 for(var f:c.fields.values())if(f.shared()){
                     Type t=type(f.type(),f.declaration());
@@ -393,9 +415,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 }
                 var body=new Block(List.copyOf(statements),List.copyOf(locals));
                 if(section.DEFAULT()!=null){fallback=body;continue;}
-                var labels=new ArrayList<Constant>();
+                var labels=new ArrayList<Expression>();
                 for(var label:section.caseValue()){
-                    if(label.qualifiedName()!=null)throw unsupported(label); // Enums remain outside the native profile.
+                    if(label.qualifiedName()!=null){labels.add(new StaticRead(statics.get(a.fields.get(label)),source(label)));continue;}
                     Object constant=a.constants.get(label);
                     labels.add(value.type()==Type.BOOL?new Constant(Type.BOOL,label.TRUE()!=null,source(label))
                         :new Constant(value.type(),constant,source(label)));
@@ -536,6 +558,22 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     var destination=a.conversions.get(p);Type target=type(destination,p);
                     Expression value=expression(p.expression());
                     if(target==Type.ANY && p.TYPE_TEST()==null)return coerce(value,Type.ANY);
+                    if(p.CONVERT()!=null){
+                        var original=a.expressions.get(p.expression()).type();
+                        if(original==destination)return value;
+                        boolean enumSource=original.object!=null && original.object.enumeration!=null;
+                        boolean enumTarget=destination.object!=null && destination.object.enumeration!=null;
+                        if(enumSource && (enumTarget || target==Type.INT || target==Type.BYTE || target==Type.INT32 || target==Type.REAL || target==Type.TEXT)){
+                            var property=original.object.fields.get(Identifiers.key(target==Type.TEXT?"नाम":"अंक"));
+                            value=new FieldRead(value,fields.get(property),source(p));
+                            if(target==Type.TEXT)return value;
+                        }
+                        if(enumTarget && original!=ManagedEmitter.Type.OBJECT){
+                            if(value.type()==Type.TEXT)value=new TextCall(Type.INT,TextOperation.PARSE_INTEGER,List.of(value),source(p));
+                            else if(value.type()!=Type.INT)value=new TypeOperation(Type.INT,TypeAction.CAST,value,Type.INT,-1,source(p));
+                            return new Call(Type.OBJECT,enumLookups.get(destination.object),List.of(value,new Constant(Type.TEXT,source(p).toString(),source(p))),source(p));
+                        }
+                    }
                     if(p.CONVERT()!=null && target==Type.TEXT && (value.type()==Type.INT || value.type()==Type.BYTE || value.type()==Type.INT32))
                         return new TextCall(Type.TEXT,TextOperation.INTEGER,List.of(value),source(p));
                     if(p.CONVERT()!=null && target==Type.TEXT && value.type()==Type.REAL)

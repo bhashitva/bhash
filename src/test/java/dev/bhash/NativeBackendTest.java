@@ -483,7 +483,6 @@ class NativeBackendTest {
             assertThrows(CompilationException.class,()->core(s));
         for(String s:List.of(
             "वर्ग अ<त> { मान न: त; } कार्य मुख्य() -> शून्य {}",
-            "परिगणना अ { क } कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(s));
@@ -2172,6 +2171,46 @@ class NativeBackendTest {
             var error=assertThrows(CompilationException.class,()->core(source));
             for(var target:List.of(Target.JVM,Target.CLR))assertEquals(assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("native.bhash",source)),target)).getMessage(),error.getMessage());
         }
+    }
+
+    @Test void nativeEnumFixturesMatchJvmClrAndForcedGc()throws Exception{
+        requireNumericTargets();for(var fixture:NativeEnumFixtures.cases()){
+            var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
+            if(fixture.name().equals("gc-stress")){assertTrue(stats(result).get("allocations")>6000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());}
+        }
+    }
+    @Test void coreEnumsUseNominalObjectsPersistentSingletonRootsAndTypedLabels()throws Exception{
+        var p=core("परिगणना रंग { लाल, हरा=५ } कार्य मुख्य() -> शून्य { चयन (रंग.हरा) { विकल्प रंग.लाल: लिखो(१); शेष: लिखो(२); } }");
+        assertEquals(1,p.classes().size());assertEquals(2,p.classes().get(0).fields().size());assertEquals(2,p.staticFields().size());
+        assertEquals(List.of(CoreProgram.Type.TEXT,CoreProgram.Type.INT),p.classes().get(0).fields().stream().map(CoreProgram.ObjectField::type).toList());
+        assertTrue(LlvmEmitter.emit(p).contains("@bh_static_reference_store"));
+    }
+    @Test void nativeEnumDiagnosticsMatchManagedTargets(){
+        for(String source:List.of(
+            "परिगणना क { अ=१, ब=१ }", "परिगणना क { अ, अ }", "परिगणना क { नाम }", "परिगणना क { अंक }",
+            "परिगणना क { अ=९२२३३७२०३६८५४७७५८०७, ब }", "परिगणना क { अ=९२२३३७२०३६८५४७७५८०८ }", "परिगणना क { अ } वर्ग ख विस्तार क {}",
+            "परिगणना क { अ } कार्य गलत() -> शून्य { नया क(); }",
+            "परिगणना क { अ } कार्य गलत() -> शून्य { क.अ=क.अ; }",
+            "परिगणना क { अ } कार्य गलत() -> शून्य { स्थिर र: क=क.अ; र.अंक=१; }",
+            "परिगणना क { अ } परिगणना ख { अ } कार्य गलत() -> शून्य { चयन (क.अ) { विकल्प ख.अ: } }",
+            "परिगणना क { अ } कार्य गलत() -> शून्य { चयन (क.अ) { विकल्प ०: } }",
+            "परिगणना क { अ } कार्य गलत() -> शून्य { चयन (क.अ) { विकल्प क.अ: विकल्प क.अ: } }",
+            "परिगणना क { अ } कार्य गलत() -> शून्य { परिवर्तित<क>(सत्य); }")){
+            String program=source+" कार्य मुख्य() -> शून्य {}";var error=assertThrows(CompilationException.class,()->core(program));
+            for(var target:List.of(Target.JVM,Target.CLR))assertEquals(assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("native.bhash",program)),target)).getMessage(),error.getMessage());
+        }
+    }
+
+    @Test void nativeEnumsResolvePackageAliasesAndQualifiedCaseLabels()throws Exception{
+        requireNumericTargets();var sources=List.of(
+            new SourceFile("colors.bhash","संकुल रंगसंग्रह; सार्वजनिक परिगणना रंग { लाल, हरा=५ }"),
+            new SourceFile("app.bhash","आयात रंगसंग्रह.रंग उपनाम र; कार्य मुख्य() -> शून्य { स्थिर क: र=परिवर्तित<र>(५); चयन (क) { विकल्प र.हरा: लिखो(क.नाम); शेष: लिखो(क.अंक); } }")
+        );var result=nativeOnlyRun(sources,GC_STRESS);assertEquals(0,result.exit(),result.err());assertEquals("हरा\n",result.out());assertEquals(0L,stats(result).get("live"));
+        for(boolean clr:new boolean[]{false,true}){var managed=numericManagedRun(sources,clr);assertEquals(result.exit(),managed.exit(),managed.err());assertEquals(result.out(),managed.out());}
+    }
+    @Test void nativeEnumLookupFailurePreservesUseSiteAndRunsFinally()throws Exception{
+        requireNumericTargets();var result=numericExact("परिगणना रंग { लाल }\nकार्य मुख्य() -> शून्य { प्रयास { परिवर्तित<रंग>(१); } अंततः { लिखो(मानक.पाठ्य.दोहराओ(\"साफ😀\",१)); } }");
+        assertEquals(1,result.exit());assertEquals("साफ😀\n",result.out());assertTrue(result.err().contains("native.bhash:2:"),result.err());assertTrue(result.err().contains("अमान्य गणना अंक।"),result.err());
     }
 
 }
