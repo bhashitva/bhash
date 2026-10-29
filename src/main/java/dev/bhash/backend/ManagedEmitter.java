@@ -588,7 +588,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         // Bhash owns initialization, rather than inheriting incompatible JVM/CLR
         // failed-class wrappers, constant inlining, and beforefieldinit behavior.
         output.append("private static int bhashInitState; private static BhashRuntime.BException bhashInitFailure;\n")
-            .append("public static boolean bhashInitialize() {".replace("boolean",target==Target.JVM?"boolean":"bool"))
+            .append("public static ").append(target==Target.JVM?"boolean":"bool").append(" bhashInitialize() {")
             .append("if(bhashInitState==2 || bhashInitState==1)return true; if(bhashInitState==3)throw bhashInitFailure; bhashInitState=1; try {\n");
         if(definition.parent!=null && definition.parent.declaration!=null)output.append(definition.parent.java).append(".bhashInitialize();\n");
         for(var initializer:staticInitializers.entrySet())output.append(initializer.getKey().java).append('=').append(initializer.getValue()).append(";\n");
@@ -1378,7 +1378,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         checkAccess(at, field.owner, field.access, object);
         if (analysis != null) analysis.fields.put(at, field);
         String receiver=field.shared?field.owner.java:memberReceiver(object, field.owner, field.access);
-        if(field.shared)return new Expr(field.type,receiver+".bhashGet_"+field.java+"()",new Location(field.mutable,receiver+".bhashSet_"+field.java+"("));
+        if(field.shared && field.owner.enumeration==null)return new Expr(field.type,receiver+".bhashGet_"+field.java+"()",new Location(field.mutable,receiver+".bhashSet_"+field.java+"("));
         return new Expr(field.type, receiver + "." + field.java, new Location(field.mutable));
     }
     private Expr callMethod(ParserRuleContext at, Expr object, String name, List<Expr> arguments) {
