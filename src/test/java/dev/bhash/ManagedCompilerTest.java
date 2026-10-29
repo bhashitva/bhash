@@ -17,6 +17,11 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class ManagedCompilerTest {
+    @Test void nativeControlFixturesMatchManagedContract()throws Exception{
+        for(var fixture:NativeControlFixtures.cases()){
+            var result=run(compile(fixture.source()),"");assertEquals(0,result.exit,fixture.name());assertEquals(fixture.expected(),result.output,fixture.name());
+        }
+    }
     @Test void bitboardExamplePreservesAll64BitsAndRunsOnBothManagedTargets() throws Exception {
         var result = run(compile(Files.readString(Path.of("examples/bitboards.bhash"))),"");
         assertEquals(0,result.exit);

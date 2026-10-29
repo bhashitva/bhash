@@ -441,7 +441,6 @@ class NativeBackendTest {
         for(String source:List.of(
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "कार्य अप्रयुक्त() -> लघुपूर्णांक { लौटाओ परिवर्तित<लघुपूर्णांक>(१); } कार्य मुख्य() -> शून्य {}",
-            "कार्य मुख्य() -> शून्य { लिखो(१ << २); }",
             "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<लघुपूर्णांक>(१)); }")){
             var error=assertThrows(CompilationException.class,()->core(source));
             assertTrue(error.getMessage().contains("native.bhash:1:"),error.getMessage());
@@ -1847,6 +1846,51 @@ class NativeBackendTest {
             byte[] input=ConsoleFixtures.utf8(file.contains("factorial")?"५\n":"भारत😀\n+४२\n");
             var result=consoleRun(List.of(exe.toString()),input,true);var managed=consoleRun(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),input,false);
             assertEquals(0,result.exit(),result.err());assertEquals(managed.out(),result.out());assertEquals(0L,stats(result).get("live"));
+        }
+    }
+    @Test void coreLowersBitwiseShiftsAndSelectionWithoutHostExpressions()throws Exception{
+        String ir=LlvmEmitter.emit(core("कार्य मुख्य() -> शून्य { चयन ((~१ & ३) << ६४) { विकल्प २: लिखो(-१ >>> -१,-१ >> १); शेष: लिखो(० ^ १ | २); } }"));
+        for(String operation:List.of("xor i64","and i64","or i64","shl i64","ashr i64","lshr i64"))assertTrue(ir.contains(operation),operation);
+        assertTrue(ir.contains(", 63"));
+    }
+    @Test void nativeBitwiseAndSelectionFixturesMatchJvmClrUnderForcedGc()throws Exception{
+        requireNumericTargets();
+        for(var fixture:NativeControlFixtures.cases()){
+            var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
+            if(fixture.name().equals("gc-and-completions")){assertTrue(stats(result).get("allocations")>4000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());}
+        }
+    }
+    @Test void nativeSelectionKeepsSharedTypeLabelScopeAndFlowDiagnostics(){
+        for(String source:List.of(
+            "कार्य मुख्य() -> शून्य { लिखो(सत्य & असत्य); }",
+            "कार्य मुख्य() -> शून्य { लिखो(१.० << २); }",
+            "कार्य मुख्य() -> शून्य { चयन (१) { विकल्प १: विकल्प +1: } }",
+            "कार्य मुख्य() -> शून्य { चयन (०) { विकल्प -०: विकल्प 0: } }",
+            "कार्य मुख्य() -> शून्य { चयन (\"अ\") { विकल्प \"अ\": विकल्प \"\\u0905\": } }",
+            "कार्य मुख्य() -> शून्य { चयन (सत्य) { विकल्प सत्य: विकल्प सत्य: } }",
+            "कार्य मुख्य() -> शून्य { चयन (१) { शेष: शेष: } }",
+            "कार्य मुख्य() -> शून्य { चयन (१.०) {} }",
+            "कार्य मुख्य() -> शून्य { चयन (१) { विकल्प \"एक\": } }",
+            "कार्य मुख्य() -> शून्य { चयन (१) { शेष: जारी; } }",
+            "कार्य मुख्य() -> शून्य { चयन (१) { विकल्प १: स्थिर अंदर: पूर्णांक = १; शेष: लिखो(अंदर); } }",
+            "कार्य मुख्य() -> शून्य { चयन (१) { शेष: विराम; लिखो(१); } }",
+            "कार्य गलत(क: पूर्णांक) -> पूर्णांक { चयन (क) { विकल्प १: लौटाओ १; } } कार्य मुख्य() -> शून्य {}")){
+            var error=assertThrows(CompilationException.class,()->core(source));
+            for(var target:List.of(Target.JVM,Target.CLR)){
+                var reference=assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("native.bhash",source)),target));
+                assertEquals(reference.getMessage(),error.getMessage());
+            }
+        }
+    }
+    @Test void nativeSwitchConsoleExamplePreservesGroupedCasesAndDefault()throws Exception{
+        requireNumericTargets();var sources=List.of(new SourceFile("switch-console.bhash",Files.readString(Path.of("examples/switch-console.bhash"))));
+        Path exe=temporary.resolve("selection"),jar=temporary.resolve("selection.jar"),clr=temporary.resolve("selection-clr");
+        new NativeCompiler(true).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+        for(String input:List.of("०\n","२\n","९\n")){
+            var result=consoleRun(List.of(exe.toString()),ConsoleFixtures.utf8(input),true);assertEquals(0,result.exit(),result.err());assertEquals(0L,stats(result).get("live"));
+            for(var command:List.of(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
+                var reference=consoleRun(command,ConsoleFixtures.utf8(input),false);assertEquals(reference.exit(),result.exit());assertEquals(reference.out(),result.out());
+            }
         }
     }
     private void requireTools()throws Exception{
