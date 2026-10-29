@@ -772,7 +772,7 @@ public final class LlvmEmitter {
         }
         else if(s instanceof Initialize i)initialize(i.owner());
         else if(s instanceof StaticWrite f){
-            expression(f.value());initialize(f.field().owner());Value value=reload(f.value());
+            expression(f.value());traceAt(f.value().source());initialize(f.field().owner());Value value=reload(f.value());
             if(f.field().type().reference())line("call void @bh_static_reference_store(ptr @static"+f.field().id()+", ptr "+value.ir()+")");
             else line("store "+value.argument()+", ptr @static"+f.field().id());
             release(f.value());
