@@ -88,3 +88,5 @@ set substitute-path /bhash/source /absolute/path/to/source-root
 ```
 
 आगे की debugger जानकारी [native diagnostics](native-diagnostics.md) में है।
+
+Managed Linux toolchains can provide these compiler/linker/header dependencies without system development packages. See [managed native toolchain](managed-native-toolchain.md).
