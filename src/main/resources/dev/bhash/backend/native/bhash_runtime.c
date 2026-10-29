@@ -1483,8 +1483,11 @@ int bh_file_exists(const void *path,const void *location) {
     void *name=file_path(path,location); /* No allocation during stat. */
 #ifdef _WIN32
     wchar_t *wide=file_wide(name);if(!wide)return 0;
-    DWORD attributes=GetFileAttributesW(wide);free(wide);
-    return attributes!=INVALID_FILE_ATTRIBUTES && !(attributes&FILE_ATTRIBUTE_DIRECTORY);
+    HANDLE file=CreateFileW(wide,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);free(wide);
+    if(file==INVALID_HANDLE_VALUE)return 0;
+    BY_HANDLE_FILE_INFORMATION info;
+    int regular=GetFileType(file)==FILE_TYPE_DISK && GetFileInformationByHandle(file,&info) && !(info.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY);
+    (void)CloseHandle(file);return regular;
 #else
     struct stat info;
     return !stat((const char *)text_data(name),&info)&&S_ISREG(info.st_mode);
@@ -1631,6 +1634,17 @@ int64_t bh_time_year(int64_t value,const void *location){return time_calendar(va
 int64_t bh_time_month(int64_t value,const void *location){return time_calendar(value,location).month;}
 int64_t bh_time_day(int64_t value,const void *location){return time_calendar(value,location).day;}
 int64_t bh_time_now(const void *location){
+#ifdef _WIN32
+    /* Use the same precise wall clock as the JVM; the legacy C clock may lag
+       a preceding Java timestamp by one Windows timer tick. */
+    FILETIME now;GetSystemTimePreciseAsFileTime(&now);
+    uint64_t ticks=((uint64_t)now.dwHighDateTime<<32)|now.dwLowDateTime;
+    const uint64_t epoch=UINT64_C(116444736000000000);
+    if(ticks<epoch)return -(int64_t)((epoch-ticks+9999)/10000);
+    uint64_t milliseconds=(ticks-epoch)/10000;
+    if(milliseconds>INT64_MAX)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
+    return (int64_t)milliseconds;
+#else
     struct timespec now;
     if(timespec_get(&now,TIME_UTC)!=TIME_UTC||now.tv_nsec<0||now.tv_nsec>=1000000000L)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
     int64_t seconds=(int64_t)now.tv_sec,fraction=now.tv_nsec/1000000;
@@ -1638,6 +1652,7 @@ int64_t bh_time_now(const void *location){
     int64_t result=seconds*1000;
     if(result>INT64_MAX-fraction)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
     return result+fraction;
+#endif
 }
 
 /* Buffer only raw bytes ahead of the next call; UTF-8 decoding is line-local.
