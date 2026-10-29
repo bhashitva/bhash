@@ -28,6 +28,15 @@ void bh_class_initialize(int32_t *state, void **failure, int64_t (*initializer)(
 void *bh_alloc(const bh_type *, uint64_t bytes);
 void bh_collect(void);
 void bh_runtime_init(void);
+/* Logical frames contain only immortal compiler-owned text, never managed references.
+   Protection boundaries restore this stack before abandoning generated C-stack frames. */
+typedef struct bh_trace_frame {
+    struct bh_trace_frame *previous;
+    const void *name, *location;
+} bh_trace_frame;
+void bh_trace_enter(bh_trace_frame *, const void *name, const void *location);
+void bh_trace_at(const void *location);
+void bh_trace_leave(void);
 /* Protection is wholly inside C: generated callbacks never resume after longjmp. */
 typedef int64_t (*bh_protected_callback)(void *);
 void bh_exception_configure(const bh_type *, const void *);

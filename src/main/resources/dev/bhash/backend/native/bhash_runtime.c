@@ -30,6 +30,7 @@ typedef max_align_t bh_alignment;
 typedef struct bh_object {
     struct bh_object *next, *work_next, *hash_next;
     const bh_type *type;
+    void *diagnostic_trace; /* Precise header reference; retained only with its exception. */
     size_t bytes;
     unsigned marked;
     uint64_t identity;
@@ -77,8 +78,10 @@ typedef struct bh_handler {
     struct bh_handler *previous;
     bh_root_frame *saved_roots;
     bh_cleanup *saved_cleanups;
+    bh_trace_frame *saved_trace;
 } bh_handler;
 static bh_handler *handlers;
+static bh_trace_frame *trace_frames;
 static _Noreturn void runtime_error(const void *, const char *);
 static _Noreturn void raise_failure_text(const void *, const void *);
 static _Noreturn void raise_failure(const void *, const char *);
@@ -129,6 +132,7 @@ void bh_collect(void) {
         for (uint64_t i = 0; i < f->count; ++i) mark(f->slots[i]);
     while (work) {
         bh_object *o = work; work = o->work_next;
+        mark(o->diagnostic_trace);
         for (size_t i = 0; i < o->type->reference_count; ++i) {
             void *value;
             memcpy(&value, o->payload + o->type->reference_offsets[i], sizeof value);
@@ -226,7 +230,7 @@ void bh_runtime_init(void) {
     report_stats = environment_flag("BHASH_GC_STATS");
 }
 void bh_shutdown(void) {
-    if (roots || handlers || cleanups || pending_exception) fatal("आंतरिक मूल-संदर्भ शेष है।");
+    if (roots || handlers || cleanups || pending_exception || trace_frames) fatal("आंतरिक मूल-संदर्भ शेष है।");
     for(uint64_t i=0;i<static_root_count;++i)*static_roots[i]=NULL;
     static_roots=NULL;static_root_count=0;
     bh_collect();
@@ -633,16 +637,16 @@ void bh_exception_configure(const bh_type *descriptor, const void *info) {
 }
 int64_t bh_protect(bh_protected_callback callback, void *environment) {
     bh_handler handler;
-    handler.previous = handlers; handler.saved_roots = roots; handler.saved_cleanups = cleanups; handlers = &handler;
+    handler.previous = handlers; handler.saved_roots = roots; handler.saved_cleanups = cleanups; handler.saved_trace = trace_frames; handlers = &handler;
     /* Neither saved field changes between setjmp and longjmp. The generated
        function's environment lives in its caller, outside this C boundary. */
     if (setjmp(handler.jump) == 0) {
         int64_t completion = callback(environment);
-        if (roots != handler.saved_roots || cleanups != handler.saved_cleanups) fatal("आंतरिक अपवाद मूल-संदर्भ असंतुलित हैं।");
+        if (roots != handler.saved_roots || cleanups != handler.saved_cleanups || trace_frames != handler.saved_trace) fatal("आंतरिक अपवाद मूल-संदर्भ असंतुलित हैं।");
         handlers = handler.previous; return completion;
     }
     handlers = handler.previous;
-    if (roots != handler.saved_roots || cleanups != handler.saved_cleanups) fatal("आंतरिक अपवाद मूल-संदर्भ असंतुलित हैं।");
+    if (roots != handler.saved_roots || cleanups != handler.saved_cleanups || trace_frames != handler.saved_trace) fatal("आंतरिक अपवाद मूल-संदर्भ असंतुलित हैं।");
     return -1;
 }
 void bh_static_roots_configure(void ***slots, uint64_t count) {
@@ -666,16 +670,51 @@ void bh_class_initialize(int32_t *state, void **failure, bh_protected_callback i
     }
     *state=2;
 }
+void bh_trace_enter(bh_trace_frame *frame,const void *name,const void *location){
+    frame->previous=trace_frames;frame->name=name;frame->location=location;trace_frames=frame;
+}
+void bh_trace_at(const void *location){if(trace_frames)trace_frames->location=location;}
+void bh_trace_leave(void){if(!trace_frames)fatal("आंतरिक निदान स्टैक अमान्य है।");trace_frames=trace_frames->previous;}
+/* Snapshot entries are precise text references (normally immortal compiler text).
+   The exception header owns the snapshot across GC, cached failures and rethrow. */
+typedef struct bh_trace_snapshot {uint64_t count,truncated;const void *entries[];} bh_trace_snapshot;
+static const bh_type trace_type={"exception trace",16,0,NULL,16,16,3};
+static void capture_trace(const void *location){
+    bh_object *object=find_object(pending_exception);
+    if(!object || object->diagnostic_trace || !trace_frames)return;
+    uint64_t count=0;bh_trace_frame *at=trace_frames;
+    while(at && count<256){++count;at=at->previous;}
+    void *slots[]={(void *)location};bh_root_frame frame;bh_roots_push(&frame,slots,1);
+    bh_trace_snapshot *snapshot=bh_alloc(&trace_type,16+count*16);
+    snapshot->count=count;snapshot->truncated=at!=NULL;at=trace_frames;
+    for(uint64_t i=0;i<count;++i,at=at->previous){snapshot->entries[i*2]=at->name;snapshot->entries[i*2+1]=(i==0 && slots[0])?slots[0]:at->location;}
+    /* Header-reference store is nonallocating; a future moving/generational collector
+       must update/track this header slot together with payload descriptor references. */
+    find_object(pending_exception)->diagnostic_trace=snapshot;
+    bh_roots_pop(&frame);
+}
+static void print_trace(const void *exception){
+    bh_object *object=find_object(exception);if(!object || !object->diagnostic_trace)return;
+    const bh_trace_snapshot *snapshot=object->diagnostic_trace;
+    for(uint64_t i=0;i<snapshot->count;++i){
+        const void *name=snapshot->entries[i*2],*location=snapshot->entries[i*2+1];
+        fputs("  में ",stderr);fwrite(text_data(name),1,(size_t)text_length(name),stderr);
+        if(location){fputs(" (",stderr);fwrite(text_data(location),1,(size_t)text_length(location),stderr);fputc(')',stderr);}fputc('\n',stderr);
+    }
+    if(snapshot->truncated)fputs("  … निदान स्टैक २५६ फ्रेम पर सीमित है।\n",stderr);
+}
 void *bh_exception_take(void) { void *value = pending_exception; pending_exception = NULL; return value; }
 _Noreturn void bh_throw(void *value, const void *location) {
     if (!value) runtime_error(location, "रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।");
     void *original; memcpy(&original, (unsigned char *)value + 16, 8);
     if (location && (!original || !text_length(original))) bh_reference_store(value, 16, (void *)location);
     pending_exception = value;
+    capture_trace(location);
     if (!handlers) fatal("आंतरिक अपवाद सीमा अनुपस्थित है।");
     /* Discard every generated/runtime helper frame abandoned by this transfer.
        The pending object is a precise global root before any frame is removed. */
     roots = handlers->saved_roots;
+    trace_frames = handlers->saved_trace;
     while (cleanups != handlers->saved_cleanups) {
         bh_cleanup *entry = cleanups; cleanups = entry->previous; entry->dispose(entry->memory);
     }
@@ -705,7 +744,7 @@ int bh_run(bh_protected_callback entry) {
     if (location && text_length(location)) {
         fwrite(text_data(location), 1, (size_t)text_length(location), stderr); fputs(": ", stderr);
     }
-    fwrite(text_data(message), 1, (size_t)text_length(message), stderr); fputc('\n', stderr); fflush(stderr);
+    fwrite(text_data(message), 1, (size_t)text_length(message), stderr); fputc('\n', stderr); print_trace(pending_exception); fflush(stderr);
     pending_exception = NULL; return 1;
 }
 

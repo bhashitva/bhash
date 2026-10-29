@@ -24,7 +24,12 @@ public final class LlvmEmitter {
     private int rootCount, returnRoot, nextTarget, nextCallback;
     private Type functionResult;
     private String owner;
-    private boolean outlined;
+    private boolean outlined, traced;
+    private boolean debugEnabled;
+    private NativeDebugInfo debug;
+    private int debugScope=-1;
+    private Source debugSource;
+    private Function currentFunction;
     private final Map<NewCollection,Integer> buffers=new IdentityHashMap<>();
     private final Map<Integer,Integer> objectSizes=new HashMap<>();
     private final Map<Expression,Value> values=new IdentityHashMap<>();
@@ -33,7 +38,7 @@ public final class LlvmEmitter {
     private static int valueKind(Type t){return switch(t){case INT->1;case BOOL->2;case TEXT->3;case OBJECT->4;case ANY->5;case REAL->6;case BYTE->7;case INT32->8;default->throw new IllegalArgumentException("Void field");};}
     private String temporary(){return "%x"+next++;}
     private String freshLabel(){return "l"+next++;}
-    private void line(String s){code.append("  ").append(s).append('\n');}
+    private void line(String s){code.append("  ").append(s);if(debug!=null && debugScope>=0 && debugSource!=null)code.append(", !dbg !").append(debug.location(debugScope,debugSource));code.append('\n');}
     private void block(String name){code.append(name).append(":\n");label=name;terminated=false;}
     private void jump(String name){line("br label %"+name);terminated=true;}
     private Value instruction(Type type,String text){String n=temporary();line(n+" = "+text);return new Value(type,n);}
@@ -47,8 +52,10 @@ public final class LlvmEmitter {
         });
     }
     public static String emit(CoreProgram program){return emit(program, "");}
-    public static String emit(CoreProgram program,String notices){return new LlvmEmitter().program(program,notices);}
+    public static String emit(CoreProgram program,String notices){return emit(program,notices,false);}
+    public static String emit(CoreProgram program,String notices,boolean debugging){var emitter=new LlvmEmitter();emitter.debugEnabled=debugging;return emitter.program(program,notices);}
     private String program(CoreProgram program,String notices){
+        if(debugEnabled)debug=new NativeDebugInfo(program.functions().get(0).source());
         boxMetadata();
         collectionMetadata(program.collections());
         String dataInit="";
@@ -103,9 +110,9 @@ public final class LlvmEmitter {
             .append(String.join(", ",staticRoots)).append("], align 8\n");
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v13\n"+
-            "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%RecordInfo = type { %ClassInfo, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
-            globals+"\ndeclare void @bh_static_roots_configure(ptr, i64)\ndeclare void @bh_static_reference_store(ptr, ptr)\ndeclare void @bh_class_initialize(ptr, ptr, ptr)\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v14\n"+
+            "target triple = \"x86_64-unknown-linux-gnu\"\n%TraceFrame = type { ptr, ptr, ptr }\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%RecordInfo = type { %ClassInfo, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
+            globals+"\ndeclare void @bh_trace_enter(ptr, ptr, ptr)\ndeclare void @bh_trace_at(ptr)\ndeclare void @bh_trace_leave()\ndeclare void @bh_static_roots_configure(ptr, i64)\ndeclare void @bh_static_reference_store(ptr, ptr)\ndeclare void @bh_class_initialize(ptr, ptr, ptr)\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+
             "declare void @bh_print_bool(i32)\ndeclare void @bh_print_space()\ndeclare void @bh_print_end()\n"+
@@ -116,7 +123,7 @@ public final class LlvmEmitter {
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
             textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_to_int32(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
-            "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  call void @bh_static_roots_configure(ptr @static_roots, i64 "+staticRoots.size()+")\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
+            "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  call void @bh_static_roots_configure(ptr @static_roots, i64 "+staticRoots.size()+")\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n"+(debug==null?"":debug.render());
     }
     private static String numericDeclarations(){
         var declarations=new StringBuilder();
@@ -358,11 +365,14 @@ public final class LlvmEmitter {
     }
     private String outline(Block body){
         String callback="@btry"+nextCallback++;
+        int savedScope=debugScope;Source savedSource=debugSource;
         var savedCode=code;int savedNext=next;String savedLabel=label,savedOwner=owner;boolean savedTerminated=terminated,savedOutlined=outlined;
         var savedValues=new IdentityHashMap<>(values);var savedTargets=new ArrayDeque<>(targets);var savedScopes=new ArrayDeque<>(scopes);
         code=new StringBuilder();next=0;owner=callback;outlined=true;values.clear();
-        code.append("define internal i64 ").append(callback).append("(ptr %environment) {\n");block("entry");environment(true);
+        if(debug!=null)debugScope=debug.function(currentFunction,callback.substring(1),true);
+        code.append("define internal i64 ").append(callback).append("(ptr %environment)").append(debug==null?"":" noinline optnone !dbg !"+debugScope).append(" {\n");block("entry");environment(true);declareVariables(List.of());
         statement(body);if(!terminated)line("ret i64 0");code.append("}\n\n");functions.append(code);
+        debugScope=savedScope;debugSource=savedSource;
         code=savedCode;next=savedNext;label=savedLabel;owner=savedOwner;terminated=savedTerminated;outlined=savedOutlined;
         values.clear();values.putAll(savedValues);targets.clear();targets.addAll(savedTargets);scopes.clear();scopes.addAll(savedScopes);
         return callback;
@@ -456,7 +466,7 @@ public final class LlvmEmitter {
         if(outlined)line("ret i64 1");
         else {
             Value value=functionResult==Type.VOID?null:instruction(functionResult,"load "+llvm(functionResult)+", ptr %return");
-            line("call void @bh_roots_pop(ptr %frame)");line(value==null?"ret void":"ret "+value.argument());
+            leaveTrace();line("call void @bh_roots_pop(ptr %frame)");line(value==null?"ret void":"ret "+value.argument());
         }
         terminated=true;block(throwing);Value exception=load(t.exception());line("call void @bh_throw(ptr "+exception.ir()+", ptr null)");line("unreachable");terminated=true;
         for(var entry:exits.entrySet())for(int i=0;i<entry.getValue().size();i++){
@@ -465,7 +475,14 @@ public final class LlvmEmitter {
         block(escape);line(outlined?"ret i64 "+completion.ir():"unreachable");terminated=true;
         block(done);line("store ptr null, ptr "+address(t.exception()));
     }
+    private void declareVariables(List<Binding> parameters){
+        if(debug==null)return;
+        for(var b:bindings.keySet()){String declaration=debug.declare(b,address(b),debugScope,parameters.indexOf(b)+1);if(!declaration.isEmpty()){Source previous=debugSource;debugSource=b.source();line(declaration);debugSource=previous;}}
+    }
+    private void traceAt(Source source){if(source!=null)line("call void @bh_trace_at(ptr "+text(source.toString())+")");}
+    private void leaveTrace(){if(traced)line("call void @bh_trace_leave()");}
     private void function(Function f){
+        currentFunction=f;traced=!f.name().isEmpty();debugSource=f.source();if(debug!=null)debugScope=debug.function(f,"bfn"+f.id(),!traced);
         code=new StringBuilder(); values.clear(); roots.clear(); bindingRoots.clear(); bindings.clear();rootCount=0;next=0;buffers.clear();targets.clear();scopes.clear();
         functionResult=f.result();owner="@bfn"+f.id();outlined=false;nextTarget=0;returnRoot=-1;
         f.parameters().forEach(this::register);scan(f.body());
@@ -473,7 +490,8 @@ public final class LlvmEmitter {
         code.append("define internal ").append(llvm(f.result())).append(" @bfn").append(f.id()).append('(');
         var arguments=new ArrayList<String>();
         for(int i=0;i<f.parameters().size();i++)arguments.add(llvm(f.parameters().get(i).type())+" %arg"+i);
-        code.append(String.join(", ",arguments)).append(") {\n");block("entry");
+        code.append(String.join(", ",arguments)).append(")").append(debug==null?"":" noinline optnone !dbg !"+debugScope).append(" {\n");block("entry");debugSource=null;
+        if(traced){line("%trace = alloca %TraceFrame, align 8");line("call void @bh_trace_enter(ptr %trace, ptr "+text(f.name())+", ptr "+text(f.source().toString())+")");}
         line("%frame = alloca %RootFrame, align 8");
         line("%roots = alloca ["+rootCount+" x ptr], align 8");
         line("store ["+rootCount+" x ptr] zeroinitializer, ptr %roots");
@@ -486,18 +504,24 @@ public final class LlvmEmitter {
             if(f.result().reference())line("%return = getelementptr ["+rootCount+" x ptr], ptr %roots, i64 0, i64 "+returnRoot);
             else line("%return = alloca "+llvm(f.result()));
         }
-        environment(false);
+        environment(false);declareVariables(f.parameters());
         for(int i=0;i<f.parameters().size();i++) {
             var b=f.parameters().get(i);line("store "+llvm(b.type())+" %arg"+i+", ptr "+address(b));
         }
         line("call void @bh_roots_push(ptr %frame, ptr %roots, i64 "+rootCount+")");
+        debugSource=f.source();
         if(f.initialization()>=0)initialize(f.initialization());
         statement(f.body());
-        if(!terminated){line("call void @bh_roots_pop(ptr %frame)");line(f.result()==Type.VOID?"ret void":"unreachable");}
+        if(!terminated){leaveTrace();line("call void @bh_roots_pop(ptr %frame)");line(f.result()==Type.VOID?"ret void":"unreachable");}
         code.append("}\n\n");functions.append(code);
     }
     private void initialize(int id){if(id>=0)line("call void @bh_class_initialize(ptr @init_state"+id+", ptr @init_failure"+id+", ptr @class_init"+id+")");}
     private Value expression(Expression e){
+        Source previous=debugSource;debugSource=e.source();
+        if(e instanceof Call || e instanceof StaticRead)traceAt(e.source());
+        try{return expressionImpl(e);}finally{debugSource=previous;}
+    }
+    private Value expressionImpl(Expression e){
         Value result;
         if(e instanceof Constant c)result=new Value(c.type(),c.type()==Type.TEXT?text((String)c.value()):c.type()==Type.BOOL?((Boolean)c.value()?"true":"false"):(c.type()==Type.OBJECT || c.type()==Type.ANY)?"null":c.type()==Type.REAL?String.format(Locale.ROOT,"0x%016X",Double.doubleToRawLongBits((Double)c.value())):c.value().toString());
         else if(e instanceof StaticRead r){
@@ -548,6 +572,7 @@ public final class LlvmEmitter {
                 line(method+" = load ptr, ptr "+slot);
                 target=method;
             }
+            traceAt(c.source());
             String call="call "+llvm(c.type())+" "+target+"("+String.join(", ",args)+")";
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else result=instruction(c.type(),call);
@@ -579,6 +604,7 @@ public final class LlvmEmitter {
             for(var a:c.arguments())expression(a);
             var args=new ArrayList<String>();for(var a:c.arguments())args.add(reload(a).argument());
             args.add("ptr "+text(c.source().toString()));
+            traceAt(c.source());
             String call="call "+llvm(c.type())+" @bh_numeric_"+c.operation().name().toLowerCase(Locale.ROOT)+"("+String.join(", ",args)+")";
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}else result=instruction(c.type(),call);
         } else if(e instanceof TextCall c) {
@@ -714,7 +740,16 @@ public final class LlvmEmitter {
         statement(c.fallback());if(!terminated)jump(exit);
         targets.pop();scopes.pop();block(exit);clearBindings(List.of(c.selector()));
     }
+    private Source statementSource(Statement s){
+        if(s instanceof Assign a)return a.value().source();if(s instanceof Return r)return r.source();if(s instanceof Print p)return p.source();if(s instanceof Jump j)return j.source();if(s instanceof Evaluate e)return e.value().source();
+        if(s instanceof Throw t)return t.source();if(s instanceof Try t)return t.source();if(s instanceof Branch b)return b.condition().source();if(s instanceof Loop l)return l.condition().source();if(s instanceof Selection c)return c.value().source();if(s instanceof Foreach f)return f.source();
+        if(s instanceof FieldWrite f)return f.destination().source();if(s instanceof IndexWrite w)return w.destination().source();if(s instanceof StaticWrite f)return f.value().source();return debugSource;
+    }
     private void statement(Statement s){
+        Source previous=debugSource;Source source=statementSource(s);if(source!=null)debugSource=source;
+        try{statementImpl(s);}finally{debugSource=previous;}
+    }
+    private void statementImpl(Statement s){
         if(s==null || terminated)return;
         if(s instanceof Block b){
             scopes.push(b.locals());for(var x:b.statements())statement(x);
@@ -738,7 +773,7 @@ public final class LlvmEmitter {
         }
         else if(s instanceof Initialize i)initialize(i.owner());
         else if(s instanceof StaticWrite f){
-            expression(f.value());initialize(f.field().owner());Value value=reload(f.value());
+            expression(f.value());traceAt(f.value().source());initialize(f.field().owner());Value value=reload(f.value());
             if(f.field().type().reference())line("call void @bh_static_reference_store(ptr @static"+f.field().id()+", ptr "+value.ir()+")");
             else line("store "+value.argument()+", ptr @static"+f.field().id());
             release(f.value());
@@ -760,7 +795,7 @@ public final class LlvmEmitter {
         else if(s instanceof Return r){
             Value v=r.value()==null?null:expression(r.value());
             if(outlined){if(v!=null)line("store "+v.argument()+", ptr %return");line("ret i64 1");terminated=true;}
-            else {line("call void @bh_roots_pop(ptr %frame)");line(v==null?"ret void":"ret "+v.argument());terminated=true;}
+            else {leaveTrace();line("call void @bh_roots_pop(ptr %frame)");line(v==null?"ret void":"ret "+v.argument());terminated=true;}
         } else if(s instanceof Evaluate e){expression(e.value());release(e.value());}
         else if(s instanceof Print p){
             var values=new ArrayList<Value>();for(var a:p.arguments())values.add(expression(a));

@@ -83,8 +83,11 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record Source(String file, int line, int column) {
         @Override public String toString() { return file+":"+line+":"+column; }
     }
-    public record Binding(int id, Type type) {}
-    public record Function(int id, Type result, List<Binding> parameters, Block body, Source source, int initialization) {
+    public record Binding(int id, Type type, String name, Source source) {
+        public Binding(int id, Type type){this(id,type,"",null);}
+    }
+    public record Function(int id, Type result, List<Binding> parameters, Block body, Source source, int initialization, String name) {
+        public Function(int id, Type result, List<Binding> parameters, Block body, Source source, int initialization){this(id,result,parameters,body,source,initialization,"");}
         public Function(int id, Type result, List<Binding> parameters, Block body, Source source){this(id,result,parameters,body,source,-1);}
     }
     public sealed interface Expression permits StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
@@ -113,9 +116,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record Loop(Expression condition, Block body) implements Statement {}
     public record SelectionCase(List<Expression> labels, Block body) {}
     public record Selection(Expression value, Binding selector, List<SelectionCase> cases, Block fallback) implements Statement {}
-    public record Return(Expression value) implements Statement {}
-    public record Jump(boolean breaking) implements Statement {}
-    public record Print(List<Expression> arguments) implements Statement {}
+    public record Return(Expression value,Source source) implements Statement { public Return(Expression value){this(value,value==null?null:value.source());} }
+    public record Jump(boolean breaking,Source source) implements Statement { public Jump(boolean breaking){this(breaking,null);} }
+    public record Print(List<Expression> arguments,Source source) implements Statement { public Print(List<Expression> arguments){this(arguments,arguments.isEmpty()?null:arguments.get(0).source());} }
     public record Evaluate(Expression value) implements Statement {}
 
     private static Source source(ParserRuleContext c) {
@@ -154,6 +157,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     private static final class Builder {
         final ManagedEmitter.Analysis a;
+        final Map<Integer,String> functionNames=new HashMap<>();
         final Map<ManagedEmitter.Binding,Binding> bindings=new IdentityHashMap<>();
         final Map<ManagedEmitter.Function,Integer> ids=new IdentityHashMap<>();
         final Map<FunctionDeclContext,ManagedEmitter.Function> declarations=new IdentityHashMap<>();
@@ -250,6 +254,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             checked=allFunctions;
             for(var f:checked) if(f.declaration!=null && !library(f.declaration)) {
                 ids.put(f,ids.size()); declarations.put(f.declaration,f);
+                functionNames.put(ids.get(f),(f.owner==null?"":originalName(f.owner.declaration.IDENTIFIER().getSymbol())+".")+originalName(f.declaration.IDENTIFIER().getSymbol()));
             }
             var constructed=new ArrayList<>(classes);if(exceptionConstructors)constructed.add(exceptionClass);
             for(var c:constructed)for(var ctor:c.constructors)constructors.put(ctor,ids.size()+constructors.size());
@@ -272,9 +277,10 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         }
         Binding binding(ManagedEmitter.Binding b,ParserRuleContext at) throws CompilationException {
             Binding result=bindings.get(b);
-            if(result==null) { result=new Binding(nextBinding++,type(b.type(),at)); bindings.put(b,result); }
+            if(result==null) { result=new Binding(nextBinding++,type(b.type(),at),at instanceof VariableDeclContext d?originalName(d.IDENTIFIER().getSymbol()):at instanceof ParameterContext d?originalName(d.IDENTIFIER().getSymbol()):"",source(at)); bindings.put(b,result); }
             return result;
         }
+        static String originalName(org.antlr.v4.runtime.Token token){return token instanceof LocatedToken t?t.originalText():token.getText();}
         CoreProgram program(ProgramContext tree) throws CompilationException {
             var result=new ArrayList<Function>(); int entry=-1;
             for(var d:tree.functionDecl()) {
@@ -339,6 +345,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     }
                     resultType=Type.VOID;
                     if(ctor.declaration()!=null)statements.add(block(ctor.declaration().block()));
+                    functionNames.put(initializers.get(ctor),originalName(c.declaration.IDENTIFIER().getSymbol())+".निर्माता");
                     result.add(new Function(initializers.get(ctor),Type.VOID,List.copyOf(initializerParameters),new Block(List.copyOf(statements),List.of()),source(at)));
                 }
             }
@@ -386,7 +393,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     new FieldWrite(new FieldRead(new Read(receiver,runtimeSource),locationField,runtimeSource),new Constant(Type.TEXT,"",runtimeSource)));
                 result.add(new Function(initializers.get(ctor),Type.VOID,List.copyOf(initParameters),new Block(init,List.of()),runtimeSource));
             }
+            for(var c:classes)if(!c.record())functionNames.put(classInitializers.get(c),originalName(c.declaration!=null?c.declaration.IDENTIFIER().getSymbol():c.enumeration.IDENTIFIER().getSymbol())+".<वर्ग आरंभ>");
             self=null;
+            result.replaceAll(f->new Function(f.id(),f.result(),f.parameters(),f.body(),f.source(),f.initialization(),functionNames.getOrDefault(f.id(),"")));
             return new CoreProgram(List.copyOf(result),entry,List.copyOf(objectTypes),types.stream()
                 .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections),new ObjectType(-5,"अपवाद",List.of(messageField,locationField),List.of(),
                     Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().filter(c->!c.record()).map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList());
@@ -477,9 +486,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             if(s.whileStatement()!=null) {
                 var w=s.whileStatement(); return new Loop(expression(w.expression()),block(w.block()));
             }
-            if(s.RETURN()!=null)return new Return(s.expression()==null?null:coerce(expression(s.expression()),resultType));
-            if(s.BREAK()!=null || s.CONTINUE()!=null)return new Jump(s.BREAK()!=null);
-            if(s.PRINT()!=null)return new Print(arguments(s.arguments()));
+            if(s.RETURN()!=null)return new Return(s.expression()==null?null:coerce(expression(s.expression()),resultType),source(s));
+            if(s.BREAK()!=null || s.CONTINUE()!=null)return new Jump(s.BREAK()!=null,source(s));
+            if(s.PRINT()!=null)return new Print(arguments(s.arguments()),source(s));
             if(s.block()!=null)return block(s.block());
             return new Evaluate(expression(s.expression()));
         }

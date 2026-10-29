@@ -12,12 +12,14 @@ import java.util.concurrent.TimeUnit;
 /** Experimental Linux x86-64 executable backend using LLVM 18 directly. */
 public final class NativeCompiler {
     private static final int TIMEOUT_SECONDS=120, LOG_LIMIT=65536;
-    private final boolean sanitize;
+    private final boolean sanitize, debug;
     public NativeCompiler(){this(false);}
     /** Internal conformance-build option; normal CLI builds have no sanitizer dependency. */
-    public NativeCompiler(boolean sanitize){this.sanitize=sanitize;}
+    public NativeCompiler(boolean sanitize){this(sanitize,false);}
+    public NativeCompiler(boolean sanitize,boolean debug){this.sanitize=sanitize;this.debug=debug;}
     private List<String> clangCommand(List<String> args){
         var command=new ArrayList<>(args);
+        if(debug)command.addAll(List.of("-g","-fno-omit-frame-pointer","-fno-optimize-sibling-calls"));
         if(sanitize)command.addAll(List.of("-fsanitize=address,undefined","-fno-omit-frame-pointer"));
         return command;
     }
@@ -42,14 +44,14 @@ public final class NativeCompiler {
                 if(in==null)throw new IOException("Missing native licensing resource: "+name);
                 notices.append("\n--- ").append(name).append(" ---\n").append(new String(in.readAllBytes(),StandardCharsets.UTF_8));
             }
-            Files.writeString(work.resolve("program.ll"),LlvmEmitter.emit(core,notices.toString()),StandardCharsets.UTF_8);
+            Files.writeString(work.resolve("program.ll"),LlvmEmitter.emit(core,notices.toString(),debug),StandardCharsets.UTF_8);
             for(String name:List.of("bhash_runtime.c","bhash_runtime.h"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
                 if(in==null)throw new IOException("Missing native runtime: "+name);
                 Files.copy(in,work.resolve(name));
             }
             command(work,List.of(opt,"-passes=verify","-disable-output","program.ll"));
-            command(work,clangCommand(List.of(clang,"-O2","-c","program.ll","-o","program.o")));
-            command(work,clangCommand(List.of(clang,"-std=c17","-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o")));
+            command(work,clangCommand(List.of(clang,debug?"-O0":"-O2","-c","program.ll","-o","program.o")));
+            command(work,clangCommand(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o")));
             command(work,clangCommand(List.of(clang,"program.o","runtime.o","-lm","-o","program")));
             Files.createDirectories(destination.getParent());
             staged=Files.createTempFile(destination.getParent(),".bhash-native-",".tmp");
