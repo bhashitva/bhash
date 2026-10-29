@@ -47,6 +47,10 @@ jobs:
             for tool in java dotnet clang gcc; do
               if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
             done
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/bitwise-selection > /tmp/control-actual 2> /tmp/control-stats
+            printf "१ -१ १ -१\n६६७ ३३३\nअंतिम😀\n" > /tmp/control-expected
+            cmp /tmp/control-actual /tmp/control-expected
+            grep "live=0" /tmp/control-stats
             printf "भारत😀\n+४२\n" > /tmp/console-input
             BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/console < /tmp/console-input > /tmp/console-actual 2> /tmp/console-stats
             printf "अपना नाम लिखें:\nएक पूर्णांक लिखें:\nनमस्ते भारत😀 ४२\n" > /tmp/console-expected
@@ -150,3 +154,4 @@ jobs:
             docs/native-bytes.md
             docs/native-time.md
             docs/native-console.md
+            docs/native-control-flow.md
