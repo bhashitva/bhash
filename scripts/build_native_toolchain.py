@@ -41,6 +41,15 @@ def package(name):
     PACKAGES[name] = dict(zip(('binary', 'version', 'source', 'source_version'), fields))
 
 
+def package_owner(output):
+    # dpkg prints diversion diagnostics before ordinary ownership records on merged-/usr.
+    for line in output.splitlines():
+        match = re.match(r'^([a-z0-9][a-z0-9+.-]*(?::[a-z0-9][a-z0-9-]*)?): /', line)
+        if match:
+            return match.group(1)
+    return None
+
+
 def owner(path):
     path = str(path)
     variants = [path, str(Path(path).resolve())]
@@ -49,7 +58,9 @@ def owner(path):
     for candidate in variants:
         result = subprocess.run(['dpkg-query', '-S', candidate], capture_output=True, text=True)
         if result.returncode == 0:
-            return result.stdout.splitlines()[0].split(': ', 1)[0].split(', ')[0]
+            found = package_owner(result.stdout)
+            if found:
+                return found
     raise RuntimeError('Cannot establish package provenance: '+path)
 
 
