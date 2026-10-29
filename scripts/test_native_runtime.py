@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / 'src/main/resources/dev/bhash/backend/native'
 BUILD = ROOT / 'target/native-runtime-tests'
 
-def run(command):
-    return subprocess.run(command, cwd=ROOT, capture_output=True, timeout=120)
+def run(command, input=None):
+    return subprocess.run(command, cwd=ROOT, capture_output=True, timeout=120, input=input)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -110,6 +110,24 @@ def main():
         assert result.returncode == 0, result.stderr
         assert result.stdout.replace(b'\r\n', b'\n') == b'Native byte/buffer checks passed.\n'
         print(f'{name}: packed bytes, binary layouts, UTF-8, file round trips, precision and exception cleanup passed')
+
+        console_exe = BUILD / ('console-' + name + ('.exe' if os.name == 'nt' else ''))
+        console_command = [part.replace('runtime_test.c', 'console_runtime_test.c').replace(str(exe), str(console_exe)) for part in command]
+        result = run(console_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        console_input = ("क😀" * 50000 + "\nनमस्ते😀\0ब\r\n-९२२३३७२०३६८५४७७५८०८\r9223372036854775807\ninvalid\n" + "9" * 100 + "x\n9223372036854775808\n").encode('utf-8')
+        console_input += b'\xff\r\n7\n' + ("क😀\ninvalid\n" * 1000 + "last").encode('utf-8')
+        result = run([str(console_exe)], input=console_input)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native console checks passed.\n'
+        # Closing stdin triggers MSVC's invalid-parameter abort; exercise POSIX I/O failures on Linux.
+        if os.name != 'nt':
+            for scenario in ('text', 'integer'):
+                result = run([str(console_exe), scenario], input=b'')
+                assert result.returncode == 0, result.stderr
+                assert result.stdout.replace(b'\r\n', b'\n') == b'Native console I/O failure checks passed.\n'
+        print(f'{name}: UTF-8 console lines, integer limits, malformed-input recovery and forced-GC unwinding passed')
 
         time_exe = BUILD / ('time-' + name + ('.exe' if os.name == 'nt' else ''))
         time_command = [part.replace('runtime_test.c', 'time_runtime_test.c').replace(str(exe), str(time_exe)) for part in command]
