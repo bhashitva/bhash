@@ -86,3 +86,12 @@ full terms are included in LICENSE and META-INF/bhash/LICENSE.
 # Optional managed native toolchain distributions
 
 The managed Linux SDK is distributed separately from the compiler JAR and generated applications. It contains LLVM/Clang/LLD and system components from a recorded Ubuntu snapshot. Full per-package notices accompany the SDK in `licenses/`; `packages.json` identifies exact binary/source versions, and `sources.json` identifies the checksum-pinned companion corresponding-source archive. Keep those materials together when redistributing the SDK. LLVM licensing: https://llvm.org/docs/DeveloperPolicy.html#license .
+
+## Windows native applications
+
+Windows native output statically links parts of the MinGW-w64 runtime supplied by the
+managed LLVM-MinGW 18/UCRT SDK. Its complete attribution is bundled in
+`src/main/resources/dev/bhash/backend/native/MINGW_RUNTIME_NOTICES.txt`, embedded in
+Windows executables (`--bhash-licenses`) and included in Windows application packages.
+The SDK preserves LLVM and MinGW notices; Windows UCRT itself is supplied by Windows.
+Upstream toolchain: https://github.com/mstorsjo/llvm-mingw/releases/tag/20240619 .

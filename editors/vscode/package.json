@@ -2,7 +2,7 @@
   "name": "bhash",
   "displayName": "Bhash (भाष)",
   "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "publisher": "bhashitva",
   "license": "Apache-2.0",
   "repository": {
@@ -199,13 +199,13 @@
           ],
           "default": "managed",
           "scope": "machine",
-          "description": "Managed downloads a pinned Linux x86-64 SDK on first Native build/run (glibc 2.35+, Java 17+). System uses an existing LLVM 18 toolchain."
+          "description": "Managed downloads a pinned Windows x64 or Linux x86-64 SDK on first Native build/run (Windows 10+ or glibc 2.35+, Java 17+). System uses an existing LLVM 18 toolchain."
         },
         "bhash.native.toolchainHome": {
           "type": "string",
           "default": "",
           "scope": "machine",
-          "description": "Optional absolute SDK cache directory on the Linux/WSL extension host. Empty uses BHASH_TOOLCHAIN_HOME or the compiler default cache. Allow approximately 1 GB of free disk space for setup."
+          "description": "Optional absolute SDK cache directory on the Windows/Linux/WSL extension host. Empty uses BHASH_TOOLCHAIN_HOME or the compiler default cache. Allow approximately 1 GB of free disk space for setup."
         }
       }
     },

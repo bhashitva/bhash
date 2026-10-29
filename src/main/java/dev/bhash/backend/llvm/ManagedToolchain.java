@@ -15,7 +15,7 @@ import java.util.zip.*;
 
 /** User-local, checksum-pinned toolchains. Installation never invokes a package manager. */
 public final class ManagedToolchain {
-    public static final String ID="bhash-linux-x86_64-llvm18-v1";
+    public static final String ID=NativePlatform.sdkId();
     public static final long MAX_ARCHIVE=1024L*1024*1024, MAX_EXPANDED=3L*1024*1024*1024;
     private static final int MAX_FILES=50000, MAX_MANIFEST=8*1024*1024;
     public record Installation(Path root,String id,String archiveSha256,String llvmVersion,String minimumGlibc){}
@@ -24,7 +24,7 @@ public final class ManagedToolchain {
     private static IOException invalid(String message){return new IOException("[BH9110] "+message);}
     public static Path home(){
         String configured=System.getenv("BHASH_TOOLCHAIN_HOME");
-        Path root=configured!=null?Path.of(configured):Path.of(System.getenv().getOrDefault("XDG_CACHE_HOME",Path.of(System.getProperty("user.home"),".cache").toString())).resolve("bhash/toolchains");
+        Path root=configured!=null?Path.of(configured):NativePlatform.windows()?Path.of(System.getenv().getOrDefault("LOCALAPPDATA",Path.of(System.getProperty("user.home"),"AppData","Local").toString())).resolve("Bhash/toolchains"):Path.of(System.getenv().getOrDefault("XDG_CACHE_HOME",Path.of(System.getProperty("user.home"),".cache").toString())).resolve("bhash/toolchains");
         if(!root.isAbsolute())throw new IllegalArgumentException("BHASH_TOOLCHAIN_HOME/XDG_CACHE_HOME must be an absolute path");
         return root.normalize();
     }
@@ -44,15 +44,17 @@ public final class ManagedToolchain {
     private static JsonObject manifest(Path root)throws IOException{
         var data=json(root.resolve("toolchain.json"));
         if(!data.has("format") || !data.get("format").toString().equals("1") || !ID.equals(string(data,"id")) || !NativeBuildInfo.TARGET.equals(string(data,"target")))throw invalid("Unsupported managed toolchain format, ID or target");
-        String version=string(data,"llvm_version"),glibc=string(data,"minimum_glibc");
+        String version=string(data,"llvm_version"),glibc=minimumGlibc(data);
+        if(NativePlatform.windows() && (!"ucrt".equals(string(data,"c_runtime")) || !"10.0".equals(string(data,"minimum_windows"))))throw invalid("Windows SDK requires UCRT");
         if(!version.matches("18\\.[0-9]+\\.[0-9]+") || !glibc.matches("[0-9]+(?:\\.[0-9]+){1,2}"))throw invalid("Invalid toolchain LLVM/glibc version");
         if(!data.has("files") || !data.get("files").isJsonObject() || data.getAsJsonObject("files").size()>MAX_FILES)throw invalid("Missing or oversized file inventory");
         var files=data.getAsJsonObject("files");
-        for(String required:List.of("bin/clang-18","bin/opt-18","bin/ld.lld","bin/llvm-readelf","libexec/clang-18","libexec/opt-18","libexec/ld.lld","libexec/llvm-readelf","sysroot/usr/include/stdio.h","resource/include/stddef.h"))if(!files.has(required))throw invalid("Incomplete toolchain: "+required);
+        for(String required:NativePlatform.requiredFiles())if(!files.has(required))throw invalid("Incomplete toolchain: "+required);
         return data;
     }
+    private static String minimumGlibc(JsonObject data)throws IOException{return NativePlatform.windows()?"0.0":string(data,"minimum_glibc");}
     private static Path safe(Path root,String name)throws IOException{
-        if(name.isEmpty() || name.startsWith("/") || name.contains("\\") || name.contains(":") || name.indexOf(0)>=0 || Arrays.stream(name.split("/",-1)).anyMatch(p->p.isEmpty() || p.equals(".") || p.equals("..")))throw invalid("Unsafe archive path: "+name);
+        if(name.isEmpty() || name.startsWith("/") || name.contains("\\") || name.contains(":") || name.indexOf(0)>=0 || Arrays.stream(name.split("/",-1)).anyMatch(p->p.isEmpty() || p.equals(".") || p.equals("..") || p.endsWith(".") || p.endsWith(" ") || p.matches("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?")))throw invalid("Unsafe archive path: "+name);
         Path result=root.resolve(name).normalize();if(!result.startsWith(root))throw invalid("Archive path escapes installation");return result;
     }
     /** Safe extraction is independent of platform; tools run only after integrity verification. */
@@ -62,7 +64,7 @@ public final class ManagedToolchain {
         try(var zip=new ZipInputStream(Files.newInputStream(archive))){
             ZipEntry entry;while((entry=zip.getNextEntry())!=null){
                 String name=entry.getName();if(entry.isDirectory())throw invalid("Toolchain ZIP must contain regular files only");
-                Path file=safe(root,name);if(name.equals(".installed.json") || !names.add(name) || names.size()>MAX_FILES)throw invalid("Duplicate/reserved archive entry or too many files: "+name);
+                Path file=safe(root,name);if(name.equals(".installed.json") || !names.add(name.toLowerCase(Locale.ROOT)) || names.size()>MAX_FILES)throw invalid("Duplicate/reserved archive entry or too many files: "+name);
                 Files.createDirectories(file.getParent());long length=0;try(var out=Files.newOutputStream(file,StandardOpenOption.CREATE_NEW)){
                     byte[] buffer=new byte[65536];int n;while((n=zip.read(buffer))!=-1){length+=n;total+=n;if(length>512L*1024*1024 || total>MAX_EXPANDED || name.equals("toolchain.json") && length>MAX_MANIFEST)throw invalid("Toolchain archive exceeds extraction limits");out.write(buffer,0,n);}
                 }zip.closeEntry();
@@ -78,7 +80,7 @@ public final class ManagedToolchain {
             var record=item.getValue().getAsJsonObject();String hash=string(record,"sha256");
             if(!hash.matches("[0-9a-f]{64}") || !Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS) || !NativeBuildInfo.fileHash(file).equals(hash))throw invalid("Toolchain file checksum mismatch/missing: "+name);
             var executable=record.get("executable");if(executable==null || !executable.isJsonPrimitive() || !executable.getAsJsonPrimitive().isBoolean())throw invalid("Missing executable flag: "+name);
-            if(setPermissions && !file.toFile().setExecutable(executable.getAsBoolean(),true) && executable.getAsBoolean())throw invalid("Cannot set executable permission: "+name);
+            if(setPermissions && !NativePlatform.windows() && !file.toFile().setExecutable(executable.getAsBoolean(),true) && executable.getAsBoolean())throw invalid("Cannot set executable permission: "+name);
             if(!setPermissions && executable.getAsBoolean() && FileSystems.getDefault().supportedFileAttributeViews().contains("posix") && !Files.isExecutable(file))throw invalid("Toolchain executable permission missing: "+name);
         }
         try(var paths=Files.walk(root)){for(var file:paths.toList())if(!Files.isDirectory(file,LinkOption.NOFOLLOW_LINKS) && !expected.contains(root.relativize(file).toString().replace('\\','/')))throw invalid("Unexpected file in toolchain: "+file);}
@@ -91,7 +93,7 @@ public final class ManagedToolchain {
         if(!directory.matches(hash+"-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))throw invalid("Invalid installation directory in active receipt");
         Path root=cache.resolve("installations").resolve(directory);if(Files.isSymbolicLink(root))throw invalid("Installation root must not be a symbolic link");
         var receipt=json(root.resolve(".installed.json"));if(!hash.equals(string(receipt,"archive_sha256")) || !NativeBuildInfo.fileHash(root.resolve("toolchain.json")).equals(string(receipt,"manifest_sha256")))throw invalid("Managed installation receipt mismatch; reinstall the trusted archive");
-        var data=manifest(root);return new Installation(root,ID,hash,string(data,"llvm_version"),string(data,"minimum_glibc"));
+        var data=manifest(root);return new Installation(root,ID,hash,string(data,"llvm_version"),minimumGlibc(data));
     }
     public static Status status()throws IOException{
         var installed=active();return installed==null?new Status(false,null,null,home().toString(),null,null):new Status(true,installed.id(),installed.archiveSha256(),installed.root().toString(),installed.llvmVersion(),installed.minimumGlibc());
@@ -107,7 +109,7 @@ public final class ManagedToolchain {
                 Path input=archive;if(url!=null){input=work.resolve("download.zip");download(validateUrl(url.toString()),input);}
                 if(!Files.isRegularFile(input) || Files.size(input)>MAX_ARCHIVE || !NativeBuildInfo.fileHash(input).equals(digest))throw invalid("Archive SHA-256 mismatch; installation was not changed");
                 Path staged=work.resolve("payload");extractAndVerify(input,staged);var data=manifest(staged);
-                var candidate=new Installation(staged,ID,digest,string(data,"llvm_version"),string(data,"minimum_glibc"));
+                var candidate=new Installation(staged,ID,digest,string(data,"llvm_version"),minimumGlibc(data));
                 NativeToolchain.doctor(candidate); // Run before activating, using precisely this installation.
                 Files.createDirectories(cache.resolve("installations"));
                 String directory=digest+"-"+UUID.randomUUID();root=cache.resolve("installations").resolve(directory);

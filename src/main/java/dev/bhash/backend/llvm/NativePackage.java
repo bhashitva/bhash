@@ -6,7 +6,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-import java.util.zip.GZIPOutputStream;
+import java.util.zip.*;
 
 /** Deterministic USTAR/gzip distribution with no Java/LLVM dependency at execution time. */
 public final class NativePackage {
@@ -17,27 +17,42 @@ public final class NativePackage {
     }
     public static long epoch(){String value=System.getenv().getOrDefault("SOURCE_DATE_EPOCH","0");try{long n=Long.parseLong(value);if(n<0 || n>8589934591L)throw new NumberFormatException();return n;}catch(NumberFormatException error){throw new IllegalArgumentException("SOURCE_DATE_EPOCH must be between 0 and 8589934591");}}
     public static Result build(List<SourceFile> sources,Path root,Path output,String name,String version,boolean debug,String maximumGlibc)throws IOException,CompilationException{
-        validateName(name,version);long epoch=epoch();NativeCompatibility.compareVersions(maximumGlibc,maximumGlibc);
-        Path destination=output.toAbsolutePath().normalize();if(destination.getFileName()==null || !destination.getFileName().toString().endsWith(".tar.gz") || Files.isDirectory(destination) || Files.isSymbolicLink(destination))throw new IOException("Native package output must be a .tar.gz file, not a directory or symbolic link.");
+        validateName(name,version);long epoch=epoch();boolean windows=NativePlatform.windows();if(!windows)NativeCompatibility.compareVersions(maximumGlibc,maximumGlibc);
+        Path destination=output.toAbsolutePath().normalize();if(destination.getFileName()==null || !destination.getFileName().toString().endsWith(windows?".zip":".tar.gz") || Files.isDirectory(destination) || Files.isSymbolicLink(destination))throw new IOException("Native package output must be a "+(windows?".zip":".tar.gz")+" file, not a directory or symbolic link.");
         var mapped=NativeCompiler.normalizeSources(sources,root);Path work=Files.createTempDirectory("bhash-release-");Path staged=null;
         try{
-            Path binary=work.resolve(name);new NativeCompiler(false,debug,root).compile(sources,binary);var compatibility=NativeCompatibility.inspect(binary,true);
-            if(NativeCompatibility.compareVersions(compatibility.minimumGlibc(),maximumGlibc)>0)throw new CompilationException("[BH9106] Executable needs glibc "+compatibility.minimumGlibc()+", exceeding --max-glibc "+maximumGlibc+". Build against an older pinned sysroot/builder.");
+            String executable=name+NativePlatform.executableSuffix();Path binary=work.resolve(executable);new NativeCompiler(false,debug,root).compile(sources,binary);var compatibility=NativeCompatibility.inspect(binary,true);
+            if(!windows && NativeCompatibility.compareVersions(compatibility.minimumGlibc(),maximumGlibc)>0)throw new CompilationException("[BH9106] Executable needs glibc "+compatibility.minimumGlibc()+", exceeding --max-glibc "+maximumGlibc+". Build against an older pinned sysroot/builder.");
             if(Files.size(binary)>256L*1024*1024)throw new IOException("Native release executable exceeds the 256 MiB package limit");
-            var files=new TreeMap<String,byte[]>();files.put("bin/"+name,Files.readAllBytes(binary));
+            var files=new TreeMap<String,byte[]>();files.put("bin/"+executable,Files.readAllBytes(binary));
             for(String license:List.of("LICENSE","NOTICE","LICENSING.md","THIRD_PARTY_NOTICES.md"))files.put(license,NativeBuildInfo.resource("/META-INF/bhash/"+license));
+            if(windows){
+                files.put("MINGW_RUNTIME_NOTICES.txt",NativeBuildInfo.resource("/dev/bhash/backend/native/MINGW_RUNTIME_NOTICES.txt"));
+                files.put("README.txt",("Bhash native release: "+name+" "+version+"\nWindows 10+ x64 / UCRT.\nNo JVM, .NET, LLVM, WSL or Visual Studio is needed to run this program.\nRun: .\\bin\\"+executable+"\nInspect provenance: .\\bin\\"+executable+" --bhash-build-info\nSHA256SUMS records SHA-256 hashes; these are not signatures.\n").getBytes(StandardCharsets.UTF_8));
+            }else{
             files.put("check-host.sh",hostCheck(compatibility.minimumGlibc()).getBytes(StandardCharsets.UTF_8));
             files.put("run.sh",("#!/bin/sh\nset -eu\ncd -- \"$(dirname -- \"$0\")\"\n./check-host.sh\nexec ./bin/"+name+" \"$@\"\n").getBytes(StandardCharsets.UTF_8));
             files.put("README.txt",("Bhash native release: "+name+" "+version+"\nLinux x86-64; glibc >= "+compatibility.minimumGlibc()+".\nNo JVM, .NET or LLVM is needed to run this program.\nVerify: sha256sum -c SHA256SUMS\nRun: ./run.sh\nInspect provenance: ./bin/"+name+" --bhash-build-info\nDebug sources: gdb; set substitute-path /bhash/source /path/to/source-root\nChecksums detect corruption; they are not signatures or proof of authorship.\n").getBytes(StandardCharsets.UTF_8));
+            }
             var manifest=new LinkedHashMap<String,Object>();manifest.put("format",1);manifest.put("name",name);manifest.put("version",version);manifest.put("target",compatibility.target());manifest.put("build",compatibility.buildInfo());manifest.put("minimum_glibc",compatibility.minimumGlibc());manifest.put("interpreter",compatibility.interpreter());manifest.put("libraries",compatibility.libraries());manifest.put("source_date_epoch",epoch);
             var hashes=new TreeMap<String,String>();for(var source:mapped)hashes.put(source.name(),NativeBuildInfo.hash(source.text().getBytes(StandardCharsets.UTF_8)));manifest.put("source_sha256",hashes);
             manifest.put("executable_sha256",NativeBuildInfo.fileHash(binary));files.put("manifest.json",(NativeBuildInfo.JSON.toJson(manifest)+"\n").getBytes(StandardCharsets.UTF_8));
             var checksums=new StringBuilder();for(var entry:files.entrySet())checksums.append(NativeBuildInfo.hash(entry.getValue())).append("  ").append(entry.getKey()).append('\n');files.put("SHA256SUMS",checksums.toString().getBytes(StandardCharsets.UTF_8));
             Files.createDirectories(destination.getParent());staged=Files.createTempFile(destination.getParent(),".bhash-release-",".tmp");
-            try(var archive=Files.newOutputStream(staged)){writeArchive(archive,name+"-"+version+"-linux-x86_64",files,epoch);}
+            try(var archive=Files.newOutputStream(staged)){if(windows)writeZip(archive,name+"-"+version+"-windows-x86_64",files,epoch);else writeArchive(archive,name+"-"+version+"-linux-x86_64",files,epoch);}
             String digest=NativeBuildInfo.fileHash(staged);try{Files.move(staged,destination,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}catch(AtomicMoveNotSupportedException e){Files.move(staged,destination,StandardCopyOption.REPLACE_EXISTING);}
             return new Result(destination,digest,compatibility.minimumGlibc());
         }finally{if(staged!=null)Files.deleteIfExists(staged);try(var paths=Files.walk(work)){for(var p:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(p);}}
+    }
+    public static void writeZip(OutputStream output,String root,SortedMap<String,byte[]> files,long epoch)throws IOException{
+        if(!root.matches("[A-Za-z0-9][A-Za-z0-9._+-]{0,95}") || epoch<0 || epoch>8589934591L)throw new IOException("Invalid archive root/epoch");
+        try(var zip=new ZipOutputStream(output,StandardCharsets.UTF_8)){
+            for(var file:files.entrySet()){
+                String path=file.getKey();if(!path.matches("[A-Za-z0-9._/-]+") || path.startsWith("/") || Arrays.stream(path.split("/",-1)).anyMatch(p->p.isEmpty() || p.equals(".") || p.equals("..")))throw new IOException("Unsafe release archive path: "+path);
+                var entry=new ZipEntry(root+"/"+path);entry.setTimeLocal(java.time.LocalDateTime.ofEpochSecond(Math.max(epoch,315532800L),0,java.time.ZoneOffset.UTC));
+                zip.putNextEntry(entry);zip.write(file.getValue());zip.closeEntry();
+            }
+        }
     }
     public static void writeArchive(OutputStream output,String root,SortedMap<String,byte[]> files,long epoch)throws IOException{
         if(!root.matches("[A-Za-z0-9][A-Za-z0-9._+-]{0,95}") || epoch<0 || epoch>8589934591L)throw new IOException("Invalid archive root/epoch");

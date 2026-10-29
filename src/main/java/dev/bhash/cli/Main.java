@@ -90,12 +90,12 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar native toolchain status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
         err.println("       java -jar bhash-compiler.jar native doctor [--json]");
         err.println("       java -jar bhash-compiler.jar native inspect <executable> [--json] [--require-runtime-match]");
-        err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");
+        err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz|archive.zip> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");
         err.println("       Native compile/run also accept --source-root ROOT for reproducible source paths.");
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
-        err.println("Native output is an experimental Linux x86-64 executable; LLVM 18 is required for builds.");
+        err.println("Native output is an experimental Linux/Windows x86-64 executable; LLVM 18 is required for builds.");
         err.println("check validates syntax only; compile/run also validate names, types and control flow.");
         return 2;
     }
@@ -118,7 +118,7 @@ public final class Main {
                     case "clr" -> Target.CLR;
                     case "native" -> Target.NATIVE;
                     case "wasm-browser", "wasm" -> Target.WASM;
-                    default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm), native (experimental Linux x86-64).");
+                    default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm), native (experimental Linux/Windows x86-64).");
                 };
             } else if(args[i].equals("--source-root") && sourceRoot==null && i+1<args.length){sourceRoot=Path.of(args[++i]);
             } else if(args[i].equals("--debug") && !debug){debug=true;
@@ -128,7 +128,7 @@ public final class Main {
         if(debug && target!=Target.NATIVE)throw new IllegalArgumentException("--debug currently requires --target native.");
         if (output == null && allowOutput) {
             var project = ProjectLoader.load(source);
-            String suffix = target == Target.JVM ? ".jar" : target == Target.CLR ? "-clr" : target == Target.NATIVE ? "-native" : "-web";
+            String suffix = target == Target.JVM ? ".jar" : target == Target.CLR ? "-clr" : target == Target.NATIVE ? "-native"+dev.bhash.backend.llvm.NativePlatform.executableSuffix() : "-web";
             output = ProjectLoader.manifest(source).getFileName().toString().equals(ProjectLoader.MANIFEST)
                     ? project.root().resolve("build").resolve(project.name() + suffix)
                     : source.resolveSibling(project.name() + suffix);
@@ -194,7 +194,7 @@ public final class Main {
                 return 2;
             }
             temporary = Files.createTempDirectory("bhash-run-");
-            Path output = temporary.resolve(requested.target == Target.JVM ? "program.jar" : "clr");
+            Path output = temporary.resolve(requested.target == Target.JVM ? "program.jar" : requested.target == Target.NATIVE ? "program"+dev.bhash.backend.llvm.NativePlatform.executableSuffix() : "clr");
             var options = new Options(requested.source, output, requested.target, requested.debug, requested.sourceRoot);
             build(options);
             ProcessBuilder builder;

@@ -8,7 +8,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.regex.*;
 
-/** Static ELF inspection only: never runs the input executable or invokes ldd. */
+/** Static ELF/PE inspection: never executes the input or invokes a dynamic loader. */
 public final class NativeCompatibility {
     public record Report(String target,String interpreter,String minimumGlibc,List<String> libraries,JsonObject buildInfo,boolean runtimeMatchesCompiler){}
     private static final Set<String> SYSTEM_LIBRARIES=Set.of("libc.so.6","libm.so.6","libgcc_s.so.1","libpthread.so.0","libdl.so.2","librt.so.1");
@@ -31,16 +31,18 @@ public final class NativeCompatibility {
             JsonObject info=JsonParser.parseString(section.group(1)).getAsJsonObject();
             for(String key:List.of("format","runtime_abi"))if(!info.get(key).isJsonPrimitive() || !info.get(key).getAsJsonPrimitive().isNumber() || !info.get(key).toString().matches("[0-9]+"))throw invalid("Invalid metadata integer: "+key);
             if(!info.get("sanitized").isJsonPrimitive() || !info.get("sanitized").getAsJsonPrimitive().isBoolean())throw invalid("Invalid sanitizer metadata");
-            if(!info.get("format").toString().equals(Integer.toString(NativeBuildInfo.FORMAT)) || !info.get("runtime_abi").toString().equals(Integer.toString(NativeBuildInfo.ABI)) || !info.get("target").getAsString().equals(NativeBuildInfo.TARGET))throw invalid("Incompatible Bhash native metadata/ABI; rebuild with this compiler");
+            if(!info.get("format").toString().equals(Integer.toString(NativeBuildInfo.FORMAT)) || !info.get("runtime_abi").toString().equals(Integer.toString(NativeBuildInfo.ABI)) || !info.get("target").getAsString().equals(NativePlatform.LINUX_TARGET))throw invalid("Incompatible Bhash native metadata/ABI; rebuild with this compiler");
             if(info.get("sanitized").getAsBoolean())throw invalid("Sanitized binaries are for validation, not release distribution");
             for(String key:List.of("runtime_sha256","runtime_header_sha256"))if(!info.get(key).getAsString().matches("[0-9a-f]{64}"))throw invalid("Invalid runtime fingerprint");
             var current=NativeBuildInfo.identity();boolean match=info.get("runtime_sha256").getAsString().equals(current.get("runtime_sha256")) && info.get("runtime_header_sha256").getAsString().equals(current.get("runtime_header_sha256"));
             if(requireRuntimeMatch && !match)throw invalid("Runtime fingerprints differ from this compiler's bundled runtime");
-            return new Report(NativeBuildInfo.TARGET,interpreter.group(1),minimum,List.copyOf(libraries),info,match);
+            return new Report(NativePlatform.LINUX_TARGET,interpreter.group(1),minimum,List.copyOf(libraries),info,match);
         }catch(JsonParseException | IllegalStateException | UnsupportedOperationException | NullPointerException | NumberFormatException e){throw invalid("Malformed Bhash build metadata: "+e.getClass().getSimpleName());}
     }
     public static Report inspect(Path binary,boolean strict)throws IOException,CompilationException{
-        Path file=binary.toAbsolutePath().normalize();byte[] bytes;try(var in=Files.newInputStream(file)){bytes=in.readNBytes(24);}
+        Path file=binary.toAbsolutePath().normalize();
+        try(var input=Files.newInputStream(file)){if(input.read()=='M' && input.read()=='Z')return PeCompatibility.inspect(file,strict);}
+        byte[] bytes;try(var in=Files.newInputStream(file)){bytes=in.readNBytes(24);}
         if(bytes.length<24 || bytes[0]!=127 || bytes[1]!='E' || bytes[2]!='L' || bytes[3]!='F' || bytes[4]!=2 || bytes[5]!=1 || ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getShort(18)!=62)throw invalid("Expected a little-endian Linux x86-64 ELF executable");
         short type=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getShort(16);if(type!=2 && type!=3)throw invalid("ELF input is not an executable or PIE");
         // Absolute input paths prevent option interpretation; LLVM readelf 18 rejects a bare --.

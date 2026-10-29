@@ -117,9 +117,9 @@ public final class LlvmEmitter {
         String license=text(notices);
         byte[] info=buildInfo.getBytes(StandardCharsets.UTF_8);globals.append("@bhash_build_info = private constant [").append(info.length+1).append(" x i8] c\"");
         for(byte b:info)globals.append(String.format(Locale.ROOT,"\\%02X",b&255));
-        globals.append("\\00\", section \".bhash.build\", align 1\n@llvm.used = appending global [1 x ptr] [ptr @bhash_build_info], section \"llvm.metadata\"\n");
+        globals.append("\\00\", section \""+(NativePlatform.windows()?".bhash":".bhash.build")+"\", align 1\n@llvm.used = appending global [1 x ptr] [ptr @bhash_build_info], section \"llvm.metadata\"\n");
         return "; Bhash native: direct LLVM IR, internal ABI v15\n"+
-            "target triple = \"x86_64-unknown-linux-gnu\"\n%TraceFrame = type { ptr, ptr, ptr }\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%RecordInfo = type { %ClassInfo, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
+            "target triple = \""+NativeBuildInfo.TARGET+"\"\n%TraceFrame = type { ptr, ptr, ptr }\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%RecordInfo = type { %ClassInfo, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
             globals+"\ndeclare void @"+NativeBuildInfo.GUARD+"()\ndeclare i32 @bh_print_build_info_if_requested(i32, ptr, ptr)\ndeclare void @bh_trace_enter(ptr, ptr, ptr)\ndeclare void @bh_trace_at(ptr)\ndeclare void @bh_trace_leave()\ndeclare void @bh_static_roots_configure(ptr, i64)\ndeclare void @bh_static_reference_store(ptr, ptr)\ndeclare void @bh_class_initialize(ptr, ptr, ptr)\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+

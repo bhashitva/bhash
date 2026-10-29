@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // A normal ProcessExecution launcher keeps Bhash console input connected to the terminal.
 import {spawn} from 'node:child_process';
-import {capture, ensureNative, nativeEnvironment, NativeOptions, requireNativeHost} from './native';
+import {capture, ensureNative, nativeEnvironment, NativeOptions, requireNativeHost, terminateTree} from './native';
 interface Request extends NativeOptions {operation: 'build' | 'run' | 'setup' | 'check' | 'repair'; input?: string;}
 async function main() {
     const request: Request = JSON.parse(process.argv[2]);
@@ -18,8 +18,8 @@ async function main() {
     }
     if (!request.input) throw new Error('Native task input is missing.');
     abort.signal.throwIfAborted();
-    const child = spawn(request.java, ['-Dfile.encoding=UTF-8','-jar',request.jar,request.operation === 'build' ? 'compile' : 'run',request.input,'--target','native'], {env, stdio:'inherit'});
-    const stop = () => child.kill('SIGTERM');
+    const child = spawn(request.java, ['-Dfile.encoding=UTF-8','-jar',request.jar,request.operation === 'build' ? 'compile' : 'run',request.input,'--target','native'], {env, stdio:'inherit', detached:process.platform === 'linux'});
+    const stop = () => terminateTree(child);
     abort.signal.addEventListener('abort', stop, {once:true});
     await new Promise<void>((resolve, reject) => {
         child.once('error', reject);

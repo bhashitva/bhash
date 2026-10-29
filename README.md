@@ -443,3 +443,10 @@ navigation, and JVM/CLR/browser build tasks. Install from the
 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash)
 or use the VSIX from a successful **Bhash VS Code extension** Actions build. Java 17+ is required;
 the packaged extension includes its compiler and does not require Maven.
+
+### Windows native builds
+
+Native compilation also supports Windows 10+ x64 with an automatically managed
+LLVM 18/UCRT SDK in the VS Code extension. WSL and Visual Studio are not required.
+The compiler needs Java 17+; generated `.exe` files need neither Java nor .NET.
+See [Windows native setup and distribution](docs/native-windows.md).

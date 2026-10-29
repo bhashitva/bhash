@@ -57,13 +57,16 @@ def discover(examples):
 
 def artifact_path(output, target, name):
     path = output / TARGETS[target] / name
-    return path.with_name(path.name + ".jar") if target == "jvm" else path
+    return path.with_name(path.name + ".jar") if target == "jvm" else path.with_name(path.name + ".exe") if target == "native" and os.name == "nt" else path
 
 
 def native_unavailable():
-    if platform.system() != "Linux" or platform.machine().lower() not in ("x86_64", "amd64"):
-        return "native compilation requires Linux x86-64"
-    for variable, default in (("BHASH_CLANG", "clang-18"), ("BHASH_LLVM_OPT", "opt-18")):
+    if platform.system() not in ("Linux", "Windows") or platform.machine().lower() not in ("x86_64", "amd64"):
+        return "native compilation requires Linux/Windows x86-64"
+    if os.environ.get("BHASH_NATIVE_TOOLCHAIN") == "managed":
+        return None  # The compiler validates the selected managed installation.
+    tools = (("BHASH_CLANG", "clang.exe"),) if os.name == "nt" else (("BHASH_CLANG", "clang-18"), ("BHASH_LLVM_OPT", "opt-18"))
+    for variable, default in tools:
         tool = os.environ.get(variable) or default
         if not shutil.which(tool):
             return f"missing LLVM 18 tool: {tool}"

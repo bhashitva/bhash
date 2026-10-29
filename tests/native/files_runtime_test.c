@@ -1,13 +1,19 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-#ifdef _MSC_VER
+#ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 #include "bhash_runtime.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#ifndef _MSC_VER
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
 #include <dirent.h>
+#endif
+#ifdef TEXT
+#undef TEXT
 #endif
 #define TEXT(name,value) static const struct {uint64_t n;char data[sizeof(value)];} name={sizeof(value)-1,value}
 TEXT(location,"files-test:1:1");TEXT(path,"target/native-runtime-tests/files.tmp");
@@ -27,7 +33,9 @@ static void failure(bh_protected_callback callback,void *input,const char *messa
     assert(n==strlen(message)&&!memcmp((unsigned char *)text+8,message,(size_t)n));
     bh_roots_pop(&frame);bh_collect();assert(bh_heap_objects()==0);
 }
-#ifndef _MSC_VER
+#ifdef _WIN32
+static int descriptors(void) {DWORD count=0;assert(GetProcessHandleCount(GetCurrentProcess(),&count));return (int)count;}
+#else
 static int descriptors(void) {
     DIR *dir=opendir("/proc/self/fd");assert(dir);int n=0;
     while(readdir(dir))++n;
@@ -54,12 +62,10 @@ int main(void){
     unsigned char chunk[8192]={0};for(int i=0;i<2048;++i)assert(fwrite(chunk,1,sizeof chunk,f)==sizeof chunk);assert(!fclose(f));
     value=bh_file_read_text(&path,&location);assert(bh_text_length(value,&location)==16777216);bh_collect();
     f=fopen(path.data,"ab");assert(f);assert(fputc('x',f)!=EOF);assert(!fclose(f));
-#ifndef _MSC_VER
     int before=descriptors();
-#endif
     for(int i=0;i<64;++i)failure(read_file,(void *)&path,"फ़ाइल १६ MiB सीमा से बड़ी है।");
-#ifndef _MSC_VER
     assert(descriptors()==before);
+#ifndef _WIN32
     TEXT(full,"/dev/full");failure(write_file,(void *)&full,"फ़ाइल लिखी नहीं जा सकी।");
 #endif
     assert(!remove(path.data));bh_shutdown();assert(bh_heap_objects()==0);

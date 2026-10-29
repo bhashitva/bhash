@@ -11,7 +11,7 @@ import java.util.*;
 /** Versioned, path/timestamp-free identity shared by code generation and deployment tools. */
 public final class NativeBuildInfo {
     public static final int ABI=15, FORMAT=1;
-    public static final String TARGET="x86_64-unknown-linux-gnu", GUARD="bh_runtime_abi_v"+ABI;
+    public static final String TARGET=NativePlatform.target(), GUARD="bh_runtime_abi_v"+ABI;
     public static final Gson JSON=new GsonBuilder().disableHtmlEscaping().create();
     private NativeBuildInfo(){}
     public static byte[] resource(String path)throws IOException{

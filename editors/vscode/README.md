@@ -55,9 +55,9 @@ A locally packaged or Actions-built version can be installed before its Marketpl
 
 `स्थिर` means a constant binding. Static class members use **`साझा`**.
 
-## Native on Linux and WSL
+## Native on Windows, Linux and WSL
 
-Native builds use the compiler bundled in version 0.5.2. Choose `native` from
+Native builds use the compiler bundled in version 0.6.0. Choose `native` from
 **Bhash: Build Project or File** or **Bhash: Run Project or File**. The first task
 downloads the [versioned SDK](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.1.0)
 (110 MiB), checks its bundled SHA-256, verifies the installation, and activates it
@@ -65,23 +65,31 @@ in your user cache. Later builds reuse it, including offline. No separate LLVM,
 linker, C development packages, Maven, Node installation, or administrator access
 is required. Java 17+ is still required to run the compiler.
 
-Supported host: **Linux x86-64, glibc 2.35+**, such as Ubuntu 22.04+.
-On Windows, install the Microsoft WSL extension, open the project with **WSL:
-Reopen Folder in WSL**, and install Bhash and Java **inside WSL**. The lower-left
-VS Code indicator should identify the Linux distribution. WSL 2 is recommended.
-Opening an ordinary Windows folder does not automatically switch compilation to
-WSL. Windows, macOS, ARM, and musl/Alpine native hosts are not supported yet.
+Supported hosts:
+
+- **Windows 10+ x64**: ordinary Windows VS Code, Java 17+, and Bhash are sufficient.
+  WSL and Visual Studio are not required. The extension downloads the pinned
+  [Windows SDK](https://github.com/bhashitva/bhash/releases/tag/native-sdk-windows-1.0.0)
+  (71 MiB) and produces `.exe` applications using Windows UCRT.
+- **Linux x86-64, glibc 2.35+**, including Ubuntu 22.04+ in WSL. Install Bhash and
+  Java inside WSL when using a WSL workspace; its SDK runs inside that distribution.
+
+macOS, ARM, and musl/Alpine native hosts are not supported yet. Each SDK builds
+for its own host; this release does not add cross compilation. Generated applications
+need neither Java nor .NET nor LLVM. The compiler continues to require Java 17+.
 
 - **Bhash: Set Up Native Tools** installs tools before the first build.
 - **Bhash: Check Native Setup** diagnoses the current installation without downloading.
 - **Bhash: Repair Native Tools** downloads and verifies a fresh copy; failed setup
   preserves the previously active SDK. Cancel through the task terminal.
-- `bhash.native.toolchainHome` optionally chooses an absolute Linux cache path.
+- `bhash.native.toolchainHome` optionally chooses an absolute cache path on the extension host.
   Empty shares the CLI cache (`BHASH_TOOLCHAIN_HOME`, otherwise
-  `$XDG_CACHE_HOME/bhash/toolchains` or `~/.cache/bhash/toolchains`). Allow about
+  `%LOCALAPPDATA%\Bhash\toolchains` on Windows;
+    `$XDG_CACHE_HOME/bhash/toolchains` or `~/.cache/bhash/toolchains` on Linux). Allow about
   1 GB of free disk space during installation; repairs retain previous generations.
 - `bhash.native.toolchainMode = system` opts into an existing LLVM 18 toolchain.
-  In managed mode, ambient `BHASH_CLANG`, `BHASH_LLVM_OPT`, and `BHASH_READELF`
+  On Windows, system mode requires LLVM-MinGW 18/UCRT, not an MSVC-only LLVM installation.
+    In managed mode, ambient `BHASH_CLANG`, `BHASH_LLVM_OPT`, and `BHASH_READELF`
   overrides are ignored for these tasks so they cannot mix incompatible tools.
 
 Native tasks support console input (`पाठपढ़ो()` and `पढ़ो()`) in the integrated

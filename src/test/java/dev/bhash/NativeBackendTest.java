@@ -1609,6 +1609,7 @@ class NativeBackendTest {
     }
     @Test void nativeFilePermissionsAndCloseFailureMatchManaged()throws Exception{
         requireNumericTargets();Path denied=temporary.resolve("denied");Files.writeString(denied,"kept");
+        assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
         var permissions=Files.getPosixFilePermissions(denied);
         try{
             Files.setPosixFilePermissions(denied,Set.of());assumeFalse(Files.isReadable(denied),"Privileged user bypasses permission test");
@@ -1807,12 +1808,12 @@ class NativeBackendTest {
         for(var fixture:ConsoleFixtures.cases()){
             var sources=List.of(new SourceFile("console.bhash",fixture.source()));
             Path exe=temporary.resolve("console"+index),jar=temporary.resolve("console"+index+".jar"),clr=temporary.resolve("console-clr"+index++);
-            new NativeCompiler(true).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+            new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
             var nativeResult=consoleRun(List.of(exe.toString()),fixture.input(),true);
             assertEquals(0,nativeResult.exit(),fixture.name()+nativeResult.err());assertEquals(fixture.expected(),nativeResult.out(),fixture.name());
             assertEquals(0L,stats(nativeResult).get("live"));
             if(fixture.name().equals("stress")){assertTrue(stats(nativeResult).get("allocations")>5000);assertTrue(stats(nativeResult).get("peak")<2500000);}
-            for(var command:List.of(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
+            for(var command:List.of(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
                 var managed=consoleRun(command,fixture.input(),false);assertEquals(nativeResult.exit(),managed.exit(),managed.err());assertEquals(nativeResult.out(),managed.out(),fixture.name());
             }
         }
@@ -1820,8 +1821,8 @@ class NativeBackendTest {
     @Test void nativeConsoleCrReturnsBeforeNextInputByteAndFlushesOutput()throws Exception{
         requireNumericTargets();var sources=List.of(new SourceFile("console.bhash","कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो()); लिखो(पाठपढ़ो()); }"));
         Path exe=temporary.resolve("interactive"),jar=temporary.resolve("interactive.jar"),clr=temporary.resolve("interactive-clr");
-        new NativeCompiler(true).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
-        for(var command:List.of(List.of(exe.toString()),List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
+        new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+        for(var command:List.of(List.of(exe.toString()),List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
             var process=new ProcessBuilder(command).redirectError(temporary.resolve("interactive.err").toFile()).start();
             var executor=java.util.concurrent.Executors.newSingleThreadExecutor();
             try{
@@ -1837,9 +1838,9 @@ class NativeBackendTest {
         requireNumericTargets();
         for(String file:List.of("examples/factorial-console.bhash","examples/native/console.bhash")){
             var sources=List.of(new SourceFile("console.bhash",Files.readString(Path.of(file))));Path exe=temporary.resolve("example"),jar=temporary.resolve("example.jar");
-            new NativeCompiler(true).compile(sources,exe);new JvmCompiler().compile(sources,jar);
+            new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);
             byte[] input=ConsoleFixtures.utf8(file.contains("factorial")?"५\n":"भारत😀\n+४२\n");
-            var result=consoleRun(List.of(exe.toString()),input,true);var managed=consoleRun(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),input,false);
+            var result=consoleRun(List.of(exe.toString()),input,true);var managed=consoleRun(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),input,false);
             assertEquals(0,result.exit(),result.err());assertEquals(managed.out(),result.out());assertEquals(0L,stats(result).get("live"));
         }
     }
@@ -1880,10 +1881,10 @@ class NativeBackendTest {
     @Test void nativeSwitchConsoleExamplePreservesGroupedCasesAndDefault()throws Exception{
         requireNumericTargets();var sources=List.of(new SourceFile("switch-console.bhash",Files.readString(Path.of("examples/switch-console.bhash"))));
         Path exe=temporary.resolve("selection"),jar=temporary.resolve("selection.jar"),clr=temporary.resolve("selection-clr");
-        new NativeCompiler(true).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+        new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
         for(String input:List.of("०\n","२\n","९\n")){
             var result=consoleRun(List.of(exe.toString()),ConsoleFixtures.utf8(input),true);assertEquals(0,result.exit(),result.err());assertEquals(0L,stats(result).get("live"));
-            for(var command:List.of(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
+            for(var command:List.of(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
                 var reference=consoleRun(command,ConsoleFixtures.utf8(input),false);assertEquals(reference.exit(),result.exit());assertEquals(reference.out(),result.out());
             }
         }
@@ -1916,9 +1917,10 @@ class NativeBackendTest {
     }
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));
-        boolean supported=System.getProperty("os.name").equals("Linux") && Set.of("amd64","x86_64").contains(System.getProperty("os.arch"));
-        if(required)assertTrue(supported,"Native CI requires Linux x86-64");else assumeTrue(supported);
-        for(String tool:List.of(System.getenv().getOrDefault("BHASH_CLANG","clang-18"),System.getenv().getOrDefault("BHASH_LLVM_OPT","opt-18"))){
+        if("managed".equals(System.getenv("BHASH_NATIVE_TOOLCHAIN"))){NativeToolchain.require(temporary);return;}
+        boolean supported=NativePlatform.supported();
+        if(required)assertTrue(supported,"Native CI requires Linux/Windows x86-64");else assumeTrue(supported);
+        for(String tool:List.of(System.getenv().getOrDefault("BHASH_CLANG",NativePlatform.windows()?"clang.exe":"clang-18"),System.getenv().getOrDefault(NativePlatform.windows()?"BHASH_CLANG":"BHASH_LLVM_OPT",NativePlatform.windows()?"clang.exe":"opt-18"))){
             boolean available;
             try{Process p=new ProcessBuilder(tool,"--version").redirectErrorStream(true).start();p.getInputStream().readAllBytes();available=p.waitFor(10,TimeUnit.SECONDS)&&p.exitValue()==0;}
             catch(java.io.IOException e){available=false;}
@@ -1938,18 +1940,18 @@ class NativeBackendTest {
             Path jar=temporary.resolve("reference.jar");
             new JvmCompiler().compile(sources,jar);
             Path referenceOut=temporary.resolve("reference.out"),referenceErr=temporary.resolve("reference.err");
-            var reference=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString())
+            var reference=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString())
                 .redirectOutput(referenceOut.toFile()).redirectError(referenceErr.toFile()).start();
             assertTrue(reference.waitFor(15,TimeUnit.SECONDS));
             assertEquals(reference.exitValue(),result.exit(),"Native/JVM exit mismatch");
-            assertEquals(Files.readString(referenceOut),result.out(),"Native/JVM output mismatch");
+            assertEquals(Files.readString(referenceOut).replace("\r\n","\n"),result.out(),"Native/JVM output mismatch");
             if(result.exit()!=0)assertTrue(Files.readString(referenceErr).startsWith("भाष: "));
         }
         return result;
     }
     private Result nativeOnlyRun(List<SourceFile> sources,Map<String,String> environment,String...arguments)throws Exception{
         Path exe=temporary.resolve("application");
-        new NativeCompiler(true).compile(sources,exe);
+        new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);
         var command=new ArrayList<String>();command.add(exe.toString());command.addAll(List.of(arguments));
         Path out=temporary.resolve("out"),err=temporary.resolve("err");
         var builder=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile());
@@ -1963,7 +1965,7 @@ class NativeBackendTest {
         Path application=temporary.resolve(clr?"numeric-clr":"numeric.jar");
         if(clr)new ClrCompiler().compile(sources,application);else new JvmCompiler().compile(sources,application);
         List<String> command=clr?List.of(ClrCompiler.executable(),application.resolve("BhashProgram.dll").toString())
-            :List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",application.toString());
+            :List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",application.toString());
         Path out=temporary.resolve("numeric-"+clr+".out"),err=temporary.resolve("numeric-"+clr+".err");
         var process=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile()).start();
         try{process.getOutputStream().close();assertTrue(process.waitFor(30,TimeUnit.SECONDS));
@@ -2004,8 +2006,9 @@ class NativeBackendTest {
         Path artifact=Path.of("target/native-tests/factorial.ll");
         Files.createDirectories(artifact.getParent());
         Files.writeString(artifact,LlvmEmitter.emit(core(Files.readString(Path.of("examples/factorial.bhash")))),StandardCharsets.UTF_8);
-        var verifier=new ProcessBuilder(System.getenv().getOrDefault("BHASH_LLVM_OPT","opt-18"),
-            "-passes=verify","-disable-output",artifact.toString()).inheritIO().start();
+        var tools=NativeToolchain.require(artifact.toAbsolutePath().getParent());
+        var verify=NativePlatform.windows()?List.of(tools.clang(),"--target="+NativeBuildInfo.TARGET,"-Xclang","-llvm-verify-each","-c",artifact.toString(),"-o",artifact.resolveSibling("factorial.o").toString()):List.of(tools.opt(),"-passes=verify","-disable-output",artifact.toString());
+        var verifier=new ProcessBuilder(verify).inheritIO().start();
         assertTrue(verifier.waitFor(15,TimeUnit.SECONDS));assertEquals(0,verifier.exitValue());
         var result=nativeRun("""
             कार्य गुणनफल(न: पूर्णांक) -> पूर्णांक {

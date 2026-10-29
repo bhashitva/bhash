@@ -2,7 +2,8 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
-const {sdk,ensureNative,nativeEnvironment,requireNativeHost,capture}=require('../dist/native.js');
+const {linuxSdk:sdk,windowsSdk,ensureNative:ensure,nativeEnvironment,requireNativeHost,capture}=require('../dist/native.js');
+const ensureNative=(options,log,signal,repair,run)=>ensure(options,log,signal,repair,run,'linux');
 const options={java:'java with spaces',jar:'/compiler हिन्दी.jar',mode:'managed'};
 function fake({installed=false,libc='glibc 2.35',busy=false,fail=false,wrong=false}={}) {
     const calls=[];let active=installed;
@@ -21,8 +22,8 @@ function fake({installed=false,libc='glibc 2.35',busy=false,fail=false,wrong=fal
     return {calls,run};
 }
 test('Linux/WSL host supported, unsupported hosts give actionable guidance',()=>{
-    requireNativeHost('linux','x64');
-    for(const [platform,arch] of [['win32','x64'],['darwin','arm64'],['linux','arm64']])assert.throws(()=>requireNativeHost(platform,arch),/WSL/);
+    requireNativeHost('linux','x64');requireNativeHost('win32','x64');
+    for(const [platform,arch] of [['win32','arm64'],['darwin','arm64'],['linux','arm64']])assert.throws(()=>requireNativeHost(platform,arch),/WSL/);
 });
 test('managed mode ignores ambient tool overrides and reuses CLI cache environment',()=>{
     const base={PATH:'path',BHASH_CLANG:'bad',BHASH_LLVM_OPT:'bad',BHASH_READELF:'bad',BHASH_TOOLCHAIN_HOME:'cache'};
@@ -86,4 +87,16 @@ test('bounded process output prevents unbounded memory use',async()=>{
 test('compiler process preserves argument boundaries and Unicode',async()=>{
     const args=['space value','हिन्दी','$(not-a-shell)'];
     assert.deepEqual(JSON.parse(await capture(process.execPath,['-e','console.log(JSON.stringify(process.argv.slice(1)))',...args],process.env)),args);
+});
+
+test('Windows managed setup selects Windows asset and never invokes getconf',async()=>{
+    const calls=[];let active=false;
+    await ensure(options,()=>{},undefined,false,async(command,args)=>{
+        calls.push({command,args});assert.notEqual(command,'getconf');
+        if(args.includes('status'))return JSON.stringify({installed:active,archiveSha256:active?windowsSdk.sha256:undefined});
+        if(args.includes('install')){assert.ok(args.includes(windowsSdk.url));assert.ok(args.includes(windowsSdk.sha256));active=true;}
+        return '{}';
+    },'win32');
+    assert.equal(calls.filter(c=>c.args.includes('install')).length,1);
+    assert.match(windowsSdk.sha256,/^[a-f0-9]{64}$/);
 });
