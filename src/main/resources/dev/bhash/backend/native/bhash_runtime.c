@@ -295,6 +295,12 @@ int64_t bh_remainder(int64_t a, int64_t b, const void *location) {
     return a == INT64_MIN && b == -1 ? 0 : a % b;
 }
 
+_Static_assert(BHASH_NATIVE_ABI_VERSION==15,"Compiler/runtime ABI mismatch");
+void bh_runtime_abi_v15(void) {}
+int bh_print_build_info_if_requested(int argc,char **argv,const char *info){
+    if(argc!=2 || strcmp(argv[1],"--bhash-build-info"))return 0;
+    fputs(info,stdout);fputc('\n',stdout);return 1;
+}
 int bh_print_licenses_if_requested(int argc, char **argv, const void *notices) {
     if (argc == 2 && strcmp(argv[1], "--bhash-license") == 0) {
         bh_print_text(notices);

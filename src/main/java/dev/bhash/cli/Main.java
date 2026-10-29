@@ -26,6 +26,7 @@ public final class Main {
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && args[0].equals("native")) return NativeCommands.run(args,out,err);
         if (args.length == 1 && args[0].equals("targets")) {
             for (var target : Target.values()) {
                 out.println(target.name().toLowerCase(java.util.Locale.ROOT) + ": "
@@ -86,6 +87,10 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser|native] [--debug]");
         err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr|native] [--debug]");
         err.println("       java -jar bhash-compiler.jar deps lock|restore|verify <project> [--offline]");
+        err.println("       java -jar bhash-compiler.jar native doctor [--json]");
+        err.println("       java -jar bhash-compiler.jar native inspect <executable> [--json] [--require-runtime-match]");
+        err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");
+        err.println("       Native compile/run also accept --source-root ROOT for reproducible source paths.");
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
@@ -94,12 +99,12 @@ public final class Main {
         return 2;
     }
 
-    private record Options(Path source, Path output, Target target, boolean debug) {}
+    private record Options(Path source, Path output, Target target, boolean debug, Path sourceRoot) {}
 
     private static Options options(String[] args, boolean allowOutput) throws IOException {
         Path source = Path.of(args[1]);
         if (source.getFileName() == null) throw new IOException("Expected a Bhash source file.");
-        Path output = null;
+        Path output = null, sourceRoot = null;
         Target target = Target.JVM;
         boolean targetSet = false, debug = false;
         for (int i = 2; i < args.length; i++) {
@@ -114,9 +119,11 @@ public final class Main {
                     case "wasm-browser", "wasm" -> Target.WASM;
                     default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm), native (experimental Linux x86-64).");
                 };
+            } else if(args[i].equals("--source-root") && sourceRoot==null && i+1<args.length){sourceRoot=Path.of(args[++i]);
             } else if(args[i].equals("--debug") && !debug){debug=true;
             } else throw new IllegalArgumentException("Invalid or incomplete option: " + args[i]);
         }
+        if(sourceRoot!=null && target!=Target.NATIVE)throw new IllegalArgumentException("--source-root requires --target native.");
         if(debug && target!=Target.NATIVE)throw new IllegalArgumentException("--debug currently requires --target native.");
         if (output == null && allowOutput) {
             var project = ProjectLoader.load(source);
@@ -125,7 +132,7 @@ public final class Main {
                     ? project.root().resolve("build").resolve(project.name() + suffix)
                     : source.resolveSibling(project.name() + suffix);
         }
-        return new Options(source, output, target, debug);
+        return new Options(source, output, target, debug, sourceRoot);
     }
 
     private static void build(Options options) throws IOException, CompilationException {
@@ -134,7 +141,7 @@ public final class Main {
         project.protectOutput(options.output,options.target == Target.CLR || options.target == Target.WASM);
         if (options.target == Target.JVM) new JvmCompiler().compile(project.sources(), options.output);
         else if (options.target == Target.WASM) new WasmCompiler().compile(project.sources(), options.output);
-        else if (options.target == Target.NATIVE) new NativeCompiler(false,options.debug).compile(project.sources(), options.output);
+        else if (options.target == Target.NATIVE) new NativeCompiler(false,options.debug,options.sourceRoot).compile(project.sources(), options.output);
         else new ClrCompiler().compile(project.sources(), options.output);
     }
 
@@ -187,7 +194,7 @@ public final class Main {
             }
             temporary = Files.createTempDirectory("bhash-run-");
             Path output = temporary.resolve(requested.target == Target.JVM ? "program.jar" : "clr");
-            var options = new Options(requested.source, output, requested.target, requested.debug);
+            var options = new Options(requested.source, output, requested.target, requested.debug, requested.sourceRoot);
             build(options);
             ProcessBuilder builder;
             if (options.target == Target.JVM) {
