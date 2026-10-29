@@ -1635,8 +1635,7 @@ int64_t bh_time_month(int64_t value,const void *location){return time_calendar(v
 int64_t bh_time_day(int64_t value,const void *location){return time_calendar(value,location).day;}
 int64_t bh_time_now(const void *location){
 #ifdef _WIN32
-    /* Use the same precise wall clock as the JVM; the legacy C clock may lag
-       a preceding Java timestamp by one Windows timer tick. */
+    /* Use the precise Windows wall clock; legacy C clocks can lag by a timer tick. */
     FILETIME now;GetSystemTimePreciseAsFileTime(&now);
     uint64_t ticks=((uint64_t)now.dwHighDateTime<<32)|now.dwLowDateTime;
     const uint64_t epoch=UINT64_C(116444736000000000);
