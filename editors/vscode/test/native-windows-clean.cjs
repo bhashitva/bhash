@@ -6,8 +6,14 @@ const repo=process.env.BHASH_TEST_REPO || 'C:\\repo';
 const {windowsSdk:sdk,compilerInvocation}=require(path.join(repo,'editors/vscode/dist/native.js'));
 const offline=process.argv.includes('--offline');
 assert.equal(process.platform,'win32');assert.equal(process.arch,'x64');
-const forbidden=['wsl.exe','clang.exe','clang-18.exe','opt.exe','cl.exe','gcc.exe','link.exe','ld.lld.exe','llvm-readobj.exe','dotnet.exe'];
+const forbidden=['clang.exe','clang-18.exe','opt.exe','cl.exe','gcc.exe','link.exe','ld.lld.exe','llvm-readobj.exe','dotnet.exe'];
 for(const tool of forbidden)assert.notEqual(spawnSync('where.exe',[tool]).status,0,`unexpected development/runtime tool: ${tool}`);
+// Server Core ships the Windows WSL launcher stub even without a Linux environment.
+// Check that no Linux command can run; the presence of that OS stub is not WSL setup.
+const wsl=spawnSync('wsl.exe',['--exec','/bin/true'],{timeout:10000});
+if(wsl.error)assert.equal(wsl.error.code,'ENOENT');
+else assert.notEqual(wsl.status,0,'unexpected runnable WSL environment');
+
 for(const folder of ['C:\\Program Files\\LLVM','C:\\Program Files (x86)\\Windows Kits','C:\\Program Files\\Microsoft Visual Studio'])assert.ok(!fs.existsSync(folder),`unexpected development installation: ${folder}`);
 const home=fs.mkdtempSync(path.join(os.tmpdir(),'bhash native भारत '));
 const launcher=path.join(repo,'editors/vscode/dist/native-task.js');
