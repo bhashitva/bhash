@@ -47,6 +47,10 @@ jobs:
             for tool in java dotnet clang gcc; do
               if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
             done
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/static-members > /tmp/static-actual 2> /tmp/static-stats
+            printf "१००० ९९९ वस्तु999 😀999\nरिक्त\n" > /tmp/static-expected
+            cmp /tmp/static-actual /tmp/static-expected
+            grep "live=0" /tmp/static-stats
             BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/int32 > /tmp/int32-actual 2> /tmp/int32-stats
             printf "३०० ० २९९ -१५० १४९\n४९९५०० १००० क299\n" > /tmp/int32-expected
             cmp /tmp/int32-actual /tmp/int32-expected
@@ -160,3 +164,4 @@ jobs:
             docs/native-console.md
             docs/native-control-flow.md
             docs/native-int32.md
+            docs/native-static-members.md
