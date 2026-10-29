@@ -14,13 +14,14 @@ public final class LlvmEmitter {
     private int next;
     private String label;
     private boolean terminated;
-    private record LoopTarget(String condition,String exit,int scopeDepth,int id,String owner) {}
-    private final Deque<LoopTarget> loops=new ArrayDeque<>();
+    // A null condition marks a selection: break is valid, continue searches an outer loop.
+    private record ControlTarget(String condition,String exit,int scopeDepth,int id,String owner) {}
+    private final Deque<ControlTarget> targets=new ArrayDeque<>();
     private final Deque<List<Binding>> scopes=new ArrayDeque<>();
     private final Map<Expression,Integer> roots=new IdentityHashMap<>();
     private final Map<Binding,Integer> bindingRoots=new LinkedHashMap<>();
     private final Map<Binding,Boolean> bindings=new LinkedHashMap<>();
-    private int rootCount, returnRoot, nextLoop, nextCallback;
+    private int rootCount, returnRoot, nextTarget, nextCallback;
     private Type functionResult;
     private String owner;
     private boolean outlined;
@@ -365,6 +366,7 @@ public final class LlvmEmitter {
         else if(s instanceof FieldWrite f){scan(f.destination().receiver());scan(f.value());}
         else if(s instanceof Branch b){scan(b.condition());scan(b.yes());scan(b.no());}
         else if(s instanceof Loop l){scan(l.condition());scan(l.body());}
+        else if(s instanceof Selection c){register(c.selector());scan(c.value());for(var item:c.cases()){item.labels().forEach(this::scan);scan(item.body());}scan(c.fallback());}
         else if(s instanceof Return r)scan(r.value());
         else if(s instanceof Throw t)scan(t.value());
         else if(s instanceof Try t){register(t.exception());scan(t.body());for(var handler:t.handlers()){register(handler.binding());scan(handler.body());}scan(t.cleanup());}
@@ -393,12 +395,12 @@ public final class LlvmEmitter {
     private String outline(Block body){
         String callback="@btry"+nextCallback++;
         var savedCode=code;int savedNext=next;String savedLabel=label,savedOwner=owner;boolean savedTerminated=terminated,savedOutlined=outlined;
-        var savedValues=new IdentityHashMap<>(values);var savedLoops=new ArrayDeque<>(loops);var savedScopes=new ArrayDeque<>(scopes);
+        var savedValues=new IdentityHashMap<>(values);var savedTargets=new ArrayDeque<>(targets);var savedScopes=new ArrayDeque<>(scopes);
         code=new StringBuilder();next=0;owner=callback;outlined=true;values.clear();
         code.append("define internal i64 ").append(callback).append("(ptr %environment) {\n");block("entry");environment(true);
         statement(body);if(!terminated)line("ret i64 0");code.append("}\n\n");functions.append(code);
         code=savedCode;next=savedNext;label=savedLabel;owner=savedOwner;terminated=savedTerminated;outlined=savedOutlined;
-        values.clear();values.putAll(savedValues);loops.clear();loops.addAll(savedLoops);scopes.clear();scopes.addAll(savedScopes);
+        values.clear();values.putAll(savedValues);targets.clear();targets.addAll(savedTargets);scopes.clear();scopes.addAll(savedScopes);
         return callback;
     }
     private void expressionRoots(Expression e,Set<Integer> slots){
@@ -428,6 +430,7 @@ public final class LlvmEmitter {
         else if(s instanceof IndexWrite w){expressionRoots(w.destination().receiver(),slots);expressionRoots(w.destination().index(),slots);expressionRoots(w.value(),slots);}
         else if(s instanceof Branch b){expressionRoots(b.condition(),slots);statementRoots(b.yes(),slots);statementRoots(b.no(),slots);}
         else if(s instanceof Loop l){expressionRoots(l.condition(),slots);statementRoots(l.body(),slots);}
+        else if(s instanceof Selection c){bindingRoot(c.selector(),slots);expressionRoots(c.value(),slots);for(var item:c.cases()){item.labels().forEach(x->expressionRoots(x,slots));statementRoots(item.body(),slots);}statementRoots(c.fallback(),slots);}
         else if(s instanceof Return r)expressionRoots(r.value(),slots);
         else if(s instanceof Throw t)expressionRoots(t.value(),slots);
         else if(s instanceof Print p)p.arguments().forEach(a->expressionRoots(a,slots));
@@ -476,11 +479,11 @@ public final class LlvmEmitter {
             completion=completionPhi(List.of("[ -1, %"+thrownEnd+" ]","[ "+completion.ir()+", %"+keptEnd+" ]"));
         }
         String done=freshLabel(),returning=freshLabel(),throwing=freshLabel(),escape=freshLabel();
-        var exits=new LinkedHashMap<LoopTarget,List<String>>();
+        var exits=new LinkedHashMap<ControlTarget,List<String>>();
         var cases=new ArrayList<String>();cases.add("i64 0, label %"+done);cases.add("i64 1, label %"+returning);cases.add("i64 -1, label %"+throwing);
-        for(var loop:loops)if(loop.owner().equals(owner)){
-            var labels=List.of(freshLabel(),freshLabel());exits.put(loop,labels);
-            cases.add("i64 "+(2+loop.id()*2)+", label %"+labels.get(0));cases.add("i64 "+(3+loop.id()*2)+", label %"+labels.get(1));
+        for(var loop:targets)if(loop.owner().equals(owner)){
+            var labels=loop.condition()==null?List.of(freshLabel()):List.of(freshLabel(),freshLabel());exits.put(loop,labels);
+            cases.add("i64 "+(2+loop.id()*2)+", label %"+labels.get(0));if(loop.condition()!=null)cases.add("i64 "+(3+loop.id()*2)+", label %"+labels.get(1));
         }
         line("switch i64 "+completion.ir()+", label %"+escape+" [ "+String.join(" ",cases)+" ]");terminated=true;
         block(returning);
@@ -490,15 +493,15 @@ public final class LlvmEmitter {
             line("call void @bh_roots_pop(ptr %frame)");line(value==null?"ret void":"ret "+value.argument());
         }
         terminated=true;block(throwing);Value exception=load(t.exception());line("call void @bh_throw(ptr "+exception.ir()+", ptr null)");line("unreachable");terminated=true;
-        for(var entry:exits.entrySet())for(int i=0;i<2;i++){
-            block(entry.getValue().get(i));clearLoopScopes(entry.getKey().scopeDepth());jump(i==0?entry.getKey().exit():entry.getKey().condition());
+        for(var entry:exits.entrySet())for(int i=0;i<entry.getValue().size();i++){
+            block(entry.getValue().get(i));clearExitScopes(entry.getKey().scopeDepth());jump(i==0?entry.getKey().exit():entry.getKey().condition());
         }
         block(escape);line(outlined?"ret i64 "+completion.ir():"unreachable");terminated=true;
         block(done);line("store ptr null, ptr "+address(t.exception()));
     }
     private void function(Function f){
-        code=new StringBuilder(); values.clear(); roots.clear(); bindingRoots.clear(); bindings.clear();rootCount=0;next=0;buffers.clear();loops.clear();scopes.clear();
-        functionResult=f.result();owner="@bfn"+f.id();outlined=false;nextLoop=0;returnRoot=-1;
+        code=new StringBuilder(); values.clear(); roots.clear(); bindingRoots.clear(); bindings.clear();rootCount=0;next=0;buffers.clear();targets.clear();scopes.clear();
+        functionResult=f.result();owner="@bfn"+f.id();outlined=false;nextTarget=0;returnRoot=-1;
         f.parameters().forEach(this::register);scan(f.body());
         if(f.result().reference())returnRoot=rootCount++;
         code.append("define internal ").append(llvm(f.result())).append(" @bfn").append(f.id()).append('(');
@@ -553,6 +556,7 @@ public final class LlvmEmitter {
                 case "+"->new Value(u.type(),v.ir());
                 case "-"->v.type()==Type.REAL?instruction(Type.REAL,"fneg double "+v.ir()):instruction(Type.INT,"sub i64 0, "+v.ir());
                 case "!"->instruction(Type.BOOL,"xor i1 "+v.ir()+", true");
+                case "~"->instruction(Type.INT,"xor i64 "+v.ir()+", -1");
                 default->throw new IllegalStateException("Unchecked unary operator");};
         } else if(e instanceof Call c){
             for(int i=0;i<c.arguments().size();i++){
@@ -645,7 +649,7 @@ public final class LlvmEmitter {
     private void clearBindings(List<Binding> locals){
         for(var b:locals)if(b.type().reference())line("store ptr null, ptr "+address(b));
     }
-    private void clearLoopScopes(int depth){
+    private void clearExitScopes(int depth){
         int count=scopes.size()-depth;
         for(var scope:scopes){if(count--<=0)break;clearBindings(scope);}
     }
@@ -664,6 +668,12 @@ public final class LlvmEmitter {
             return instruction(Type.BOOL,"phi i1 [ "+(and?"false":"true")+", %"+from+" ], [ "+right.ir()+", %"+rightEnd+" ]");
         }
         Value right=expression(b.right());
+        if(Set.of("&","|","^").contains(op))return instruction(Type.INT,
+            (op.equals("&")?"and":op.equals("|")?"or":"xor")+" i64 "+left.ir()+", "+right.ir());
+        if(Set.of("<<",">>",">>>").contains(op)){
+            Value count=instruction(Type.INT,"and i64 "+right.ir()+", 63");
+            return instruction(Type.INT,(op.equals("<<")?"shl":op.equals(">>")?"ashr":"lshr")+" i64 "+left.ir()+", "+count.ir());
+        }
         if(left.type()==Type.REAL){
             String operation=switch(op){case "+"->"fadd";case "-"->"fsub";case "*"->"fmul";case "/"->"fdiv";
                 case "=="->"fcmp oeq";case "!="->"fcmp une";case "<"->"fcmp olt";case "<="->"fcmp ole";case ">"->"fcmp ogt";case ">="->"fcmp oge";
@@ -702,11 +712,31 @@ public final class LlvmEmitter {
         Value more=collectionCall(Type.BOOL,CollectionOperation.ITER_CHECK,load(f.owner()),List.of(load(f.version()),load(f.index())),-1,f.source());
         line("br i1 "+more.ir()+", label %"+body+", label %"+exit);block(body);
         var locals=f.items().stream().map(Assign::binding).toList();int depth=scopes.size();scopes.push(locals);
-        loops.push(new LoopTarget(advance,exit,depth,nextLoop++,owner));f.items().forEach(this::statement);statement(f.body());loops.pop();
+        targets.push(new ControlTarget(advance,exit,depth,nextTarget++,owner));f.items().forEach(this::statement);statement(f.body());targets.pop();
         if(!terminated){clearBindings(locals);jump(advance);}scopes.pop();
         block(advance);Value index=load(f.index());Value next=instruction(Type.INT,"add i64 "+index.ir()+", 1");
         line("store i64 "+next.ir()+", ptr "+address(f.index()));jump(condition);block(exit);
         clearBindings(locals);line("store ptr null, ptr "+address(f.owner()));
+    }
+    private void selection(Selection c){
+        Value value=expression(c.value());line("store "+value.argument()+", ptr "+address(c.selector()));release(c.value());
+        int depth=scopes.size();scopes.push(List.of(c.selector()));
+        String exit=freshLabel();targets.push(new ControlTarget(null,exit,depth,nextTarget++,owner));
+        for(var item:c.cases()){
+            String body=freshLabel(),nextCase=freshLabel();Value matches=null;
+            for(var constant:item.labels()){
+                Value labelValue=expression(constant),selector=load(c.selector()),same;
+                if(selector.type()==Type.TEXT){
+                    Value comparison=instruction(Type.INT,"call i32 @bh_text_equal(ptr "+selector.ir()+", ptr "+labelValue.ir()+")");
+                    same=instruction(Type.BOOL,"icmp ne i32 "+comparison.ir()+", 0");
+                }else same=instruction(Type.BOOL,"icmp eq "+selector.argument()+", "+labelValue.ir());
+                release(constant);matches=matches==null?same:instruction(Type.BOOL,"or i1 "+matches.ir()+", "+same.ir());
+            }
+            line("br i1 "+matches.ir()+", label %"+body+", label %"+nextCase);
+            block(body);statement(item.body());if(!terminated)jump(exit);block(nextCase);
+        }
+        statement(c.fallback());if(!terminated)jump(exit);
+        targets.pop();scopes.pop();block(exit);clearBindings(List.of(c.selector()));
     }
     private void statement(Statement s){
         if(s==null || terminated)return;
@@ -716,6 +746,7 @@ public final class LlvmEmitter {
         }
         else if(s instanceof Assign a){Value v=expression(a.value());line("store "+v.argument()+", ptr "+address(a.binding()));release(a.value());}
         else if(s instanceof Foreach f)foreach(f);
+        else if(s instanceof Selection c)selection(c);
         else if(s instanceof Try t)tryStatement(t);
         else if(s instanceof Throw t){
             Value value=expression(t.value());line("call void @bh_throw(ptr "+value.ir()+", ptr "+text(t.source().toString())+")");
@@ -754,14 +785,14 @@ public final class LlvmEmitter {
             }
             line("call void @bh_print_end()");
         } else if(s instanceof Jump j){
-            var loop=loops.peek();
+            var loop=j.breaking()?targets.peek():targets.stream().filter(x->x.condition()!=null).findFirst().orElseThrow();
             if(!loop.owner().equals(owner)){line("ret i64 "+(2+loop.id()*2+(j.breaking()?0:1)));terminated=true;}
-            else {clearLoopScopes(loop.scopeDepth());jump(j.breaking()?loop.exit():loop.condition());}
+            else {clearExitScopes(loop.scopeDepth());jump(j.breaking()?loop.exit():loop.condition());}
         }
         else if(s instanceof Loop l){
             String condition=freshLabel(),body=freshLabel(),exit=freshLabel();jump(condition);block(condition);
             Value v=expression(l.condition());line("br i1 "+v.ir()+", label %"+body+", label %"+exit);
-            block(body);loops.push(new LoopTarget(condition,exit,scopes.size(),nextLoop++,owner));statement(l.body());loops.pop();
+            block(body);targets.push(new ControlTarget(condition,exit,scopes.size(),nextTarget++,owner));statement(l.body());targets.pop();
             if(!terminated)jump(condition);block(exit);
         } else if(s instanceof Branch b){
             Value v=expression(b.condition());String yes=freshLabel(),no=freshLabel(),merge=freshLabel();
