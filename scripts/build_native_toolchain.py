@@ -111,11 +111,17 @@ def main():
         for soname, (library, pkg) in sorted(runtime_dependencies.items()):
             copy_file(library, root/'lib'/soname, pkg)
         resource = Path(run('clang-18', '-print-resource-dir'))
+        resource_owners = {}
         for pkg in ('clang-18', 'libclang-common-18-dev', 'libclang-rt-18-dev'):
             for name in run('dpkg-query', '-L', pkg).splitlines():
                 path = Path(name)
-                if path.is_file() and path.is_relative_to(resource):
-                    copy_file(path, root/'resource'/path.relative_to(resource), pkg)
+                if path.is_file():
+                    resource_owners[str(path.resolve())] = pkg
+        for directory, _, names in os.walk(resource, followlinks=True):
+            for name in names:
+                path = Path(directory)/name
+                pkg = resource_owners.get(str(path.resolve())) or owner(path)
+                copy_file(path, root/'resource'/path.relative_to(resource), pkg)
         assert (root/'resource/include/stddef.h').is_file()
         for pkg in ('libc6', 'libc6-dev', 'linux-libc-dev', 'libgcc-13-dev', 'libgcc-s1'):
             for name in run('dpkg-query', '-L', pkg).splitlines():
