@@ -205,6 +205,7 @@ All six UTC time-library functions are available on native Linux; see [native ti
 Native UTF-8 console input (`पाठपढ़ो()` and `पढ़ो()`) is described in [native console input](docs/native-console.md).
 Native bitwise operators, shifts, and `चयन` statements are described in [native control flow](docs/native-control-flow.md).
 Native signed 32-bit `लघुपूर्णांक`, conversions, boxing, and collections are described in [native int32](docs/native-int32.md).
+Native static fields, methods, lazy class initialization, and persistent GC roots are described in [native static members](docs/native-static-members.md).
 Native packed byte buffers, UTF-8 encoding/decoding and binary file I/O are also available; see [native bytes](docs/native-bytes.md).
 Native UTF-8 text file I/O is available through `मानक.फ़ाइल`; see [native files](docs/native-files.md).
 

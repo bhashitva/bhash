@@ -159,6 +159,16 @@ def main():
         assert result.stdout.replace(b'\r\n', b'\n') == b'Native int32 checks passed.\n'
         print(f'{name}: signed int32 boundaries, boxed key identity, JSON, scalar storage and forced-GC failure cleanup passed')
 
+        static_exe = BUILD / ('static-' + name + ('.exe' if os.name == 'nt' else ''))
+        static_command = [part.replace('runtime_test.c', 'static_runtime_test.c').replace(str(exe), str(static_exe)) for part in command]
+        result = run(static_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(static_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native static checks passed.\n'
+        print(f'{name}: persistent root replacement, clearing, unwinding, cached failures, recursive initialization and shutdown passed')
+
         decimal_exe = BUILD / ('decimals-' + name + ('.exe' if os.name == 'nt' else ''))
         decimal_command = [part.replace('runtime_test.c', 'decimal_runtime_test.c').replace(str(exe), str(decimal_exe)) for part in command]
         result = run(decimal_command)

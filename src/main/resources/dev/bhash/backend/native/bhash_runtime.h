@@ -20,6 +20,11 @@ typedef struct bh_root_frame {
 } bh_root_frame;
 void bh_roots_push(bh_root_frame *, void **slots, uint64_t count);
 void bh_roots_pop(bh_root_frame *);
+/* Process-lifetime writable reference slots, separate from unwindable stack roots.
+   Configure once before program entry; registration and stores never allocate. */
+void bh_static_roots_configure(void ***slots, uint64_t count);
+void bh_static_reference_store(void **slot, void *value);
+void bh_class_initialize(int32_t *state, void **failure, int64_t (*initializer)(void *));
 void *bh_alloc(const bh_type *, uint64_t bytes);
 void bh_collect(void);
 void bh_runtime_init(void);

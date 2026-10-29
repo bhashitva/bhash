@@ -294,6 +294,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         output.append(typeName(function.result)).append(' ').append(function.java).append('(');
         emitParameters(declaration.parameters(), function.parameters);
         output.append(") {\n");
+        if(function.owner!=null && function.shared)output.append(function.owner.java).append(".bhashInitialize();\n");
         int errorsBeforeBody = diagnostics.size();
         var flow = statements(declaration.block());
         if (diagnostics.size() == errorsBeforeBody && returnType != Type.VOID && flow.contains(Flow.NORMAL))
@@ -565,6 +566,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 .append(String.join(",",definition.contracts.stream().map(c->c.java).toList()));
         output.append(" {\n");
         Map<Field, String> initializers = new LinkedHashMap<>();
+        Map<Field, String> staticInitializers = new LinkedHashMap<>();
         for (Field field : definition.fields.values()) recover(() -> {
             currentClass = definition; currentStatic=field.shared;
             Expr value;
@@ -577,14 +579,26 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             }
             output.append(accessName(field.access)).append(' ');
             if (field.shared) output.append("static ");
-            if (!field.mutable) output.append(target == Target.JVM ? "final " : "readonly ");
+            if (!field.mutable && !field.shared) output.append(target == Target.JVM ? "final " : "readonly ");
             output.append(typeName(field.type)).append(' ').append(field.java);
-            if (field.shared) output.append('=').append(value.java);
+            if (field.shared) staticInitializers.put(field,value.java);
             output.append(";\n");
             if (!field.shared) initializers.put(field, value.java);
         });
-        if (target==Target.CLR && definition.fields.values().stream().anyMatch(f->f.shared))
-            output.append("static ").append(definition.java).append("() {}\n");
+        // Bhash owns initialization, rather than inheriting incompatible JVM/CLR
+        // failed-class wrappers, constant inlining, and beforefieldinit behavior.
+        output.append("private static int bhashInitState; private static BhashRuntime.BException bhashInitFailure;\n")
+            .append("public static ").append(target==Target.JVM?"boolean":"bool").append(" bhashInitialize() {")
+            .append("if(bhashInitState==2 || bhashInitState==1)return true; if(bhashInitState==3)throw bhashInitFailure; bhashInitState=1; try {\n");
+        if(definition.parent!=null && definition.parent.declaration!=null)output.append(definition.parent.java).append(".bhashInitialize();\n");
+        for(var initializer:staticInitializers.entrySet())output.append(initializer.getKey().java).append('=').append(initializer.getValue()).append(";\n");
+        output.append("bhashInitState=2; return true; } catch(BhashRuntime.BException failure){bhashInitFailure=failure; bhashInitState=3; throw failure;} }\n");
+        for(var field:staticInitializers.keySet()){
+            output.append("public static ").append(typeName(field.type)).append(" bhashGet_").append(field.java)
+                .append("(){bhashInitialize();return ").append(field.java).append(";}\n");
+            if(field.mutable)output.append("public static void bhashSet_").append(field.java).append('(').append(typeName(field.type))
+                .append(" value){bhashInitialize();").append(field.java).append("=value;}\n");
+        }
         currentStatic=false;
         for (Constructor constructor:definition.constructors) recover(() -> emitConstructor(definition,constructor,initializers));
         for (var overloads:definition.methods.values()) for (Function method:overloads) recover(() -> emitFunction(method));
@@ -1364,6 +1378,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         checkAccess(at, field.owner, field.access, object);
         if (analysis != null) analysis.fields.put(at, field);
         String receiver=field.shared?field.owner.java:memberReceiver(object, field.owner, field.access);
+        if(field.shared && field.owner.enumeration==null)return new Expr(field.type,receiver+".bhashGet_"+field.java+"()",new Location(field.mutable,receiver+".bhashSet_"+field.java+"("));
         return new Expr(field.type, receiver + "." + field.java, new Location(field.mutable));
     }
     private Expr callMethod(ParserRuleContext at, Expr object, String name, List<Expr> arguments) {
@@ -1429,7 +1444,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (constructor.access != Access.PUBLIC && currentClass != definition)
                 throw error(ctx, "Constructor is not accessible (" + accessName(constructor.access) + ").");
             if (analysis != null) analysis.constructors.put(ctx, constructor);
-            return new Expr(definition.type, "new " + definition.java + "(" + constructorCallArguments(arguments,constructor) + ")", true);
+            String allocation="new " + definition.java + "(" + constructorCallArguments(arguments,constructor) + ")";
+            if(definition.declaration!=null && definition.declaration.RECORD()==null)allocation="("+definition.java+".bhashInitialize()?"+allocation+":null)";
+            return new Expr(definition.type,allocation,true);
         }
         if (ctx.IDENTIFIER() != null) {
             String name = ctx.IDENTIFIER().getText();

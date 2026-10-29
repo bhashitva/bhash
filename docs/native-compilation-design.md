@@ -89,7 +89,10 @@ Unsupported features produce source-located Hindi diagnostics, including unused
 unsupported declarations. Unsupported calls to standard-library intrinsics are rejected;
 injected compiler metadata alone does not require library execution.
 
-Unsupported conversions and standard-library calls, static members, user-defined generics,
+Static fields/methods and lazy class initialization now use the shared contract and precise
+persistent roots described in [native static members](native-static-members.md).
+
+Unsupported conversions and standard-library calls, user-defined generics,
 interop and concurrency are not yet available. The decimal-area calculation is supported;
 math and seeded random library calls are supported. Other unsupported library calls receive diagnostics. Defaults and behavior of managed targets are unchanged.
 
