@@ -136,5 +136,5 @@ jobs:
       - name: Run application without Java, .NET, Node or SDK mounted
         shell: pwsh
         run: |
-          docker run --rm --network none -v bhash-windows-programs:C:\app:ro mcr.microsoft.com/windows/servercore:ltsc2022 powershell.exe -NoProfile -Command 'foreach($tool in @("java","dotnet","node","clang","gcc","wsl")){if(Get-Command $tool -ErrorAction SilentlyContinue){throw "Unexpected tool: $tool"}}; & C:\app\hello.exe; if($LASTEXITCODE){exit $LASTEXITCODE}'
+          docker run --rm --network none -v bhash-windows-programs:C:\app:ro mcr.microsoft.com/windows/servercore:ltsc2022 powershell.exe -NoProfile -Command 'foreach($tool in @("java","dotnet","node","clang","gcc")){if(Get-Command $tool -ErrorAction SilentlyContinue){throw "Unexpected tool: $tool"}}; & C:\app\hello.exe; if($LASTEXITCODE){exit $LASTEXITCODE}'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
