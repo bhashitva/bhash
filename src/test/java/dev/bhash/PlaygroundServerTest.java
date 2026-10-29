@@ -97,6 +97,7 @@ class PlaygroundServerTest {
             if(args.length>0 && args[0].equals("child")) { Thread.sleep(60000); return; }
             Path jar=Path.of(SleepingCompiler.class.getProtectionDomain().getCodeSource().getLocation().toURI());
             String java=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
+            Files.writeString(jar.getParent().resolve("parent.pid"),Long.toString(ProcessHandle.current().pid()));
             Process child=new ProcessBuilder(java,"-jar",jar.toString(),"child").start();
             Files.writeString(jar.getParent().resolve("child.pid"),Long.toString(child.pid()));
             Thread.sleep(60000);
@@ -110,13 +111,16 @@ class PlaygroundServerTest {
             output.putNextEntry(new java.util.jar.JarEntry(resource));input.transferTo(output);output.closeEntry();
         }
         var settings=new PlaygroundServer.Settings(jar,directory.resolve("data"),web,"127.0.0.1",0,URI.create("http://localhost:0"),URI.create("http://127.0.0.1:0"),2,2,100,false);
+        String job;
         try(var app=new PlaygroundServer(settings)) {
-            app.start();String id=id(post(app,form("लिखो(१);","scratch")).body());
+            app.start();String id=id(post(app,form("लिखो(१);","scratch")).body());job=id;
             String result=finished(app,id);assertTrue(result.contains("timed out"),result);
             long pid=Long.parseLong(Files.readString(directory.resolve("child.pid")));
-            for(int i=0;i<100 && ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);i++) Thread.sleep(20);
+            long parent=Long.parseLong(Files.readString(directory.resolve("parent.pid")));
+            assertFalse(ProcessHandle.of(parent).map(ProcessHandle::isAlive).orElse(false),"Compiler parent survived cleanup");
             assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false),"Compiler descendant survived deadline");
         }
+        assertFalse(Files.exists(directory.resolve("data/work").resolve(job)),"Compiler output remained locked after shutdown");
     }
     @Test void refusesNonemptyUnmanagedDataAndClearsOnlyItsOwnTransientBuilds() throws Exception {
         Path data=directory.resolve("data");Files.createDirectories(data);Files.writeString(data.resolve("notes.txt"),"keep");
