@@ -3,6 +3,9 @@
 #define BHASH_NATIVE_RUNTIME_H
 #include <stddef.h>
 #include <stdint.h>
+#define BHASH_NATIVE_ABI_VERSION 15
+void bh_runtime_abi_v15(void);
+int bh_print_build_info_if_requested(int, char **, const char *);
 /* Internal ABI. References are allocation-base payload pointers, never interior
    pointers. Type descriptors and root slots permit future reference updates. */
 typedef struct bh_type {
