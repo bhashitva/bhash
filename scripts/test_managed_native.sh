@@ -41,7 +41,16 @@ original_home=$BHASH_TOOLCHAIN_HOME
 export BHASH_TOOLCHAIN_HOME="/home/bhash/second cache भारत"
 cli native toolchain install --archive "$bundle" --sha256 "$sha"
 cli compile /repo/examples/native/hello.bhash --target native --debug --source-root /repo -o debug-2
-cmp debug-1 debug-2
+if ! cmp debug-1 debug-2; then
+    reader=$(find "$original_home/installations" -path '*/bin/llvm-readelf' -type f | head -n 1)
+    for executable in debug-1 debug-2; do
+        echo "Debug path diagnostics: $executable"
+        "$reader" --debug-dump=info "$executable" | grep -E 'sysroot|include_path|comp_dir|producer|/home/bhash' | head -n 35 || true
+        "$reader" --string-dump=.debug_str "$executable" | grep -E '/home/bhash|toolchain|installations' | head -n 35 || true
+        "$reader" --string-dump=.debug_line_str "$executable" | grep -E '/home/bhash|toolchain|installations' | head -n 35 || true
+    done
+    exit 1
+fi
 export BHASH_TOOLCHAIN_HOME=$original_home
 # Failed/corrupt archives never replace the active installation.
 cp "$BHASH_TOOLCHAIN_HOME/active.json" active-before.json
