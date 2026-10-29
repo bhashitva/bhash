@@ -87,6 +87,7 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser|native] [--debug]");
         err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr|native] [--debug]");
         err.println("       java -jar bhash-compiler.jar deps lock|restore|verify <project> [--offline]");
+        err.println("       java -jar bhash-compiler.jar native toolchain status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
         err.println("       java -jar bhash-compiler.jar native doctor [--json]");
         err.println("       java -jar bhash-compiler.jar native inspect <executable> [--json] [--require-runtime-match]");
         err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");

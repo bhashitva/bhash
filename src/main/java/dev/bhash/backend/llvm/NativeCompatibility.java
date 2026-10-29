@@ -43,7 +43,8 @@ public final class NativeCompatibility {
         Path file=binary.toAbsolutePath().normalize();byte[] bytes;try(var in=Files.newInputStream(file)){bytes=in.readNBytes(24);}
         if(bytes.length<24 || bytes[0]!=127 || bytes[1]!='E' || bytes[2]!='L' || bytes[3]!='F' || bytes[4]!=2 || bytes[5]!=1 || ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getShort(18)!=62)throw invalid("Expected a little-endian Linux x86-64 ELF executable");
         short type=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getShort(16);if(type!=2 && type!=3)throw invalid("ELF input is not an executable or PIE");
-        String tool=System.getenv().getOrDefault("BHASH_READELF","readelf");Path work=file.getParent();
-        return parse(NativeToolchain.run(work,List.of(tool,"-W","-h","-l","-d","-V","--",file.toString())),NativeToolchain.run(work,List.of(tool,"-W","-p",".bhash.build","--",file.toString())),strict);
+        // Absolute input paths prevent option interpretation; LLVM readelf 18 rejects a bare --.
+        String tool=NativeToolchain.readelf();Path work=file.getParent();
+        return parse(NativeToolchain.run(work,List.of(tool,"-W","-h","-l","-d","-V",file.toString())),NativeToolchain.run(work,List.of(tool,"-W","-p",".bhash.build",file.toString())),strict);
     }
 }
