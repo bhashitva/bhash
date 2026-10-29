@@ -32,6 +32,7 @@ public final class NativeToolchain {
         return new Report(NativeBuildInfo.TARGET,cv,clang,opt,NativeBuildInfo.ABI,(String)identity.get("runtime_sha256"),lv,libc);
     }
     public static Report doctor()throws IOException,CompilationException{
+        requirePlatform();
         Path work=Files.createTempDirectory("bhash-doctor-");try{
             Report report=require(work);Files.writeString(work.resolve("probe.c"),"#include <math.h>\n#include <time.h>\n#include <stdio.h>\nint main(void){struct timespec t;volatile double x=2;return !timespec_get(&t,TIME_UTC) || !isfinite(log(x));}\n");
             try{run(work,List.of(report.clang(),"--target="+report.target(),"-std=c17","probe.c","-lm","-o","probe"));}

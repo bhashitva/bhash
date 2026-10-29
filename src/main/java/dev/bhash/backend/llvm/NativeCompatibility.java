@@ -19,6 +19,8 @@ public final class NativeCompatibility {
         String[] x=a.split("\\."),y=b.split("\\.");for(int i=0;i<Math.max(x.length,y.length);i++){int cmp=new java.math.BigInteger(i<x.length?x[i]:"0").compareTo(new java.math.BigInteger(i<y.length?y[i]:"0"));if(cmp!=0)return cmp;}return 0;
     }
     public static Report parse(String elf,String metadata,boolean requireRuntimeMatch)throws IOException,CompilationException{
+        if(Pattern.compile("\\((?:RPATH|RUNPATH)\\)").matcher(elf).find())throw invalid("Embedded library search paths are not supported for native distribution");
+        var glibcNames=Pattern.compile("GLIBC_[A-Za-z0-9_.]+").matcher(elf);while(glibcNames.find())if(!glibcNames.group().matches("GLIBC_[0-9]+(?:\\.[0-9]+){1,2}"))throw invalid("Unsupported glibc version requirement: "+glibcNames.group());
         var libraries=new TreeSet<String>();var needed=Pattern.compile("\\(NEEDED\\).*?Shared library: \\[([^]\\r\\n]+)]").matcher(elf);while(needed.find())libraries.add(needed.group(1));
         if(!libraries.contains("libc.so.6") || !SYSTEM_LIBRARIES.containsAll(libraries))throw invalid("Unsupported native dependencies: "+libraries+". Ship ordinary glibc builds, not sanitizer/JVM/.NET binaries.");
         var interpreter=Pattern.compile("Requesting program interpreter: ([^]\\r\\n]+)]").matcher(elf);if(!interpreter.find() || !interpreter.group(1).equals("/lib64/ld-linux-x86-64.so.2"))throw invalid("Expected the Linux x86-64 glibc loader /lib64/ld-linux-x86-64.so.2");

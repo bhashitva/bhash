@@ -18,7 +18,7 @@ public final class NativePackage {
     public static long epoch(){String value=System.getenv().getOrDefault("SOURCE_DATE_EPOCH","0");try{long n=Long.parseLong(value);if(n<0 || n>8589934591L)throw new NumberFormatException();return n;}catch(NumberFormatException error){throw new IllegalArgumentException("SOURCE_DATE_EPOCH must be between 0 and 8589934591");}}
     public static Result build(List<SourceFile> sources,Path root,Path output,String name,String version,boolean debug,String maximumGlibc)throws IOException,CompilationException{
         validateName(name,version);long epoch=epoch();NativeCompatibility.compareVersions(maximumGlibc,maximumGlibc);
-        Path destination=output.toAbsolutePath().normalize();if(!destination.getFileName().toString().endsWith(".tar.gz") || Files.isDirectory(destination) || Files.isSymbolicLink(destination))throw new IOException("Native package output must be a .tar.gz file, not a directory or symbolic link.");
+        Path destination=output.toAbsolutePath().normalize();if(destination.getFileName()==null || !destination.getFileName().toString().endsWith(".tar.gz") || Files.isDirectory(destination) || Files.isSymbolicLink(destination))throw new IOException("Native package output must be a .tar.gz file, not a directory or symbolic link.");
         var mapped=NativeCompiler.normalizeSources(sources,root);Path work=Files.createTempDirectory("bhash-release-");Path staged=null;
         try{
             Path binary=work.resolve(name);new NativeCompiler(false,debug,root).compile(sources,binary);var compatibility=NativeCompatibility.inspect(binary,true);
