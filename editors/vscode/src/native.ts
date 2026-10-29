@@ -18,7 +18,7 @@ export const sdk = sdkForHost();
 export interface NativeOptions {java: string; jar: string; mode: 'managed' | 'system'; home?: string;}
 export type Runner = (command: string, args: string[], env: NodeJS.ProcessEnv, signal?: AbortSignal, cwd?: string) => Promise<string>;
 export function compilerInvocation(jar: string, args: string[], platform = process.platform): {args:string[]; cwd?:string} {
-    if (platform === 'win32') return {args:['-Dfile.encoding=UTF-8','-jar',path.basename(jar),'--utf8-args',Buffer.from(JSON.stringify({args,cwd:process.cwd()}),'utf8').toString('base64')],cwd:path.dirname(path.resolve(jar))};
+    if (platform === 'win32') return {args:['-Dfile.encoding=UTF-8','-Dstdout.encoding=UTF-8','-Dstderr.encoding=UTF-8','-jar',path.basename(jar),'--utf8-args',Buffer.from(JSON.stringify({args,cwd:process.cwd()}),'utf8').toString('base64')],cwd:path.dirname(path.resolve(jar))};
     return {args:['-Dfile.encoding=UTF-8','-jar',jar,...args]};
 }
 export function requireNativeHost(platform = process.platform, arch = process.arch): void {
