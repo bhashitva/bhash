@@ -30,7 +30,7 @@ PATH modification और अलग C development packages की आवश्य
 CLI से offline installation भी संभव है:
 
 ```powershell
-java -jar bhash-compiler.jar native toolchain install --archive bhash-windows-x86_64-llvm18-v1.zip --sha256 dc3e8db77a73dcc9577c26517a12fce1efd65843c85b660bd6b3e812142411aa
+java -jar bhash-compiler.jar native toolchain install --archive bhash-windows-x86_64-llvm18-v1.zip --sha256 b0d5934ea134e500ff598f737c40b3076400e85e5760a22bfcc28f7aaf321f3f
 java -jar bhash-compiler.jar native doctor --json
 java -jar bhash-compiler.jar compile hello.bhash --target native
 .\hello-native.exe
