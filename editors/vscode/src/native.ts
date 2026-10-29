@@ -11,7 +11,7 @@ export const linuxSdk = Object.freeze({
 export const windowsSdk = Object.freeze({
     id: 'bhash-windows-x86_64-llvm18-v1',
     url: 'https://github.com/bhashitva/bhash/releases/download/native-sdk-windows-1.0.0/bhash-windows-x86_64-llvm18-v1.zip',
-    sha256: 'e1f6fde6e2243dc9152263ebcb03164d566e322ef3da989e0cd389ebc2a289c8'
+    sha256: 'dc3e8db77a73dcc9577c26517a12fce1efd65843c85b660bd6b3e812142411aa'
 });
 export function sdkForHost(platform = process.platform) {return platform === 'win32' ? windowsSdk : linuxSdk;}
 export const sdk = sdkForHost();

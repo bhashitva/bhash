@@ -90,7 +90,8 @@ public final class ManagedToolchain {
         Path pointer=cache.resolve("active.json");if(!Files.exists(pointer,LinkOption.NOFOLLOW_LINKS))return null;
         var active=json(pointer);String hash=string(active,"archive_sha256");validateDigest(hash);hash=hash.toLowerCase(Locale.ROOT);
         String directory=string(active,"directory");
-        if(!directory.matches(hash+"-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))throw invalid("Invalid installation directory in active receipt");
+        String prefix=NativePlatform.windows()?hash.substring(0,16):hash;
+        if(!directory.matches("(?:"+prefix+"|"+hash+")-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))throw invalid("Invalid installation directory in active receipt");
         Path root=cache.resolve("installations").resolve(directory);if(Files.isSymbolicLink(root))throw invalid("Installation root must not be a symbolic link");
         var receipt=json(root.resolve(".installed.json"));if(!hash.equals(string(receipt,"archive_sha256")) || !NativeBuildInfo.fileHash(root.resolve("toolchain.json")).equals(string(receipt,"manifest_sha256")))throw invalid("Managed installation receipt mismatch; reinstall the trusted archive");
         var data=manifest(root);return new Installation(root,ID,hash,string(data,"llvm_version"),minimumGlibc(data));
@@ -112,7 +113,7 @@ public final class ManagedToolchain {
                 var candidate=new Installation(staged,ID,digest,string(data,"llvm_version"),minimumGlibc(data));
                 NativeToolchain.doctor(candidate); // Run before activating, using precisely this installation.
                 Files.createDirectories(cache.resolve("installations"));
-                String directory=digest+"-"+UUID.randomUUID();root=cache.resolve("installations").resolve(directory);
+                String directory=(NativePlatform.windows()?digest.substring(0,16):digest)+"-"+UUID.randomUUID();root=cache.resolve("installations").resolve(directory);
                 var receipt=new LinkedHashMap<String,Object>();receipt.put("archive_sha256",digest);receipt.put("manifest_sha256",NativeBuildInfo.fileHash(staged.resolve("toolchain.json")));
                 Files.writeString(staged.resolve(".installed.json"),NativeBuildInfo.JSON.toJson(receipt)+"\n");
                 Files.move(staged,root,StandardCopyOption.ATOMIC_MOVE);createdRoot=true;

@@ -30,7 +30,7 @@ PATH modification और अलग C development packages की आवश्य
 CLI से offline installation भी संभव है:
 
 ```powershell
-java -jar bhash-compiler.jar native toolchain install --archive bhash-windows-x86_64-llvm18-v1.zip --sha256 e1f6fde6e2243dc9152263ebcb03164d566e322ef3da989e0cd389ebc2a289c8
+java -jar bhash-compiler.jar native toolchain install --archive bhash-windows-x86_64-llvm18-v1.zip --sha256 dc3e8db77a73dcc9577c26517a12fce1efd65843c85b660bd6b3e812142411aa
 java -jar bhash-compiler.jar native doctor --json
 java -jar bhash-compiler.jar compile hello.bhash --target native
 .\hello-native.exe
@@ -47,7 +47,9 @@ VS Code launcher compiler arguments को UTF-8 JSON/ASCII envelope में �
 इससे Windows Java launcher का ANSI code-page conversion Hindi paths को नहीं बदलता।
 Compiler JAR को उसके directory से relative name के साथ launch किया जाता है और
 application का original working directory सुरक्षित रहता है। Windows regional settings
-बदलने की आवश्यकता नहीं है।
+बदलने की आवश्यकता नहीं है। Windows cache directory names में checksum का छोटा prefix
+और unique ID रहता है, ताकि executable paths छोटे रहें; receipts और verification पूरा
+SHA-256 रखते हैं।
 
 ## पाठ और फ़ाइलें (Text and files)
 

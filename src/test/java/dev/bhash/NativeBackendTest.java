@@ -1807,7 +1807,7 @@ class NativeBackendTest {
         requireNumericTargets();int index=0;
         for(var fixture:ConsoleFixtures.cases()){
             var sources=List.of(new SourceFile("console.bhash",fixture.source()));
-            Path exe=temporary.resolve("console"+index),jar=temporary.resolve("console"+index+".jar"),clr=temporary.resolve("console-clr"+index++);
+            Path exe=executable("console"+index),jar=temporary.resolve("console"+index+".jar"),clr=temporary.resolve("console-clr"+index++);
             new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
             var nativeResult=consoleRun(List.of(exe.toString()),fixture.input(),true);
             assertEquals(0,nativeResult.exit(),fixture.name()+nativeResult.err());assertEquals(fixture.expected(),nativeResult.out(),fixture.name());
@@ -1820,7 +1820,7 @@ class NativeBackendTest {
     }
     @Test void nativeConsoleCrReturnsBeforeNextInputByteAndFlushesOutput()throws Exception{
         requireNumericTargets();var sources=List.of(new SourceFile("console.bhash","कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो()); लिखो(पाठपढ़ो()); }"));
-        Path exe=temporary.resolve("interactive"),jar=temporary.resolve("interactive.jar"),clr=temporary.resolve("interactive-clr");
+        Path exe=executable("interactive"),jar=temporary.resolve("interactive.jar"),clr=temporary.resolve("interactive-clr");
         new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
         for(var command:List.of(List.of(exe.toString()),List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
             var process=new ProcessBuilder(command).redirectError(temporary.resolve("interactive.err").toFile()).start();
@@ -1837,7 +1837,7 @@ class NativeBackendTest {
     @Test void nativeConsoleFactorialAndExampleMatchManaged()throws Exception{
         requireNumericTargets();
         for(String file:List.of("examples/factorial-console.bhash","examples/native/console.bhash")){
-            var sources=List.of(new SourceFile("console.bhash",Files.readString(Path.of(file))));Path exe=temporary.resolve("example"),jar=temporary.resolve("example.jar");
+            var sources=List.of(new SourceFile("console.bhash",Files.readString(Path.of(file))));Path exe=executable("example"),jar=temporary.resolve("example.jar");
             new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);
             byte[] input=ConsoleFixtures.utf8(file.contains("factorial")?"५\n":"भारत😀\n+४२\n");
             var result=consoleRun(List.of(exe.toString()),input,true);var managed=consoleRun(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),input,false);
@@ -1880,7 +1880,7 @@ class NativeBackendTest {
     }
     @Test void nativeSwitchConsoleExamplePreservesGroupedCasesAndDefault()throws Exception{
         requireNumericTargets();var sources=List.of(new SourceFile("switch-console.bhash",Files.readString(Path.of("examples/switch-console.bhash"))));
-        Path exe=temporary.resolve("selection"),jar=temporary.resolve("selection.jar"),clr=temporary.resolve("selection-clr");
+        Path exe=executable("selection"),jar=temporary.resolve("selection.jar"),clr=temporary.resolve("selection-clr");
         new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
         for(String input:List.of("०\n","२\n","९\n")){
             var result=consoleRun(List.of(exe.toString()),ConsoleFixtures.utf8(input),true);assertEquals(0,result.exit(),result.err());assertEquals(0L,stats(result).get("live"));
@@ -1921,6 +1921,7 @@ class NativeBackendTest {
         try{NativeToolchain.require(temporary);}
         catch(java.io.IOException | CompilationException error){if(required)throw error;assumeTrue(false,error.getMessage());}
     }
+    private Path executable(String name){return temporary.resolve(name+NativePlatform.executableSuffix());}
     private record Result(int exit,String out,String err){}
     private Result nativeRun(String source,String...arguments)throws Exception{
         return nativeRun(source,Map.of(),arguments);
@@ -1944,7 +1945,7 @@ class NativeBackendTest {
         return result;
     }
     private Result nativeOnlyRun(List<SourceFile> sources,Map<String,String> environment,String...arguments)throws Exception{
-        Path exe=temporary.resolve("application");
+        Path exe=executable("application");
         new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);
         var command=new ArrayList<String>();command.add(exe.toString());command.addAll(List.of(arguments));
         Path out=temporary.resolve("out"),err=temporary.resolve("err");

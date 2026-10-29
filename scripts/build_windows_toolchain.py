@@ -52,6 +52,7 @@ def main():
         for name in ('include', 'lib/clang/18', 'x86_64-w64-mingw32'):
             shutil.copytree(upstream / name, root / name)
         shutil.copyfile(upstream / 'LICENSE.TXT', root / 'LLVM_LICENSE.txt')
+        shutil.copyfile(upstream / 'bin/clang-target-wrapper.sh', root / 'CLANG_WRAPPER_SOURCE.sh')
         (root / 'bin').mkdir()
         # Keep just the compiler, GNU-flavour LLD, inspector and their private DLL closure.
         pending = ['clang.exe', 'clang-18.exe', 'ld.lld.exe', 'llvm-readobj.exe']
@@ -79,7 +80,8 @@ def main():
         (root / 'README.txt').write_text('Bhash Windows x64 SDK, LLVM 18.1.8, UCRT, Windows 10+.\n'
             'Tools and private DLLs stay inside the SDK. No PATH changes or administrator access.\n'
             'Unmodified LLVM-MinGW components; upstream SHA and source links: provenance.json.\n'
-            'Notices: LLVM_LICENSE.txt and x86_64-w64-mingw32/share/mingw32/COPYING*.\n', encoding='utf-8')
+            'Notices: LLVM_LICENSE.txt and x86_64-w64-mingw32/share/mingw32/COPYING*.\n'
+            'Wrapper source/license: CLANG_WRAPPER_SOURCE.sh.\n', encoding='utf-8')
         inventory = {p.relative_to(root).as_posix(): dict(sha256=sha(p), executable=p.suffix.lower() == '.exe')
                      for p in sorted(root.rglob('*')) if p.is_file()}
         manifest = dict(format=1, id=ID, target='x86_64-w64-windows-gnu', llvm_version='18.1.8',
