@@ -96,12 +96,14 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record TextCall(Type type, TextOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public record Allocate(int objectType, Source source) implements Expression { public Type type(){return Type.OBJECT;} }
     public record FieldRead(Expression receiver, ObjectField field, Source source) implements Expression { public Type type(){return field.type();} }
-    public sealed interface Statement permits Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach, Try, Throw {}
+    public sealed interface Statement permits Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach, Try, Throw, Selection {}
     public record FieldWrite(FieldRead destination, Expression value) implements Statement {}
     public record Block(List<Statement> statements, List<Binding> locals) implements Statement {}
     public record Assign(Binding binding, Expression value) implements Statement {}
     public record Branch(Expression condition, Block yes, Statement no) implements Statement {}
     public record Loop(Expression condition, Block body) implements Statement {}
+    public record SelectionCase(List<Constant> labels, Block body) {}
+    public record Selection(Expression value, Binding selector, List<SelectionCase> cases, Block fallback) implements Statement {}
     public record Return(Expression value) implements Statement {}
     public record Jump(boolean breaking) implements Statement {}
     public record Print(List<Expression> arguments) implements Statement {}
@@ -133,10 +135,6 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 t.IDENTIFIER()!=null && CollectionTypes.builtin(t.IDENTIFIER().getText())))throw unsupported(c);
         if (c instanceof ValueTypeContext t &&
                 !(t.INT_TYPE()!=null || t.REAL_TYPE()!=null || t.BOOL_TYPE()!=null || t.TEXT_TYPE()!=null || t.OBJECT_TYPE()!=null || t.BYTE_TYPE()!=null || t.BUFFER_TYPE()!=null || t.IDENTIFIER()!=null)) throw unsupported(c);
-        if (c instanceof StatementContext s && s.switchStatement()!=null) throw unsupported(c);
-        if (c instanceof UnaryContext u && u.BIT_NOT()!=null) throw unsupported(c);
-        if ((c instanceof ShiftContext || c instanceof BitwiseOrContext || c instanceof BitwiseXorContext ||
-                c instanceof BitwiseAndContext) && c.getChildCount()>1) throw unsupported(c);
         if (c instanceof PrimaryContext p && !(p.INTEGER_LITERAL()!=null || p.REAL_LITERAL()!=null || p.STRING_LITERAL()!=null ||
                 p.TRUE()!=null || p.FALSE()!=null || p.IDENTIFIER()!=null || p.NEW()!=null || p.THIS()!=null || p.BASE()!=null || p.NULL()!=null || p.CONVERT()!=null || p.TYPE_TEST()!=null || p.SAFE_CAST()!=null ||
                 p.expression()!=null && p.LPAREN()!=null && p.CONVERT()==null && p.TYPE_TEST()==null && p.SAFE_CAST()==null))
@@ -361,6 +359,28 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             Statement no=c.ifStatement()!=null?branch(c.ifStatement()):c.block().size()>1?block(c.block(1)):null;
             return new Branch(expression(c.expression()),block(c.block(0)),no);
         }
+        Selection selection(SwitchStatementContext c) throws CompilationException {
+            Expression value=expression(c.expression());var selector=new Binding(nextBinding++,value.type());
+            var cases=new ArrayList<SelectionCase>();Block fallback=null;
+            for(var section:c.switchSection()){
+                var statements=new ArrayList<Statement>();var locals=new ArrayList<Binding>();
+                for(var item:section.statement()){
+                    statements.add(statement(item));
+                    if(item.variableDecl()!=null)locals.add(binding(a.bindings.get(item.variableDecl()),item.variableDecl()));
+                }
+                var body=new Block(List.copyOf(statements),List.copyOf(locals));
+                if(section.DEFAULT()!=null){fallback=body;continue;}
+                var labels=new ArrayList<Constant>();
+                for(var label:section.caseValue()){
+                    if(label.qualifiedName()!=null)throw unsupported(label); // Enums remain outside the native profile.
+                    Object constant=a.constants.get(label);
+                    labels.add(value.type()==Type.BOOL?new Constant(Type.BOOL,label.TRUE()!=null,source(label))
+                        :new Constant(value.type(),constant,source(label)));
+                }
+                cases.add(new SelectionCase(List.copyOf(labels),body));
+            }
+            return new Selection(value,selector,List.copyOf(cases),fallback);
+        }
         Statement statement(StatementContext s) throws CompilationException {
             if(s.variableDecl()!=null) {
                 var d=s.variableDecl();
@@ -401,6 +421,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 }
                 return new Foreach(collection,owner,index,version,List.copyOf(items),block(loop.block()),source(loop));
             }
+            if(s.switchStatement()!=null)return selection(s.switchStatement());
             if(s.whileStatement()!=null) {
                 var w=s.whileStatement(); return new Loop(expression(w.expression()),block(w.block()));
             }
@@ -539,7 +560,6 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 throw unsupported(p);
             }
             if(c instanceof UnaryContext u && u.postfix()==null) {
-                if(u.BIT_NOT()!=null)throw unsupported(u);
                 return new Unary(type(a.expressions.get(c).type(),c),u.getChild(0).getText(),expression(u.unary()),source(c));
             }
             if(c instanceof PostfixContext p && !p.postfixPart().isEmpty()) {
