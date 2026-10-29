@@ -18,15 +18,20 @@ abstract class StandardLibraryTest {
     @TempDir Path directory;
     int next;
     StandardLibraryTest(boolean clr){this.clr=clr;}
-    String execute(String source) throws Exception {
+    String execute(String source) throws Exception { return execute(source,new byte[0]); }
+    String execute(String source,byte[] input) throws Exception {
         Path output=directory.resolve("app"+next+++(clr?"-clr":".jar"));
         var sources=List.of(new SourceFile("standard-test.bhash",source));
         if(clr)new ClrCompiler().compile(sources,output);else new JvmCompiler().compile(sources,output);
         String java=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
-        Path log=directory.resolve("result"+next+".txt");
-        var process=(clr?new ProcessBuilder(ClrCompiler.executable(),output.resolve("BhashProgram.dll").toString()):new ProcessBuilder(java,"-jar",output.toString())).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        Path log=directory.resolve("result"+next+".txt"),stdin=directory.resolve("input"+next);
+        Files.write(stdin,input);
+        var process=(clr?new ProcessBuilder(ClrCompiler.executable(),output.resolve("BhashProgram.dll").toString()):new ProcessBuilder(java,"-jar",output.toString())).redirectInput(stdin.toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try{process.getOutputStream().close();assertTrue(process.waitFor(30,TimeUnit.SECONDS));String result=Files.readString(log).replace("\r\n","\n");assertEquals(0,process.exitValue(),result);return result;}
         finally{process.destroyForcibly();}
+    }
+    @Test void consoleInputMatchesPortableFixtures()throws Exception{
+        for(var fixture:ConsoleFixtures.cases())assertEquals(fixture.expected(),execute(fixture.source(),fixture.input()),fixture.name());
     }
     @Test void portableExampleAndTypedJsonCollectionsRunWithoutCompilerRuntimeDependencies() throws Exception {
         String result=execute(Files.readString(Path.of("examples/standard-library/portable.bhash")));

@@ -16,6 +16,7 @@ _Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
 #include <setjmp.h>
 #ifdef _MSC_VER
 #include <io.h>
+#include <fcntl.h>
 #else
 #include <unistd.h>
 #endif
@@ -59,6 +60,7 @@ static void grow_object_index(void) {
     object_index = expanded; index_count = count;
 }
 static bh_root_frame *roots;
+static int console_skip_lf;
 static void *pending_exception;
 static const bh_type *exception_descriptor;
 static const void *exception_info;
@@ -211,6 +213,10 @@ static int environment_flag(const char *name) {
 #endif
 }
 void bh_runtime_init(void) {
+    console_skip_lf=0;
+#ifdef _MSC_VER
+    (void)_setmode(_fileno(stdin),_O_BINARY);
+#endif
     struct timespec now = {0,0}; (void)timespec_get(&now, TIME_UTC);
     random_state = (uint64_t)now.tv_sec ^ ((uint64_t)now.tv_nsec << 32) ^ (uint64_t)clock();
     stress = environment_flag("BHASH_GC_STRESS");
@@ -1407,4 +1413,55 @@ int64_t bh_time_now(const void *location){
     int64_t result=seconds*1000;
     if(result>INT64_MAX-fraction)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
     return result+fraction;
+}
+
+/* Buffer only raw bytes ahead of the next call; UTF-8 decoding is line-local.
+   The growable scratch text is precisely rooted across every capacity allocation. */
+static void *console_line(int integer,const void *location){
+    const char *read_error=integer?"कंसोल से UTF-8 इनपुट पढ़ा नहीं जा सका।":"UTF-8 पाठ पढ़ा नहीं जा सका।";
+    if(fflush(stdout))runtime_error(location,read_error);
+    data_buffer b;buffer_init(&b,UINT64_MAX,"पाठ सीमा से बाहर है।",location);
+    for(;;){
+        int c=fgetc(stdin);
+        if(console_skip_lf){console_skip_lf=0;if(c=='\n')c=fgetc(stdin);}
+        if(c==EOF){
+            if(ferror(stdin))runtime_error(location,read_error);
+            if(!b.size)runtime_error(location,integer?"इनपुट समाप्त: एक पूर्णांक अपेक्षित था।":"इनपुट समाप्त: पाठ अपेक्षित था।");
+            break;
+        }
+        if(c=='\n')break;
+        if(c=='\r'){console_skip_lf=1;break;}
+        unsigned char byte=(unsigned char)c;buffer_bytes(&b,&byte,1,1);
+    }
+    if(b.size&&!valid_utf8(text_data(b.slots[0]),b.size))runtime_error(location,read_error);
+    return buffer_finish(&b);
+}
+void *bh_console_text(const void *location){return console_line(0,location);}
+/* Java Character.isWhitespace: deliberately excludes NBSP, figure space and NNBSP. */
+static int console_space(uint32_t c){
+    return (c>=9&&c<=13)||(c>=0x1c&&c<=0x20)||c==0x1680||(c>=0x2000&&c<=0x2006)
+        ||(c>=0x2008&&c<=0x200a)||c==0x2028||c==0x2029||c==0x205f||c==0x3000;
+}
+int64_t bh_console_integer(const void *location){
+    void *slot=console_line(1,location);bh_root_frame frame;bh_roots_push(&frame,&slot,1);
+    uint64_t n=text_length(slot),i=0,start=n,end=0;
+    while(i<n){uint64_t at=i;uint32_t c=scalar(text_data(slot),&i);if(!console_space(c)){if(start==n)start=at;end=i;}}
+    i=start;int negative=0,script=0,overflow=0;uint64_t value=0;
+    if(i<end&&(text_data(slot)[i]=='+'||text_data(slot)[i]=='-'))negative=text_data(slot)[i++]=='-';
+    const char *invalid="अमान्य इनपुट: एक पंक्ति में एक पूर्णांक लिखें (0-9 या ०-९)।";
+    if(i>=end)runtime_error(location,invalid);
+    uint64_t limit=negative?UINT64_C(9223372036854775808):INT64_MAX;
+    while(i<end){
+        uint32_t c=scalar(text_data(slot),&i);int current,digit;
+        if(c>='0'&&c<='9'){current=1;digit=(int)(c-'0');}
+        else if(c>=0x966&&c<=0x96f){current=2;digit=(int)(c-0x966);}
+        else{runtime_error(location,invalid);return 0;}
+        if(script&&current!=script)runtime_error(location,invalid);script=current;
+        if(value>(limit-(uint64_t)digit)/10)overflow=1;
+        if(!overflow)value=value*10+(uint64_t)digit;
+    }
+    /* Grammar errors take precedence over overflow, like the managed regex check. */
+    if(overflow)runtime_error(location,"पूर्णांक 64-बिट सीमा से बाहर है।");
+    int64_t result=negative?(value==UINT64_C(9223372036854775808)?INT64_MIN:-(int64_t)value):(int64_t)value;
+    bh_roots_pop(&frame);return result;
 }

@@ -202,6 +202,7 @@ The native target also supports every `मानक.गणित` and `मान
 
 Native text split/join and strict JSON parsing/serialization are also available, with typed nested collections and safe partial-failure cleanup; see [native structured text](docs/native-json-text.md).
 All six UTC time-library functions are available on native Linux; see [native time](docs/native-time.md).
+Native UTF-8 console input (`पाठपढ़ो()` and `पढ़ो()`) is described in [native console input](docs/native-console.md).
 Native packed byte buffers, UTF-8 encoding/decoding and binary file I/O are also available; see [native bytes](docs/native-bytes.md).
 Native UTF-8 text file I/O is available through `मानक.फ़ाइल`; see [native files](docs/native-files.md).
 

@@ -135,4 +135,7 @@ void *bh_time_write(int64_t, const void *);
 int64_t bh_time_year(int64_t, const void *);
 int64_t bh_time_month(int64_t, const void *);
 int64_t bh_time_day(int64_t, const void *);
+/* Console reads consume one UTF-8 line; stdin remains owned by the host. */
+void *bh_console_text(const void *location);
+int64_t bh_console_integer(const void *location);
 #endif
