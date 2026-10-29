@@ -153,3 +153,10 @@ JavaScript Date.getMonth जैसे शून्य-आधारित API स
 ```
 
 महीने और leap year के अनुसार दिन १ से २८, २९, ३० या ३१ तक हो सकता है।
+
+## मूल-मशीन लक्ष्य (Native Target)
+
+इन सभी छह functions का वही UTC व्यवहार native Linux पर भी उपलब्ध है।
+[Native time guide](../../docs/native-time.md) में ranges, errors, memory safety और
+[पूरे native उदाहरण](../../examples/native/time.bhash) की जानकारी है। वर्ष `0000` पर
+`अमान्य UTC समय पाठ।` और null पाठ पर सामान्य null-reference अपवाद मिलता है।

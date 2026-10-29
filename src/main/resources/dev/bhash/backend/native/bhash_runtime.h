@@ -128,4 +128,11 @@ int bh_file_supported(const void *);
 int bh_file_exists(const void *, const void *);
 void *bh_file_read_text(const void *, const void *);
 void bh_file_write_text(const void *, const void *, const void *);
+/* UTC timestamps: Unix epoch milliseconds, calendar years 0001..9999. */
+int64_t bh_time_now(const void *);
+int64_t bh_time_read(const void *, const void *);
+void *bh_time_write(int64_t, const void *);
+int64_t bh_time_year(int64_t, const void *);
+int64_t bh_time_month(int64_t, const void *);
+int64_t bh_time_day(int64_t, const void *);
 #endif

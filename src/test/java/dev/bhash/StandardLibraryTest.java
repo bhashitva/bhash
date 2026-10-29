@@ -139,5 +139,14 @@ abstract class StandardLibraryTest {
                 .replace("DIR",literal(dir.toString())).replace("LOOP",literal(loop.toString()));
         assertEquals("सत्य असत्य असत्य असत्य\n",execute(code));
     }
+    @Test void timeRejectsYearZeroWithPortableFailure()throws Exception{
+        assertEquals("अमान्य UTC समय पाठ।\n",execute("""
+            आयात मानक.समय उपनाम स;
+            कार्य मुख्य() -> शून्य {
+                प्रयास { स.पढ़ो("0000-01-01T00:00:00.000Z"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
+
+            }
+            """));
+    }
     static String literal(String s){return "\""+s.replace("\\","\\\\").replace("\"","\\\"").replace("\n","\\n").replace("\r","\\r").replace("\t","\\t")+"\"";}
 }

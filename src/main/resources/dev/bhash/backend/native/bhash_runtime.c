@@ -1350,3 +1350,61 @@ uint64_t bh_buffer_call(uint32_t operation,uint64_t a,uint64_t b,uint64_t c,uint
     }
     if(slots[2])result=pointer_bits(slots[2]);bh_roots_pop(&frame);return result;
 }
+
+/* Proleptic Gregorian UTC arithmetic, independent of timezone, locale and time_t
+   calendar conversion limits. Days are counted from 0001-01-01. */
+#define BH_TIME_MIN INT64_C(-62135596800000)
+#define BH_TIME_MAX INT64_C(253402300799999)
+#define BH_DAY_MS INT64_C(86400000)
+typedef struct bh_calendar {int year,month,day,hour,minute,second,millisecond;} bh_calendar;
+static int time_leap(int year){return year%4==0&&(year%100!=0||year%400==0);}
+static int time_month_days(int year,int month){
+    static const int days[]={31,28,31,30,31,30,31,31,30,31,30,31};
+    return days[month-1]+(month==2&&time_leap(year));
+}
+static bh_calendar time_calendar(int64_t value,const void *location){
+    if(value<BH_TIME_MIN||value>BH_TIME_MAX)runtime_error(location,"समय सीमा से बाहर है।");
+    int64_t elapsed=value-BH_TIME_MIN,days=elapsed/BH_DAY_MS,clock=elapsed%BH_DAY_MS;
+    int year=1+(int)(days/146097)*400;days%=146097;
+    int cycles=(int)(days/36524);if(cycles==4)cycles=3;
+    year+=cycles*100;days-=cycles*36524;
+    year+=(int)(days/1461)*4;days%=1461;
+    cycles=(int)(days/365);if(cycles==4)cycles=3;
+    year+=cycles;days-=cycles*365;
+    int month=1;while(days>=time_month_days(year,month)){days-=time_month_days(year,month);++month;}
+    bh_calendar result={year,month,(int)days+1,(int)(clock/3600000),(int)(clock/60000%60),(int)(clock/1000%60),(int)(clock%1000)};
+    return result;
+}
+static int time_digits(const unsigned char *text,unsigned at,unsigned count,const void *location){
+    int value=0;for(unsigned i=0;i<count;++i){unsigned c=text[at+i];if(c<'0'||c>'9')runtime_error(location,"अमान्य UTC समय पाठ।");value=value*10+(int)(c-'0');}return value;
+}
+int64_t bh_time_read(const void *text,const void *location){
+    bh_instance((void *)text,location);
+    if(text_length(text)!=24)runtime_error(location,"अमान्य UTC समय पाठ।");
+    const unsigned char *s=text_data(text);
+    if(s[4]!='-'||s[7]!='-'||s[10]!='T'||s[13]!=':'||s[16]!=':'||s[19]!='.'||s[23]!='Z')runtime_error(location,"अमान्य UTC समय पाठ।");
+    int year=time_digits(s,0,4,location),month=time_digits(s,5,2,location),day=time_digits(s,8,2,location);
+    int hour=time_digits(s,11,2,location),minute=time_digits(s,14,2,location),second=time_digits(s,17,2,location),ms=time_digits(s,20,3,location);
+    if(year<1||month<1||month>12||day<1||day>time_month_days(year,month)||hour>23||minute>59||second>59)runtime_error(location,"अमान्य UTC समय पाठ।");
+    int64_t y=year-1,days=y*365+y/4-y/100+y/400+day-1;
+    for(int m=1;m<month;++m)days+=time_month_days(year,m);
+    return BH_TIME_MIN+days*BH_DAY_MS+hour*INT64_C(3600000)+minute*INT64_C(60000)+second*INT64_C(1000)+ms;
+}
+void *bh_time_write(int64_t value,const void *location){
+    bh_calendar t=time_calendar(value,location);char buffer[25];
+    int n=snprintf(buffer,sizeof buffer,"%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",t.year,t.month,t.day,t.hour,t.minute,t.second,t.millisecond);
+    if(n!=24)fatal("आंतरिक समय प्रारूप अमान्य है।");
+    return ascii_text(buffer,location);
+}
+int64_t bh_time_year(int64_t value,const void *location){return time_calendar(value,location).year;}
+int64_t bh_time_month(int64_t value,const void *location){return time_calendar(value,location).month;}
+int64_t bh_time_day(int64_t value,const void *location){return time_calendar(value,location).day;}
+int64_t bh_time_now(const void *location){
+    struct timespec now;
+    if(timespec_get(&now,TIME_UTC)!=TIME_UTC||now.tv_nsec<0||now.tv_nsec>=1000000000L)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
+    int64_t seconds=(int64_t)now.tv_sec,fraction=now.tv_nsec/1000000;
+    if(seconds<INT64_MIN/1000||seconds>INT64_MAX/1000)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
+    int64_t result=seconds*1000;
+    if(result>INT64_MAX-fraction)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
+    return result+fraction;
+}

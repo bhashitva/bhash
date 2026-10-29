@@ -260,3 +260,6 @@ packages alongside them, and compiled applications carry the library runtime.
 Native Linux also supports the text-file subset (`समर्थित`, `है`, `पाठपढ़ो`,
 `पाठलिखो`), with the same UTF-8 and 16 MiB contracts. See [native files](native-files.md).
 Native byte-buffer encoding/decoding and binary file APIs are also available; see [native bytes](native-bytes.md).
+
+Native Linux supports all six UTC time functions with the same timestamp format,
+calendar range and error messages; see [native time](native-time.md).

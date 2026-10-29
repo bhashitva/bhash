@@ -47,6 +47,10 @@ jobs:
             for tool in java dotnet clang gcc; do
               if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
             done
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/time > /tmp/time-actual 2> /tmp/time-stats
+            printf "1969-12-31T23:59:59.999Z\n२००० २ २९\nसत्य\n१००० १०००\nसमय सीमा से बाहर है।\n" > /tmp/time-expected
+            cmp /tmp/time-actual /tmp/time-expected
+            grep "live=0" /tmp/time-stats
             mkdir -p target/native-byte-example
             BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/native/bytes > /tmp/bytes-actual 2> /tmp/bytes-stats
             printf "अमान्य UTF-8 बाइटबफ़र।\n३०० ३३५८६\n२५५ २५५ -१\n" > /tmp/bytes-expected
@@ -139,3 +143,4 @@ jobs:
             docs/native-json-text.md
             docs/native-files.md
             docs/native-bytes.md
+            docs/native-time.md

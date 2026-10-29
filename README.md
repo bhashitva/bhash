@@ -201,6 +201,7 @@ Native LLVM now supports `दशमलव` arithmetic, comparisons, checked conv
 The native target also supports every `मानक.गणित` and `मानक.यादृच्छिक` function, including matching seeded streams; see the [native math/random guide](docs/native-math-random.md).
 
 Native text split/join and strict JSON parsing/serialization are also available, with typed nested collections and safe partial-failure cleanup; see [native structured text](docs/native-json-text.md).
+All six UTC time-library functions are available on native Linux; see [native time](docs/native-time.md).
 Native packed byte buffers, UTF-8 encoding/decoding and binary file I/O are also available; see [native bytes](docs/native-bytes.md).
 Native UTF-8 text file I/O is available through `मानक.फ़ाइल`; see [native files](docs/native-files.md).
 
