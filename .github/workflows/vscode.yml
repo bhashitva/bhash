@@ -9,7 +9,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -26,13 +26,22 @@ jobs:
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
       - run: npm run build --prefix editors/vscode
       - run: npm test --prefix editors/vscode
+      - name: Test shipped native launcher without LLVM or C development packages
+        if: runner.os == 'Linux'
+        run: |
+          docker build -f scripts/native-vscode-clean.Dockerfile -t bhash-vscode-clean .
+          docker volume create bhash-vscode-cache
+          docker run --rm -v bhash-vscode-cache:/home/bhash/.cache -v "$PWD:/repo:ro" bhash-vscode-clean node /repo/editors/vscode/test/native-clean.cjs
+          docker run --rm --network none -v bhash-vscode-cache:/home/bhash/.cache -v "$PWD:/repo:ro" bhash-vscode-clean node /repo/editors/vscode/test/native-clean.cjs --offline
       - if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:integration --prefix editors/vscode
+        env:
+          BHASH_TEST_NATIVE: '1'
       - if: runner.os == 'Windows'
         run: npm run test:integration --prefix editors/vscode
       - run: npm run package --prefix editors/vscode
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-vscode-${{ runner.os }}
-          path: target/bhash-vscode-0.4.1.vsix
+          path: target/bhash-vscode-0.5.0.vsix
           if-no-files-found: error

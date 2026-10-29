@@ -1,9 +1,6 @@
 name: Publish native SDK assets
 on:
   workflow_dispatch:
-  push:
-    branches: [feature/vscode-native]
-    paths: [.github/workflows/native-sdk-release.yml]
 permissions:
   contents: write
   actions: read
