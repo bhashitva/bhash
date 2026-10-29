@@ -210,6 +210,7 @@ Native enums, conversions, typed selection, and singleton GC roots are described
 Native immutable records, structural equality, and map-key hashing are described in [native records](docs/native-records.md).
 Native user-defined generics, concrete specialization, typed layouts and GC validation are described in [native generics](docs/native-generics.md).
 Native exception stack traces, debug symbols and GDB usage are described in [native diagnostics](docs/native-diagnostics.md).
+Native setup checks, reproducible builds and executable distribution are described in [native releases](docs/native-releases.md).
 Native packed byte buffers, UTF-8 encoding/decoding and binary file I/O are also available; see [native bytes](docs/native-bytes.md).
 Native UTF-8 text file I/O is available through `मानक.फ़ाइल`; see [native files](docs/native-files.md).
 

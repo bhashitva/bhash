@@ -16,6 +16,7 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
     <antlr.version>4.13.2</antlr.version>
   </properties>
   <dependencies>
@@ -49,6 +50,9 @@
         <groupId>org.antlr</groupId><artifactId>antlr4-maven-plugin</artifactId><version>${antlr.version}</version>
         <executions><execution><goals><goal>antlr4</goal></goals></execution></executions>
         <configuration><visitor>true</visitor><listener>false</listener><arguments><argument>-package</argument><argument>dev.bhash.parser</argument></arguments></configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.4.1</version>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version>
