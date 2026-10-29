@@ -437,13 +437,13 @@ class NativeBackendTest {
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: पूर्णांक = सत्य; }"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { लिखो(अ); }"));
     }
-    @Test void unsupportedUnusedDeclarationsAndLibraryCallsHaveSourceLocations(){
+    @Test void genericMemberDeclarationsKeepSharedSourceDiagnostics(){
         for(String source:List.of(
-            "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
-            "वर्ग अ<त> { मान न: त; } कार्य मुख्य() -> शून्य {}")){
+            "अनुबंध अ { कार्य न<त>(व: त) -> त; } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ { कार्य न<त>(व: त) -> त { लौटाओ व; } } कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(source));
             assertTrue(error.getMessage().contains("native.bhash:1:"),error.getMessage());
-            assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
+            assertTrue(error.getMessage().contains("Generic"),error.getMessage());
         }
     }
     @Test void crossFileVisibilityAndCallsUseExistingResolution()throws Exception{
@@ -485,8 +485,7 @@ class NativeBackendTest {
             "वर्ग अ<त> { मान न: त; } कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "अभिलेख अ<त>(न: त); कार्य मुख्य() -> शून्य {}")){
-            var error=assertThrows(CompilationException.class,()->core(s));
-            assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
+            assertDoesNotThrow(()->core(s));
         }
     }
     @Test void heapObjectGraphsAndCyclesSurviveAndAreReclaimed()throws Exception{
@@ -814,8 +813,7 @@ class NativeBackendTest {
             "अनुबंध अ { कार्य न() -> पूर्णांक; } अनुबंध ब { कार्य न() -> पाठ; } अनुबंध ग विस्तार अ, ब {}"))
             assertThrows(CompilationException.class,()->core(source+" कार्य मुख्य() -> शून्य {}"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { लिखो(सुरक्षितरूप<पूर्णांक>(१)); }"));
-        var unsupported=assertThrows(CompilationException.class,()->core("वर्ग क<त> { मान न: त; } कार्य मुख्य() -> शून्य {}"));
-        assertTrue(unsupported.getMessage().contains("BH9001"));
+        assertDoesNotThrow(()->core("वर्ग क<त> { मान न: त; } कार्य मुख्य() -> शून्य {}"));
     }
     @Test void nativeInterfaceDiamondsRedeclarationsAndMultipleContractsMatchJvm()throws Exception{
         requireTools();
@@ -1132,7 +1130,7 @@ class NativeBackendTest {
         assertEquals(1,p.collections().stream().filter(t->t.kind()==CollectionKind.LIST && t.valueKind()==3).count());
         assertTrue(LlvmEmitter.emit(p).contains("%CollectionInfo"));
         assertDoesNotThrow(()->core("कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[१]; }"));
-        assertThrows(CompilationException.class,()->core("वर्ग क<त> {} कार्य मुख्य() -> शून्य {}"));
+        assertDoesNotThrow(()->core("वर्ग क<त> {} कार्य मुख्य() -> शून्य {}"));
     }
     @Test void nativeArraysDefaultsAliasesInitializersAndJaggedDimensionsMatchJvm()throws Exception{
         requireTools();var result=nativeRun("""
@@ -2213,6 +2211,55 @@ class NativeBackendTest {
         assertEquals(1,result.exit());assertEquals("साफ😀\n",result.out());assertTrue(result.err().contains("native.bhash:2:"),result.err());assertTrue(result.err().contains("अमान्य गणना अंक।"),result.err());
     }
 
+    @Test void nativeGenericFixturesMatchJvmClrAndForcedGc()throws Exception{
+        requireNumericTargets();for(var fixture:NativeGenericFixtures.cases()){
+            var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
+            if(fixture.name().equals("gc-stress")){assertTrue(stats(result).get("allocations")>4000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());}
+        }
+    }
+    @Test void coreSpecializesGenericLayoutsAndReusesClosedDefinitions()throws Exception{
+        var p=core("""
+            वर्ग पात्र<त> { सार्वजनिक मान व: त; सार्वजनिक साझा मान याद: त; }
+            कार्य पहचान<त>(व: त) -> त { लौटाओ व; }
+            कार्य मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); नया पात्र<पाठ>(); नया पात्र<पूर्णांक>(); लिखो(पहचान<पूर्णांक>(१),पहचान<पूर्णांक>(२)); }
+            """);
+        assertEquals(2,p.classes().size());assertEquals(List.of(Type.INT,Type.TEXT),p.classes().stream().map(c->c.fields().get(0).type()).toList());
+        assertEquals(2,p.staticFields().size());assertEquals(1,p.functions().stream().filter(f->f.result()==Type.INT).count());
+        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("@bh_static_reference_store"));
+    }
+    @Test void nativeGenericDiagnosticsMatchManaged()throws Exception{
+        for(String source:List.of(
+            "वर्ग क<त> {} कार्य मुख्य() -> शून्य { नया क(); }",
+            "अभिलेख क<त>(व: त); कार्य मुख्य() -> शून्य { नया क<पूर्णांक,पाठ>(१); }",
+            "वर्ग क<त> {} कार्य मुख्य() -> शून्य { स्थिर अ: क<सर्ववस्तु> = नया क<पाठ>(); }",
+            "कार्य जोड़<त>(व: त) -> त { लौटाओ व+१; } कार्य मुख्य() -> शून्य { जोड़<तार्किक>(सत्य); }",
+            "कार्य पहचान<त>(व: त) -> त { लौटाओ व; } कार्य मुख्य() -> शून्य { पहचान<पूर्णांक>(सत्य); }",
+            "वर्ग पात्र<त> { मान अगला: पात्र<पात्र<त>>; } कार्य मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); }")){
+            var error=assertThrows(CompilationException.class,()->core(source));
+            for(var target:List.of(Target.JVM,Target.CLR))assertEquals(assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("native.bhash",source)),target)).getMessage(),error.getMessage());
+        }
+    }
+
+    @Test void nativeGenericsResolvePackageAliasesAndFailureLocations()throws Exception{
+        requireNumericTargets();var sources=List.of(
+            new SourceFile("library.bhash","""
+                संकुल संग्रह;
+                सार्वजनिक अभिलेख पात्र<त>(व: त);
+                सार्वजनिक कार्य पहचान<त>(व: त) -> त { लौटाओ व; }
+                सार्वजनिक कार्य असफल<त>(व: त) -> त { प्रयास { स्थिर न: पूर्णांक=०; लिखो(१/न); लौटाओ व; } अंततः { लिखो("साफ😀"); } }
+                """),
+            new SourceFile("app.bhash","""
+                आयात संग्रह.पात्र उपनाम प; आयात संग्रह.पहचान उपनाम लो;
+                कार्य मुख्य() -> शून्य {
+                    स्थिर क: प<पाठ> = लो<प<पाठ>>(नया प<पाठ>("भारत😀"));
+                    स्थिर म: मानचित्र<प<पाठ>,पूर्णांक> = नया मानचित्र<प<पाठ>,पूर्णांक>{क:७}; लिखो(म[नया संग्रह.पात्र<पाठ>("भारत😀")]);
+                    संग्रह.असफल<प<पाठ>>(क);
+                }
+                """));
+        var result=nativeOnlyRun(sources,GC_STRESS);assertEquals(1,result.exit(),result.err());assertEquals("७\nसाफ😀\n",result.out());assertTrue(result.err().contains("library.bhash:4:"),result.err());assertEquals(0L,stats(result).get("live"));
+        for(boolean clr:new boolean[]{false,true}){var managed=numericManagedRun(sources,clr);assertEquals(result.exit(),managed.exit(),managed.err());assertEquals(result.out(),managed.out());assertTrue(managed.err().contains("library.bhash:4:"),managed.err());}
+    }
+
     @Test void nativeRecordFixturesMatchJvmClrAndForcedGc()throws Exception{
         requireNumericTargets();for(var fixture:NativeRecordFixtures.cases()){
             var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
@@ -2225,7 +2272,7 @@ class NativeBackendTest {
         assertTrue(c.assignableTypes().contains(-9));assertTrue(c.virtualMethods().isEmpty());assertTrue(p.initializations().isEmpty());
         String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v13"));
     }
-    @Test void nativeRecordDiagnosticsMatchManagedAndKeepUserGenericsOutsideProfile(){
+    @Test void nativeRecordDiagnosticsMatchManaged(){
         for(String declaration:List.of(
             "अभिलेख क(अ: पूर्णांक, अ: पूर्णांक);", "अभिलेख क(); वर्ग ख विस्तार क {}",
             "अभिलेख क(अ: पूर्णांक); कार्य गलत() -> शून्य { नया क(); }",
@@ -2234,7 +2281,7 @@ class NativeBackendTest {
             String source=declaration+" कार्य मुख्य() -> शून्य {}";var error=assertThrows(CompilationException.class,()->core(source));
             for(var target:List.of(Target.JVM,Target.CLR))assertEquals(assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("native.bhash",source)),target)).getMessage(),error.getMessage());
         }
-        assertTrue(assertThrows(CompilationException.class,()->core("अभिलेख पात्र<त>(व: त); कार्य मुख्य() -> शून्य {}" )).getMessage().contains("BH9001"));
+        assertDoesNotThrow(()->core("अभिलेख पात्र<त>(व: त); कार्य मुख्य() -> शून्य {}"));
     }
 
     @Test void nativeRecordsResolveAliasesAndPreserveFailureLocations()throws Exception{
