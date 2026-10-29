@@ -477,7 +477,7 @@ public final class LlvmEmitter {
     }
     private void declareVariables(List<Binding> parameters){
         if(debug==null)return;
-        for(var b:bindings.keySet()){String declaration=debug.declare(b,address(b),debugScope,parameters.indexOf(b)+1);if(!declaration.isEmpty())line(declaration);}
+        for(var b:bindings.keySet()){String declaration=debug.declare(b,address(b),debugScope,parameters.indexOf(b)+1);if(!declaration.isEmpty()){Source previous=debugSource;debugSource=b.source();line(declaration);debugSource=previous;}}
     }
     private void traceAt(Source source){if(source!=null)line("call void @bh_trace_at(ptr "+text(source.toString())+")");}
     private void leaveTrace(){if(traced)line("call void @bh_trace_leave()");}
@@ -490,7 +490,7 @@ public final class LlvmEmitter {
         code.append("define internal ").append(llvm(f.result())).append(" @bfn").append(f.id()).append('(');
         var arguments=new ArrayList<String>();
         for(int i=0;i<f.parameters().size();i++)arguments.add(llvm(f.parameters().get(i).type())+" %arg"+i);
-        code.append(String.join(", ",arguments)).append(")").append(debug==null?"":" noinline optnone !dbg !"+debugScope).append(" {\n");block("entry");
+        code.append(String.join(", ",arguments)).append(")").append(debug==null?"":" noinline optnone !dbg !"+debugScope).append(" {\n");block("entry");debugSource=null;
         if(traced){line("%trace = alloca %TraceFrame, align 8");line("call void @bh_trace_enter(ptr %trace, ptr "+text(f.name())+", ptr "+text(f.source().toString())+")");}
         line("%frame = alloca %RootFrame, align 8");
         line("%roots = alloca ["+rootCount+" x ptr], align 8");
@@ -509,6 +509,7 @@ public final class LlvmEmitter {
             var b=f.parameters().get(i);line("store "+llvm(b.type())+" %arg"+i+", ptr "+address(b));
         }
         line("call void @bh_roots_push(ptr %frame, ptr %roots, i64 "+rootCount+")");
+        debugSource=f.source();
         if(f.initialization()>=0)initialize(f.initialization());
         statement(f.body());
         if(!terminated){leaveTrace();line("call void @bh_roots_pop(ptr %frame)");line(f.result()==Type.VOID?"ret void":"unreachable");}
