@@ -13,6 +13,7 @@ RUN rm -f /etc/apt/sources.list \
 RUN printf 'Types: deb deb-src\nURIs: https://apt.llvm.org/jammy/\nSuites: llvm-toolchain-jammy-18\nComponents: main\nSigned-By: /usr/share/keyrings/bhash-llvm.asc\n' > /etc/apt/sources.list.d/bhash-llvm.sources \
  && apt-get -o APT::Update::Error-Mode=any update \
  && DEBIAN_FRONTEND=noninteractive apt-get -y --allow-downgrades dist-upgrade \
+ && apt-cache policy clang-18 llvm-18 lld-18 libclang-rt-18-dev \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends --allow-downgrades "clang-18=$LLVM_DEB_VERSION" "llvm-18=$LLVM_DEB_VERSION" "lld-18=$LLVM_DEB_VERSION" "libclang-rt-18-dev=$LLVM_DEB_VERSION" libc6-dev libgcc-11-dev linux-libc-dev binutils python3 dpkg-dev ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 ENV BHASH_UBUNTU_SNAPSHOT=${UBUNTU_SNAPSHOT} BHASH_LLVM_DEB_VERSION=${LLVM_DEB_VERSION}
