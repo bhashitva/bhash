@@ -27,7 +27,7 @@ jobs:
         id: sdk-cache
         with:
           path: target/managed-toolchain
-          key: linux-x64-bhash-sdk-v1-${{ hashFiles('scripts/native-toolchain.Dockerfile', 'scripts/build_native_toolchain.py', 'LICENSE', 'NOTICE') }}
+          key: linux-x64-bhash-sdk-jammy-v1-${{ hashFiles('scripts/native-toolchain.Dockerfile', 'scripts/build_native_toolchain.py', 'LICENSE', 'NOTICE') }}
       - name: Build portable toolchain from pinned Ubuntu snapshot
         if: steps.sdk-cache.outputs.cache-hit != 'true'
         run: |
@@ -42,11 +42,12 @@ jobs:
         with:
           path: target/managed-toolchain
           key: ${{ steps.sdk-cache.outputs.cache-primary-key }}
-      - name: Build clean Java-only consumer image
-        run: docker build -f scripts/native-toolchain-clean.Dockerfile -t bhash-toolchain-consumer .
-      - name: Verify native compilation without system development packages
+      - name: Verify clean Ubuntu 22.04 and 24.04 consumers
         run: |
-          docker run --rm --network none -v "$PWD/target:/artifacts:ro" -v "$PWD:/repo:ro" bhash-toolchain-consumer sh /repo/scripts/test_managed_native.sh
+          for version in 22.04 24.04; do
+            docker build --build-arg UBUNTU_VERSION=$version -f scripts/native-toolchain-clean.Dockerfile -t bhash-toolchain-consumer:$version .
+            docker run --rm --network none -v "$PWD/target:/artifacts:ro" -v "$PWD:/repo:ro" bhash-toolchain-consumer:$version sh /repo/scripts/test_managed_native.sh
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-managed-native-toolchain-linux-x86_64
