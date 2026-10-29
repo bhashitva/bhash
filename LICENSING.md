@@ -45,3 +45,7 @@ unless explicitly stated otherwise, as described in Section 5. See
 license for the Bhash or Nij Bhasha Sanstha names or logos; see Section 6.
 
 Fundraising is voluntary and does not add conditions to the software license.
+
+## Optional managed native toolchain
+
+Managed toolchain archives separately redistribute LLVM/Clang/LLD and selected Linux system development/runtime components under their respective licenses. Their per-package notices are retained in `licenses/`, versions in `packages.json`, and matching corresponding sources in the companion `-sources.zip` identified by `sources.json`. Redistributors must make that companion archive and notices available alongside the binary toolchain. See [managed toolchains](docs/managed-native-toolchain.md); the Bhash Apache license does not replace those component licenses.
