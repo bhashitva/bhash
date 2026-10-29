@@ -29,7 +29,7 @@ public final class LlvmEmitter {
     private final Map<Integer,Integer> objectSizes=new HashMap<>();
     private final Map<Expression,Value> values=new IdentityHashMap<>();
     private record Value(Type type,String ir) { String argument(){return llvm(type)+" "+ir;} }
-    private static String llvm(Type t) { return switch(t){case REAL->"double";case INT,BYTE->"i64";case BOOL->"i1";case TEXT,OBJECT,ANY->"ptr";case VOID->"void";}; }
+    private static String llvm(Type t) { return switch(t){case REAL->"double";case INT,BYTE,INT32->"i64";case BOOL->"i1";case TEXT,OBJECT,ANY->"ptr";case VOID->"void";}; }
     private String temporary(){return "%x"+next++;}
     private String freshLabel(){return "l"+next++;}
     private void line(String s){code.append("  ").append(s).append('\n');}
@@ -83,7 +83,7 @@ public final class LlvmEmitter {
         }
         for(var f:program.functions())function(f);
         String license=text(notices);
-        return "; Bhash native: direct LLVM IR, internal ABI v10\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v11\n"+
             "target triple = \"x86_64-unknown-linux-gnu\"\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
             globals+"\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
@@ -94,7 +94,7 @@ public final class LlvmEmitter {
             "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\n"+
             "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
-            textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
+            textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_to_int32(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @bh_runtime_init()\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %skip = icmp ne i32 %shown, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n";
     }
@@ -154,7 +154,7 @@ public final class LlvmEmitter {
     }
     /** Negative membership IDs are reserved for built-in boxed types and सर्ववस्तु. */
     private void boxMetadata(){
-        for(int kind:new int[]{1,2,3,6,7}){
+        for(int kind:new int[]{1,2,3,6,7,8}){
             globals.append("@box_types").append(kind).append(" = private constant [2 x i64] [i64 -").append(kind).append(", i64 -4]\n");
             globals.append("@box_info").append(kind).append(" = private constant %ClassInfo { ptr null, ptr null, i64 2, ptr @box_types").append(kind).append(" }, align 8\n");
             globals.append("@box_refs").append(kind).append(" = private constant [").append(kind==3?1:0).append(" x i64] [").append(kind==3?"i64 8":"").append("]\n");
@@ -235,7 +235,9 @@ public final class LlvmEmitter {
               %integer = icmp eq ptr %ai, @box_info1
               %boolean = icmp eq ptr %ai, @box_info2
               %byte = icmp eq ptr %ai, @box_info7
-              %integral = or i1 %integer, %byte
+              %small = icmp eq ptr %ai, @box_info8
+              %wideorbyte = or i1 %integer, %byte
+              %integral = or i1 %wideorbyte, %small
               %scalar = or i1 %integral, %boolean
               br i1 %scalar, label %numbers, label %textkind
             numbers:
@@ -280,7 +282,7 @@ public final class LlvmEmitter {
     private Value box(Box b){
         Value input=expression(b.value());
         if(input.type()==Type.OBJECT || input.type()==Type.ANY)return new Value(Type.ANY,input.ir());
-        int kind=switch(input.type()){case BYTE->7;case REAL->6;case INT->1;case BOOL->2;case TEXT->3;default->throw new IllegalStateException("Unchecked box type");};
+        int kind=switch(input.type()){case INT32->8;case BYTE->7;case REAL->6;case INT->1;case BOOL->2;case TEXT->3;default->throw new IllegalStateException("Unchecked box type");};
         Value result=instruction(Type.ANY,"call ptr @bh_alloc(ptr @box_gc"+kind+", i64 16)");
         line("store ptr @box_info"+kind+", ptr "+result.ir());
         // Publish before the reference-store barrier; reload rooted text after allocation.
@@ -296,14 +298,14 @@ public final class LlvmEmitter {
     }
     private Value typeOperation(TypeOperation t){
         Value value=expression(t.value());
-        if(t.action()==TypeAction.CAST && (value.type()==Type.INT || value.type()==Type.BYTE) && t.targetType()==Type.REAL)
+        if(t.action()==TypeAction.CAST && (value.type()==Type.INT || value.type()==Type.BYTE || value.type()==Type.INT32) && t.targetType()==Type.REAL)
             return instruction(Type.REAL,"sitofp i64 "+value.ir()+" to double");
         if(t.action()==TypeAction.CAST && value.type()==Type.REAL && t.targetType()==Type.INT)
             return instruction(Type.INT,"call i64 @bh_real_to_int(double "+value.ir()+", ptr "+text(t.source().toString())+")");
-        if(t.action()==TypeAction.CAST && t.targetType()==Type.INT && value.type()==Type.BYTE)return new Value(Type.INT,value.ir());
-        if(t.action()==TypeAction.CAST && t.targetType()==Type.BYTE && (value.type()==Type.INT || value.type()==Type.REAL)){
+        if(t.action()==TypeAction.CAST && t.targetType()==Type.INT && (value.type()==Type.BYTE || value.type()==Type.INT32))return new Value(Type.INT,value.ir());
+        if(t.action()==TypeAction.CAST && (t.targetType()==Type.BYTE || t.targetType()==Type.INT32) && (value.type()==Type.INT || value.type()==Type.BYTE || value.type()==Type.INT32 || value.type()==Type.REAL)){
             if(value.type()==Type.REAL)value=instruction(Type.INT,"call i64 @bh_real_to_int(double "+value.ir()+", ptr "+text(t.source().toString())+")");
-            return instruction(Type.BYTE,"call i64 @bh_to_byte(i64 "+value.ir()+", ptr "+text(t.source().toString())+")");
+            return instruction(t.targetType(),"call i64 @"+(t.targetType()==Type.BYTE?"bh_to_byte":"bh_to_int32")+"(i64 "+value.ir()+", ptr "+text(t.source().toString())+")");
         }
         boolean dynamic=value.type()==Type.OBJECT || value.type()==Type.ANY;
         Value matches=dynamic?instruction(Type.BOOL,"call i1 @bhash_is_type(ptr "+value.ir()+", i64 "+t.targetId()+")")
