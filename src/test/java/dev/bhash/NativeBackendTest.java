@@ -440,8 +440,7 @@ class NativeBackendTest {
     @Test void unsupportedUnusedDeclarationsAndLibraryCallsHaveSourceLocations(){
         for(String source:List.of(
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
-            "कार्य अप्रयुक्त() -> लघुपूर्णांक { लौटाओ परिवर्तित<लघुपूर्णांक>(१); } कार्य मुख्य() -> शून्य {}",
-            "कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<लघुपूर्णांक>(१)); }")){
+            "वर्ग अ { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(source));
             assertTrue(error.getMessage().contains("native.bhash:1:"),error.getMessage());
             assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
@@ -486,8 +485,7 @@ class NativeBackendTest {
             "वर्ग अ { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}",
             "परिगणना अ { क } कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
-            "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}",
-            "वर्ग अ { मान न: लघुपूर्णांक; } कार्य मुख्य() -> शून्य {}")){
+            "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(s));
             assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
         }
@@ -817,7 +815,7 @@ class NativeBackendTest {
             "अनुबंध अ { कार्य न() -> पूर्णांक; } अनुबंध ब { कार्य न() -> पाठ; } अनुबंध ग विस्तार अ, ब {}"))
             assertThrows(CompilationException.class,()->core(source+" कार्य मुख्य() -> शून्य {}"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { लिखो(सुरक्षितरूप<पूर्णांक>(१)); }"));
-        var unsupported=assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर क: लघुपूर्णांक = परिवर्तित<लघुपूर्णांक>(१); }"));
+        var unsupported=assertThrows(CompilationException.class,()->core("वर्ग क { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}"));
         assertTrue(unsupported.getMessage().contains("BH9001"));
     }
     @Test void nativeInterfaceDiamondsRedeclarationsAndMultipleContractsMatchJvm()throws Exception{
@@ -1134,7 +1132,7 @@ class NativeBackendTest {
         assertEquals(1,p.collections().stream().filter(t->t.kind()==CollectionKind.ARRAY).count());
         assertEquals(1,p.collections().stream().filter(t->t.kind()==CollectionKind.LIST && t.valueKind()==3).count());
         assertTrue(LlvmEmitter.emit(p).contains("%CollectionInfo"));
-        assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[१]; }"));
+        assertDoesNotThrow(()->core("कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[१]; }"));
         assertThrows(CompilationException.class,()->core("वर्ग क<त> {} कार्य मुख्य() -> शून्य {}"));
     }
     @Test void nativeArraysDefaultsAliasesInitializersAndJaggedDimensionsMatchJvm()throws Exception{
@@ -1890,6 +1888,32 @@ class NativeBackendTest {
             var result=consoleRun(List.of(exe.toString()),ConsoleFixtures.utf8(input),true);assertEquals(0,result.exit(),result.err());assertEquals(0L,stats(result).get("live"));
             for(var command:List.of(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
                 var reference=consoleRun(command,ConsoleFixtures.utf8(input),false);assertEquals(reference.exit(),result.exit());assertEquals(reference.out(),result.out());
+            }
+        }
+    }
+    @Test void corePreservesInt32TypeIdentityBoxMetadataAndScalarCollectionKinds()throws Exception{
+        var program=core("वर्ग पात्र { सार्वजनिक मान क: लघुपूर्णांक; } कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[२]; स्थिर ब: सर्ववस्तु = परिवर्तित<लघुपूर्णांक>(१); लिखो(प्रकारहै<लघुपूर्णांक>(ब),परिवर्तित<लघुपूर्णांक>(ब)); }");
+        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v11"));
+        assertTrue(program.collections().stream().anyMatch(c->c.valueKind()==8));
+    }
+    @Test void nativeInt32FixturesMatchJvmClrAndForcedGc()throws Exception{
+        requireNumericTargets();
+        for(var fixture:NativeInt32Fixtures.cases()){
+            var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
+            if(fixture.name().equals("gc-stress")){assertTrue(stats(result).get("allocations")>6000,result.err());assertTrue(stats(result).get("peak")<350000,result.err());}
+        }
+    }
+    @Test void nativeInt32KeepsManagedNarrowingAndSelectionDiagnostics(){
+        for(String source:List.of(
+            "कार्य मुख्य() -> शून्य { स्थिर क: लघुपूर्णांक = १; }",
+            "कार्य मुख्य() -> शून्य { स्थिर क: लघुपूर्णांक = परिवर्तित<लघुपूर्णांक>(१); क=क+१; }",
+            "कार्य मुख्य() -> शून्य { परिवर्तित<लघुपूर्णांक>(सत्य); }",
+            "कार्य मुख्य() -> शून्य { सुरक्षितरूप<लघुपूर्णांक>(रिक्त); }",
+            "कार्य मुख्य() -> शून्य { चयन (परिवर्तित<लघुपूर्णांक>(१)) { विकल्प २१४७४८३६४८: } }",
+            "कार्य मुख्य() -> शून्य { स्थिर अ: सूची<लघुपूर्णांक> = नया सूची<लघुपूर्णांक>{१}; }")){
+            var error=assertThrows(CompilationException.class,()->core(source));
+            for(var target:List.of(Target.JVM,Target.CLR)){
+                var reference=assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("native.bhash",source)),target));assertEquals(reference.getMessage(),error.getMessage());
             }
         }
     }
