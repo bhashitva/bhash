@@ -31,6 +31,17 @@ class ManagedToolchainTest {
         }
         assertFalse(Files.exists(temporary.resolve("escape")));
     }
+    @Test void caseDistinctHeadersFollowHostFilesystemRules()throws Exception{
+        var files=payload();var manifest=NativeBuildInfo.JSON.fromJson(new String(files.get("toolchain.json"),java.nio.charset.StandardCharsets.UTF_8),com.google.gson.JsonObject.class);
+        for(String name:List.of("include/Case.h","include/case.h")){
+            byte[] bytes=name.getBytes(java.nio.charset.StandardCharsets.UTF_8);files.put(name,bytes);
+            manifest.getAsJsonObject("files").add(name,NativeBuildInfo.JSON.toJsonTree(Map.of("sha256",NativeBuildInfo.hash(bytes),"executable",false)));
+        }
+        files.put("toolchain.json",NativeBuildInfo.JSON.toJson(manifest).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        Path archive=zip(files),root=temporary.resolve("case-headers");
+        if(NativePlatform.windows())assertThrows(IOException.class,()->ManagedToolchain.extractAndVerify(archive,root));
+        else {ManagedToolchain.extractAndVerify(archive,root);assertFalse(Arrays.equals(Files.readAllBytes(root.resolve("include/Case.h")),Files.readAllBytes(root.resolve("include/case.h"))));}
+    }
     @Test void rejectsMissingFilesExtraFilesAndWrongTargets()throws Exception{
         var missing=payload();missing.remove(NativePlatform.requiredFiles().get(1));assertThrows(IOException.class,()->ManagedToolchain.extractAndVerify(zip(missing),temporary.resolve("missing")));
         var extra=payload();extra.put("unlisted",new byte[0]);assertThrows(IOException.class,()->ManagedToolchain.extractAndVerify(zip(extra),temporary.resolve("extra")));
