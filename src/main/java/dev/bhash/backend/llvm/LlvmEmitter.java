@@ -386,6 +386,7 @@ public final class LlvmEmitter {
         else if(s instanceof Selection c){register(c.selector());scan(c.value());for(var item:c.cases()){item.labels().forEach(this::scan);scan(item.body());}scan(c.fallback());}
         else if(s instanceof Return r)scan(r.value());
         else if(s instanceof Throw t)scan(t.value());
+        else if(s instanceof Fail f){scan(f.message());scan(f.location());}
         else if(s instanceof Try t){register(t.exception());scan(t.body());for(var handler:t.handlers()){register(handler.binding());scan(handler.body());}scan(t.cleanup());}
         else if(s instanceof Print p)p.arguments().forEach(this::scan);
         else if(s instanceof Evaluate e)scan(e.value());
@@ -451,6 +452,7 @@ public final class LlvmEmitter {
         else if(s instanceof Selection c){bindingRoot(c.selector(),slots);expressionRoots(c.value(),slots);for(var item:c.cases()){item.labels().forEach(x->expressionRoots(x,slots));statementRoots(item.body(),slots);}statementRoots(c.fallback(),slots);}
         else if(s instanceof Return r)expressionRoots(r.value(),slots);
         else if(s instanceof Throw t)expressionRoots(t.value(),slots);
+        else if(s instanceof Fail f){expressionRoots(f.message(),slots);expressionRoots(f.location(),slots);}
         else if(s instanceof Print p)p.arguments().forEach(a->expressionRoots(a,slots));
         else if(s instanceof Evaluate e)expressionRoots(e.value(),slots);
         else if(s instanceof Foreach f){expressionRoots(f.collection(),slots);bindingRoot(f.owner(),slots);for(var item:f.items()){bindingRoot(item.binding(),slots);statementRoots(item,slots);}statementRoots(f.body(),slots);}
@@ -772,6 +774,9 @@ public final class LlvmEmitter {
         else if(s instanceof Foreach f)foreach(f);
         else if(s instanceof Selection c)selection(c);
         else if(s instanceof Try t)tryStatement(t);
+        else if(s instanceof Fail f){
+            expression(f.message());expression(f.location());line("call void @bh_text_fail(ptr "+reload(f.message()).ir()+", ptr "+reload(f.location()).ir()+")");line("unreachable");terminated=true;
+        }
         else if(s instanceof Throw t){
             Value value=expression(t.value());line("call void @bh_throw(ptr "+value.ir()+", ptr "+text(t.source().toString())+")");
             line("unreachable");terminated=true;
