@@ -22,7 +22,9 @@ jobs:
       - name: Install LLVM 18 tools
         run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18 gdb build-essential binutils
       - name: Check collector under sanitizers and optimization
-        run: python3 scripts/test_native_runtime.py --sanitize
+        run: |
+          python3 scripts/test_native_runtime.py --sanitize
+          python3 scripts/test_native_fixed.py
       - name: Build compiler for native checks
         run: mvn --batch-mode --no-transfer-progress -DskipTests package
       - name: Verify compiler archive reproducibility
