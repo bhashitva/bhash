@@ -189,7 +189,33 @@ public final class PlaygroundServer implements AutoCloseable {
         try {
             if(!process.waitFor(settings.timeoutSeconds,TimeUnit.SECONDS)) throw new IOException("Compilation timed out; try a smaller program");
             if(process.exitValue()!=0) {try(var input=Files.newInputStream(log)){throw new IOException(new String(input.readNBytes(MAX_ERROR),StandardCharsets.UTF_8));}}
-        } finally {process.descendants().forEach(child->child.destroyForcibly());if(process.isAlive())process.destroyForcibly();}
+        } finally {stopCompiler(process);}
+    }
+    private static void stopCompiler(Process process) throws IOException {
+        // Snapshot before killing the parent: orphaned descendants cannot be discovered afterwards.
+        var descendants=process.descendants().toList();
+        var exits=new ArrayList<CompletableFuture<ProcessHandle>>();
+        for(var child:descendants)exits.add(child.onExit());
+        exits.add(process.toHandle().onExit());
+        for(var child:descendants)if(child.isAlive())child.destroyForcibly();
+        if(process.isAlive())process.destroyForcibly();
+        var stopped=CompletableFuture.allOf(exits.toArray(CompletableFuture<?>[]::new));
+        boolean interrupted=Thread.interrupted();long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+        try {
+            for(;;) {
+                long remaining=deadline-System.nanoTime();
+                if(remaining<=0)throw new IOException("Compiler process cleanup timed out");
+                try {stopped.get(remaining,TimeUnit.NANOSECONDS);break;}
+                catch(InterruptedException ignored){interrupted=true;}
+                catch(ExecutionException error){throw new IOException("Could not wait for compiler process cleanup",error.getCause());}
+                catch(TimeoutException error){throw new IOException("Compiler process cleanup timed out",error);}
+            }
+        } finally {
+            try(var output=process.getOutputStream();var input=process.getInputStream();var error=process.getErrorStream()){
+                // Close every parent-side pipe, even if another close reports an error.
+            }
+            finally {if(interrupted)Thread.currentThread().interrupt();}
+        }
     }
     private String jobJson(Job job) {return "{\"id\":"+quote(job.id)+",\"status\":"+quote(job.status)+",\"error\":"+quote(job.error)+",\"url\":"+quote(runOrigin+"/artifacts/"+job.id+"/runner.html")+"}";}
     private void expire() {try{synchronized(jobs){expireLocked();}}catch(Exception error){System.err.println("Playground cache cleanup failed");}}
