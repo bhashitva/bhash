@@ -149,6 +149,16 @@ def main():
         assert result.stdout.replace(b'\r\n', b'\n') == b'Native math/random checks passed.\n'
         print(f'{name}: math domains, signed zeros, rounding, golden mixed random sequences, range rejection and unwinding passed')
 
+        int32_exe = BUILD / ('int32-' + name + ('.exe' if os.name == 'nt' else ''))
+        int32_command = [part.replace('runtime_test.c', 'int32_runtime_test.c').replace(str(exe), str(int32_exe)) for part in command]
+        result = run(int32_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(int32_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native int32 checks passed.\n'
+        print(f'{name}: signed int32 boundaries, boxed key identity, JSON, scalar storage and forced-GC failure cleanup passed')
+
         decimal_exe = BUILD / ('decimals-' + name + ('.exe' if os.name == 'nt' else ''))
         decimal_command = [part.replace('runtime_test.c', 'decimal_runtime_test.c').replace(str(exe), str(decimal_exe)) for part in command]
         result = run(decimal_command)
