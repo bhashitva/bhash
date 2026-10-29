@@ -4,7 +4,7 @@ FROM ubuntu:22.04
 # the official LLVM Jammy build and authenticated by its dedicated signing key.
 RUN apt-get -o APT::Update::Error-Mode=any update && apt-get install -y --no-install-recommends ca-certificates curl gnupg && rm -rf /var/lib/apt/lists/*
 ARG UBUNTU_SNAPSHOT=20261001T000000Z
-ARG LLVM_DEB_VERSION=18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144
+ARG LLVM_DEB_VERSION=1:18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144
 RUN rm -f /etc/apt/sources.list \
  && printf 'Types: deb deb-src\nURIs: https://snapshot.ubuntu.com/ubuntu/%s/\nSuites: jammy jammy-updates jammy-security\nComponents: main universe\nCheck-Valid-Until: no\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' "$UBUNTU_SNAPSHOT" > /etc/apt/sources.list.d/ubuntu.sources \
  && printf 'Package: *\nPin: origin snapshot.ubuntu.com\nPin-Priority: 1001\n' > /etc/apt/preferences.d/bhash-snapshot \
