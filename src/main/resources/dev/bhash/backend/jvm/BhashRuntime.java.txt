@@ -4,10 +4,24 @@ import java.nio.charset.StandardCharsets;
 
 /** Compiled into each generated program; no compiler or ANTLR dependency at runtime. */
 final class BhashRuntime {
-    private static final BufferedReader INPUT = new BufferedReader(new InputStreamReader(
-            System.in, StandardCharsets.UTF_8.newDecoder()
-                    .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)));
+    private static final InputStream INPUT = new BufferedInputStream(System.in);
+    private static boolean inputSkipLf;
+    private static String inputLine() throws IOException {
+        OUTPUT.flush();
+        var bytes = new ByteArrayOutputStream();
+        for (;;) {
+            int c = INPUT.read();
+            if (inputSkipLf) { inputSkipLf=false; if(c=='\n') c=INPUT.read(); }
+            if(c<0) { if(bytes.size()==0)return null; break; }
+            if(c=='\n')break;
+            if(c=='\r') { inputSkipLf=true; break; }
+            bytes.write(c);
+        }
+        return StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+            .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+            .decode(java.nio.ByteBuffer.wrap(bytes.toByteArray())).toString();
+    }
     private static final PrintWriter OUTPUT = new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8), true);
     private static final PrintWriter ERRORS = new PrintWriter(new OutputStreamWriter(System.err, StandardCharsets.UTF_8), true);
 
@@ -22,7 +36,7 @@ final class BhashRuntime {
 
     static long readInteger() {
         final String input;
-        try { input = INPUT.readLine(); }
+        try { input = inputLine(); }
         catch (IOException error) { throw new Failure("कंसोल से UTF-8 इनपुट पढ़ा नहीं जा सका।"); }
         if (input == null) throw new Failure("इनपुट समाप्त: एक पूर्णांक अपेक्षित था।");
         String value = input.strip();
@@ -36,7 +50,7 @@ final class BhashRuntime {
 
     static String readText() {
         try {
-            String value = INPUT.readLine();
+            String value = inputLine();
             if (value == null) throw new Failure("इनपुट समाप्त: पाठ अपेक्षित था।");
             return value;
         } catch (IOException e) { throw new Failure("UTF-8 पाठ पढ़ा नहीं जा सका।"); }
