@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 — 2026-10-29
+
+- Add Native build/run choices and configured native tasks on Linux x86-64 and WSL.
+- Automatically install a pinned, checksum-verified LLVM 18 SDK from permanent GitHub Release assets; reuse the CLI cache offline.
+- Add setup, check, and repair commands, optional system toolchain mode, and Linux/WSL setup guidance.
+- Keep task discovery and untrusted workspaces free of downloads; preserve terminal console input.
+
 ## 0.4.1 — 2026-10-27
 
 - Resolve documentation links relative to the extension subdirectory so Marketplace links to the package guide and Hindi tutorials open correctly.

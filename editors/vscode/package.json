@@ -1,8 +1,8 @@
 {
   "name": "bhash",
-  "displayName": "Bhash (भाष)",
+  "displayName": "Bhash (à¤­à¤¾à¤·)",
   "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "bhashitva",
   "license": "Apache-2.0",
   "repository": {
@@ -43,7 +43,11 @@
       "description": "Highlighting and snippets work in Restricted Mode. Trust is required for the Java language server and build/run commands.",
       "restrictedConfigurations": [
         "bhash.javaPath",
-        "bhash.compilerPath"
+        "bhash.compilerPath",
+        "bhash.native.toolchainMode",
+        "bhash.native.toolchainHome",
+        "bhash.native.toolchainMode",
+        "bhash.native.toolchainHome"
       ]
     },
     "virtualWorkspaces": {
@@ -57,7 +61,7 @@
         "id": "bhash",
         "aliases": [
           "Bhash",
-          "भाष"
+          "à¤­à¤¾à¤·"
         ],
         "extensions": [
           ".bhash"
@@ -124,6 +128,30 @@
       {
         "command": "bhash.verifyDependencies",
         "title": "Bhash: Verify Dependencies"
+      },
+      {
+        "command": "bhash.setupNativeTools",
+        "title": "Bhash: Set Up Native Tools"
+      },
+      {
+        "command": "bhash.checkNativeSetup",
+        "title": "Bhash: Check Native Setup"
+      },
+      {
+        "command": "bhash.repairNativeTools",
+        "title": "Bhash: Repair Native Tools"
+      },
+      {
+        "command": "bhash.setupNativeTools",
+        "title": "Bhash: Set Up Native Tools"
+      },
+      {
+        "command": "bhash.checkNativeSetup",
+        "title": "Bhash: Check Native Setup"
+      },
+      {
+        "command": "bhash.repairNativeTools",
+        "title": "Bhash: Repair Native Tools"
       }
     ],
     "configuration": {
@@ -146,7 +174,9 @@
           "enum": [
             "jvm",
             "clr",
-            "wasm-browser"
+            "wasm-browser",
+            "native",
+            "native"
           ],
           "default": "jvm",
           "description": "Default target for build tasks. CLR and browser builds require .NET 10; browser builds also require wasm-tools."
@@ -160,6 +190,22 @@
           ],
           "default": "off",
           "description": "Language server protocol trace in the Bhash output channel. Verbose tracing can include source text."
+        },
+        "bhash.native.toolchainMode": {
+          "type": "string",
+          "enum": [
+            "managed",
+            "system"
+          ],
+          "default": "managed",
+          "scope": "machine",
+          "description": "Managed downloads a pinned Linux x86-64 SDK on first Native build/run (glibc 2.39+, Java 17+). System uses an existing LLVM 18 toolchain."
+        },
+        "bhash.native.toolchainHome": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Optional absolute SDK cache directory on the Linux/WSL extension host. Empty uses BHASH_TOOLCHAIN_HOME or the compiler default cache. Allow approximately 1 GB of free disk space for setup."
         }
       }
     },
@@ -186,7 +232,9 @@
             "enum": [
               "jvm",
               "clr",
-              "wasm-browser"
+              "wasm-browser",
+              "native",
+              "native"
             ]
           }
         }
@@ -223,7 +271,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.cjs",
     "test:integration": "node test/run.cjs",
-    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.4.1.vsix"
+    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.5.0.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

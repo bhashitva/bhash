@@ -7,7 +7,7 @@ programs while you edit.
 
 ## Install
 
-1. Download `bhash-vscode-0.4.1.vsix` from the **Bhash VS Code extension** GitHub
+1. Download `bhash-vscode-0.5.0.vsix` from the **Bhash VS Code extension** GitHub
    Actions artifact for a successful main-branch build.
 2. In VS Code choose **Extensions → … → Install from VSIX…** and select the file.
 3. Install **Java 17 or later** on the computer running the extension host.
@@ -47,13 +47,67 @@ A locally packaged or Actions-built version can be installed before its Marketpl
   the semantic pass to avoid misleading follow-on errors.
 - Independent manifests and multi-root workspaces remain separate compilation
   units. Discovery ignores `.bhash`, `.git`, `node_modules`, `target`, `build`, and `dist`.
-- Build JVM, CLR, or browser WebAssembly; run JVM/CLR in an integrated terminal
+- Build JVM, CLR, Native, or browser WebAssembly; run JVM/CLR/Native in an integrated terminal
   with console input. File paths are passed as process arguments, never a shell
   command. Builds use saved files and prompt for the target.
 - **Bhash: New Project**, **Bhash: Restart Language Server**, and
   **Bhash: Open Browser Playground** commands.
 
 `स्थिर` means a constant binding. Static class members use **`साझा`**.
+
+## Native on Linux and WSL
+
+Native builds use the compiler bundled in version 0.5.0. Choose `native` from
+**Bhash: Build Project or File** or **Bhash: Run Project or File**. The first task
+downloads the [versioned SDK](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.0.0)
+(115 MiB), checks its bundled SHA-256, verifies the installation, and activates it
+in your user cache. Later builds reuse it, including offline. No separate LLVM,
+linker, C development packages, Maven, Node installation, or administrator access
+is required. Java 17+ is still required to run the compiler.
+
+Supported host: **Linux x86-64, glibc 2.39+**, such as Ubuntu 24.04+.
+On Windows, install the Microsoft WSL extension, open the project with **WSL:
+Reopen Folder in WSL**, and install Bhash and Java **inside WSL**. The lower-left
+VS Code indicator should identify the Linux distribution. WSL 2 is recommended.
+Opening an ordinary Windows folder does not automatically switch compilation to
+WSL. Windows, macOS, ARM, and musl/Alpine native hosts are not supported yet.
+
+- **Bhash: Set Up Native Tools** installs tools before the first build.
+- **Bhash: Check Native Setup** diagnoses the current installation without downloading.
+- **Bhash: Repair Native Tools** downloads and verifies a fresh copy; failed setup
+  preserves the previously active SDK. Cancel through the task terminal.
+- `bhash.native.toolchainHome` optionally chooses an absolute Linux cache path.
+  Empty shares the CLI cache (`BHASH_TOOLCHAIN_HOME`, otherwise
+  `$XDG_CACHE_HOME/bhash/toolchains` or `~/.cache/bhash/toolchains`). Allow about
+  1 GB of free disk space during installation; repairs retain previous generations.
+- `bhash.native.toolchainMode = system` opts into an existing LLVM 18 toolchain.
+  In managed mode, ambient `BHASH_CLANG`, `BHASH_LLVM_OPT`, and `BHASH_READELF`
+  overrides are ignored for these tasks so they cannot mix incompatible tools.
+
+Native tasks support console input (`पाठपढ़ो()` and `पढ़ो()`) in the integrated
+terminal. No SDK download occurs while editing, discovering tasks, or in
+Restricted Mode. Dependencies still follow the ordinary lock/restore rules.
+Example `.vscode/tasks.json` entry:
+
+```json
+{"type":"bhash","label":"Native build","command":"build","project":"bhash.project","target":"native"}
+```
+
+The SDK and corresponding third-party sources are GitHub **Release assets**,
+not files committed to Git. Copyright and redistribution notices are retained;
+see [managed toolchain details](../../docs/managed-native-toolchain.md).
+Generated Linux executables do not require Java or LLVM; their supported runtime
+still depends on the recorded Linux/glibc compatibility requirements. Debugger
+integration and native compilation of every language feature are separate work.
+
+### हिन्दी में शुरुआत
+
+Linux या WSL में Ubuntu 24.04 या नया संस्करण और Java 17+ स्थापित करें।
+VS Code में WSL वाला फ़ोल्डर खोलें और उसी WSL में Bhash extension स्थापित करें।
+**Bhash: Run Project or File** में `native` चुनें। पहली बार आवश्यक उपकरण अपने
+आप डाउनलोड और सत्यापित होंगे; उसके बाद इंटरनेट के बिना भी निर्माण कर सकते हैं।
+उपकरणों की जाँच के लिए **Bhash: Check Native Setup**, और खराब स्थापना को फिर से
+स्थापित करने के लिए **Bhash: Repair Native Tools** चलाएँ।
 
 ## Standard library
 
