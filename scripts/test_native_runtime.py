@@ -169,6 +169,16 @@ def main():
         assert result.stdout.replace(b'\r\n', b'\n') == b'Native static checks passed.\n'
         print(f'{name}: persistent root replacement, clearing, unwinding, cached failures, recursive initialization and shutdown passed')
 
+        record_exe = BUILD / ('records-' + name + ('.exe' if os.name == 'nt' else ''))
+        record_command = [part.replace('runtime_test.c', 'records_runtime_test.c').replace(str(exe), str(record_exe)) for part in command]
+        result = run(record_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(record_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native record checks passed.\n'
+        print(f'{name}: nominal records, structural map keys, scalar precision, nulls, NaN/zero, 5000-level chains and shared DAGs passed')
+
         decimal_exe = BUILD / ('decimals-' + name + ('.exe' if os.name == 'nt' else ''))
         decimal_command = [part.replace('runtime_test.c', 'decimal_runtime_test.c').replace(str(exe), str(decimal_exe)) for part in command]
         result = run(decimal_command)

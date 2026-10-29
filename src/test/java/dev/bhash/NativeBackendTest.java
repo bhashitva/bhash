@@ -484,7 +484,7 @@ class NativeBackendTest {
         for(String s:List.of(
             "वर्ग अ<त> { मान न: त; } कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
-            "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}")){
+            "अभिलेख अ<त>(न: त); कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(s));
             assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
         }
@@ -1892,7 +1892,7 @@ class NativeBackendTest {
     }
     @Test void corePreservesInt32TypeIdentityBoxMetadataAndScalarCollectionKinds()throws Exception{
         var program=core("वर्ग पात्र { सार्वजनिक मान क: लघुपूर्णांक; } कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[२]; स्थिर ब: सर्ववस्तु = परिवर्तित<लघुपूर्णांक>(१); लिखो(प्रकारहै<लघुपूर्णांक>(ब),परिवर्तित<लघुपूर्णांक>(ब)); }");
-        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v12"));
+        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v13"));
         assertTrue(program.collections().stream().anyMatch(c->c.valueKind()==8));
     }
     @Test void nativeInt32FixturesMatchJvmClrAndForcedGc()throws Exception{
@@ -2211,6 +2211,52 @@ class NativeBackendTest {
     @Test void nativeEnumLookupFailurePreservesUseSiteAndRunsFinally()throws Exception{
         requireNumericTargets();var result=numericExact("परिगणना रंग { लाल }\nकार्य मुख्य() -> शून्य { प्रयास { परिवर्तित<रंग>(१); } अंततः { लिखो(मानक.पाठ्य.दोहराओ(\"साफ😀\",१)); } }");
         assertEquals(1,result.exit());assertEquals("साफ😀\n",result.out());assertTrue(result.err().contains("native.bhash:2:"),result.err());assertTrue(result.err().contains("अमान्य गणना अंक।"),result.err());
+    }
+
+    @Test void nativeRecordFixturesMatchJvmClrAndForcedGc()throws Exception{
+        requireNumericTargets();for(var fixture:NativeRecordFixtures.cases()){
+            var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
+            if(fixture.name().equals("gc-stress")){assertTrue(stats(result).get("allocations")>10000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());}
+        }
+    }
+    @Test void coreRecordsHavePreciseLayoutsNominalMarkersAndNoVirtualSlots()throws Exception{
+        var p=core("अभिलेख पात्र(नाम: पाठ, न: पूर्णांक, व: सर्ववस्तु); कार्य मुख्य() -> शून्य { स्थिर क: पात्र=नया पात्र(\"क\",१,रिक्त); लिखो(क==नया पात्र(\"क\",१,रिक्त)); }");
+        var c=p.classes().get(0);assertEquals(List.of(CoreProgram.Type.TEXT,CoreProgram.Type.INT,CoreProgram.Type.ANY),c.fields().stream().map(CoreProgram.ObjectField::type).toList());
+        assertTrue(c.assignableTypes().contains(-9));assertTrue(c.virtualMethods().isEmpty());assertTrue(p.initializations().isEmpty());
+        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v13"));
+    }
+    @Test void nativeRecordDiagnosticsMatchManagedAndKeepUserGenericsOutsideProfile(){
+        for(String declaration:List.of(
+            "अभिलेख क(अ: पूर्णांक, अ: पूर्णांक);", "अभिलेख क(); वर्ग ख विस्तार क {}",
+            "अभिलेख क(अ: पूर्णांक); कार्य गलत() -> शून्य { नया क(); }",
+            "अभिलेख क(अ: पूर्णांक); कार्य गलत() -> शून्य { नया क(\"अ\"); }",
+            "अभिलेख क(अ: पूर्णांक); कार्य गलत() -> शून्य { स्थिर व: क=नया क(१); व.अ=२; }")){
+            String source=declaration+" कार्य मुख्य() -> शून्य {}";var error=assertThrows(CompilationException.class,()->core(source));
+            for(var target:List.of(Target.JVM,Target.CLR))assertEquals(assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("native.bhash",source)),target)).getMessage(),error.getMessage());
+        }
+        assertTrue(assertThrows(CompilationException.class,()->core("अभिलेख पात्र<त>(व: त); कार्य मुख्य() -> शून्य {}" )).getMessage().contains("BH9001"));
+    }
+
+    @Test void nativeRecordsResolveAliasesAndPreserveFailureLocations()throws Exception{
+        requireNumericTargets();var sources=List.of(new SourceFile("point.bhash","संकुल आकृति; सार्वजनिक अभिलेख बिंदु(नाम: पाठ, न: पूर्णांक);"),
+            new SourceFile("app.bhash","आयात आकृति.बिंदु उपनाम ब; कार्य मुख्य() -> शून्य { स्थिर क: ब=नया ब(\"क\",१); स्थिर म: मानचित्र<ब,पूर्णांक> = नया मानचित्र<ब,पूर्णांक>{क:७}; लिखो(म[नया ब(\"क\",१)]); }"));
+        var result=nativeOnlyRun(sources,GC_STRESS);assertEquals(0,result.exit(),result.err());assertEquals("७\n",result.out());assertEquals(0L,stats(result).get("live"));
+        for(boolean clr:new boolean[]{false,true}){var managed=numericManagedRun(sources,clr);assertEquals(result.exit(),managed.exit(),managed.err());assertEquals(result.out(),managed.out());}
+        result=numericExact("अभिलेख बिंदु(न: पूर्णांक);\nकार्य मुख्य() -> शून्य { स्थिर क: बिंदु=रिक्त; प्रयास { लिखो(क.न); } अंततः { लिखो(मानक.पाठ्य.दोहराओ(\"साफ😀\",१)); } }");
+        assertEquals(1,result.exit());assertEquals("साफ😀\n",result.out());assertTrue(result.err().contains("native.bhash:2:"),result.err());
+    }
+    @Test void nativeRecordsCompareAndHashDeepSharedGraphsWithoutHostRecursion()throws Exception{
+        requireTools();var result=nativeOnlyRun(List.of(new SourceFile("native.bhash","""
+            अभिलेख नोड(अ: नोड, ब: नोड, न: पूर्णांक);
+            कार्य मुख्य() -> शून्य {
+                मान क: नोड=रिक्त; मान ख: नोड=रिक्त; मान न: पूर्णांक=०;
+                जबतक (न<१०००) { क=नया नोड(क,रिक्त,न); ख=नया नोड(ख,रिक्त,न); न=न+१; }
+                स्थिर म: मानचित्र<नोड,पूर्णांक> = नया मानचित्र<नोड,पूर्णांक>{क:७}; लिखो(क==ख,म[ख]);
+                क=रिक्त; ख=रिक्त; न=०;
+                जबतक (न<८०) { क=नया नोड(क,क,न); ख=नया नोड(ख,ख,न); न=न+१; }
+                म[क]=८; लिखो(क==ख,म[ख]);
+            }
+            """)),GC_STRESS);assertEquals(0,result.exit(),result.err());assertEquals("सत्य ७\nसत्य ८\n",result.out());assertEquals(0L,stats(result).get("live"));
     }
 
 }

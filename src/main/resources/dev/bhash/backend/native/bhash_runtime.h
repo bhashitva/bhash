@@ -52,6 +52,14 @@ typedef struct bh_class_info {
     uint64_t type_count;
     const int64_t *type_ids;
 } bh_class_info;
+/* A -9 nominal marker identifies this extension; ordinary metadata keeps its prefix. */
+typedef struct bh_record_info {
+    bh_class_info nominal;
+    uint64_t field_count;
+    const uint64_t *field_kinds;
+} bh_record_info;
+/* Value comparison does not allocate managed objects or trigger GC. */
+int bh_value_same(uint64_t kind, uint64_t a, uint64_t b);
 typedef struct bh_collection_info {
     bh_class_info nominal;
     uint64_t kind, key_kind, value_kind;

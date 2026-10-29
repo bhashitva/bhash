@@ -82,4 +82,4 @@ range, implicit numbering, conversions/failures, nulls, nominal casts, collectio
 selection, side effects और finally unwinding cover करते हैं। 256-member initializer तथा
 cyclic containers/failed conversions वाला stress example हर allocation पर forced GC से
 चलता है। Linux CI LLVM 18 verification, ASan/UBSan, all-example builds और clean-container
-execution भी करती है। Records और user-defined generics अगले milestones हैं।
+execution भी करती है। Native records अब [record guide](native-records.md) में वर्णित हैं; user-defined generics अभी अगले milestone हैं।

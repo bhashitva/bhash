@@ -137,7 +137,6 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         }
     }
     private static void validate(ParserRuleContext c) throws CompilationException {
-        if(c instanceof ClassDeclContext d && d.RECORD()!=null)throw unsupported(c);
         if (c instanceof TypeParametersContext) throw unsupported(c);
         if(c instanceof TypeArgumentsContext && !(c.getParent() instanceof ValueTypeContext t &&
                 t.IDENTIFIER()!=null && CollectionTypes.builtin(t.IDENTIFIER().getText())))throw unsupported(c);
@@ -255,7 +254,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             var constructed=new ArrayList<>(classes);if(exceptionConstructors)constructed.add(exceptionClass);
             for(var c:constructed)for(var ctor:c.constructors)constructors.put(ctor,ids.size()+constructors.size());
             for(var c:constructed)for(var ctor:c.constructors)initializers.put(ctor,ids.size()+constructors.size()+initializers.size());
-            for(var c:classes)classInitializers.put(c,ids.size()+constructors.size()+initializers.size()+classInitializers.size());
+            for(var c:classes)if(!c.record())classInitializers.put(c,ids.size()+constructors.size()+initializers.size()+classInitializers.size());
             for(var c:classes)if(c.enumeration!=null)enumLookups.put(c,ids.size()+constructors.size()+initializers.size()+classInitializers.size()+enumLookups.size());
         }
         Type type(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
@@ -296,7 +295,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     var implementation=membership.contains(required.owner)?tables.get(c).stream().filter(f->f.java.equals(required.java) && f.result==required.result && f.access==ManagedEmitter.Access.PUBLIC).findFirst().orElse(null):null;
                     itable.add(implementation==null?-1:ids.get(implementation));
                 }
-                objectTypes.add(new ObjectType(classIds.get(c),c.spelling,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList(),List.copyOf(itable),java.util.stream.Stream.concat(membership.stream().map(classIds::get),java.util.stream.Stream.of(-4)).toList()));
+                objectTypes.add(new ObjectType(classIds.get(c),c.spelling,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList(),List.copyOf(itable),java.util.stream.Stream.concat(membership.stream().map(classIds::get),c.record()?java.util.stream.Stream.of(-4,-9):java.util.stream.Stream.of(-4)).toList()));
                 for(var methods:c.methods.values())for(var f:methods){
                     self=f.shared?null:new Binding(nextBinding++,Type.OBJECT);
                     var parameters=new ArrayList<Binding>();if(self!=null)parameters.add(self);
@@ -308,6 +307,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     var at=ctor.declaration()==null?c.declaration:ctor.declaration();
                     var parameters=new ArrayList<Binding>();
                     if(ctor.declaration()!=null && ctor.declaration().parameters()!=null)for(var p:ctor.declaration().parameters().parameter())parameters.add(binding(a.bindings.get(p),p));
+                    if(c.record())for(var parameter:ctor.parameters())parameters.add(new Binding(nextBinding++,type(parameter,at)));
                     // A factory allocates exactly once. Initializers never allocate another receiver.
                     self=new Binding(nextBinding++,Type.OBJECT);
                     var arguments=new ArrayList<Expression>();arguments.add(new Read(self,source(at)));
@@ -326,8 +326,13 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                         baseArguments.addAll(checkedArguments(ctor.declaration()==null?null:ctor.declaration().arguments(),parent.parameters()));
                         statements.add(new Evaluate(new Call(Type.VOID,initializers.get(parent),List.copyOf(baseArguments),source(at))));
                     }
+                    int recordField=0;
                     for(var f:c.fields.values()){
                         if(f.shared())continue;
+                        if(c.record()){
+                            statements.add(new FieldWrite(new FieldRead(new Read(self,source(at)),fields.get(f),source(at)),coerce(new Read(parameters.get(recordField++),source(at)),type(f.type(),at))));
+                            continue;
+                        }
                         Type t=type(f.type(),f.declaration());
                         Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(t,t==Type.TEXT?"":t==Type.BOOL?false:(t==Type.INT || t==Type.BYTE || t==Type.INT32)?(Object)0L:t==Type.REAL?(Object)0.0:null,source(f.declaration()));
                         statements.add(new FieldWrite(new FieldRead(new Read(self,source(at)),fields.get(f),source(f.declaration())),coerce(value,t)));
@@ -338,6 +343,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 }
             }
             for(var c:classes){
+                if(c.record())continue;
                 self=null;resultType=Type.VOID;var statements=new ArrayList<Statement>();
                 if(c.enumeration!=null){
                     var receiver=new Binding(nextBinding++,Type.OBJECT);var at=source(c.at());
@@ -383,7 +389,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             self=null;
             return new CoreProgram(List.copyOf(result),entry,List.copyOf(objectTypes),types.stream()
                 .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections),new ObjectType(-5,"अपवाद",List.of(messageField,locationField),List.of(),
-                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList());
+                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().filter(c->!c.record()).map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList());
         }
         void collectTypes(ManagedEmitter.ClassInfo c, Set<ManagedEmitter.ClassInfo> result) throws CompilationException {
             if(c==null || !result.add(c))return;
@@ -604,7 +610,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     }
                     var ctor=a.constructors.get(p);
                     if(ctor==null || !constructors.containsKey(ctor))throw unsupported(p);
-                    return new Call(Type.OBJECT,constructors.get(ctor),checkedArguments(p.arguments(),ctor.parameters()),source(c),false,-1,-1,classIds.get(actual.object));
+                    return new Call(Type.OBJECT,constructors.get(ctor),checkedArguments(p.arguments(),ctor.parameters()),source(c),false,-1,-1,actual.object.record()?-1:classIds.get(actual.object));
                 }
                 if(a.fields.containsKey(p)){var field=a.fields.get(p);return field.shared()?new StaticRead(statics.get(field),source(c)):new FieldRead(new Read(self,source(c)),fields.get(field),source(c));}
                 if(p.TRUE()!=null || p.FALSE()!=null)return new Constant(Type.BOOL,p.TRUE()!=null,source(c));
