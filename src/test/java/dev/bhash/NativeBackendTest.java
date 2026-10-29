@@ -1890,7 +1890,7 @@ class NativeBackendTest {
     }
     @Test void corePreservesInt32TypeIdentityBoxMetadataAndScalarCollectionKinds()throws Exception{
         var program=core("वर्ग पात्र { सार्वजनिक मान क: लघुपूर्णांक; } कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[२]; स्थिर ब: सर्ववस्तु = परिवर्तित<लघुपूर्णांक>(१); लिखो(प्रकारहै<लघुपूर्णांक>(ब),परिवर्तित<लघुपूर्णांक>(ब)); }");
-        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v14"));
+        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v15"));
         assertTrue(program.collections().stream().anyMatch(c->c.valueKind()==8));
     }
     @Test void nativeInt32FixturesMatchJvmClrAndForcedGc()throws Exception{
@@ -2327,7 +2327,7 @@ class NativeBackendTest {
         var p=core("अभिलेख पात्र(नाम: पाठ, न: पूर्णांक, व: सर्ववस्तु); कार्य मुख्य() -> शून्य { स्थिर क: पात्र=नया पात्र(\"क\",१,रिक्त); लिखो(क==नया पात्र(\"क\",१,रिक्त)); }");
         var c=p.classes().get(0);assertEquals(List.of(CoreProgram.Type.TEXT,CoreProgram.Type.INT,CoreProgram.Type.ANY),c.fields().stream().map(CoreProgram.ObjectField::type).toList());
         assertTrue(c.assignableTypes().contains(-9));assertTrue(c.virtualMethods().isEmpty());assertTrue(p.initializations().isEmpty());
-        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v14"));
+        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v15"));
     }
     @Test void nativeRecordDiagnosticsMatchManaged(){
         for(String declaration:List.of(
