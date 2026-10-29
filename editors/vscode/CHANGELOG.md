@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 — 2026-10-29
+
+- Restore the Hindi display name and language alias in Marketplace/package metadata.
+- Reject packaging when the Hindi name or alias is incorrectly encoded.
+
 ## 0.5.0 — 2026-10-29
 
 - Add Native build/run choices and configured native tasks on Linux x86-64 and WSL.
