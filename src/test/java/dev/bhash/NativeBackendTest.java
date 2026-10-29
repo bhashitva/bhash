@@ -2247,6 +2247,17 @@ class NativeBackendTest {
         assertEquals(1,result.exit());assertTrue(result.err().contains("  में पहला (rethrow.bhash:2:"),result.err());assertTrue(result.err().contains("  में पकड़ (rethrow.bhash:3:"),result.err());
         assertFalse(result.err().contains("  में बाद ("),result.err());assertEquals(0L,stats(result).get("live"));
     }
+    @Test void nativeStaticInitializationTraceKeepsTheWriteUseSite()throws Exception{
+        requireTools();String source="""
+            वर्ग असफल { सार्वजनिक साझा मान न: पूर्णांक=१/०; }
+            कार्य मुख्य() -> शून्य {
+                लिखो(०);
+                असफल.न=२;
+            }
+            """;
+        var result=nativeOnlyRun(List.of(new SourceFile("static-trace.bhash",source)),GC_STRESS);
+        assertEquals(1,result.exit());assertEquals("०\n",result.out());assertTrue(result.err().contains("  में असफल.<वर्ग आरंभ> (static-trace.bhash:1:"),result.err());assertTrue(result.err().contains("  में मुख्य (static-trace.bhash:4:"),result.err());assertEquals(0L,stats(result).get("live"));
+    }
     @Test void nativeFinallyReplacementGetsItsOwnTrace()throws Exception{
         requireTools();String source="""
             कार्य पुराना() -> शून्य { फेंको नया अपवाद("पुराना"); }
