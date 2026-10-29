@@ -445,7 +445,7 @@ void *bh_text_integer(int64_t value, const void *location) {
     memcpy(text_data(result), buffer + at, sizeof buffer - at); return result;
 }
 int64_t bh_text_parse_integer(const void *s, const void *location) {
-    uint64_t n = text_length(s), i = 0, value = 0; int negative = 0, script = 0;
+    uint64_t n = text_length(s), i = 0, value = 0; int negative = 0, script = 0, overflow = 0;
     if (n && (text_data(s)[0] == '+' || text_data(s)[0] == '-')) negative = text_data(s)[i++] == '-';
     if (i == n) runtime_error(location, "अमान्य पूर्णांक पाठ।");
     uint64_t limit = negative ? UINT64_C(9223372036854775808) : INT64_MAX;
@@ -456,9 +456,10 @@ int64_t bh_text_parse_integer(const void *s, const void *location) {
         else { runtime_error(location, "अमान्य पूर्णांक पाठ।"); return 0; }
         if (script && current != script) runtime_error(location, "अमान्य पूर्णांक पाठ।");
         script = current;
-        if (value > (limit - (uint64_t)digit) / 10) runtime_error(location, "पूर्णांक 64-बिट सीमा से बाहर है।");
-        value = value * 10 + (uint64_t)digit;
+        if (value > (limit - (uint64_t)digit) / 10) overflow = 1;
+        if (!overflow) value = value * 10 + (uint64_t)digit;
     }
+    if (overflow) runtime_error(location, "पूर्णांक 64-बिट सीमा से बाहर है।");
     if (negative && value == UINT64_C(9223372036854775808)) return INT64_MIN;
     return negative ? -(int64_t)value : (int64_t)value;
 }
@@ -711,7 +712,7 @@ static uint64_t mix_hash(uint64_t value) {
 static uint64_t boxed_kind(const void *value) {
     const bh_class_info *info; memcpy(&info, value, 8);
     int64_t id = info->type_count ? info->type_ids[0] : 0;
-    return id == -7 ? BH_BYTE : id == -6 ? BH_REAL : id >= -3 && id <= -1 ? (uint64_t)-id : BH_REFERENCE;
+    return id == -8 ? BH_INT32 : id == -7 ? BH_BYTE : id == -6 ? BH_REAL : id >= -3 && id <= -1 ? (uint64_t)-id : BH_REFERENCE;
 }
 static uint64_t box_payload(const void *value) { uint64_t bits; memcpy(&bits, (const unsigned char *)value + 8, 8); return bits; }
 static int collection_same(uint64_t kind, uint64_t a, uint64_t b) {
@@ -1185,8 +1186,8 @@ static void json_write_value(json_writer *w,uint64_t kind,uint64_t bits,unsigned
     }else if(kind==BH_TEXT)slots[1]=slots[0];
     if(kind==BH_TEXT)json_write_string(w,slots[1]);
     else if(kind==BH_BOOL)buffer_bytes(&w->buffer,bits?"true":"false",bits?4:5,bits?4:5);
-    else if(kind==BH_INT||kind==BH_BYTE||kind==BH_REAL){
-        if(kind==BH_INT||kind==BH_BYTE){int64_t value;memcpy(&value,&bits,8);slots[1]=bh_text_integer(value,w->location);}
+    else if(kind==BH_INT||kind==BH_BYTE||kind==BH_INT32||kind==BH_REAL){
+        if(kind==BH_INT||kind==BH_BYTE||kind==BH_INT32){int64_t value;memcpy(&value,&bits,8);slots[1]=bh_text_integer(value,w->location);}
         else{double value;memcpy(&value,&bits,8);slots[1]=bh_text_real(numeric_finite(value,w->location),w->location);}
         uint64_t n=text_length(slots[1]);buffer_text(&w->buffer,&slots[1],n,n);
     }else{
@@ -1311,6 +1312,10 @@ void *bh_file_read_text(const void *path,const void *location){return file_read(
 void bh_file_write_text(const void *path,const void *value,const void *location){file_write(path,value,0,location);}
 int64_t bh_to_byte(int64_t value,const void *location){
     if(value<0||value>255)runtime_error(location,"बाइट परिवर्तन सीमा से बाहर है।");
+    return value;
+}
+int64_t bh_to_int32(int64_t value,const void *location){
+    if(value<INT32_MIN||value>INT32_MAX)runtime_error(location,"लघुपूर्णांक परिवर्तन सीमा से बाहर है।");
     return value;
 }
 static uint64_t buffer_span(uint64_t offset,uint64_t size,const void *location){
