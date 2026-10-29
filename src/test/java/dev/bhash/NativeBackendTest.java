@@ -1784,7 +1784,10 @@ class NativeBackendTest {
         requireTools();long before=System.currentTimeMillis();
         var result=nativeOnlyRun(List.of(new SourceFile("clock.bhash","कार्य मुख्य() -> शून्य { लिखो(परिवर्तित<पाठ>(मानक.समय.अभी())); }")),GC_STRESS);
         long after=System.currentTimeMillis(),actual=Long.parseLong(result.out().strip());
-        assertEquals(0,result.exit());assertTrue(actual>=before&&actual<=after,result.out());assertEquals(0L,stats(result).get("live"));
+        // Older JVMs sample Windows' coarse wall clock; native uses the precise API.
+        // Allow two scheduler ticks when comparing these independent clock samples.
+        long resolution=NativePlatform.windows()?32:0;
+        assertEquals(0,result.exit());assertTrue(actual>=before-resolution&&actual<=after+resolution,result.out());assertEquals(0L,stats(result).get("live"));
     }
     @Test void nativeUtcStressAndPortableLibraryExampleMatchManaged()throws Exception{
         requireNumericTargets();var result=numericExact(Files.readString(Path.of("examples/native/time.bhash")));
