@@ -2,6 +2,9 @@ name: Windows x64 native SDK and compiler
 on: [push, pull_request]
 permissions:
   contents: read
+concurrency:
+  group: windows-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   windows-native:
     runs-on: windows-2022
@@ -50,12 +53,12 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $first=(Get-FileHash target/windows-sdk/*.zip).Hash
           $second=(Get-FileHash target/windows-sdk-again/*.zip).Hash
-          if ($first -ne $second -or $first -ne 'e1f6fde6e2243dc9152263ebcb03164d566e322ef3da989e0cd389ebc2a289c8') { throw 'SDK reproducibility/catalog checksum mismatch' }
+          if ($first -ne $second -or $first -ne 'b0d5934ea134e500ff598f737c40b3076400e85e5760a22bfcc28f7aaf321f3f') { throw 'SDK reproducibility/catalog checksum mismatch' }
           "BHASH_TOOLCHAIN_HOME=$env:RUNNER_TEMP\bhash-toolchains" >> $env:GITHUB_ENV
       - name: Install and validate managed Windows SDK
         shell: pwsh
         run: |
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native toolchain install --archive target/windows-sdk/bhash-windows-x86_64-llvm18-v1.zip --sha256 e1f6fde6e2243dc9152263ebcb03164d566e322ef3da989e0cd389ebc2a289c8 --json
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native toolchain install --archive target/windows-sdk/bhash-windows-x86_64-llvm18-v1.zip --sha256 b0d5934ea134e500ff598f737c40b3076400e85e5760a22bfcc28f7aaf321f3f --json
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native doctor --json
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
