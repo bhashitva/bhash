@@ -146,12 +146,13 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     /** Native typed core, using the same checker and overload decisions as managed targets. */
     public static CoreProgram core(List<SourceFile> sources) throws CompilationException {
         var resolution = ProjectResolver.resolve(sources);
-        CoreProgram.validateProfile(resolution.tree());
         try {
             var emitter = new ManagedEmitter("project", Target.JVM);
             emitter.analysis = new Analysis();
             emitter.analysis.exceptionClass=emitter.exceptionClass;
             var tree = GenericExpander.expand("project", resolution.tree());
+            // Validate concrete specializations, just as the managed targets check them.
+            CoreProgram.validateProfile(tree);
             emitter.program(tree, true);
             var functions = emitter.functions.values().stream().flatMap(List::stream).toList();
             return CoreProgram.build(tree, emitter.analysis, functions, emitter.classOrder);
