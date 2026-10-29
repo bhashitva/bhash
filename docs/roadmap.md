@@ -58,8 +58,9 @@ An experimental direct-LLVM implementation and approved automatic-memory-managem
 design are under development. See [native compilation](native-compilation-design.md)
 for the Linux x86-64 scope and required validation gates. Native now supports the current
 scalar, text, object, collection, exception, standard-library, enum and record milestones,
-including [user-defined generics](native-generics.md). Debug/source mapping, additional
-platforms and deployment/toolchain improvements remain follow-ups.
+including [user-defined generics](native-generics.md). Native exception traces and initial [DWARF/source debugging](native-diagnostics.md) are
+implemented. Rich object inspection, debugger/editor integration, additional platforms and
+deployment/toolchain improvements remain follow-ups.
 
 - Prototype LLVM IR emission from Java and pin an external LLVM toolchain.
 - x86-64 Linux assembly/object/executable pipeline, then AArch64 cross-build.

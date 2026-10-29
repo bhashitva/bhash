@@ -239,3 +239,7 @@ not supported Windows Bhash output. The local development environment lacks Linu
 execution/LLVM, so native execution evidence comes from CI. Existing managed/backend
 regression checks and the expanded cross-backend corpus must also pass on the final
 PR revision before this experimental milestone is considered ready to merge.
+
+Native runtime stack traces and optional DWARF/source debugging are described in
+[native diagnostics](native-diagnostics.md). Internal ABI v14 adds precise exception-header
+trace ownership and unwindable logical frames without changing user object payload layouts.
