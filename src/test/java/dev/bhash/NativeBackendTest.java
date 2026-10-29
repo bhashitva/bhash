@@ -1890,7 +1890,7 @@ class NativeBackendTest {
     }
     @Test void corePreservesInt32TypeIdentityBoxMetadataAndScalarCollectionKinds()throws Exception{
         var program=core("वर्ग पात्र { सार्वजनिक मान क: लघुपूर्णांक; } कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[२]; स्थिर ब: सर्ववस्तु = परिवर्तित<लघुपूर्णांक>(१); लिखो(प्रकारहै<लघुपूर्णांक>(ब),परिवर्तित<लघुपूर्णांक>(ब)); }");
-        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v13"));
+        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v14"));
         assertTrue(program.collections().stream().anyMatch(c->c.valueKind()==8));
     }
     @Test void nativeInt32FixturesMatchJvmClrAndForcedGc()throws Exception{
@@ -2211,6 +2211,52 @@ class NativeBackendTest {
         assertEquals(1,result.exit());assertEquals("साफ😀\n",result.out());assertTrue(result.err().contains("native.bhash:2:"),result.err());assertTrue(result.err().contains("अमान्य गणना अंक।"),result.err());
     }
 
+    @Test void debugOptionRequiresNativeTarget()throws Exception{
+        var out=new java.io.ByteArrayOutputStream();var err=new java.io.ByteArrayOutputStream();
+        int status=dev.bhash.cli.Main.run(new String[]{"compile","examples/native/debugging.bhash","--debug"},new java.io.PrintStream(out),new java.io.PrintStream(err));
+        assertEquals(2,status);assertTrue(err.toString(java.nio.charset.StandardCharsets.UTF_8).contains("--debug currently requires --target native"));
+    }
+    @Test void nativeCorePreservesOriginalNamesAndEmitsOptionalDebugMetadata()throws Exception{
+        String source="""
+            कार्य पहचान<त>(अ: त) -> त { स्थिर उत्तर: त=अ; लौटाओ उत्तर; }
+            कार्य मुख्य() -> शून्य { लिखो(पहचान<पूर्णांक>(४२)); }
+            """;
+        var program=core(source);assertTrue(program.functions().stream().anyMatch(f->f.name().equals("पहचान")));
+        var function=program.functions().stream().filter(f->f.name().equals("पहचान")).findFirst().orElseThrow();assertEquals("अ",function.parameters().get(0).name());
+        String normal=LlvmEmitter.emit(program),debug=LlvmEmitter.emit(program,"",true);
+        assertTrue(normal.contains("@bh_trace_enter"));assertFalse(normal.contains("!DICompileUnit"));
+        for(String metadata:List.of("!DICompileUnit","!DISubprogram","!DILocation","!DILocalVariable","@llvm.dbg.declare","noinline optnone","Debug Info Version"))assertTrue(debug.contains(metadata),metadata);
+    }
+    @Test void nativeRuntimeTraceUsesBhashNamesAcrossVirtualGenericAndFinallyCalls()throws Exception{
+        requireTools();String source=Files.readString(Path.of("examples/native/diagnostics.bhash"));
+        var result=nativeOnlyRun(List.of(new SourceFile("diagnostics.bhash",source)),GC_STRESS);
+        assertEquals(1,result.exit());assertEquals("साफ😀\n",result.out());assertEquals(0L,stats(result).get("live"));
+        assertTrue(result.err().contains("diagnostics.bhash:3:"),result.err());
+        int previous=-1;for(String name:List.of("भाग","गणक.लो","परत","मुख्य")){int next=result.err().indexOf("  में "+name+" (");assertTrue(next>previous,result.err());previous=next;}
+        for(String hidden:List.of("bfn","btry","विशेष_","संकुलित_"))assertFalse(result.err().contains(hidden),result.err());
+    }
+    @Test void nativeRethrowPreservesFirstStackAcrossCollection()throws Exception{
+        requireTools();String source="""
+            वर्ग भंडार { सार्वजनिक साझा मान ग: अपवाद; }
+            कार्य पहला() -> शून्य { फेंको नया अपवाद("दोष😀"); }
+            कार्य पकड़() -> शून्य { प्रयास { पहला(); } पकड़ो (ग: अपवाद) { भंडार.ग=ग; } }
+            कार्य बाद() -> शून्य { मानक.पाठ्य.दोहराओ("दबाव",१००); फेंको भंडार.ग; }
+            कार्य मुख्य() -> शून्य { पकड़(); बाद(); }
+            """;
+        var result=nativeOnlyRun(List.of(new SourceFile("rethrow.bhash",source)),GC_STRESS);
+        assertEquals(1,result.exit());assertTrue(result.err().contains("  में पहला (rethrow.bhash:2:"),result.err());assertTrue(result.err().contains("  में पकड़ (rethrow.bhash:3:"),result.err());
+        assertFalse(result.err().contains("  में बाद ("),result.err());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeFinallyReplacementGetsItsOwnTrace()throws Exception{
+        requireTools();String source="""
+            कार्य पुराना() -> शून्य { फेंको नया अपवाद("पुराना"); }
+            कार्य नया_दोष() -> शून्य { फेंको नया अपवाद("नया"); }
+            कार्य मुख्य() -> शून्य { प्रयास { पुराना(); } अंततः { नया_दोष(); } }
+            """;
+        var result=nativeOnlyRun(List.of(new SourceFile("finally.bhash",source)),GC_STRESS);
+        assertEquals(1,result.exit());assertTrue(result.err().contains("  में नया_दोष (finally.bhash:2:"),result.err());assertFalse(result.err().contains("  में पुराना ("),result.err());assertEquals(0L,stats(result).get("live"));
+    }
+
     @Test void nativeGenericFixturesMatchJvmClrAndForcedGc()throws Exception{
         requireNumericTargets();for(var fixture:NativeGenericFixtures.cases()){
             var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
@@ -2270,7 +2316,7 @@ class NativeBackendTest {
         var p=core("अभिलेख पात्र(नाम: पाठ, न: पूर्णांक, व: सर्ववस्तु); कार्य मुख्य() -> शून्य { स्थिर क: पात्र=नया पात्र(\"क\",१,रिक्त); लिखो(क==नया पात्र(\"क\",१,रिक्त)); }");
         var c=p.classes().get(0);assertEquals(List.of(CoreProgram.Type.TEXT,CoreProgram.Type.INT,CoreProgram.Type.ANY),c.fields().stream().map(CoreProgram.ObjectField::type).toList());
         assertTrue(c.assignableTypes().contains(-9));assertTrue(c.virtualMethods().isEmpty());assertTrue(p.initializations().isEmpty());
-        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v13"));
+        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v14"));
     }
     @Test void nativeRecordDiagnosticsMatchManaged(){
         for(String declaration:List.of(
