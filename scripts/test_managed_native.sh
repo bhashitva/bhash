@@ -45,7 +45,6 @@ if ! cmp debug-1 debug-2; then
     reader=$(find "$original_home/installations" -path '*/bin/llvm-readelf' -type f | head -n 1)
     for executable in debug-1 debug-2; do
         echo "Debug path diagnostics: $executable"
-        "$reader" --debug-dump=info "$executable" | grep -E 'sysroot|include_path|comp_dir|producer|/home/bhash' | head -n 35 || true
         "$reader" --string-dump=.debug_str "$executable" | grep -E '/home/bhash|toolchain|installations' | head -n 35 || true
         "$reader" --string-dump=.debug_line_str "$executable" | grep -E '/home/bhash|toolchain|installations' | head -n 35 || true
     done

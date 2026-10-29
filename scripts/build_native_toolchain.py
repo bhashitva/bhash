@@ -160,7 +160,7 @@ unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH OBJC_INCLUDE_PATH LIBRARY_PATH GCC
             path = root/'bin'/name;path.parent.mkdir(exist_ok=True)
             command = 'exec "$bhash_sdk/libexec/'+name+'" "$@"\n'
             if name == 'clang-18':
-                command = '''exec "$bhash_sdk/libexec/clang-18" -Wno-unused-command-line-argument --sysroot="$bhash_sdk/sysroot" --gcc-toolchain="$bhash_sdk/sysroot/usr" -resource-dir "$bhash_sdk/resource" --ld-path="$bhash_sdk/bin/ld.lld" "-ffile-prefix-map=$bhash_sdk=/bhash/toolchain" "-fdebug-prefix-map=$bhash_sdk=/bhash/toolchain" "$@"
+                command = '''exec "$bhash_sdk/libexec/clang-18" -Wno-unused-command-line-argument -gno-record-command-line -fno-record-command-line --sysroot="$bhash_sdk/sysroot" --gcc-toolchain="$bhash_sdk/sysroot/usr" -resource-dir "$bhash_sdk/resource" --ld-path="$bhash_sdk/bin/ld.lld" "-ffile-prefix-map=$bhash_sdk=/bhash/toolchain" "-fdebug-prefix-map=$bhash_sdk=/bhash/toolchain" "$@"
 '''
             path.write_text(common+command, encoding='utf-8');path.chmod(0o755)
         # Declaring a lower minimum is insufficient: inspect every host-side ELF.
