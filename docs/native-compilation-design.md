@@ -92,6 +92,8 @@ injected compiler metadata alone does not require library execution.
 Static fields/methods and lazy class initialization now use the shared contract and precise
 persistent roots described in [native static members](native-static-members.md).
 
+Native enums and typed selection are described in [native enums](native-enums.md).
+
 Unsupported conversions and standard-library calls, user-defined generics,
 interop and concurrency are not yet available. The decimal-area calculation is supported;
 math and seeded random library calls are supported. Other unsupported library calls receive diagnostics. Defaults and behavior of managed targets are unchanged.
