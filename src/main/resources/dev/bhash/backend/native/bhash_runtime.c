@@ -62,6 +62,8 @@ static void grow_object_index(void) {
 static bh_root_frame *roots;
 static int console_skip_lf;
 static void *pending_exception;
+static void ***static_roots;
+static uint64_t static_root_count;
 static const bh_type *exception_descriptor;
 static const void *exception_info;
 typedef struct bh_cleanup {
@@ -122,6 +124,7 @@ void bh_collect(void) {
     collecting = 1;
     ++collections;
     mark(pending_exception);
+    for(uint64_t i=0;i<static_root_count;++i)mark(*static_roots[i]);
     for (bh_root_frame *f = roots; f; f = f->previous)
         for (uint64_t i = 0; i < f->count; ++i) mark(f->slots[i]);
     while (work) {
@@ -224,6 +227,8 @@ void bh_runtime_init(void) {
 }
 void bh_shutdown(void) {
     if (roots || handlers || cleanups || pending_exception) fatal("आंतरिक मूल-संदर्भ शेष है।");
+    for(uint64_t i=0;i<static_root_count;++i)*static_roots[i]=NULL;
+    static_roots=NULL;static_root_count=0;
     bh_collect();
     if (object_index != initial_index) free(object_index);
     memset(initial_index, 0, sizeof initial_index);
@@ -639,6 +644,27 @@ int64_t bh_protect(bh_protected_callback callback, void *environment) {
     handlers = handler.previous;
     if (roots != handler.saved_roots || cleanups != handler.saved_cleanups) fatal("आंतरिक अपवाद मूल-संदर्भ असंतुलित हैं।");
     return -1;
+}
+void bh_static_roots_configure(void ***slots, uint64_t count) {
+    if(roots || handlers || static_roots || static_root_count || (count && !slots))fatal("आंतरिक स्थिर मूल-संदर्भ विन्यास अमान्य है।");
+    for(uint64_t i=0;i<count;++i)if(!slots[i])fatal("आंतरिक स्थिर मूल-संदर्भ स्लॉट अमान्य है।");
+    static_roots=slots;static_root_count=count;
+}
+void bh_static_reference_store(void **slot, void *value) {
+    /* A dedicated nonallocating barrier permits a future generational collector. */
+    *slot=value;
+}
+void bh_class_initialize(int32_t *state, void **failure, bh_protected_callback initializer) {
+    /* Single mutator: 0 unseen, 1 initializing (recursive use), 2 ready, 3 failed. */
+    if(*state==2 || *state==1)return;
+    if(*state==3)bh_throw(*failure,NULL);
+    if(*state!=0)fatal("आंतरिक वर्ग आरंभीकरण स्थिति अमान्य है।");
+    *state=1;
+    if(bh_protect(initializer,NULL)==-1){
+        bh_static_reference_store(failure,bh_exception_take());
+        *state=3;bh_throw(*failure,NULL);
+    }
+    *state=2;
 }
 void *bh_exception_take(void) { void *value = pending_exception; pending_exception = NULL; return value; }
 _Noreturn void bh_throw(void *value, const void *location) {
