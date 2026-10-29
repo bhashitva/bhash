@@ -40,6 +40,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record StructuredTypes(int texts,int values,int object) {}
     public enum BufferOperation { ENCODE, DECODE, READ_FILE, WRITE_FILE, SLICE, ARRAY, FILL, READ_INT, WRITE_INT, READ_REAL, WRITE_REAL }
     public record BufferCall(Type type, BufferOperation operation, List<Expression> arguments, int descriptor, Source source) implements Expression {}
+    public record InputCall(Type type, Source source) implements Expression {}
     public enum TimeOperation { NOW, READ, WRITE, YEAR, MONTH, DAY }
     public record TimeCall(Type type, TimeOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public enum FileOperation { SUPPORTED, EXISTS, READ_TEXT, WRITE_TEXT }
@@ -78,7 +79,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     }
     public record Binding(int id, Type type) {}
     public record Function(int id, Type result, List<Binding> parameters, Block body, Source source) {}
-    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -423,6 +424,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             return List.copyOf(values);
         }
         Expression libraryCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
+            if(f.java.equals("BhashRuntime.readText") || f.java.equals("BhashRuntime.readInteger"))return new InputCall(type(f.result,at),source(at));
             String intrinsic=f.intrinsic;
             if(intrinsic==null && at instanceof PrimaryContext p && p.IDENTIFIER()!=null){
                 String name=Identifiers.key(p.IDENTIFIER().getText());
