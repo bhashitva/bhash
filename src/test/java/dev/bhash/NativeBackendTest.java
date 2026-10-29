@@ -440,7 +440,7 @@ class NativeBackendTest {
     @Test void unsupportedUnusedDeclarationsAndLibraryCallsHaveSourceLocations(){
         for(String source:List.of(
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
-            "वर्ग अ { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}")){
+            "वर्ग अ<त> { मान न: त; } कार्य मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(source));
             assertTrue(error.getMessage().contains("native.bhash:1:"),error.getMessage());
             assertTrue(error.getMessage().contains("BH9001"),error.getMessage());
@@ -482,7 +482,7 @@ class NativeBackendTest {
             "वर्ग अ { मान न: पूर्णांक; निर्माता(){ यह.क(); } कार्य क() -> शून्य {} } कार्य मुख्य() -> शून्य {}"))
             assertThrows(CompilationException.class,()->core(s));
         for(String s:List.of(
-            "वर्ग अ { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}",
+            "वर्ग अ<त> { मान न: त; } कार्य मुख्य() -> शून्य {}",
             "परिगणना अ { क } कार्य मुख्य() -> शून्य {}",
             "अनुबंध अ<क> {} कार्य मुख्य() -> शून्य {}",
             "अभिलेख अ(न: पूर्णांक); कार्य मुख्य() -> शून्य {}")){
@@ -815,7 +815,7 @@ class NativeBackendTest {
             "अनुबंध अ { कार्य न() -> पूर्णांक; } अनुबंध ब { कार्य न() -> पाठ; } अनुबंध ग विस्तार अ, ब {}"))
             assertThrows(CompilationException.class,()->core(source+" कार्य मुख्य() -> शून्य {}"));
         assertThrows(CompilationException.class,()->core("कार्य मुख्य() -> शून्य { लिखो(सुरक्षितरूप<पूर्णांक>(१)); }"));
-        var unsupported=assertThrows(CompilationException.class,()->core("वर्ग क { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य {}"));
+        var unsupported=assertThrows(CompilationException.class,()->core("वर्ग क<त> { मान न: त; } कार्य मुख्य() -> शून्य {}"));
         assertTrue(unsupported.getMessage().contains("BH9001"));
     }
     @Test void nativeInterfaceDiamondsRedeclarationsAndMultipleContractsMatchJvm()throws Exception{
@@ -1893,7 +1893,7 @@ class NativeBackendTest {
     }
     @Test void corePreservesInt32TypeIdentityBoxMetadataAndScalarCollectionKinds()throws Exception{
         var program=core("वर्ग पात्र { सार्वजनिक मान क: लघुपूर्णांक; } कार्य मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[२]; स्थिर ब: सर्ववस्तु = परिवर्तित<लघुपूर्णांक>(१); लिखो(प्रकारहै<लघुपूर्णांक>(ब),परिवर्तित<लघुपूर्णांक>(ब)); }");
-        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v11"));
+        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v12"));
         assertTrue(program.collections().stream().anyMatch(c->c.valueKind()==8));
     }
     @Test void nativeInt32FixturesMatchJvmClrAndForcedGc()throws Exception{
@@ -2148,4 +2148,30 @@ class NativeBackendTest {
             List.of(new SourceFile("bad.bhash","कार्य मुख्य() -> शून्य { लिखो(अ); }")),output));
         assertEquals("previous executable",Files.readString(output));
     }
+    @Test void coreSeparatesStaticStorageFromObjectLayoutsAndVirtualSlots()throws Exception{
+        var p=core("वर्ग क { साझा मान न: पूर्णांक; साझा मान प: पाठ; साझा कार्य लो() -> पूर्णांक { लौटाओ न; } कार्य अलग() -> पूर्णांक { लौटाओ न; } } कार्य मुख्य() -> शून्य { क.न=२; लिखो(क.लो()); }");
+        assertEquals(2,p.staticFields().size());assertEquals(0,p.classes().get(0).fields().size());assertEquals(1,p.classes().get(0).virtualMethods().size());
+        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("@static_roots"));assertTrue(ir.contains("@bh_class_initialize"));assertTrue(ir.contains("@bh_static_reference_store"));
+    }
+    @Test void nativeStaticFixturesMatchJvmClrAndForcedGc()throws Exception{
+        requireNumericTargets();
+        for(var fixture:NativeStaticFixtures.cases()){
+            var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
+            if(fixture.name().equals("gc-stress")){assertTrue(stats(result).get("allocations")>10000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());}
+        }
+    }
+    @Test void nativeStaticMembersKeepManagedAccessAndInitializerDiagnostics(){
+        for(String source:List.of(
+            "वर्ग क { साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य { नया क().न=२; }",
+            "वर्ग क { निजी साझा मान न: पूर्णांक; } कार्य मुख्य() -> शून्य { लिखो(क.न); }",
+            "वर्ग क { साझा स्थिर न: पूर्णांक=१; } कार्य मुख्य() -> शून्य { क.न=२; }",
+            "वर्ग क { मान न: पूर्णांक; साझा कार्य लो() -> पूर्णांक { लौटाओ न; } } कार्य मुख्य() -> शून्य {}",
+            "वर्ग क { साझा मान न: पूर्णांक=लो(); साझा कार्य लो() -> पूर्णांक { लौटाओ १; } } कार्य मुख्य() -> शून्य {}",
+            "वर्ग क { साझा निर्माता() {} } कार्य मुख्य() -> शून्य {}",
+            "वर्ग क { साझा कार्य लो() -> शून्य {} } वर्ग ख विस्तार क { साझा कार्य लो() -> शून्य {} } कार्य मुख्य() -> शून्य {}")){
+            var error=assertThrows(CompilationException.class,()->core(source));
+            for(var target:List.of(Target.JVM,Target.CLR))assertEquals(assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("native.bhash",source)),target)).getMessage(),error.getMessage());
+        }
+    }
+
 }
