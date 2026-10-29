@@ -16,7 +16,11 @@ export const windowsSdk = Object.freeze({
 export function sdkForHost(platform = process.platform) {return platform === 'win32' ? windowsSdk : linuxSdk;}
 export const sdk = sdkForHost();
 export interface NativeOptions {java: string; jar: string; mode: 'managed' | 'system'; home?: string;}
-export type Runner = (command: string, args: string[], env: NodeJS.ProcessEnv, signal?: AbortSignal) => Promise<string>;
+export type Runner = (command: string, args: string[], env: NodeJS.ProcessEnv, signal?: AbortSignal, cwd?: string) => Promise<string>;
+export function compilerInvocation(jar: string, args: string[], platform = process.platform): {args:string[]; cwd?:string} {
+    if (platform === 'win32') return {args:['-Dfile.encoding=UTF-8','-jar',path.basename(jar),'--utf8-args',Buffer.from(JSON.stringify({args,cwd:process.cwd()}),'utf8').toString('base64')],cwd:path.dirname(path.resolve(jar))};
+    return {args:['-Dfile.encoding=UTF-8','-jar',jar,...args]};
+}
 export function requireNativeHost(platform = process.platform, arch = process.arch): void {
     if (!['linux', 'win32'].includes(platform) || arch !== 'x64') throw new Error('Native requires a Windows x64 or Linux x86-64 extension host (including WSL Ubuntu 22.04+). macOS and ARM hosts are not supported yet.');
 }
@@ -40,9 +44,9 @@ export function terminateTree(child: ChildProcess, signal: NodeJS.Signals = 'SIG
         } else child.kill(signal);
     } catch {}
 }
-export const capture: Runner = (command, args, env, signal) => new Promise((resolve, reject) => {
+export const capture: Runner = (command, args, env, signal, cwd) => new Promise((resolve, reject) => {
     signal?.throwIfAborted();
-    const child = spawn(command, args, {env, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform === 'linux'});
+    const child = spawn(command, args, {env, cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform === 'linux'});
     let stdout = '', stderr = '', overflow = false, timedOut = false;
     let escalation: ReturnType<typeof setTimeout> | undefined;
     const terminate = () => {
@@ -73,7 +77,7 @@ export async function ensureNative(options: NativeOptions, log: (message: string
     requireNativeHost(platform);
     const sdk = sdkForHost(platform);
     const env = nativeEnvironment(options);
-    const compiler = (args: string[]) => run(options.java, ['-Dfile.encoding=UTF-8', '-jar', options.jar, ...args], env, signal);
+    const compiler = (args: string[]) => {const invocation=compilerInvocation(options.jar,args,platform);return run(options.java,invocation.args,env,signal,invocation.cwd);};
     if (options.mode === 'system') {await compiler(['native', 'doctor', '--json']); return;}
     if (platform === 'linux') {
     const libc = (await run('getconf', ['GNU_LIBC_VERSION'], env, signal)).trim();

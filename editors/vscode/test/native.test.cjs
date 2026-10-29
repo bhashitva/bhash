@@ -92,7 +92,8 @@ test('compiler process preserves argument boundaries and Unicode',async()=>{
 test('Windows managed setup selects Windows asset and never invokes getconf',async()=>{
     const calls=[];let active=false;
     await ensure(options,()=>{},undefined,false,async(command,args)=>{
-        calls.push({command,args});assert.notEqual(command,'getconf');
+        assert.notEqual(command,'getconf');
+        assert.ok(args.includes('--utf8-args'));args=JSON.parse(Buffer.from(args.at(-1),'base64').toString('utf8')).args;calls.push({command,args});
         if(args.includes('status'))return JSON.stringify({installed:active,archiveSha256:active?windowsSdk.sha256:undefined});
         if(args.includes('install')){assert.ok(args.includes(windowsSdk.url));assert.ok(args.includes(windowsSdk.sha256));active=true;}
         return '{}';
