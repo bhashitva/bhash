@@ -271,7 +271,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.cjs",
     "test:integration": "node test/run.cjs",
-    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.5.2.vsix"
+    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.6.0.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"
