@@ -17,7 +17,7 @@ ARTIFACTS = ROOT/'target/managed-toolchain'
 JAR = ROOT/'target/bhash-compiler-0.1.0-SNAPSHOT.jar'
 JAVA = Path(os.environ['JAVA_HOME'])/'bin/java'
 KEYTOOL = Path(os.environ['JAVA_HOME'])/'bin/keytool'
-NAME = 'bhash-linux-x86_64-llvm18-v1.zip'
+NAME = 'bhash-linux-x86_64-llvm18-v1-jammy.zip'
 DIGEST = (ARTIFACTS/(NAME+'.sha256')).read_text().split()[0]
 
 

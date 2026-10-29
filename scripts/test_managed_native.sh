@@ -3,12 +3,12 @@
 # Run as an unprivileged user in scripts/native-toolchain-clean.Dockerfile, with --network none.
 set -eu
 jar=/artifacts/bhash-compiler-0.1.0-SNAPSHOT.jar
-bundle=/artifacts/managed-toolchain/bhash-linux-x86_64-llvm18-v1.zip
+bundle=/artifacts/managed-toolchain/bhash-linux-x86_64-llvm18-v1-jammy.zip
 for tool in clang clang-18 opt opt-18 gcc cc ld ld.lld readelf llvm-readelf; do
     if command -v "$tool"; then echo "Unexpected system development tool: $tool"; exit 1; fi
 done
 [ ! -e /usr/include/stdio.h ]
-for package in libc6-dev libgcc-13-dev linux-libc-dev clang-18 llvm-18 binutils; do
+for package in libc6-dev libgcc-11-dev linux-libc-dev clang-18 llvm-18 binutils; do
     if dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then echo "Unexpected system package: $package"; exit 1; fi
 done
 read -r sha name < "$bundle.sha256"
