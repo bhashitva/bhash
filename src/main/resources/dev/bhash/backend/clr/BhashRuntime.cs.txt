@@ -33,7 +33,8 @@ internal static class BhashRuntime {
     internal static string output() => Output.ToString();
     internal static string errors() => Errors.ToString();
 #else
-    private static readonly StreamReader Input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false, true), false);
+    private static readonly Stream Input = new BufferedStream(Console.OpenStandardInput());
+    private static bool inputSkipLf;
     private static readonly StreamWriter Output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true };
     private static readonly StreamWriter Errors = new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false)) { AutoFlush = true };
 
@@ -48,9 +49,27 @@ internal static class BhashRuntime {
         internal Failure(string message) : base(message) {}
     }
 
+    private static string inputLine() {
+#if BHASH_BROWSER
+        return Input.ReadLine();
+#else
+        Output.Flush();
+        using var bytes = new MemoryStream();
+        for (;;) {
+            int c=Input.ReadByte();
+            if(inputSkipLf) { inputSkipLf=false; if(c=='\n')c=Input.ReadByte(); }
+            if(c<0) { if(bytes.Length==0)return null; break; }
+            if(c=='\n')break;
+            if(c=='\r') { inputSkipLf=true; break; }
+            bytes.WriteByte((byte)c);
+        }
+        return new UTF8Encoding(false,true).GetString(bytes.ToArray());
+#endif
+    }
+
     internal static long readInteger() {
         string input;
-        try { input = Input.ReadLine(); }
+        try { input = inputLine(); }
         catch (Exception error) when (error is IOException || error is DecoderFallbackException) {
             throw new Failure("कंसोल से UTF-8 इनपुट पढ़ा नहीं जा सका।");
         }
@@ -74,7 +93,7 @@ internal static class BhashRuntime {
         || c == '\u2028' || c == '\u2029' || c == '\u205f' || c == '\u3000';
 
     internal static string readText() {
-        try { return Input.ReadLine() ?? throw new Failure("इनपुट समाप्त: पाठ अपेक्षित था।"); }
+        try { return inputLine() ?? throw new Failure("इनपुट समाप्त: पाठ अपेक्षित था।"); }
         catch (Exception e) when (e is IOException || e is DecoderFallbackException) { throw new Failure("UTF-8 पाठ पढ़ा नहीं जा सका।"); }
     }
     internal static long length(string value) {
