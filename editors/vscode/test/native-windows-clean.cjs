@@ -46,8 +46,14 @@ try {
         const program=path.join(home,name+'.exe');cli(['compile',source,'--target','native','-o',program]);
         const run=invoke(program,[]);assert.match(run.stderr,/live=0/);assert.match(run.stderr,/allocations=[1-9]/);
     }
-    const zip=path.join(home,'hello.zip');cli(['native','package',hello,'--name','hello','--version','1','-o',zip]);
+    const zip=path.join(home,'hello.zip');cli(['native','package',hello,'--name','hello','--version','1','--debug','-o',zip]);
     assert.ok(fs.statSync(zip).size>0);
+    const relocated=path.join(home,'relocated source'),cache=path.join(home,'relocated SDK');
+    fs.mkdirSync(relocated);const source2=path.join(relocated,'hello.bhash');fs.copyFileSync(hello,source2);
+    const originalCache=env.BHASH_TOOLCHAIN_HOME;fs.cpSync(originalCache,cache,{recursive:true});env.BHASH_TOOLCHAIN_HOME=cache;
+    const zip2=path.join(home,'hello-again.zip');cli(['native','package',source2,'--name','hello','--version','1','--debug','-o',zip2]);
+    assert.deepEqual(fs.readFileSync(zip2),fs.readFileSync(zip),'debug release changes across source and SDK cache relocation');
+    env.BHASH_TOOLCHAIN_HOME=originalCache;
     const before=fs.readFileSync(active,'utf8');
     const bad=spawnSync(java,['-jar',jar,'native','toolchain','install','--archive',archive||zip,'--sha256','0'.repeat(64)],{encoding:'utf8'});
     assert.notEqual(bad.status,0);assert.equal(fs.readFileSync(active,'utf8'),before);

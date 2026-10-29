@@ -23,8 +23,13 @@ public final class NativeCompiler {
         for(var source:sources){Path file=Path.of(source.name()).toRealPath();if(!file.startsWith(base))throw new IOException("Native source is outside --source-root: "+source.name());mapped.add(new SourceFile("/bhash/source/"+base.relativize(file).toString().replace('\\','/'),source.text()));}
         return List.copyOf(mapped);
     }
-    private static List<String> mapped(Path work,List<String> command){
-        var flags=new ArrayList<>(command);flags.add("-ffile-prefix-map="+work+"=/bhash/build");flags.add("-fdebug-prefix-map="+work+"=/bhash/build");flags.add("-fdebug-compilation-dir=/bhash/build");return flags;
+    private static List<String> mapped(Path work,Path sdk,List<String> command){
+        var flags=new ArrayList<>(command);
+        var roots=new LinkedHashMap<Path,String>();roots.put(work,"/bhash/build");if(sdk!=null)roots.put(sdk,"/bhash/sdk");
+        for(var root:roots.entrySet())for(String spelling:new LinkedHashSet<>(List.of(root.getKey().toString(),root.getKey().toString().replace('\\','/')))){
+            flags.add("-ffile-prefix-map="+spelling+"="+root.getValue());flags.add("-fdebug-prefix-map="+spelling+"="+root.getValue());
+        }
+        flags.add("-fdebug-compilation-dir=/bhash/build");return flags;
     }
     private List<String> clangCommand(List<String> args){
         var command=new ArrayList<>(args);
@@ -44,6 +49,7 @@ public final class NativeCompiler {
         Path work=Files.createTempDirectory("bhash-native-"); Path staged=null;
         try {
             var tools=NativeToolchain.require(work);String clang=tools.clang(),opt=tools.opt();
+            Path sdk=tools.managed()?Path.of(clang).getParent().getParent():null;
             String buildInfo=NativeBuildInfo.describe(debug,sanitize,tools.version(),tools.linkerVersion(),tools.libcVersion());
             if(tools.managed()){
                 var metadata=com.google.gson.JsonParser.parseString(buildInfo).getAsJsonObject();metadata.addProperty("toolchain_id",tools.toolchainId());metadata.addProperty("toolchain_sha256",tools.toolchainSha256());buildInfo=NativeBuildInfo.JSON.toJson(metadata);
@@ -60,8 +66,8 @@ public final class NativeCompiler {
                 Files.copy(in,work.resolve(name));
             }
             if(!NativePlatform.windows())NativeToolchain.run(work,List.of(opt,"-passes=verify","-disable-output","program.ll"));
-            NativeToolchain.run(work,mapped(work,clangCommand(List.of(clang,debug?"-O0":"-O2","-Xclang","-llvm-verify-each","-c","program.ll","-o","program.o"))));
-            NativeToolchain.run(work,mapped(work,clangCommand(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"))));
+            NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,debug?"-O0":"-O2","-Xclang","-llvm-verify-each","-c","program.ll","-o","program.o"))));
+            NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"))));
             NativeToolchain.run(work,clangCommand(List.of(clang,"program.o","runtime.o","-lm",NativePlatform.windows()?"-Wl,--no-insert-timestamp":"-Wl,--build-id=sha1","-o","program"+NativePlatform.executableSuffix())));
             Files.createDirectories(destination.getParent());
             staged=Files.createTempFile(destination.getParent(),".bhash-native-",".tmp");
