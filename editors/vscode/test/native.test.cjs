@@ -2,7 +2,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
-const {linuxSdk:sdk,windowsSdk,ensureNative:ensure,nativeEnvironment,requireNativeHost,capture}=require('../dist/native.js');
+const {linuxSdk:sdk,windowsSdk,ensureNative:ensure,nativeEnvironment,requireNativeHost,capture,compilerInvocation}=require('../dist/native.js');
 const ensureNative=(options,log,signal,repair,run)=>ensure(options,log,signal,repair,run,'linux');
 const options={java:'java with spaces',jar:'/compiler हिन्दी.jar',mode:'managed'};
 function fake({installed=false,libc='glibc 2.35',busy=false,fail=false,wrong=false}={}) {
@@ -100,4 +100,13 @@ test('Windows managed setup selects Windows asset and never invokes getconf',asy
     },'win32');
     assert.equal(calls.filter(c=>c.args.includes('install')).length,1);
     assert.match(windowsSdk.sha256,/^[a-f0-9]{64}$/);
+});
+
+test('Windows compiler envelope preserves Unicode, literal arguments and caller directory',()=>{
+    const jar=path.resolve('compiler भारत','compiler.jar'),args=['compile','नमस्ते 😀.bhash','$(not-a-shell)'];
+    const invocation=compilerInvocation(jar,args,'win32');
+    assert.equal(invocation.cwd,path.dirname(jar));assert.ok(invocation.args.includes(path.basename(jar)));
+    const decoded=JSON.parse(Buffer.from(invocation.args.at(-1),'base64').toString('utf8'));
+    assert.deepEqual(decoded,{args,cwd:process.cwd()});
+    assert.match(invocation.args.at(-1),/^[A-Za-z0-9+/=]+$/);
 });

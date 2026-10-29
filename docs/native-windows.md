@@ -43,6 +43,12 @@ java -jar bhash-compiler.jar run hello.bhash --target native
 `BHASH_READELF` system mode में compiler और `llvm-readobj.exe` के paths चुन सकते हैं।
 Managed mode में tool overrides मिलाने की अनुमति नहीं है।
 
+VS Code launcher compiler arguments को UTF-8 JSON/ASCII envelope में भेजता है।
+इससे Windows Java launcher का ANSI code-page conversion Hindi paths को नहीं बदलता।
+Compiler JAR को उसके directory से relative name के साथ launch किया जाता है और
+application का original working directory सुरक्षित रहता है। Windows regional settings
+बदलने की आवश्यकता नहीं है।
+
 ## पाठ और फ़ाइलें (Text and files)
 
 भाष text UTF-8 रहता है। Windows console input/output को UTF-8 code page में चलाया जाता है;

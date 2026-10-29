@@ -46,13 +46,13 @@ public final class ManagedToolchain {
         if(!data.has("format") || !data.get("format").toString().equals("1") || !ID.equals(string(data,"id")) || !NativeBuildInfo.TARGET.equals(string(data,"target")))throw invalid("Unsupported managed toolchain format, ID or target");
         String version=string(data,"llvm_version"),glibc=minimumGlibc(data);
         if(NativePlatform.windows() && (!"ucrt".equals(string(data,"c_runtime")) || !"10.0".equals(string(data,"minimum_windows"))))throw invalid("Windows SDK requires UCRT");
-        if(!version.matches("18\\.[0-9]+\\.[0-9]+") || !glibc.matches("[0-9]+(?:\\.[0-9]+){1,2}"))throw invalid("Invalid toolchain LLVM/glibc version");
+        if(!version.matches("18\\.[0-9]+\\.[0-9]+") || !NativePlatform.windows() && !glibc.matches("[0-9]+(?:\\.[0-9]+){1,2}"))throw invalid("Invalid toolchain LLVM/glibc version");
         if(!data.has("files") || !data.get("files").isJsonObject() || data.getAsJsonObject("files").size()>MAX_FILES)throw invalid("Missing or oversized file inventory");
         var files=data.getAsJsonObject("files");
         for(String required:NativePlatform.requiredFiles())if(!files.has(required))throw invalid("Incomplete toolchain: "+required);
         return data;
     }
-    private static String minimumGlibc(JsonObject data)throws IOException{return NativePlatform.windows()?"0.0":string(data,"minimum_glibc");}
+    private static String minimumGlibc(JsonObject data)throws IOException{return NativePlatform.windows()?null:string(data,"minimum_glibc");}
     private static Path safe(Path root,String name)throws IOException{
         if(name.isEmpty() || name.startsWith("/") || name.contains("\\") || name.contains(":") || name.indexOf(0)>=0 || Arrays.stream(name.split("/",-1)).anyMatch(p->p.isEmpty() || p.equals(".") || p.equals("..") || p.endsWith(".") || p.endsWith(" ") || p.matches("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?")))throw invalid("Unsafe archive path: "+name);
         Path result=root.resolve(name).normalize();if(!result.startsWith(root))throw invalid("Archive path escapes installation");return result;

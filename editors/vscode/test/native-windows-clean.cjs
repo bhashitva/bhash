@@ -3,7 +3,7 @@
 const fs=require('node:fs');const path=require('node:path');const os=require('node:os');
 const {spawnSync}=require('node:child_process');const assert=require('node:assert/strict');
 const repo=process.env.BHASH_TEST_REPO || 'C:\\repo';
-const {windowsSdk:sdk}=require(path.join(repo,'editors/vscode/dist/native.js'));
+const {windowsSdk:sdk,compilerInvocation}=require(path.join(repo,'editors/vscode/dist/native.js'));
 const offline=process.argv.includes('--offline');
 assert.equal(process.platform,'win32');assert.equal(process.arch,'x64');
 const forbidden=['wsl.exe','clang.exe','clang-18.exe','opt.exe','cl.exe','gcc.exe','link.exe','ld.lld.exe','llvm-readobj.exe','dotnet.exe'];
@@ -12,14 +12,14 @@ for(const folder of ['C:\\Program Files\\LLVM','C:\\Program Files (x86)\\Windows
 const home=fs.mkdtempSync(path.join(os.tmpdir(),'bhash native भारत '));
 const launcher=path.join(repo,'editors/vscode/dist/native-task.js');
 const java=process.env.BHASH_TEST_JAVA || 'C:\\java\\bin\\java.exe';
-const jar=path.join(repo,'target/bhash-compiler-0.1.0-SNAPSHOT.jar');
+const jar=path.join(home,'compiler.jar');fs.copyFileSync(path.join(repo,'target/bhash-compiler-0.1.0-SNAPSHOT.jar'),jar);
 const request={java,jar,mode:'managed'};
 const env={...process.env,BHASH_GC_STRESS:'1',BHASH_GC_STATS:'1'};
-function invoke(executable,args,input,extra={}){
-    const r=spawnSync(executable,args,{cwd:home,env:{...env,...extra},input,encoding:'utf8',timeout:360000,maxBuffer:4*1024*1024});
+function invoke(executable,args,input,extra={},cwd=home){
+    const r=spawnSync(executable,args,{cwd,env:{...env,...extra},input,encoding:'utf8',timeout:360000,maxBuffer:4*1024*1024});
     assert.ifError(r.error);assert.equal(r.status,0,`${r.stdout}\n${r.stderr}`);return r;
 }
-function cli(args){return invoke(java,['-Dfile.encoding=UTF-8','-jar',jar,...args]);}
+function cli(args){const request=compilerInvocation(jar,args);return invoke(java,request.args,undefined,{},request.cwd);}
 function task(operation,input,stdin){return invoke(process.execPath,[launcher,JSON.stringify({...request,operation,input})],stdin);}
 try {
     const active=path.join(process.env.BHASH_TOOLCHAIN_HOME,'active.json');

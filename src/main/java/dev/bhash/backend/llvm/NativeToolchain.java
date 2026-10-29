@@ -53,7 +53,7 @@ public final class NativeToolchain {
         String target=run(work,List.of(selected.clang(),"-dumpmachine")).strip();if(!(NativePlatform.windows()?target.matches("x86_64-(?:w64|pc)-(?:windows-gnu|mingw32)"):target.matches("x86_64-(?:[^-]+-)?linux-gnu")))throw new CompilationException("[BH9104] clang targets "+target+"; select an LLVM 18 toolchain for "+NativeBuildInfo.TARGET+".");
         String linker=selected.linker()!=null?selected.linker():run(work,List.of(selected.clang(),"--print-prog-name="+(NativePlatform.windows()?"ld.lld":"ld"))).strip();
         String lv=run(work,List.of(linker,"--version")).lines().findFirst().orElse("");
-        return new Report(NativeBuildInfo.TARGET,cv,selected.clang(),selected.opt(),NativeBuildInfo.ABI,(String)identity.get("runtime_sha256"),lv,libc,installed!=null,installed==null?"system":installed.id(),installed==null?null:installed.archiveSha256(),selected.readelf());
+        return new Report(NativeBuildInfo.TARGET,cv,selected.clang(),NativePlatform.windows()?null:selected.opt(),NativeBuildInfo.ABI,(String)identity.get("runtime_sha256"),lv,libc,installed!=null,installed==null?"system":installed.id(),installed==null?null:installed.archiveSha256(),selected.readelf());
     }
     public static Report doctor()throws IOException,CompilationException{return doctor(null);}
     public static Report doctor(ManagedToolchain.Installation selected)throws IOException,CompilationException{

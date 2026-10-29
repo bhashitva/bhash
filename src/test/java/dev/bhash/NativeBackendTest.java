@@ -1917,15 +1917,9 @@ class NativeBackendTest {
     }
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));
-        if("managed".equals(System.getenv("BHASH_NATIVE_TOOLCHAIN"))){NativeToolchain.require(temporary);return;}
-        boolean supported=NativePlatform.supported();
-        if(required)assertTrue(supported,"Native CI requires Linux/Windows x86-64");else assumeTrue(supported);
-        for(String tool:List.of(System.getenv().getOrDefault("BHASH_CLANG",NativePlatform.windows()?"clang.exe":"clang-18"),System.getenv().getOrDefault(NativePlatform.windows()?"BHASH_CLANG":"BHASH_LLVM_OPT",NativePlatform.windows()?"clang.exe":"opt-18"))){
-            boolean available;
-            try{Process p=new ProcessBuilder(tool,"--version").redirectErrorStream(true).start();p.getInputStream().readAllBytes();available=p.waitFor(10,TimeUnit.SECONDS)&&p.exitValue()==0;}
-            catch(java.io.IOException e){available=false;}
-            if(required)assertTrue(available,"Missing "+tool);else assumeTrue(available,"Missing "+tool);
-        }
+        if(required)assertTrue(NativePlatform.supported(),"Native CI requires Linux/Windows x86-64");else assumeTrue(NativePlatform.supported());
+        try{NativeToolchain.require(temporary);}
+        catch(java.io.IOException | CompilationException error){if(required)throw error;assumeTrue(false,error.getMessage());}
     }
     private record Result(int exit,String out,String err){}
     private Result nativeRun(String source,String...arguments)throws Exception{
