@@ -59,7 +59,8 @@ milestone में नहीं जुड़ता; explicit data maps/lists �
 ## स्मृति अनुबंध (Memory Contract)
 
 Records ordinary heap objects हैं: nominal metadata pointer के बाद हर field का 8-byte
-carrier है। केवल reference fields precise GC descriptor में आती हैं। Constructor arguments,
+carrier है; boolean fields में केवल low bit meaningful है, इसलिए equality/hash padding
+bits को ignore करते हैं। केवल reference fields precise GC descriptor में आती हैं। Constructor arguments,
 new receiver और returned records writable roots से सुरक्षित हैं, allocating `अंततः` तथा
 exceptions सहित। Reference fields existing nonallocating store barrier उपयोग करती हैं।
 
