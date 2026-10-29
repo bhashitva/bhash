@@ -78,32 +78,6 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python scripts/build_examples.py --target native --require-native
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: Verify clean Windows build/run and offline reuse
-        shell: pwsh
-        run: |
-          # Server Core has no WSL, Visual Studio, LLVM or C development SDK.
-          New-Item -ItemType Directory target/clean-node -Force | Out-Null
-          Copy-Item (Get-Command node.exe).Source target/clean-node/node.exe
-          docker pull mcr.microsoft.com/windows/servercore:ltsc2022
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          docker volume create bhash-windows-cache
-          docker volume create bhash-windows-programs
-          $mounts=@('-v',"${PWD}:C:\repo:ro",'-v',"$env:JAVA_HOME`:C:\java:ro",'-v','bhash-windows-cache:C:\cache','-v','bhash-windows-programs:C:\programs')
-          $settings=@('-e','BHASH_TEST_DEPLOY_DIR=C:\programs','-e','BHASH_TOOLCHAIN_HOME=C:\cache','-e','BHASH_NATIVE_TOOLCHAIN=managed')
-          $published=$false
-          try { $published=(Invoke-WebRequest -Method Head 'https://github.com/bhashitva/bhash/releases/download/native-sdk-windows-1.0.0/bhash-windows-x86_64-llvm18-v1.zip').StatusCode -eq 200 }
-          catch { if ([int]$_.Exception.Response.StatusCode -ne 404) { throw } }
-          if (-not $published) { $settings+=@('-e','BHASH_TEST_SDK_ARCHIVE=C:\repo\target\windows-sdk\bhash-windows-x86_64-llvm18-v1.zip') }
-          Write-Host "Published SDK download available: $published"
-          docker run --rm @mounts @settings mcr.microsoft.com/windows/servercore:ltsc2022 C:\repo\target\clean-node\node.exe C:\repo\editors\vscode\test\native-windows-clean.cjs
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          docker run --rm --network none @mounts @settings mcr.microsoft.com/windows/servercore:ltsc2022 C:\repo\target\clean-node\node.exe C:\repo\editors\vscode\test\native-windows-clean.cjs --offline
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - name: Run application without Java, .NET, Node or SDK mounted
-        shell: pwsh
-        run: |
-          docker run --rm --network none -v bhash-windows-programs:C:\app:ro mcr.microsoft.com/windows/servercore:ltsc2022 powershell.exe -NoProfile -Command 'foreach($tool in @("java","dotnet","node","clang","gcc","wsl")){if(Get-Command $tool -ErrorAction SilentlyContinue){throw "Unexpected tool: $tool"}}; & C:\app\hello.exe; if($LASTEXITCODE){exit $LASTEXITCODE}'
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Package Windows-ready VSIX
         run: npm run package --prefix editors/vscode
       - uses: actions/upload-artifact@v4
@@ -118,3 +92,49 @@ jobs:
             target/examples/build-report.json
             target/examples/logs/
           if-no-files-found: error
+  windows-clean:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - name: Build compiler and shipped Windows launcher
+        shell: pwsh
+        run: |
+          mvn --batch-mode --no-transfer-progress package -DskipTests
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm ci --prefix editors/vscode --no-audit --no-fund
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run build --prefix editors/vscode
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Verify clean Windows build/run and offline reuse
+        shell: pwsh
+        run: |
+          # Server Core has no WSL, Visual Studio, LLVM or C development SDK.
+          New-Item -ItemType Directory target/clean-node -Force | Out-Null
+          Copy-Item (Get-Command node.exe).Source target/clean-node/node.exe
+          docker pull mcr.microsoft.com/windows/servercore:ltsc2022
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          docker volume create bhash-windows-cache
+          docker volume create bhash-windows-programs
+          $mounts=@('-v',"${PWD}:C:\repo:ro",'-v',"$env:JAVA_HOME`:C:\java:ro",'-v','bhash-windows-cache:C:\cache','-v','bhash-windows-programs:C:\programs')
+          $settings=@('-e','BHASH_TEST_DEPLOY_DIR=C:\programs','-e','BHASH_TOOLCHAIN_HOME=C:\cache','-e','BHASH_NATIVE_TOOLCHAIN=managed')
+          Write-Host "Testing automatic installation from the permanent GitHub SDK release"
+          docker run --rm @mounts @settings mcr.microsoft.com/windows/servercore:ltsc2022 C:\repo\target\clean-node\node.exe C:\repo\editors\vscode\test\native-windows-clean.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          docker run --rm --network none @mounts @settings mcr.microsoft.com/windows/servercore:ltsc2022 C:\repo\target\clean-node\node.exe C:\repo\editors\vscode\test\native-windows-clean.cjs --offline
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Run application without Java, .NET, Node or SDK mounted
+        shell: pwsh
+        run: |
+          docker run --rm --network none -v bhash-windows-programs:C:\app:ro mcr.microsoft.com/windows/servercore:ltsc2022 powershell.exe -NoProfile -Command 'foreach($tool in @("java","dotnet","node","clang","gcc","wsl")){if(Get-Command $tool -ErrorAction SilentlyContinue){throw "Unexpected tool: $tool"}}; & C:\app\hello.exe; if($LASTEXITCODE){exit $LASTEXITCODE}'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
