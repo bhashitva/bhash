@@ -675,21 +675,23 @@ void bh_trace_enter(bh_trace_frame *frame,const void *name,const void *location)
 }
 void bh_trace_at(const void *location){if(trace_frames)trace_frames->location=location;}
 void bh_trace_leave(void){if(!trace_frames)fatal("आंतरिक निदान स्टैक अमान्य है।");trace_frames=trace_frames->previous;}
-/* Snapshot payload holds only immortal text addresses; it has no managed fields.
-   The exception header owns it precisely, including across GC, cached failures and rethrow. */
+/* Snapshot entries are precise text references (normally immortal compiler text).
+   The exception header owns the snapshot across GC, cached failures and rethrow. */
 typedef struct bh_trace_snapshot {uint64_t count,truncated;const void *entries[];} bh_trace_snapshot;
-static const bh_type trace_type={"exception trace",16,0,NULL,0,0,0};
+static const bh_type trace_type={"exception trace",16,0,NULL,16,16,3};
 static void capture_trace(const void *location){
     bh_object *object=find_object(pending_exception);
     if(!object || object->diagnostic_trace || !trace_frames)return;
     uint64_t count=0;bh_trace_frame *at=trace_frames;
     while(at && count<256){++count;at=at->previous;}
+    void *slots[]={(void *)location};bh_root_frame frame;bh_roots_push(&frame,slots,1);
     bh_trace_snapshot *snapshot=bh_alloc(&trace_type,16+count*16);
     snapshot->count=count;snapshot->truncated=at!=NULL;at=trace_frames;
-    for(uint64_t i=0;i<count;++i,at=at->previous){snapshot->entries[i*2]=at->name;snapshot->entries[i*2+1]=(i==0 && location)?location:at->location;}
+    for(uint64_t i=0;i<count;++i,at=at->previous){snapshot->entries[i*2]=at->name;snapshot->entries[i*2+1]=(i==0 && slots[0])?slots[0]:at->location;}
     /* Header-reference store is nonallocating; a future moving/generational collector
        must update/track this header slot together with payload descriptor references. */
     find_object(pending_exception)->diagnostic_trace=snapshot;
+    bh_roots_pop(&frame);
 }
 static void print_trace(const void *exception){
     bh_object *object=find_object(exception);if(!object || !object->diagnostic_trace)return;
