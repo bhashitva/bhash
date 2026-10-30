@@ -160,6 +160,7 @@ export function activate(extensionContext: vscode.ExtensionContext) {
     command('bhash.lockDependencies',()=>dependencies('lock'));
     command('bhash.restoreDependencies',()=>dependencies('restore'));
     command('bhash.verifyDependencies',()=>dependencies('verify'));
+    command('bhash.openCommunity',()=>vscode.env.openExternal(vscode.Uri.parse('https://discord.gg/qC5zdJy6Qw')));
     command('bhash.restartServer',restart);command('bhash.openPlayground',()=>vscode.env.openExternal(vscode.Uri.parse('https://play.bhashitva.org/')));
     context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(() => {void startServer();}));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {if(event.affectsConfiguration('bhash.javaPath') || event.affectsConfiguration('bhash.compilerPath')) void restart().catch(error => output.appendLine(String(error)));}));
