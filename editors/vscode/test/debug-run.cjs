@@ -29,9 +29,11 @@ const {runTests,downloadAndUnzipVSCode,resolveCliArgsFromVSCodeExecutablePath}=r
     const {stdout,stderr}=await promisify(execFile)(command,args,{encoding:'utf8',timeout:180000,windowsHide:true,
         windowsVerbatimArguments:process.platform==='win32'});
     console.log(stdout,stderr);
-    await runTests({vscodeExecutablePath:executable,extensionDevelopmentPath:path.join(development,'extension'),
-        extensionTestsPath:path.join(__dirname,'debug-host.cjs'),
-        launchArgs:[workspace,'--extensions-dir',extensions,'--user-data-dir',userData,'--disable-workspace-trust',
+    // test-electron launches through cmd on Windows, so its path options need shell quotes.
+    const testPath=value=>process.platform==='win32'?'"'+value+'"':value;
+    await runTests({vscodeExecutablePath:executable,extensionDevelopmentPath:testPath(path.join(development,'extension')),
+        extensionTestsPath:testPath(path.join(__dirname,'debug-host.cjs')),
+        launchArgs:[testPath(workspace),'--extensions-dir',testPath(extensions),'--user-data-dir',testPath(userData),'--disable-workspace-trust',
             '--skip-welcome','--skip-release-notes',...(process.platform==='linux'?['--no-sandbox']:[]),'--disable-gpu'],
         extensionTestsEnv:{BHASH_DEBUG_WORKSPACE:workspace,BHASH_DEBUG_LOG:path.join(output,'dap.log'),BHASH_NATIVE_TOOLCHAIN:'managed',BHASH_TOOLCHAIN_HOME:process.env.BHASH_TOOLCHAIN_HOME}});
 })().catch(error=>{console.error(error);process.exitCode=1;});
