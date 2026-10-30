@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+from native_debug_support import compiler, gdb, GDB_ARGUMENTS
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'target/native-inspection'
@@ -77,17 +78,16 @@ print('PASS inspection, immutable roots, no allocations, UTF-8/NUL, cycles, coll
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    java = Path(os.environ['JAVA_HOME']) / 'bin/java' if os.environ.get('JAVA_HOME') else 'java'
-    program = OUT / 'inspection'
-    run([java, '-jar', ROOT/'target/bhash-compiler-0.1.0-SNAPSHOT.jar', 'compile', SOURCE,
-         '--target', 'native', '--debug', '-o', program])
+    program = OUT / ('inspection.exe' if os.name == 'nt' else 'inspection')
+    run(compiler(ROOT, ['compile', SOURCE,
+         '--target', 'native', '--debug', '-o', program]))
     markers = {name: next(i for i, line in enumerate(SOURCE.read_text(encoding='utf-8').splitlines(), 1)
                           if name in line) for name in ('DEBUG_BEFORE', 'DEBUG_AFTER', 'DEBUG_INNER')}
     commands = 'set pagination off\nset confirm off\nset disable-randomization off\nset charset UTF-8\nset language c\n'
     commands += 'set may-call-functions off\n' + python_command('exec(compile(open(' + repr(str(PRINTER)) + ', "rb").read(), ' + repr(str(PRINTER)) + ', "exec"))')
     commands += 'skip -rfu ^bh_\nskip -rfu ^bhash_\n'
-    commands += 'break ' + json.dumps(str(SOURCE)) + ':' + str(markers['DEBUG_BEFORE']) + '\n'
-    commands += 'break ' + json.dumps(str(SOURCE)) + ':' + str(markers['DEBUG_AFTER']) + '\nrun\n'
+    commands += 'break ' + json.dumps(SOURCE.as_posix()) + ':' + str(markers['DEBUG_BEFORE']) + '\n'
+    commands += 'break ' + json.dumps(SOURCE.as_posix()) + ':' + str(markers['DEBUG_AFTER']) + '\nrun\n'
     commands += python_command(INSPECT)
     commands += 'step\ninfo frame\ninfo line *$pc\nx/8i $pc\nmaintenance info line-table debug-inspection.bhash\n' + python_command("assert gdb.selected_frame().name() == 'दुगुना'; assert int(gdb.selected_frame().read_var('मूल')) == 21; assert int(gdb.parse_and_eval('roots')) != before_roots[0][0], 'callee roots not registered at source stop'")
     commands += 'next\nfinish\ncontinue\n' + python_command(INSPECT)
@@ -96,7 +96,7 @@ def main():
     commands += 'continue\n'
     script = OUT/'inspection.gdb'
     script.write_text(commands, encoding='utf-8')
-    transcript = run(['gdb', '--nx', '--nh', '--batch', '-iex', 'set auto-load off', '-x', script, program],
+    transcript = run([gdb(), *GDB_ARGUMENTS, '--batch', '-x', script, program],
                      env={**os.environ, 'LC_ALL': 'C.UTF-8', 'BHASH_GC_STRESS': '1', 'BHASH_GC_STATS': '1'})
     (OUT/'gdb.log').write_text(transcript, encoding='utf-8')
     assert transcript.count('PASS inspection,') == 2, transcript

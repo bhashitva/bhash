@@ -39,6 +39,11 @@ def resolve(destination):
         database = Path(work) / 'ucrt64.db'
         download(MIRROR + 'ucrt64/ucrt64.db', database)
         packages = {}
+        if database.read_bytes()[:4] == bytes.fromhex('28b52ffd'):
+            unpacked = Path(work) / 'database.tar'
+            with unpacked.open('wb') as stream:
+                subprocess.run(['zstd', '-d', '-c', str(database)], stdout=stream, check=True)
+            database = unpacked
         with tarfile.open(database) as archive:
             for member in archive:
                 if member.name.endswith('/desc'):
@@ -134,6 +139,10 @@ def build(lock_path, output):
     (output / 'windows-debugger.json').write_text(json.dumps({
         'id': ID, 'url': 'https://github.com/bhashitva/bhash/releases/download/native-debugger-windows-1.0.0/' + archive.name,
         'sha256': digest}, indent=2) + '\n', encoding='utf-8')
+    with zipfile.ZipFile(output / 'bhash-windows-debugger-corresponding-sources.zip', 'w', compression=zipfile.ZIP_STORED) as sources:
+        sources.write(lock_path, 'packages.lock.json')
+        for source in sorted(source_output.iterdir()):
+            sources.write(source, source.name)
     print('Built', archive, digest, flush=True)
 
 
