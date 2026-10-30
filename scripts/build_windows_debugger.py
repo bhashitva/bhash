@@ -16,6 +16,7 @@ import tarfile
 import tempfile
 import urllib.request
 import zipfile
+from windows_gdb_manifest import utf8_gdb
 
 MIRROR = 'https://repo.msys2.org/mingw/'
 ID = 'bhash-windows-x86_64-gdb-v1'
@@ -85,7 +86,8 @@ def keep(name):
     if not parts or parts[0] != 'ucrt64':
         return False
     relative = '/'.join(parts[1:])
-    return (relative == 'bin/gdb.exe' or relative.startswith('bin/') and relative.endswith('.dll')
+    license_file = parts[-1].lower().startswith(('license', 'licence', 'copying', 'copyright')) or parts[-1].lower().endswith('.terms')
+    return (license_file or relative == 'bin/gdb.exe' or relative.startswith('bin/') and relative.endswith('.dll')
             or relative.startswith(('share/gdb/', 'share/licenses/', 'share/terminfo/'))
             or relative.startswith('lib/python') and not any(p in parts for p in ('test', 'tests', '__pycache__', 'site-packages')))
 
@@ -119,8 +121,15 @@ def build(lock_path, output):
                     payload[name] = content
             source = source_output / package['source_url'].rsplit('/', 1)[1]
             download(package['source_url'], source, package['source_sha256'])
+    payload['bin/gdb.exe'] = utf8_gdb(payload['bin/gdb.exe'])
+    # MSYS2 uses common GNU licenses rather than copying them into each package.
+    # Retain the complete standard texts in the standalone payload as well.
+    for license_name in ('GPL-2', 'GPL-3', 'LGPL-2.1', 'LGPL-3'):
+        payload['share/licenses/common/' + license_name] = (Path('/usr/share/common-licenses') / license_name).read_bytes()
     payload['NOTICE.txt'] = (
-        'Bhash Windows debugger: unmodified MSYS2 UCRT64 GDB and Python runtime files.\n'
+        'Bhash Windows debugger: MSYS2 UCRT64 GDB and Python runtime files.\n'
+        'GDB manifest modified by Bhash on 2026-10-30 to enable per-process UTF-8; code unchanged.\n'
+        'The corresponding-source release includes the exact manifest patch script.\n'
         'GDB is GPL-3.0-or-later. Python and dependencies retain their own licenses.\n'
         'See share/licenses and the adjacent corresponding-source archives and package lock.\n'
         'This separate debugger distribution does not change the license of Bhash programs.\n'
@@ -140,9 +149,14 @@ def build(lock_path, output):
         'id': ID, 'url': 'https://github.com/bhashitva/bhash/releases/download/native-debugger-windows-1.0.0/' + archive.name,
         'sha256': digest}, indent=2) + '\n', encoding='utf-8')
     with zipfile.ZipFile(output / 'bhash-windows-debugger-corresponding-sources.zip', 'w', compression=zipfile.ZIP_STORED) as sources:
-        sources.write(lock_path, 'packages.lock.json')
+        for script_name in ('build_windows_debugger.py', 'windows_gdb_manifest.py'):
+            info = zipfile.ZipInfo(script_name, (2026, 1, 1, 0, 0, 0))
+            sources.writestr(info, Path(__file__).with_name(script_name).read_bytes())
+        info = zipfile.ZipInfo('packages.lock.json', (2026, 1, 1, 0, 0, 0))
+        sources.writestr(info, lock_path.read_bytes())
         for source in sorted(source_output.iterdir()):
-            sources.write(source, source.name)
+            info = zipfile.ZipInfo(source.name, (2026, 1, 1, 0, 0, 0))
+            sources.writestr(info, source.read_bytes())
     print('Built', archive, digest, flush=True)
 
 

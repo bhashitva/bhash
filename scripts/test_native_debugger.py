@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 import subprocess
-from native_debug_support import compiler, gdb, GDB_ARGUMENTS
+from native_debug_support import compiler, gdb, gdb_arguments
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +24,7 @@ def main():
          ROOT/'examples/native/debugging.bhash', '--target', 'native', '--debug', '-o', executable]))
     commands = OUTPUT / 'commands.gdb'
     commands.write_text('set pagination off\nset confirm off\nset disable-randomization off\nskip -rfu ^bh_\nbreak debugging.bhash:9\nrun\nstep\nframe\nbreak debugging.bhash:4\ncontinue\ninfo args\ninfo locals\nnext\nframe\nfinish\nframe\nnext\ninfo locals\ncontinue\n', encoding='utf-8')
-    transcript = run([gdb(), *GDB_ARGUMENTS, '--batch', '-x', commands, executable], env={**os.environ, 'LC_ALL':'C.UTF-8'})
+    transcript = run([gdb(), *gdb_arguments(), '--batch', '-x', commands, executable], env={**os.environ, 'LC_ALL':'C.UTF-8'})
     (OUTPUT/'gdb.log').write_text(transcript, encoding='utf-8')
     for expected in ('दुगुना', 'मुख्य', 'debugging.bhash:4', 'उत्तर = 42', 'मूल = 21', 'फल = 42', 'exited normally'):
         if expected not in transcript:

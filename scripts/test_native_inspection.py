@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
-from native_debug_support import compiler, gdb, GDB_ARGUMENTS
+from native_debug_support import compiler, gdb, gdb_arguments
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'target/native-inspection'
@@ -96,7 +96,7 @@ def main():
     commands += 'continue\n'
     script = OUT/'inspection.gdb'
     script.write_text(commands, encoding='utf-8')
-    transcript = run([gdb(), *GDB_ARGUMENTS, '--batch', '-x', script, program],
+    transcript = run([gdb(), *gdb_arguments(), '--batch', '-x', script, program],
                      env={**os.environ, 'LC_ALL': 'C.UTF-8', 'BHASH_GC_STRESS': '1', 'BHASH_GC_STATS': '1'})
     (OUT/'gdb.log').write_text(transcript, encoding='utf-8')
     assert transcript.count('PASS inspection,') == 2, transcript

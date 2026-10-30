@@ -22,3 +22,12 @@ def compiler(root, arguments):
 
 def gdb():
     return os.environ.get('BHASH_GDB', 'gdb')
+
+
+def gdb_arguments():
+    result = list(GDB_ARGUMENTS)
+    if os.name == 'nt':
+        data = Path(gdb()).parent.parent / 'share/gdb'
+        if (data / 'python/gdb/__init__.py').is_file():
+            result.insert(0, '--data-directory=' + str(data))
+    return result
