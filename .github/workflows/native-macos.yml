@@ -18,10 +18,17 @@ jobs:
         with:
           python-version: '3.11.9'
       - uses: actions/cache@v4
+        id: sdk-cache
+        with:
+          path: target/macos-sdk
+          key: macos-sdk-reproduced-${{ hashFiles('scripts/build_macos_native_toolchain.py', 'scripts/build_native_toolchain.py') }}
+      - uses: actions/cache@v4
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
         with:
           path: llvm-upstream.tar.xz
           key: macos-llvm-18.1.8-4573b7f25f46d2a9
       - name: Authenticate upstream and reproduce the managed LLVM SDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
         run: |
           test "$(uname -m)" = arm64
           if [ ! -f llvm-upstream.tar.xz ]; then
@@ -30,6 +37,8 @@ jobs:
           python3 scripts/build_macos_native_toolchain.py llvm-upstream.tar.xz
           python3 scripts/build_macos_native_toolchain.py llvm-upstream.tar.xz --output target/macos-sdk-again
           cmp target/macos-sdk/bhash-macos-arm64-llvm18-v1.zip target/macos-sdk-again/bhash-macos-arm64-llvm18-v1.zip
+      - name: Verify the immutable SDK catalog hash, including cached archives
+        run: |
           cd target/macos-sdk
           echo 'c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d  bhash-macos-arm64-llvm18-v1.zip' | shasum -a 256 -c -
       - uses: actions/upload-artifact@v4
@@ -92,12 +101,12 @@ jobs:
         run: |
           python3 scripts/test_native_runtime.py --sanitize
           python3 scripts/test_native_fixed.py
-      - name: Cross-validate native language behavior against JVM and CLR with forced GC
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,MacosCompatibilityTest test
       - name: Verify reproducible release packages, Mach-O inspection, symbols and standalone execution
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: python3 scripts/test_macos_native_release.py
+      - name: Cross-validate native language behavior against JVM and CLR with forced GC
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,MacosCompatibilityTest test
       - name: Compile every applicable native example
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
