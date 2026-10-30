@@ -58,4 +58,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: native-debug-vsix-${{ matrix.os }}
-          path: target/bhash-vscode-0.8.0.vsix
+          path: target/bhash-vscode-*.vsix

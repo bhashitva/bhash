@@ -6,6 +6,7 @@ const {execFile}=require('node:child_process');const {promisify}=require('node:u
     const workspace=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'bhash-vscode-')));
     try {
         await fs.mkdir(path.join(workspace,'src'));await fs.mkdir(path.join(workspace,'.vscode'));
+        await fs.writeFile(path.join(workspace,'.vscode','settings.json'),JSON.stringify({'debug.allowBreakpointsEverywhere':false}));
         await fs.writeFile(path.join(workspace,'bhash.project'),'name=host-test\nsources=src\n');
         await fs.writeFile(path.join(workspace,'src','math.bhash'),'संकुल गणित;\nसार्वजनिक कार्य दोहरा(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }\n');
         await fs.writeFile(path.join(workspace,'src','main.bhash'),'आयात गणित.दोहरा;\nकार्य मुख्य() -> शून्य {\n    स्थिर क: पूर्णांक = दोहरा(३);\n    लिखो(क);\n}\n');

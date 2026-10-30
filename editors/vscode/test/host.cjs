@@ -5,6 +5,17 @@ exports.run=async()=>{
     const workspace=process.env.BHASH_TEST_WORKSPACE;let uri=vscode.Uri.file(path.join(workspace,'src','main.bhash'));
     const document=await vscode.workspace.openTextDocument(uri);uri=document.uri;await vscode.window.showTextDocument(document);
     assert.equal(document.languageId,'bhash');const extension=vscode.extensions.getExtension('bhashitva.bhash');assert.ok(extension);await extension.activate();
+    // Use the editor command (F9), which checks the language contribution.
+    // debug.addBreakpoints bypasses this gate and missed the 0.8.0 regression.
+    assert.equal(vscode.workspace.getConfiguration('debug',uri).get('allowBreakpointsEverywhere'),false);
+    const breakpointEditor=await vscode.window.showTextDocument(document);
+    breakpointEditor.selection=new vscode.Selection(3,0,3,0);
+    await vscode.commands.executeCommand('editor.debug.action.toggleBreakpoint');
+    const editorPoint=vscode.debug.breakpoints.find(b=>b instanceof vscode.SourceBreakpoint&&b.location.uri.toString()===uri.toString()&&b.location.range.start.line===3);
+    assert.ok(editorPoint,'Bhash must permit normal gutter/F9 breakpoints with the override disabled');
+    await vscode.commands.executeCommand('editor.debug.action.toggleBreakpoint');
+    assert.ok(!vscode.debug.breakpoints.some(b=>b.id===editorPoint.id),'F9 removes the breakpoint');
+    console.log('PASS Bhash editor breakpoint toggle with allowBreakpointsEverywhere=false.');
     const position=new vscode.Position(2,document.lineAt(2).text.indexOf("दोहरा"));
     const label=item=>typeof item.label==='string'?item.label:item.label.label;
     const completion=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,position),list=>list?.items?.some(i=>label(i)==='दोहरा'),'compiler keyword completion');

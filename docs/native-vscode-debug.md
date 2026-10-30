@@ -26,7 +26,11 @@ Extension GDB/Python की जाँच पहले करती है। फ
 ## पहला सत्र (First Session)
 
 [debug-inspection.bhash](../examples/native/debug-inspection.bhash) खोलें। `DEBUG_BEFORE`
-और `DEBUG_AFTER` वाली executable lines के बाएँ gutter में breakpoint लगाएँ। Command
+और `DEBUG_AFTER` वाली executable lines के बाएँ gutter में क्लिक करें, या उस line पर
+cursor रखकर **F9** दबाएँ। 0.8.1 से Bhash files के लिए यह सामान्य editor सुविधा
+सक्षम है। यदि 0.8.0 में breakpoint नहीं लग रहा है, तो update करें; अस्थायी रूप से
+workspace Settings में **Debug: Allow Breakpoints Everywhere** सक्षम कर सकते हैं।
+इस विकल्प को 0.8.1 में रखने की जरूरत नहीं है। Command
 Palette से **Bhash: Debug Native (Linux/WSL)** चलाएँ। Project के अंदर की source file
 खोलने पर nearest `bhash.project` build होता है। Dirty Bhash project buffers पहले save
 होते हैं; invalid source या cancelled build पर पुराना executable launch नहीं होता।

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- Enable normal gutter and F9 breakpoints in Bhash source files without enabling breakpoints for every language.
+- Test the editor Toggle Breakpoint command with the global override disabled, alongside native GDB debugging.
+
 ## 0.8.0
 
 - Add Linux/WSL native debugging through VS Code's Microsoft C/C++ GDB adapter: source breakpoints, stepping, Hindi call stacks and expandable Bhash variables.
