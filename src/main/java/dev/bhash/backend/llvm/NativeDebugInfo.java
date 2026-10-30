@@ -33,7 +33,7 @@ final class NativeDebugInfo {
         var arguments=new ArrayList<String>();Type result=callback?Type.INT:f.result();arguments.add(result==Type.VOID?"null":"!"+type(result));
         if(callback)arguments.add("!"+type(Type.OBJECT));else for(var parameter:f.parameters())arguments.add("!"+type(parameter.type()));
         int signature=add("!DISubroutineType(types: !"+add("!{"+String.join(", ",arguments)+"}")+")");
-        return add("distinct !DISubprogram(name: "+quote(name)+", scope: !"+file(f.source())+", file: !"+file(f.source())+", line: "+f.source().line()+", type: !"+signature+", scopeLine: 0, flags: DIFlagPrototyped"+(artificial?" | DIFlagArtificial":"")+", spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !"+unit+")");
+        return add("distinct !DISubprogram(name: "+quote(name)+", linkageName: "+quote(linkage)+", scope: !"+file(f.source())+", file: !"+file(f.source())+", line: "+f.source().line()+", type: !"+signature+", scopeLine: "+f.source().line()+", flags: DIFlagPrototyped"+(artificial?" | DIFlagArtificial":"")+", spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !"+unit+")");
     }
     int location(int scope,Source source){return locations.computeIfAbsent(scope+":"+source,k->{
         // Lexical file scopes also handle generated constructor/base initialization from other files.
