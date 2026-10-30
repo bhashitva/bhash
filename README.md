@@ -464,3 +464,13 @@ See [Windows native setup and distribution](docs/native-windows.md).
 ### macOS Apple Silicon native builds
 
 Native compilation supports macOS 14+ ARM64 using a managed LLVM 18 SDK and locally installed Apple Command Line Tools. Use ARM64 VS Code and Java 17+ to build; generated applications require neither Java nor .NET nor LLVM. See [macOS native setup, packaging and debugging](docs/native-macos.md).
+
+
+### Windows native debugging
+
+On Windows 10 version 1903 or later, the Bhash VS Code extension supports native
+source breakpoints, stepping, Hindi call stacks and read-only heap inspection.
+Run **Bhash: Debug Native**; a separate verified GDB/Python package is installed
+automatically. Java 17+ and Microsoft's C/C++ extension are required on that host;
+WSL and preinstalled LLVM/C development tools are unnecessary. See the
+[Hindi native debugging guide](docs/native-vscode-debug.md).
