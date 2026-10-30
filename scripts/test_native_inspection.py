@@ -84,7 +84,7 @@ def main():
     markers = {name: next(i for i, line in enumerate(SOURCE.read_text(encoding='utf-8').splitlines(), 1)
                           if name in line) for name in ('DEBUG_BEFORE', 'DEBUG_AFTER', 'DEBUG_INNER')}
     commands = 'set pagination off\nset confirm off\nset disable-randomization off\nset charset UTF-8\n'
-    commands += 'set may-call-functions off\nsource ' + json.dumps(str(PRINTER)) + '\n'
+    commands += 'set may-call-functions off\n' + python_command('exec(compile(open(' + repr(str(PRINTER)) + ', "rb").read(), ' + repr(str(PRINTER)) + ', "exec"))')
     commands += 'skip -rfu ^bh_\nskip -rfu ^bhash_\n'
     commands += 'break ' + json.dumps(str(SOURCE)) + ':' + str(markers['DEBUG_BEFORE']) + '\n'
     commands += 'break ' + json.dumps(str(SOURCE)) + ':' + str(markers['DEBUG_AFTER']) + '\nrun\n'
