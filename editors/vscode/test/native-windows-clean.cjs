@@ -20,6 +20,14 @@ const launcher=path.join(repo,'editors/vscode/dist/native-task.js');
 const java=process.env.BHASH_TEST_JAVA || 'C:\\java\\bin\\java.exe';
 const jar=path.join(home,'compiler.jar');fs.copyFileSync(path.join(repo,'target/bhash-compiler-0.1.0-SNAPSHOT.jar'),jar);
 const request={java,jar,mode:'managed'};
+function copyCacheContents(from,to){
+    fs.mkdirSync(to,{recursive:true});
+    for(const name of fs.readdirSync(from)){
+        const source=path.join(from,name),destination=path.join(to,name);
+        if(fs.statSync(source).isDirectory())copyCacheContents(source,destination);
+        else fs.writeFileSync(destination,fs.readFileSync(source));
+    }
+}
 const env={...process.env,BHASH_GC_STRESS:'1',BHASH_GC_STATS:'1'};
 function invoke(executable,args,input,extra={},cwd=home){
     const r=spawnSync(executable,args,{cwd,env:{...env,...extra},input,encoding:'utf8',timeout:360000,maxBuffer:4*1024*1024});
@@ -58,11 +66,10 @@ try {
     const relocated=path.join(home,'relocated source'),cache=path.join(home,'relocated SDK');
     fs.mkdirSync(relocated);const source2=path.join(relocated,'hello.bhash');fs.copyFileSync(hello,source2);
     const originalCache=env.BHASH_TOOLCHAIN_HOME;
-    // A Windows Docker volume root is a junction; copy its contents, not the mountpoint.
+    // Recreate regular files from bytes, without cloning Docker reparse-point metadata.
     const receiptPath=path.join('installations',JSON.parse(fs.readFileSync(active,'utf8')).directory,'.installed.json');
     assert.ok(fs.existsSync(path.join(originalCache,receiptPath)),'original cache must contain its installation receipt');
-    fs.mkdirSync(cache);
-    for(const entry of fs.readdirSync(originalCache))fs.cpSync(path.join(originalCache,entry),path.join(cache,entry),{recursive:true,dereference:true});
+    copyCacheContents(originalCache,cache);
     assert.ok(fs.existsSync(path.join(cache,'active.json')),'relocated cache must contain its active receipt');
     assert.ok(fs.existsSync(path.join(cache,receiptPath)),'relocated cache must contain its installation receipt');
     env.BHASH_TOOLCHAIN_HOME=cache;
