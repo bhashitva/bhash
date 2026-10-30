@@ -32,9 +32,17 @@ export function gdbSetup(script: string) {
     ].map(command => ({...command, ignoreFailures: false}));
 }
 export const gdbArguments = ['--nx', '--nh', '-eiex', 'set python ignore-environment on', '-eiex', 'set python dont-write-bytecode on', '-iex', 'set auto-load off'];
+export async function debuggerArguments(command: string): Promise<string[]> {
+    const result = [...gdbArguments];
+    if (process.platform === 'win32' && path.isAbsolute(command)) {
+        const data = path.resolve(path.dirname(command), '..', 'share', 'gdb');
+        try {await fs.access(path.join(data, 'python', 'gdb', '__init__.py')); result.unshift('--data-directory=' + data);} catch {}
+    }
+    return result;
+}
 export async function probeGdb(command: string, signal?: AbortSignal): Promise<void> {
     try {
-        const {stdout} = await promisify(execFile)(command, [...gdbArguments, '--batch', '-ex', 'python import gdb, sys; from gdb.FrameDecorator import FrameDecorator; print("BHASH_GDB_READY:" + gdb.VERSION + ":" + str(sys.version_info[0]))'],
+        const {stdout} = await promisify(execFile)(command, [...await debuggerArguments(command), '--batch', '-ex', 'python import gdb, sys; from gdb.FrameDecorator import FrameDecorator; print("BHASH_GDB_READY:" + gdb.VERSION + ":" + str(sys.version_info[0]))'],
             {encoding: 'utf8', timeout: 15000, maxBuffer: 65536, signal, windowsHide: true});
         const match = /BHASH_GDB_READY:(\d+)[^\r\n]*:3(?:\r?\n|$)/.exec(stdout);
         if (!match || Number(match[1]) < 12) throw Error('GDB 12+ with Python 3 support is required.');
@@ -51,7 +59,7 @@ export async function removeDebugBuild(directory: string): Promise<void> {
     await fs.rm(resolved, {recursive: true, force: true, maxRetries: 10, retryDelay: 100});
 }
 export async function prepareNativeDebug(options: DebugOptions, log: (text: string) => void, signal?: AbortSignal,
-    dependencies: {probe: typeof probeGdb; ensure: typeof ensureNative; run: Runner; debugger?: typeof ensureDebugger} = {probe: probeGdb, ensure: ensureNative, run: capture, debugger: ensureDebugger}): Promise<{program: string; directory: string; gdb: string; setupCommands: ReturnType<typeof gdbSetup>}> {
+    dependencies: {probe: typeof probeGdb; ensure: typeof ensureNative; run: Runner; debugger?: typeof ensureDebugger} = {probe: probeGdb, ensure: ensureNative, run: capture, debugger: ensureDebugger}): Promise<{program: string; directory: string; gdb: string; debuggerArgs: string[]; setupCommands: ReturnType<typeof gdbSetup>}> {
     requireDebugHost();
     if (!path.isAbsolute(options.input) || !path.isAbsolute(options.cwd)) throw Error('Debug input and working directory must be absolute paths on the extension host.');
     const gdb = await (dependencies.debugger || ensureDebugger)(options, options.gdb, log, signal);
@@ -66,6 +74,6 @@ export async function prepareNativeDebug(options: DebugOptions, log: (text: stri
         await dependencies.run(options.java, invocation.args, nativeEnvironment(options), signal, invocation.cwd || options.cwd);
         signal?.throwIfAborted();
         await fs.access(program, fs.constants.X_OK);
-        return {program, directory, gdb, setupCommands: gdbSetup(path.join(options.extensionRoot, 'debug', 'bhash_gdb.py'))};
+        return {program, directory, gdb, debuggerArgs: await debuggerArguments(gdb), setupCommands: gdbSetup(path.join(options.extensionRoot, 'debug', 'bhash_gdb.py'))};
     } catch (error) {await removeDebugBuild(directory); throw error;}
 }

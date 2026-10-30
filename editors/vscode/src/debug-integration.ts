@@ -59,10 +59,11 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
                     });
                 } finally {cancellation?.dispose();}
                 directory = result.directory; builds.add(directory);
+                abort.signal.throwIfAborted();
                 return {...configuration, type: 'cppdbg', request: 'launch', MIMode: 'gdb',
                     program: result.program, cwd, miDebuggerPath: result.gdb,
                     // Load only our explicit printer, with user/system init and ELF auto-load disabled.
-                    miDebuggerArgs: '--nx --nh -eiex "set python ignore-environment on" -eiex "set python dont-write-bytecode on" -iex "set auto-load off"',
+                    miDebuggerArgs: result.debuggerArgs.map(argument => JSON.stringify(argument)).join(' '),
                     setupCommands: [...result.setupCommands, ...(configuration.setupCommands || [])],
                     externalConsole: false, stopAtEntry: configuration.stopAtEntry ?? false,
                     bhashBuildDirectory: directory};
