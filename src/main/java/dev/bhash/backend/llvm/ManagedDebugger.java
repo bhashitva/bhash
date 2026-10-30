@@ -49,7 +49,10 @@ public final class ManagedDebugger {
     }
     private static void probe(Path root)throws IOException{
         String prefix=NativeBuildInfo.JSON.toJson(root.toString());
-        var builder=new ProcessBuilder(root.resolve("bin/gdb.exe").toString(),"--data-directory="+root.resolve("share/gdb"),"--nx","--nh","--batch","-eiex","set python ignore-environment on","-eiex","set python dont-write-bytecode on","-iex","set auto-load off","-ex","python import gdb, json, struct, sys, ctypes, os; assert os.path.normcase(os.path.realpath(sys.prefix)) == os.path.normcase(os.path.realpath("+prefix+")), 'Bundled Python prefix required'; assert ctypes.windll.kernel32.GetACP() == 65001, 'Windows 10 1903+ UTF-8 process support required'; from gdb.FrameDecorator import FrameDecorator; assert sys.version_info.major == 3; print('BHASH_GDB_READY')");
+        String python="import gdb, json, struct, sys, ctypes, os; assert os.path.normcase(os.path.realpath(sys.prefix)) == os.path.normcase(os.path.realpath("+prefix+")), 'Bundled Python prefix required'; assert ctypes.windll.kernel32.GetACP() == 65001, 'Windows 10 1903+ UTF-8 process support required'; from gdb.FrameDecorator import FrameDecorator; assert sys.version_info.major == 3; print('BHASH_GDB_READY')";
+        // Avoid nested double quotes in Windows Java 17/MinGW argv parsing.
+        String encoded=Base64.getEncoder().encodeToString(python.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var builder=new ProcessBuilder(root.resolve("bin/gdb.exe").toString(),"--data-directory="+root.resolve("share/gdb"),"--nx","--nh","--batch","-eiex","set python ignore-environment on","-eiex","set python dont-write-bytecode on","-iex","set auto-load off","-ex","python import base64; exec(base64.b64decode('"+encoded+"'))");
         builder.directory(root.toFile());builder.redirectErrorStream(true);
         builder.environment().keySet().removeIf(key->Set.of("PYTHONHOME","PYTHONPATH","PYTHONSTARTUP").contains(key.toUpperCase(Locale.ROOT)));
         Path output=Files.createTempFile(root,".probe-",".log");
