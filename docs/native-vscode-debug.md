@@ -116,7 +116,8 @@ inspection के पहले/बाद allocation/collection counters तथ�
 समान होने चाहिए। दूसरे stop से पहले 300 forced collections होती हैं; shutdown पर
 `live=0` चाहिए। Inferior calls के निषेध को भी जाँचा जाता है।
 
-`editors/vscode/test/debug-run.cjs` actual VS Code और Microsoft GDB adapter शुरू करता
+`editors/vscode/test/debug-run.cjs` packaged VSIX को Hindi/quoted path में खोलकर actual
+VS Code और Microsoft GDB adapter शुरू करता
 है, DAP breakpoints/step-in/next/step-out तथा Variables/Call Stack requests जाँचता है,
 फिर forced-GC run और per-session build cleanup सत्यापित करता है। Dedicated CI दोनों
 Ubuntu 22.04 और 24.04 पर चलता है। Existing native runtime sanitizer tests collector
