@@ -36,9 +36,13 @@ jobs:
           require('./editors/vscode/dist/native.js').ensureNative({java:'java',jar:path.resolve('target/bhash-compiler-0.1.0-SNAPSHOT.jar'),mode:'managed'},console.log).catch(error=>{console.error(error);process.exitCode=1;});
           JS
       - name: Real GDB inspection and forced-GC safety
+        id: inspection
+        continue-on-error: true
         run: python3 scripts/test_native_inspection.py && python3 scripts/test_native_debugger.py
       - run: npm run package --prefix editors/vscode
       - name: Real VS Code GDB launch, breakpoints, stepping, stacks and variables
+        id: vscode
+        continue-on-error: true
         run: xvfb-run -a node editors/vscode/test/debug-run.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -48,6 +52,9 @@ jobs:
             target/native-inspection/
             target/native-debugger/
             target/vscode-debug/
+      - name: Require both debugger integration tests
+        if: always()
+        run: test '${{ steps.inspection.outcome }}' = success && test '${{ steps.vscode.outcome }}' = success
       - uses: actions/upload-artifact@v4
         with:
           name: native-debug-vsix-${{ matrix.os }}
