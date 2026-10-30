@@ -74,10 +74,26 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           # BHASH_CLANG is only used by the standalone C tests; managed compiler selects its own tools.
           Remove-Item Env:BHASH_CLANG
-          mvn --batch-mode --no-transfer-progress '-Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,Utf8ArgumentsTest' test
+          mvn --batch-mode --no-transfer-progress '-Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,Utf8ArgumentsTest' '-DargLine=-Xmx768m' test
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python scripts/build_examples.py --target native --require-native
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Diagnose Windows helper startup failures
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_OperatingSystem | Select-Object FreePhysicalMemory,TotalVirtualMemorySize,FreeVirtualMemory | Format-List
+          Get-Process | Group-Object ProcessName | Sort-Object Count -Descending | Select-Object -First 15 Count,Name | Format-Table
+          if (Test-Path "$env:BHASH_TOOLCHAIN_HOME/active.json") {
+            $active=Get-Content "$env:BHASH_TOOLCHAIN_HOME/active.json" | ConvertFrom-Json
+            $sdk=Join-Path "$env:BHASH_TOOLCHAIN_HOME/installations" $active.directory
+            foreach ($tool in @('clang.exe','clang-18.exe')) {
+              & "$sdk/bin/$tool" --version
+              Write-Host "$tool exit code: $LASTEXITCODE"
+            }
+            java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native toolchain verify --json
+          }
+          exit 0
       - name: Package Windows-ready VSIX
         run: npm run package --prefix editors/vscode
       - uses: actions/upload-artifact@v4
