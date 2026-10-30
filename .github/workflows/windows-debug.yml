@@ -25,3 +25,92 @@ jobs:
           path: |
             target/windows-debugger-sdk/
             scripts/windows-debugger-packages.lock.json
+
+  windows:
+    needs: debugger
+    runs-on: windows-2022
+    timeout-minutes: 35
+    env:
+      BHASH_NATIVE_TOOLCHAIN: managed
+      BHASH_TOOLCHAIN_HOME: ${{ github.workspace }}/target/windows-debug-tools
+      BHASH_DEBUGGER_HOME: ${{ github.workspace }}/target/windows-debug-gdb
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-debugger-sdk
+          path: target/debugger-artifact
+      - name: Validate release catalog and build package
+        shell: pwsh
+        run: |
+          $candidate=Get-Content target/debugger-artifact/target/windows-debugger-sdk/windows-debugger.json | ConvertFrom-Json
+          $catalog=Get-Content editors/vscode/src/windows-debugger.json | ConvertFrom-Json
+          if ($catalog.sha256 -eq ('0' * 64)) {
+            Copy-Item target/debugger-artifact/target/windows-debugger-sdk/windows-debugger.json editors/vscode/src/windows-debugger.json
+          } elseif ($catalog.sha256 -ne $candidate.sha256) { throw 'Debugger release is not reproducible from the package lock' }
+          mvn --batch-mode --no-transfer-progress package -DskipTests
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm ci --prefix editors/vscode --no-audit --no-fund
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run package --prefix editors/vscode
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm test --prefix editors/vscode
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Real debugger in Windows Server Core without WSL or development tools
+        id: clean
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $service=Get-Service docker
+          if ($service.Status -ne 'Running') { Start-Service docker; $service.WaitForStatus('Running',[TimeSpan]::FromSeconds(60)) }
+          docker pull mcr.microsoft.com/windows/servercore:ltsc2022
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $node=Split-Path (Get-Command node.exe).Source
+          $python=python -c "import sys; print(sys.base_prefix)"
+          docker volume create bhash-debug-tools
+          docker volume create bhash-debug-gdb
+          $candidate=(Resolve-Path target/debugger-artifact/target/windows-debugger-sdk/bhash-windows-x86_64-gdb-v1.zip).Path
+          $bootstrap=@('-e','BHASH_TEST_DEBUGGER_ARCHIVE=C:\repo\target\debugger-artifact\target\windows-debugger-sdk\bhash-windows-x86_64-gdb-v1.zip')
+          docker run --rm --workdir C:\repo -v "${PWD}:C:\repo" -v "$env:JAVA_HOME`:C:\java:ro" -v "${node}:C:\node:ro" -v "${python}:C:\python:ro" -v bhash-debug-tools:C:\tools -v bhash-debug-gdb:C:\debugger -e JAVA_HOME=C:\java -e BHASH_NATIVE_TOOLCHAIN=managed -e BHASH_TOOLCHAIN_HOME=C:\tools -e BHASH_DEBUGGER_HOME=C:\debugger -e BHASH_TEST_PYTHON=C:\python\python.exe -e 'PATH=C:\java\bin;C:\node;C:\python;C:\Windows\system32;C:\Windows' @bootstrap mcr.microsoft.com/windows/servercore:ltsc2022 C:\node\node.exe scripts/test_windows_debug_clean.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Real VS Code Windows debugging with isolated development-tool PATH
+        id: vscode
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $node=(Get-Command node.exe).Source
+          $python=(Get-Command python.exe).Source
+          $env:BHASH_TEST_PYTHON=$python
+          $env:PATH="$env:JAVA_HOME\bin;$(Split-Path $node);$(Split-Path $python);$env:SystemRoot\system32;$env:SystemRoot"
+          # Candidate bootstrap only; the final workflow uses the published automatic download.
+          $archive=(Resolve-Path target/debugger-artifact/target/windows-debugger-sdk/bhash-windows-x86_64-gdb-v1.zip).Path
+          $hash=(Get-FileHash $archive).Hash.ToLower()
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native debugger install --archive $archive --sha256 $hash --json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & $node editors/vscode/test/debug-run.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-debug-results
+          path: |
+            target/native-inspection/
+            target/native-debugger/
+            target/vscode-debug/dap.log
+            target/bhash-vscode-*.vsix
+      - name: Require clean-machine and actual editor debugger tests
+        if: always()
+        shell: pwsh
+        run: |
+          if ('${{ steps.clean.outcome }}' -ne 'success' -or '${{ steps.vscode.outcome }}' -ne 'success') { throw 'Windows debugger acceptance failed' }
