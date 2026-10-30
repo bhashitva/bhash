@@ -13,18 +13,26 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y zstd
       - name: Build locked GDB/Python distribution and corresponding sources
         run: |
-          if test -f scripts/windows-debugger-packages.lock.json; then
-            python3 scripts/build_windows_debugger.py
-          else
-            python3 scripts/build_windows_debugger.py --resolve
-          fi
+          python3 scripts/build_windows_debugger.py
+          python3 scripts/build_windows_debugger.py --output target/windows-debugger-sdk-again
+          cmp target/windows-debugger-sdk/bhash-windows-x86_64-gdb-v1.zip target/windows-debugger-sdk-again/bhash-windows-x86_64-gdb-v1.zip
+          cmp target/windows-debugger-sdk/bhash-windows-debugger-corresponding-sources.zip target/windows-debugger-sdk-again/bhash-windows-debugger-corresponding-sources.zip
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-debugger-sdk
+          compression-level: 0
           path: |
-            target/windows-debugger-sdk/
+            target/windows-debugger-sdk/bhash-windows-x86_64-gdb-v1.zip
+            target/windows-debugger-sdk/*.sha256
+            target/windows-debugger-sdk/windows-debugger.json
             scripts/windows-debugger-packages.lock.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-debugger-sources
+          compression-level: 0
+          path: target/windows-debugger-sdk/bhash-windows-debugger-corresponding-sources.zip
 
   windows:
     needs: debugger
@@ -33,7 +41,7 @@ jobs:
     env:
       BHASH_NATIVE_TOOLCHAIN: managed
       BHASH_TOOLCHAIN_HOME: ${{ github.workspace }}/target/windows-debug-tools
-      BHASH_DEBUGGER_HOME: ${{ github.workspace }}/target/windows-debug-gdb
+      BHASH_DEBUGGER_HOME: ${{ github.workspace }}/target/debugger हिन्दी
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
