@@ -60,14 +60,76 @@ public final class NativeToolchain {
         requirePlatform();
         Path work=Files.createTempDirectory("bhash-doctor-");try{
             Report report=require(work,selected);Files.writeString(work.resolve("probe.c"),"#include <math.h>\n#include <time.h>\n#include <stdio.h>\nint main(void){struct timespec t;volatile double x=2;return !timespec_get(&t,TIME_UTC) || !isfinite(log(x));}\n");
-            try{run(work,List.of(report.clang(),"--target="+report.target(),"-std=c17","probe.c","-lm","-o","probe"+NativePlatform.executableSuffix()));}
+            try{
+                if(NativePlatform.windows()){
+                    run(work,List.of(report.clang(),"--target="+report.target(),"-std=c17","-c","probe.c","-o","probe.o"));
+                    run(work,List.of(report.clang(),"--target="+report.target(),"probe.o","-lm","-o","probe.exe"));
+                }else run(work,List.of(report.clang(),"--target="+report.target(),"-std=c17","probe.c","-lm","-o","probe"+NativePlatform.executableSuffix()));
+            }
             catch(CompilationException error){throw new CompilationException("[BH9105] C17/system-linker probe failed. For system tools install target C17 headers/libraries; for managed tools verify or reinstall the trusted archive.\n"+error.getMessage());}
             run(work,NativePlatform.windows()?List.of(report.readelf(),"--file-headers","probe.exe"):List.of(report.readelf(),"-W","-h","probe"));
             run(work,List.of(work.resolve("probe"+NativePlatform.executableSuffix()).toString()));return report;
         }finally{ManagedToolchain.delete(work);}
     }
     private static ProcessBuilder builder(List<String> args,Path work){var b=new ProcessBuilder(args).directory(work.toFile()).redirectErrorStream(true);b.environment().put("LC_ALL","C");return b;}
+    // The MinGW clang wrapper and LLVM 18 driver start descendants without
+    // CREATE_NO_WINDOW. Invoke the real driver, integrated cc1, and linker ourselves.
+    static List<String> windowsClangInvocation(List<String> args){
+        var command=new ArrayList<>(args);
+        Path driver=Path.of(command.get(0));
+        if(driver.getFileName().toString().equalsIgnoreCase("clang.exe") && driver.getParent()!=null){
+            Path real=driver.resolveSibling("clang-18.exe");
+            if(Files.isRegularFile(real))command.set(0,real.toString());
+        }
+        if(command.stream().noneMatch(a->a.startsWith("--target=") || a.equals("-target")))command.add("--target="+NativeBuildInfo.TARGET);
+        if(command.contains("-c"))command.add("-fintegrated-cc1");
+        return List.copyOf(command);
+    }
+    static List<String> windowsLinkCommand(String plan)throws CompilationException{
+        List<String> result=null;
+        try{
+            for(String line:plan.lines().toList()){
+                String text=line.strip();if(!text.startsWith("\""))continue;
+                if(result!=null)throw new IllegalArgumentException("expected one linker job");
+                var words=new ArrayList<String>();int pos=0;
+                while(pos<text.length()){
+                    while(pos<text.length() && Character.isWhitespace(text.charAt(pos)))pos++;
+                    if(pos==text.length())break;
+                    if(text.charAt(pos)!='"')throw new IllegalArgumentException("unquoted linker argument");
+                    int start=pos++;boolean ended=false;
+                    while(pos<text.length()){
+                        char c=text.charAt(pos++);
+                        if(c=='\\'){if(pos<text.length())pos++;else throw new IllegalArgumentException("truncated escape");}
+                        else if(c=='"'){ended=true;break;}
+                    }
+                    if(!ended)throw new IllegalArgumentException("unterminated argument");
+                    words.add(com.google.gson.JsonParser.parseString(text.substring(start,pos)).getAsString());
+                }
+                if(words.isEmpty())throw new IllegalArgumentException("missing linker");
+                String executable=words.get(0).replace('\\','/');
+                String name=executable.substring(executable.lastIndexOf('/')+1);
+                if(!name.equalsIgnoreCase("ld.lld") && !name.equalsIgnoreCase("ld.lld.exe"))throw new IllegalArgumentException("expected GNU ld.lld");
+                result=List.copyOf(words);
+            }
+            if(result==null)throw new IllegalArgumentException("missing linker job");
+            return result;
+        }catch(RuntimeException error){throw new CompilationException("[BH9103] Unsupported Windows LLVM linker plan: "+error.getMessage());}
+    }
     public static String run(Path work,List<String> args)throws IOException,CompilationException{
+        if(NativePlatform.windows()){
+            String name=Path.of(args.get(0)).getFileName().toString().toLowerCase(Locale.ROOT);
+            if(name.equals("clang.exe") || name.equals("clang-18.exe")){
+                var command=windowsClangInvocation(args);
+                if(command.contains("-o") && !command.contains("-c")){
+                    var plan=new ArrayList<>(command);plan.add("-###");
+                    return runProcess(work,windowsLinkCommand(runProcess(work,plan)));
+                }
+                return runProcess(work,command);
+            }
+        }
+        return runProcess(work,args);
+    }
+    private static String runProcess(Path work,List<String> args)throws IOException,CompilationException{
         Process process;
         try{process=builder(args,work).start();}
         catch(IOException e){throw new CompilationException("[BH9102] Cannot start native tool "+args.get(0)+". Use native toolchain install for the managed SDK, or install a matching LLVM 18 target toolchain; see docs/managed-native-toolchain.md. Cause: "+e.getMessage());}
