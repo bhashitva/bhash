@@ -18,11 +18,16 @@ const {runTests,downloadAndUnzipVSCode,resolveCliArgsFromVSCodeExecutablePath}=r
     const development=path.join(output,process.platform==='win32'?"Bhash extension हिन्दी 'quotes'":'Bhash extension हिन्दी "quotes"');
     await promisify(execFile)(process.env.BHASH_TEST_PYTHON || (process.platform==='win32'?'python':'python3'),['-m','zipfile','-e',path.join(root,'target',`bhash-vscode-${require('../package.json').version}.vsix`),development]);
     const executable=await downloadAndUnzipVSCode('stable');
-    const [cli,...prefix]=process.platform==='win32'
-        ? [executable,path.join(path.dirname(executable),'resources','app','out','cli.js')]
-        : resolveCliArgsFromVSCodeExecutablePath(executable,{reuseMachineInstall:true});
-    const {stdout,stderr}=await promisify(execFile)(cli,[...prefix,'--extensions-dir',extensions,'--user-data-dir',userData,
-        '--install-extension','ms-vscode.cpptools','--force'],{encoding:'utf8',timeout:180000,windowsHide:true,env:{...process.env,ELECTRON_RUN_AS_NODE:'1'}});
+    const [cli,...prefix]=resolveCliArgsFromVSCodeExecutablePath(executable,{reuseMachineInstall:true});
+    const installArgs=[...prefix,'--extensions-dir',extensions,'--user-data-dir',userData,
+        '--install-extension','ms-vscode.cpptools','--force'];
+    // Use the vendor's Windows launcher rather than assuming its internal JS layout.
+    // cmd needs one outer quoted command; reject metacharacters in these CI-only paths.
+    if(process.platform==='win32' && [cli,...installArgs].some(value=>/["%\r\n&|<>^]/.test(value)))throw Error('Unsupported character in Windows test launcher path');
+    const command=process.platform==='win32'?process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe':cli;
+    const args=process.platform==='win32'?['/d','/s','/c','"'+[cli,...installArgs].map(value=>'"'+value+'"').join(' ')+'"']:installArgs;
+    const {stdout,stderr}=await promisify(execFile)(command,args,{encoding:'utf8',timeout:180000,windowsHide:true,
+        windowsVerbatimArguments:process.platform==='win32'});
     console.log(stdout,stderr);
     await runTests({vscodeExecutablePath:executable,extensionDevelopmentPath:path.join(development,'extension'),
         extensionTestsPath:path.join(__dirname,'debug-host.cjs'),
