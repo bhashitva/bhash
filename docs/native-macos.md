@@ -98,3 +98,8 @@ Local executables और SDK tools ad-hoc signed हैं। यह Developer I
 notarization नहीं है। Public download के लिए distributor को अपने Apple credentials और
 Apple की signing/notarization प्रक्रिया अलग से अपनानी होगी। Bhash Gatekeeper settings
 नहीं बदलता और quarantine protection नहीं हटाता। Checksums signatures का विकल्प नहीं हैं।
+
+Minimum macOS 14 पर native/JVM/CLR conformance, forced GC और release/debug packaging
+जाँचे गए हैं। GitHub के macOS 14 runner retirement के बाद ongoing CI macOS 15 और 26
+पर चलता है। SDK और linker स्थानीय Apple installation से आते हैं; अलग SDK versions
+के बीच byte-for-byte समान executable का दावा नहीं है।
