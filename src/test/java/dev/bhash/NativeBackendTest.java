@@ -18,6 +18,12 @@ import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
     @TempDir Path temporary;
+    @AfterEach void releaseWindowsHelperProcessHandles(){
+        // JDK 17 closes Windows Process handles through its Cleaner. This suite
+        // launches thousands of helpers in one VM; reclaim those native handles
+        // between cases rather than waiting for Java heap pressure.
+        if(NativePlatform.windows())System.gc();
+    }
     private static CoreProgram core(String s)throws Exception{return ManagedEmitter.core(List.of(new SourceFile("native.bhash",s)));}
     @Test void corePreservesCheckedOverloadsShadowingAndDecodedLiterals()throws Exception{
         var program=core("""
