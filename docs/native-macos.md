@@ -103,3 +103,13 @@ Minimum macOS 14 पर native/JVM/CLR conformance, forced GC और release/deb
 जाँचे गए हैं। GitHub के macOS 14 runner retirement के बाद ongoing CI macOS 15 और 26
 पर चलता है। SDK और linker स्थानीय Apple installation से आते हैं; अलग SDK versions
 के बीच byte-for-byte समान executable का दावा नहीं है।
+
+### macOS 26 sanitizer validation
+
+LLVM 18 का AddressSanitizer runtime macOS 26.4+ पर `main()` से पहले
+[deadlock कर सकता है](https://github.com/llvm/llvm-project/issues/200447)।
+सामान्य Bhash applications इस sanitizer को link नहीं करते। macOS 26 CI में
+managed LLVM 18 से पूरे runtime suite के सामान्य builds और current Apple Clang
+(Xcode/Command Line Tools 26.4+) से उसी suite के ASan/UBSan builds दोनों अनिवार्य
+हैं। macOS 15 पर LLVM 18 sanitizer validation भी जारी रहती है। इस कारण
+forced-GC या sanitizer checks छोड़े नहीं जाते।
