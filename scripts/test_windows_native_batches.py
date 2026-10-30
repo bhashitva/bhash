@@ -50,15 +50,16 @@ def main():
     batches = [methods[i:i + args.batch_size] for i in range(0, len(methods), args.batch_size)]
     print(f'{len(methods)} native tests in {len(batches)} fresh JVM batches; no retries', flush=True)
     for number, batch in enumerate(batches, 1):
-        reports = ROOT / f'target/surefire-reports/windows-native-batch-{number:02}'
-        report = reports / 'TEST-dev.bhash.NativeBackendTest.xml'
+        reports = ROOT / 'target/surefire-reports'
+        suffix = f'windows-native-batch-{number:02}'
+        report = reports / f'TEST-dev.bhash.NativeBackendTest-{suffix}.xml'
         if not args.dry_run:
             reports.mkdir(parents=True, exist_ok=True)
             report.unlink(missing_ok=True)  # Never accept a previous run's report.
         selector = 'NativeBackendTest#' + '+'.join(batch)
         command = [args.maven, '--batch-mode', '--no-transfer-progress', *args.maven_arg,
                    f'-Dtest={selector}', '-DargLine=-Xmx768m',
-                   f'-Dsurefire.reportsDirectory={reports}', 'test']
+                   f'-Dsurefire.reportNameSuffix={suffix}', 'test']
         print(f'Batch {number}/{len(batches)}: ' + ', '.join(batch), flush=True)
         if not args.dry_run:
             subprocess.run(command, cwd=ROOT, check=True)
