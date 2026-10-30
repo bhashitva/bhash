@@ -28,14 +28,18 @@ def discover(source):
     return sorted(methods)
 
 
-def verify(report, expected):
+def verify(report, expected, allowed_skips=()):
     suite = ET.parse(report).getroot()
     cases = suite.findall('testcase')
     actual = [case.attrib['name'] for case in cases]
     if sorted(actual) != sorted(expected):
         raise RuntimeError(f'Incomplete batch coverage in {report}: expected {expected}, got {actual}')
-    if any(case.find(tag) is not None for case in cases for tag in ('failure', 'error', 'skipped')):
-        raise RuntimeError(f'Failed or skipped test in {report}')
+    if any(case.find(tag) is not None for case in cases for tag in ('failure', 'error')):
+        raise RuntimeError(f'Failed test in {report}')
+    skipped = [case.attrib['name'] for case in cases if case.find('skipped') is not None]
+    if set(skipped) - set(allowed_skips):
+        raise RuntimeError(f'Unexpected skipped test in {report}: {skipped}')
+    return skipped
 
 
 def container_command(command, environment):
@@ -95,6 +99,10 @@ def main():
     methods = discover(source.read_text(encoding='utf-8'))
     batches = [methods[i:i + args.batch_size] for i in range(0, len(methods), args.batch_size)]
     print(f'{len(methods)} native tests in {len(batches)} fresh JVM batches; no retries', flush=True)
+    # This existing test exercises POSIX mode bits and /dev/full, covered by Linux
+    # CI. Windows has neither; permit only its existing platform assumption.
+    allowed_skips = {'nativeFilePermissionsAndCloseFailureMatchManaged'} if os.name == 'nt' else set()
+    skipped = []
     for number, batch in enumerate(batches, 1):
         reports = ROOT / 'target/surefire-reports'
         suffix = f'windows-native-batch-{number:02}'
@@ -111,8 +119,12 @@ def main():
             command = container_command(command, os.environ)
         if not args.dry_run:
             subprocess.run(command, cwd=ROOT, check=True)
-            verify(report, batch)
-    print(f'All {len(methods)} native tests ' + ('selected' if args.dry_run else 'passed without skips'), flush=True)
+            skipped.extend(verify(report, batch, allowed_skips))
+    if args.dry_run:
+        print(f'All {len(methods)} native tests selected', flush=True)
+    else:
+        print(f'All {len(methods)} native tests accounted for: {len(methods)-len(skipped)} passed; '
+              f'{len(skipped)} expected POSIX-only skip; no unexpected skips', flush=True)
 
 
 if __name__ == '__main__':

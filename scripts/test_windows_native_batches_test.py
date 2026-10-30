@@ -32,6 +32,10 @@ class BatchCoverageTest(unittest.TestCase):
                 report.write_text(f'<testsuite><testcase name="one"><{status}/></testcase></testsuite>', encoding='utf-8')
                 with self.assertRaises(RuntimeError):
                     verify(report, ['one'])
+            report.write_text('<testsuite><testcase name="posix"><skipped/></testcase></testsuite>', encoding='utf-8')
+            self.assertEqual(['posix'], verify(report, ['posix'], {'posix'}))
+            with self.assertRaises(RuntimeError):
+                verify(report, ['posix'], {'other'})
 
     def test_container_runs_offline_with_explicit_dependencies_and_literal_selector(self):
         with tempfile.TemporaryDirectory() as directory:
