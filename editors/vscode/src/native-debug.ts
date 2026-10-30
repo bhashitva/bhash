@@ -14,6 +14,7 @@ export function gdbSetup(script: string) {
     if (/[\r\n]/.test(script)) throw Error('The debugger script path cannot contain a newline.');
     return [
         {text: 'set charset UTF-8'},
+        {text: 'set language c'},
         {text: 'set pagination off'},
         {text: 'set print elements 100'},
         // Watch must not call Bhash functions, which can allocate/collect.
