@@ -60,7 +60,13 @@ public final class LlvmEmitter {
     }
     public static String emit(CoreProgram program,String notices,boolean debugging,String buildInfo){var emitter=new LlvmEmitter();emitter.debugEnabled=debugging;emitter.buildInfo=buildInfo;return emitter.program(program,notices);}
     private String program(CoreProgram program,String notices){
-        if(debugEnabled)debug=new NativeDebugInfo(program.functions().get(0).source());
+        if(debugEnabled){
+            debug=new NativeDebugInfo(program.functions().get(0).source());
+            byte[] schema=NativeDebugInfo.schema(program).getBytes(StandardCharsets.UTF_8);
+            globals.append("@bhash_debug_schema = constant { i64, [").append(schema.length).append(" x i8] } { i64 ").append(schema.length).append(", [").append(schema.length).append(" x i8] c\"");
+            for(byte b:schema)globals.append(String.format(Locale.ROOT,"\\%02X",b&255));
+            globals.append("\" }, align 8\n");
+        }
         boxMetadata();
         collectionMetadata(program.collections());
         String dataInit="";
