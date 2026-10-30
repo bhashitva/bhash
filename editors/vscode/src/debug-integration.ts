@@ -20,7 +20,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
     const hasDebugger = async () => {
         if (vscode.extensions.getExtension('ms-vscode.cpptools')) return true;
         const choice = await vscode.window.showInformationMessage(
-            'Bhash uses the Microsoft C/C++ extension’s GDB debugger. Install it on this Linux/WSL extension host, then retry.', 'Open debugger in Extensions');
+            'Bhash uses the Microsoft C/C++ extension’s GDB debugger. Install it on this extension host, then retry.', 'Open debugger in Extensions');
         if (choice) await vscode.commands.executeCommand('workbench.extensions.action.showExtensionsWithIds', ['ms-vscode.cpptools']);
         return false;
     };
@@ -31,7 +31,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
             try {
                 if (!vscode.workspace.isTrusted) throw Error('Trust the workspace before building or debugging Bhash programs.');
                 requireDebugHost();
-                if (folder && folder.uri.scheme !== 'file') throw Error('Native debugging requires a folder on disk in Linux/WSL.');
+                if (folder && folder.uri.scheme !== 'file') throw Error('Native debugging requires a folder on disk on the extension host.');
                 if (!await hasDebugger()) return undefined;
                 if (configuration.request !== 'launch' || configuration.MIMode && configuration.MIMode !== 'gdb')
                     throw Error('Bhash native debugging currently supports GDB launch sessions only.');
@@ -39,11 +39,11 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
                 if (input === undefined) input = (await services.activeInput()).input;
                 if (typeof input !== 'string' || !input.trim()) throw Error('bhashInput must name a .bhash file, project folder, or bhash.project.');
                 const cwd = configuration.cwd || folder?.uri.fsPath || path.dirname(input);
-                if (typeof cwd !== 'string' || !path.isAbsolute(cwd)) throw Error('Debug cwd must be an absolute Linux/WSL directory.');
+                if (typeof cwd !== 'string' || !path.isAbsolute(cwd)) throw Error('Debug cwd must be an absolute directory on the extension host.');
                 input = path.resolve(cwd, input);
                 await services.save(input);
                 const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
-                const gdb = config.get<string>('native.gdbPath', 'gdb');
+                const gdb = config.get<string>('native.gdbPath', '');
                 const abort = new AbortController();
                 const cancellation = token?.onCancellationRequested(() => abort.abort());
                 if (token?.isCancellationRequested) abort.abort();
@@ -60,9 +60,9 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
                 } finally {cancellation?.dispose();}
                 directory = result.directory; builds.add(directory);
                 return {...configuration, type: 'cppdbg', request: 'launch', MIMode: 'gdb',
-                    program: result.program, cwd, miDebuggerPath: gdb,
+                    program: result.program, cwd, miDebuggerPath: result.gdb,
                     // Load only our explicit printer, with user/system init and ELF auto-load disabled.
-                    miDebuggerArgs: '--nx --nh -iex "set auto-load off"',
+                    miDebuggerArgs: '--nx --nh -eiex "set python ignore-environment on" -eiex "set python dont-write-bytecode on" -iex "set auto-load off"',
                     setupCommands: [...result.setupCommands, ...(configuration.setupCommands || [])],
                     externalConsole: false, stopAtEntry: configuration.stopAtEntry ?? false,
                     bhashBuildDirectory: directory};
@@ -85,7 +85,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
             requireDebugHost();
             if (!await hasDebugger()) return;
             const {input, folder} = await services.activeInput();
-            await vscode.debug.startDebugging(folder, {type: 'cppdbg', request: 'launch', name: 'Bhash: Native (Linux/WSL)',
+            await vscode.debug.startDebugging(folder, {type: 'cppdbg', request: 'launch', name: 'Bhash: Native',
                 bhashNative: true, bhashInput: input, cwd: folder?.uri.fsPath || path.dirname(input),
                 stopAtEntry: false, args: []});
         } catch (error) {void vscode.window.showErrorMessage('Bhash native debug: ' + String(error));}
