@@ -2,7 +2,7 @@
   "name": "bhash",
   "displayName": "Bhash (भाष)",
   "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "publisher": "bhashitva",
   "license": "Apache-2.0",
   "repository": {
@@ -35,7 +35,8 @@
     "onLanguage:bhash",
     "onLanguage:bhash-project",
     "workspaceContains:**/bhash.project",
-    "onTaskType:bhash"
+    "onTaskType:bhash",
+    "onDebugResolve:cppdbg"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -47,7 +48,8 @@
         "bhash.native.toolchainMode",
         "bhash.native.toolchainHome",
         "bhash.native.toolchainMode",
-        "bhash.native.toolchainHome"
+        "bhash.native.toolchainHome",
+        "bhash.native.gdbPath"
       ]
     },
     "virtualWorkspaces": {
@@ -156,6 +158,10 @@
       {
         "command": "bhash.repairNativeTools",
         "title": "Bhash: Repair Native Tools"
+      },
+      {
+        "command": "bhash.debugNative",
+        "title": "Bhash: Debug Native (Linux/WSL)"
       }
     ],
     "configuration": {
@@ -210,6 +216,12 @@
           "default": "",
           "scope": "machine",
           "description": "Optional absolute SDK cache directory on the Windows/Linux/WSL/macOS extension host. Empty uses BHASH_TOOLCHAIN_HOME or the compiler default cache. Allow approximately 1 GB of free disk space for setup."
+        },
+        "bhash.native.gdbPath": {
+          "type": "string",
+          "default": "gdb",
+          "scope": "machine",
+          "description": "GDB 12+ with Python 3 support on the Linux/WSL extension host. Install using your distribution package manager. Debugging also requires Microsoft C/C++ on that host."
         }
       }
     },
@@ -269,13 +281,50 @@
           "strings": "off"
         }
       }
-    }
+    },
+    "debuggers": [
+      {
+        "type": "cppdbg",
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "bhashNative": {
+                "type": "boolean",
+                "default": false,
+                "description": "Build Bhash input with --target native --debug before launching GDB (Linux/WSL only)."
+              },
+              "bhashInput": {
+                "type": "string",
+                "description": "Bhash source file or project to compile. Relative paths resolve from cwd."
+              }
+            }
+          }
+        },
+        "configurationSnippets": [
+          {
+            "label": "Bhash: Native (Linux/WSL)",
+            "description": "Compile and debug a Bhash project with GDB. Requires Microsoft C/C++.",
+            "body": {
+              "type": "cppdbg",
+              "request": "launch",
+              "name": "Bhash: Native (Linux/WSL)",
+              "bhashNative": true,
+              "bhashInput": "${workspaceFolder}/bhash.project",
+              "program": "${workspaceFolder}/.bhash/debug/program",
+              "cwd": "${workspaceFolder}",
+              "stopAtEntry": false,
+              "args": []
+            }
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.cjs",
     "test:integration": "node test/run.cjs",
-    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.7.1.vsix"
+    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.8.0.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"
