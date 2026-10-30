@@ -15,7 +15,7 @@ class ManagedToolchainTest {
         var files=new TreeMap<String,byte[]>();
         for(String name:NativePlatform.requiredFiles())files.put(name,"fixture\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         var inventory=new TreeMap<String,Object>();files.forEach((name,bytes)->inventory.put(name,Map.of("sha256",NativeBuildInfo.hash(bytes),"executable",name.startsWith("bin/") || name.startsWith("libexec/"))));
-        var manifest=new LinkedHashMap<String,Object>();manifest.put("format",1);manifest.put("id",ManagedToolchain.ID);manifest.put("target",NativeBuildInfo.TARGET);manifest.put("llvm_version","18.1.8");manifest.put("minimum_glibc","2.39");manifest.put("c_runtime","ucrt");manifest.put("minimum_windows","10.0");manifest.put("files",inventory);
+        var manifest=new LinkedHashMap<String,Object>();manifest.put("format",1);manifest.put("id",ManagedToolchain.ID);manifest.put("target",NativeBuildInfo.TARGET);manifest.put("llvm_version","18.1.8");manifest.put("minimum_glibc","2.39");manifest.put("c_runtime",NativePlatform.macos()?"libSystem":"ucrt");manifest.put("minimum_macos","14.0");manifest.put("apple_sdk","external");manifest.put("minimum_windows","10.0");manifest.put("files",inventory);
         files.put("toolchain.json",NativeBuildInfo.JSON.toJson(manifest).getBytes(java.nio.charset.StandardCharsets.UTF_8));return files;
     }
     private Path zip(Map<String,byte[]> files)throws Exception{
@@ -39,7 +39,8 @@ class ManagedToolchainTest {
         }
         files.put("toolchain.json",NativeBuildInfo.JSON.toJson(manifest).getBytes(java.nio.charset.StandardCharsets.UTF_8));
         Path archive=zip(files),root=temporary.resolve("case-headers");
-        if(NativePlatform.windows())assertThrows(IOException.class,()->ManagedToolchain.extractAndVerify(archive,root));
+        Path probe=temporary.resolve("FilesystemCaseProbe");Files.writeString(probe,"probe");boolean insensitive=Files.exists(temporary.resolve("filesystemcaseprobe"));Files.delete(probe);
+        if(insensitive)assertThrows(IOException.class,()->ManagedToolchain.extractAndVerify(archive,root));
         else {ManagedToolchain.extractAndVerify(archive,root);assertFalse(Arrays.equals(Files.readAllBytes(root.resolve("include/Case.h")),Files.readAllBytes(root.resolve("include/case.h"))));}
     }
     @Test void rejectsMissingFilesExtraFilesAndWrongTargets()throws Exception{

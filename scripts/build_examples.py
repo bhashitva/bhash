@@ -61,8 +61,9 @@ def artifact_path(output, target, name):
 
 
 def native_unavailable():
-    if platform.system() not in ("Linux", "Windows") or platform.machine().lower() not in ("x86_64", "amd64"):
-        return "native compilation requires Linux/Windows x86-64"
+    host, arch = platform.system(), platform.machine().lower()
+    if not ((host in ("Linux", "Windows") and arch in ("x86_64", "amd64")) or (host == "Darwin" and arch in ("arm64", "aarch64"))):
+        return "native compilation requires Linux/Windows x86-64 or macOS 14+ ARM64"
     if os.environ.get("BHASH_NATIVE_TOOLCHAIN") == "managed":
         return None  # The compiler validates the selected managed installation.
     tools = (("BHASH_CLANG", "clang.exe"),) if os.name == "nt" else (("BHASH_CLANG", "clang-18"), ("BHASH_LLVM_OPT", "opt-18"))

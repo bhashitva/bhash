@@ -24,7 +24,7 @@ public final class ManagedToolchain {
     private static IOException invalid(String message){return new IOException("[BH9110] "+message);}
     public static Path home(){
         String configured=System.getenv("BHASH_TOOLCHAIN_HOME");
-        Path root=configured!=null?Path.of(configured):NativePlatform.windows()?Path.of(System.getenv().getOrDefault("LOCALAPPDATA",Path.of(System.getProperty("user.home"),"AppData","Local").toString())).resolve("Bhash/toolchains"):Path.of(System.getenv().getOrDefault("XDG_CACHE_HOME",Path.of(System.getProperty("user.home"),".cache").toString())).resolve("bhash/toolchains");
+        Path root=configured!=null?Path.of(configured):NativePlatform.macos()?Path.of(System.getProperty("user.home"),"Library","Caches","Bhash","toolchains"):NativePlatform.windows()?Path.of(System.getenv().getOrDefault("LOCALAPPDATA",Path.of(System.getProperty("user.home"),"AppData","Local").toString())).resolve("Bhash/toolchains"):Path.of(System.getenv().getOrDefault("XDG_CACHE_HOME",Path.of(System.getProperty("user.home"),".cache").toString())).resolve("bhash/toolchains");
         if(!root.isAbsolute())throw new IllegalArgumentException("BHASH_TOOLCHAIN_HOME/XDG_CACHE_HOME must be an absolute path");
         return root.normalize();
     }
@@ -46,13 +46,14 @@ public final class ManagedToolchain {
         if(!data.has("format") || !data.get("format").toString().equals("1") || !ID.equals(string(data,"id")) || !NativeBuildInfo.TARGET.equals(string(data,"target")))throw invalid("Unsupported managed toolchain format, ID or target");
         String version=string(data,"llvm_version"),glibc=minimumGlibc(data);
         if(NativePlatform.windows() && (!"ucrt".equals(string(data,"c_runtime")) || !"10.0".equals(string(data,"minimum_windows"))))throw invalid("Windows SDK requires UCRT");
-        if(!version.matches("18\\.[0-9]+\\.[0-9]+") || !NativePlatform.windows() && !glibc.matches("[0-9]+(?:\\.[0-9]+){1,2}"))throw invalid("Invalid toolchain LLVM/glibc version");
+        if(NativePlatform.macos() && (!"libSystem".equals(string(data,"c_runtime")) || !NativePlatform.MINIMUM_MACOS.equals(string(data,"minimum_macos")) || !"external".equals(string(data,"apple_sdk"))))throw invalid("macOS SDK requires local Apple Command Line Tools and libSystem");
+        if(!version.matches("18\\.[0-9]+\\.[0-9]+") || !NativePlatform.windows() && !NativePlatform.macos() && !glibc.matches("[0-9]+(?:\\.[0-9]+){1,2}"))throw invalid("Invalid toolchain LLVM/glibc version");
         if(!data.has("files") || !data.get("files").isJsonObject() || data.getAsJsonObject("files").size()>MAX_FILES)throw invalid("Missing or oversized file inventory");
         var files=data.getAsJsonObject("files");
         for(String required:NativePlatform.requiredFiles())if(!files.has(required))throw invalid("Incomplete toolchain: "+required);
         return data;
     }
-    private static String minimumGlibc(JsonObject data)throws IOException{return NativePlatform.windows()?null:string(data,"minimum_glibc");}
+    private static String minimumGlibc(JsonObject data)throws IOException{return NativePlatform.windows() || NativePlatform.macos()?null:string(data,"minimum_glibc");}
     private static Path safe(Path root,String name)throws IOException{
         if(name.isEmpty() || name.startsWith("/") || name.contains("\\") || name.contains(":") || name.indexOf(0)>=0 || Arrays.stream(name.split("/",-1)).anyMatch(p->p.isEmpty() || p.equals(".") || p.equals("..") || p.endsWith(".") || p.endsWith(" ") || p.matches("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?")))throw invalid("Unsafe archive path: "+name);
         Path result=root.resolve(name).normalize();if(!result.startsWith(root))throw invalid("Archive path escapes installation");return result;

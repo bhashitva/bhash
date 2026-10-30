@@ -57,13 +57,13 @@ A locally packaged or Actions-built version can be installed before its Marketpl
 
 ## Native on Windows, Linux and WSL
 
-Native builds use the compiler bundled in version 0.6.4. Choose `native` from
+Native builds use the compiler bundled in version 0.7.0. Choose `native` from
 **Bhash: Build Project or File** or **Bhash: Run Project or File**. The first task
 downloads the [versioned SDK](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.1.0)
 (110 MiB), checks its bundled SHA-256, verifies the installation, and activates it
 in your user cache. Later builds reuse it, including offline. No separate LLVM,
-linker, C development packages, Maven, Node installation, or administrator access
-is required. Java 17+ is still required to run the compiler.
+Maven or Node installation is required. Java 17+ is still required to run the compiler.
+On macOS, install Apple’s Command Line Tools separately for the local SDK and linker.
 
 Supported hosts:
 
@@ -74,7 +74,11 @@ Supported hosts:
 - **Linux x86-64, glibc 2.35+**, including Ubuntu 22.04+ in WSL. Install Bhash and
   Java inside WSL when using a WSL workspace; its SDK runs inside that distribution.
 
-macOS, ARM, and musl/Alpine native hosts are not supported yet. Each SDK builds
+- **macOS 14+ Apple Silicon ARM64**: use ARM64 VS Code, ARM64 Java 17+, and Apple’s
+  Command Line Tools (`xcode-select --install`). Bhash downloads a pinned LLVM 18
+  SDK; Apple’s SDK and linker are not redistributed. See [macOS setup and distribution](https://github.com/bhashitva/bhash/blob/main/docs/native-macos.md).
+
+Intel Macs, other ARM hosts, and musl/Alpine are not supported. Each SDK builds
 for its own host; this release does not add cross compilation. Generated applications
 need neither Java nor .NET nor LLVM. The compiler continues to require Java 17+.
 

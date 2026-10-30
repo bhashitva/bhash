@@ -18,6 +18,10 @@ import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
     @TempDir Path temporary;
+    @BeforeEach void reportNativeCase(TestInfo info){
+        if(Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE")))
+            System.out.println("Native conformance: "+info.getDisplayName());
+    }
     @AfterEach void releaseWindowsHelperProcessHandles(){
         // JDK 17 closes Windows Process handles through its Cleaner. This suite
         // launches thousands of helpers in one VM; reclaim those native handles
@@ -1817,7 +1821,7 @@ class NativeBackendTest {
         for(var fixture:ConsoleFixtures.cases()){
             var sources=List.of(new SourceFile("console.bhash",fixture.source()));
             Path exe=executable("console"+index),jar=temporary.resolve("console"+index+".jar"),clr=temporary.resolve("console-clr"+index++);
-            new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+            new NativeCompiler(nativeSanitizers()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
             var nativeResult=consoleRun(List.of(exe.toString()),fixture.input(),true);
             assertEquals(0,nativeResult.exit(),fixture.name()+nativeResult.err());assertEquals(fixture.expected(),nativeResult.out(),fixture.name());
             assertEquals(0L,stats(nativeResult).get("live"));
@@ -1830,7 +1834,7 @@ class NativeBackendTest {
     @Test void nativeConsoleCrReturnsBeforeNextInputByteAndFlushesOutput()throws Exception{
         requireNumericTargets();var sources=List.of(new SourceFile("console.bhash","कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो()); लिखो(पाठपढ़ो()); }"));
         Path exe=executable("interactive"),jar=temporary.resolve("interactive.jar"),clr=temporary.resolve("interactive-clr");
-        new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+        new NativeCompiler(nativeSanitizers()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
         for(var command:List.of(List.of(exe.toString()),List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
             var process=new ProcessBuilder(command).redirectError(temporary.resolve("interactive.err").toFile()).start();
             var executor=java.util.concurrent.Executors.newSingleThreadExecutor();
@@ -1847,7 +1851,7 @@ class NativeBackendTest {
         requireNumericTargets();
         for(String file:List.of("examples/factorial-console.bhash","examples/native/console.bhash")){
             var sources=List.of(new SourceFile("console.bhash",Files.readString(Path.of(file))));Path exe=executable("example"),jar=temporary.resolve("example.jar");
-            new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);
+            new NativeCompiler(nativeSanitizers()).compile(sources,exe);new JvmCompiler().compile(sources,jar);
             byte[] input=ConsoleFixtures.utf8(file.contains("factorial")?"५\n":"भारत😀\n+४२\n");
             var result=consoleRun(List.of(exe.toString()),input,true);var managed=consoleRun(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),input,false);
             assertEquals(0,result.exit(),result.err());assertEquals(managed.out(),result.out());assertEquals(0L,stats(result).get("live"));
@@ -1890,7 +1894,7 @@ class NativeBackendTest {
     @Test void nativeSwitchConsoleExamplePreservesGroupedCasesAndDefault()throws Exception{
         requireNumericTargets();var sources=List.of(new SourceFile("switch-console.bhash",Files.readString(Path.of("examples/switch-console.bhash"))));
         Path exe=executable("selection"),jar=temporary.resolve("selection.jar"),clr=temporary.resolve("selection-clr");
-        new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
+        new NativeCompiler(nativeSanitizers()).compile(sources,exe);new JvmCompiler().compile(sources,jar);new ClrCompiler().compile(sources,clr);
         for(String input:List.of("०\n","२\n","९\n")){
             var result=consoleRun(List.of(exe.toString()),ConsoleFixtures.utf8(input),true);assertEquals(0,result.exit(),result.err());assertEquals(0L,stats(result).get("live"));
             for(var command:List.of(List.of(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString()),List.of(ClrCompiler.executable(),clr.resolve("BhashProgram.dll").toString()))){
@@ -1924,9 +1928,17 @@ class NativeBackendTest {
             }
         }
     }
+    private static boolean nativeSanitizers(){
+        // LLVM 18 ASan deadlocks before main on macOS 26.4+: llvm/llvm-project#200447.
+        // Run every conformance/forced-GC case with the shipped, unsanitized compiler
+        // there; native-macos.yml additionally requires the complete C runtime suite
+        // under current Apple ASan/UBSan. Keep LLVM ASan coverage on macOS 14/15/Linux.
+        if(NativePlatform.windows())return false;
+        return !NativePlatform.macos() || Integer.parseInt(System.getProperty("os.version").split("\\.")[0])<26;
+    }
     private void requireTools()throws Exception{
         boolean required=Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE"));
-        if(required)assertTrue(NativePlatform.supported(),"Native CI requires Linux/Windows x86-64");else assumeTrue(NativePlatform.supported());
+        if(required)assertTrue(NativePlatform.supported(),"Native CI requires a supported Linux/Windows x86-64 or macOS ARM64 host");else assumeTrue(NativePlatform.supported());
         try{NativeToolchain.require(temporary);}
         catch(java.io.IOException | CompilationException error){if(required)throw error;assumeTrue(false,error.getMessage());}
     }
@@ -1955,7 +1967,7 @@ class NativeBackendTest {
     }
     private Result nativeOnlyRun(List<SourceFile> sources,Map<String,String> environment,String...arguments)throws Exception{
         Path exe=executable("application");
-        new NativeCompiler(!NativePlatform.windows()).compile(sources,exe);
+        new NativeCompiler(nativeSanitizers()).compile(sources,exe);
         var command=new ArrayList<String>();command.add(exe.toString());command.addAll(List.of(arguments));
         Path out=temporary.resolve("out"),err=temporary.resolve("err");
         var builder=new ProcessBuilder(command).redirectOutput(out.toFile()).redirectError(err.toFile());

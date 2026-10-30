@@ -1,0 +1,135 @@
+name: macOS Apple Silicon native compiler
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: native-macos-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  macos-sdk:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: actions/cache@v4
+        id: sdk-cache
+        with:
+          path: target/macos-sdk
+          key: macos-sdk-reproduced-${{ hashFiles('scripts/build_macos_native_toolchain.py', 'scripts/build_native_toolchain.py') }}
+      - uses: actions/cache@v4
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        with:
+          path: llvm-upstream.tar.xz
+          key: macos-llvm-18.1.8-4573b7f25f46d2a9
+      - name: Authenticate upstream and reproduce the managed LLVM SDK
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          test "$(uname -m)" = arm64
+          if [ ! -f llvm-upstream.tar.xz ]; then
+            curl --fail --location --retry 3 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-arm64-apple-macos11.tar.xz' -o llvm-upstream.tar.xz
+          fi
+          python3 scripts/build_macos_native_toolchain.py llvm-upstream.tar.xz
+          python3 scripts/build_macos_native_toolchain.py llvm-upstream.tar.xz --output target/macos-sdk-again
+          cmp target/macos-sdk/bhash-macos-arm64-llvm18-v1.zip target/macos-sdk-again/bhash-macos-arm64-llvm18-v1.zip
+      - name: Verify the immutable SDK catalog hash, including cached archives
+        run: |
+          cd target/macos-sdk
+          echo 'c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d  bhash-macos-arm64-llvm18-v1.zip' | shasum -a 256 -c -
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bhash-macos-sdk
+          path: target/macos-sdk/*
+          if-no-files-found: error
+  macos-native:
+    needs: macos-sdk
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      BHASH_NATIVE_TOOLCHAIN: managed
+      BHASH_REQUIRE_NATIVE: 'true'
+      BHASH_REQUIRE_CLR: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      # LeakSanitizer is unavailable on Darwin. Precise collector live-count tests remain mandatory.
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bhash-macos-sdk
+          path: target/macos-sdk
+      - name: Build compiler and activate the authenticated local SDK
+        id: setup
+        run: |
+          test "$(uname -m)" = arm64
+          mvn --batch-mode --no-transfer-progress -DskipTests package
+          export BHASH_TOOLCHAIN_HOME="$RUNNER_TEMP/Bhash SDK भारत"
+          echo "BHASH_TOOLCHAIN_HOME=$BHASH_TOOLCHAIN_HOME" >> "$GITHUB_ENV"
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native toolchain install --archive target/macos-sdk/bhash-macos-arm64-llvm18-v1.zip --sha256 c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d --json
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native toolchain verify --json
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native doctor --json
+          python3 - <<'PYTHON'
+          import json, os, pathlib
+          cache=pathlib.Path(os.environ['BHASH_TOOLCHAIN_HOME'])
+          active=json.loads((cache/'active.json').read_text())
+          with open(os.environ['GITHUB_PATH'],'a') as out:
+              out.write(str(cache/'installations'/active['directory']/'bin')+'\n')
+          PYTHON
+          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
+      - name: Validate collector, binary64 formatting and exception cleanup under sanitizers
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: |
+          if [ "${{ matrix.os }}" = macos-26 ]; then
+            # LLVM 18's ASan runtime deadlocks before main on macOS 26.4+:
+            # https://github.com/llvm/llvm-project/issues/200447
+            # Exercise the shipped LLVM uninstrumented, then require the same
+            # complete runtime suite under Apple's current compatible sanitizers.
+            python3 scripts/test_native_runtime.py
+            apple_clang="$(xcrun --find clang)"
+            "$apple_clang" --version
+            python3 scripts/test_native_runtime.py --cc "$apple_clang" --sanitize
+          else
+            python3 scripts/test_native_runtime.py --sanitize
+          fi
+          python3 scripts/test_native_fixed.py
+      - name: Verify reproducible release packages, Mach-O inspection, symbols and standalone execution
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: python3 scripts/test_macos_native_release.py
+      - name: Cross-validate native language behavior against JVM and CLR with forced GC
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,MacosCompatibilityTest test
+      - name: Compile every applicable native example
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: |
+          python3 -m unittest discover -s scripts -p test_build_examples.py
+          python3 scripts/build_examples.py --target native --require-native
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bhash-macos-${{ matrix.os }}-validation
+          path: |
+            target/surefire-reports/
+            target/macos-release/
+            target/examples/build-report.json
+            target/examples/logs/
+          if-no-files-found: warn

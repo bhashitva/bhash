@@ -38,7 +38,7 @@ exports.run=async()=>{
     const tasks=await vscode.tasks.fetchTasks({type:'bhash'});const build=tasks.find(task=>task.definition.command==='build');assert.ok(build,'configured Bhash task resolves');
     await new Promise(async(resolve,reject)=>{const timer=setTimeout(()=>{listener.dispose();reject(new Error('Build task timed out'));},60000);const listener=vscode.tasks.onDidEndTaskProcess(event=>{if(event.execution.task.definition.type==='bhash'){clearTimeout(timer);listener.dispose();event.exitCode===0?resolve():reject(new Error(`Build task exit ${event.exitCode}`));}});try{await vscode.tasks.executeTask(build);}catch(error){clearTimeout(timer);listener.dispose();reject(error);}});
     const result=await promisify(execFile)('java',['-jar',path.join(workspace,'build','host-test.jar')],{encoding:'utf8'});assert.equal(result.stdout.trim(),'६');
-    if(process.platform==='linux' && process.env.BHASH_TEST_NATIVE==='1') {
+    if(['linux','darwin'].includes(process.platform) && process.env.BHASH_TEST_NATIVE==='1') {
         // Resolve a configured task before first use: resolution itself must not install tools.
         const native=(await vscode.tasks.fetchTasks({type:'bhash'})).find(t=>t.definition.target==='native');
         assert.ok(native,'configured Native task resolves');
@@ -52,12 +52,12 @@ exports.run=async()=>{
             }});
             try{await vscode.tasks.executeTask(native);}catch(error){clearTimeout(timer);listener.dispose();reject(error);}
         });
-        // Execute the produced ELF directly: it needs neither Java nor LLVM at runtime.
+        // Execute the produced executable directly: it needs neither Java nor LLVM at runtime.
         const nativeResult=await promisify(execFile)(path.join(workspace,'build','host-test-native'),[],{encoding:'utf8'});
         assert.equal(nativeResult.stdout.trim(),'६');
         const status=await promisify(execFile)('java',['-jar',extension.extensionPath+'/server/bhash-compiler.jar','native','toolchain','status','--json']);
         assert.equal(JSON.parse(status.stdout).archiveSha256,require('../dist/native.js').sdk.sha256);
-        console.log('PASS VS Code Native configured build: first-use GitHub SDK download, verified cache, and generated ELF execution.');
+        console.log('PASS VS Code Native configured build: first-use GitHub SDK download, verified cache, and generated native execution.');
     }
     assert.equal(await fs.readFile(path.join(workspace,'src','main.bhash'),'utf8'),source);
     console.log('PASS VS Code extension host: activation, completion, cross-file definition, outline, unsaved diagnostics, and JVM build task.');

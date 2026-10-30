@@ -6,7 +6,7 @@ Windows 10+ x64 के managed SDK, setup और distribution के लिए [
 
 ## आवश्यकता और दायरा (Requirements and scope)
 
-Managed bundle के लिए **Linux x86-64, host glibc 2.35+ और Java 17+** चाहिए। Windows पर VS Code/terminal को Ubuntu 22.04+ WSL workspace में चलाएँ। LLVM, GCC, binutils, C development headers या administrator/root access उपभोक्ता मशीन पर आवश्यक नहीं हैं। Java अभी Bhash compiler/language server के लिए आवश्यक है; बने हुए executable को Java/LLVM की जरूरत नहीं होती। ARM, musl, native Windows और macOS compiler hosts इस bundle में समर्थित नहीं हैं। पुराने glibc वाले Linux पर compatible system toolchain विकल्प बना रहता है।
+Managed bundle के लिए **Linux x86-64, host glibc 2.35+ और Java 17+** चाहिए। Windows पर VS Code/terminal को Ubuntu 22.04+ WSL workspace में चलाएँ। LLVM, GCC, binutils, C development headers या administrator/root access उपभोक्ता मशीन पर आवश्यक नहीं हैं। Java अभी Bhash compiler/language server के लिए आवश्यक है; बने हुए executable को Java/LLVM की जरूरत नहीं होती। यह bundle Linux के लिए है। [Windows x64](native-windows.md) और [macOS Apple Silicon](native-macos.md) के अलग managed SDK हैं; macOS पर Apple Command Line Tools भी चाहिए। Linux ARM और musl अभी समर्थित नहीं हैं। पुराने glibc वाले Linux पर compatible system toolchain विकल्प बना रहता है।
 
 Bundle में matching LLVM 18 clang/opt, LLD linker, llvm-readelf, इन tools की private runtime libraries, Clang resource files तथा glibc/GCC/Linux headers और startup/link libraries का sysroot है। केवल LLVM libraries देना पर्याप्त नहीं होता। Tools की private libraries `LD_LIBRARY_PATH` में केवल उनके child process के लिए लगती हैं; generated application में LLVM dependency नहीं जुड़ती। Managed clang system include/library override variables साफ करके अपने sysroot का प्रयोग करता है।
 

@@ -13,7 +13,12 @@ export const windowsSdk = Object.freeze({
     url: 'https://github.com/bhashitva/bhash/releases/download/native-sdk-windows-1.0.0/bhash-windows-x86_64-llvm18-v1.zip',
     sha256: 'b0d5934ea134e500ff598f737c40b3076400e85e5760a22bfcc28f7aaf321f3f'
 });
-export function sdkForHost(platform = process.platform) {return platform === 'win32' ? windowsSdk : linuxSdk;}
+export const macosSdk = Object.freeze({
+    id: 'bhash-macos-arm64-llvm18-v1',
+    url: 'https://github.com/bhashitva/bhash/releases/download/native-sdk-macos-1.0.0/bhash-macos-arm64-llvm18-v1.zip',
+    sha256: 'c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d'
+});
+export function sdkForHost(platform = process.platform) {return platform === 'darwin' ? macosSdk : platform === 'win32' ? windowsSdk : linuxSdk;}
 export const sdk = sdkForHost();
 export interface NativeOptions {java: string; jar: string; mode: 'managed' | 'system'; home?: string;}
 export type Runner = (command: string, args: string[], env: NodeJS.ProcessEnv, signal?: AbortSignal, cwd?: string) => Promise<string>;
@@ -21,8 +26,8 @@ export function compilerInvocation(jar: string, args: string[], platform = proce
     if (platform === 'win32') return {args:['-Dfile.encoding=UTF-8','-Dstdout.encoding=UTF-8','-Dstderr.encoding=UTF-8','-jar',path.basename(jar),'--utf8-args',Buffer.from(JSON.stringify({args,cwd:callerDirectory}),'utf8').toString('base64')],cwd:path.dirname(path.resolve(jar))};
     return {args:['-Dfile.encoding=UTF-8','-jar',jar,...args]};
 }
-export function requireNativeHost(platform = process.platform, arch = process.arch): void {
-    if (!['linux', 'win32'].includes(platform) || arch !== 'x64') throw new Error('Native requires a Windows x64 or Linux x86-64 extension host (including WSL Ubuntu 22.04+). macOS and ARM hosts are not supported yet.');
+export function requireNativeHost(platform = process.platform, arch: string = process.arch): void {
+    if (!((['linux', 'win32'].includes(platform) && arch === 'x64') || (platform === 'darwin' && arch === 'arm64'))) throw new Error('Native requires Windows x64, Linux x86-64 (including WSL Ubuntu 22.04+), or macOS 14+ Apple Silicon ARM64. Intel Macs and other ARM hosts are not supported.');
 }
 export function nativeEnvironment(options: NativeOptions, base = process.env): NodeJS.ProcessEnv {
     if (!['managed', 'system'].includes(options.mode)) throw new Error('bhash.native.toolchainMode must be managed or system.');
@@ -36,7 +41,7 @@ export function nativeEnvironment(options: NativeOptions, base = process.env): N
 }
 export function terminateTree(child: ChildProcess, signal: NodeJS.Signals = 'SIGTERM'): void {
     try {
-        if (process.platform === 'linux' && child.pid) process.kill(-child.pid, signal);
+        if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, signal);
         else if (process.platform === 'win32' && child.pid) {
             const killer = spawn(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe'), ['/PID', String(child.pid), '/T', '/F'], {windowsHide:true, stdio:'ignore'});
             killer.once('error',()=>child.kill(signal));
@@ -46,7 +51,7 @@ export function terminateTree(child: ChildProcess, signal: NodeJS.Signals = 'SIG
 }
 export const capture: Runner = (command, args, env, signal, cwd) => new Promise((resolve, reject) => {
     signal?.throwIfAborted();
-    const child = spawn(command, args, {env, cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform === 'linux'});
+    const child = spawn(command, args, {env, cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32'});
     let stdout = '', stderr = '', overflow = false, timedOut = false;
     let escalation: ReturnType<typeof setTimeout> | undefined;
     const terminate = () => {
@@ -73,12 +78,20 @@ export const capture: Runner = (command, args, env, signal, cwd) => new Promise(
 });
 interface Status {installed: boolean; archiveSha256?: string;}
 export async function ensureNative(options: NativeOptions, log: (message: string) => void,
-    signal?: AbortSignal, repair = false, run: Runner = capture, platform: NodeJS.Platform = process.platform): Promise<void> {
-    requireNativeHost(platform);
+    signal?: AbortSignal, repair = false, run: Runner = capture, platform: NodeJS.Platform = process.platform, arch: string = process.arch): Promise<void> {
+    requireNativeHost(platform, arch);
     const sdk = sdkForHost(platform);
     const env = nativeEnvironment(options);
     const compiler = (args: string[]) => {const invocation=compilerInvocation(options.jar,args,platform);return run(options.java,invocation.args,env,signal,invocation.cwd);};
     if (options.mode === 'system') {await compiler(['native', 'doctor', '--json']); return;}
+    if (platform === 'darwin') {
+        const version = (await run('/usr/bin/sw_vers', ['-productVersion'], env, signal)).trim();
+        if (!/^\d+\.\d+(?:\.\d+)?$/.test(version) || Number(version.split('.')[0]) < 14) throw new Error(`Native requires macOS 14+ Apple Silicon; found ${version}.`);
+        try {
+            await run('/usr/bin/xcrun', ['--sdk', 'macosx', '--show-sdk-path'], env, signal);
+            await run('/usr/bin/xcrun', ['--sdk', 'macosx', '--find', 'ld'], env, signal);
+        } catch {throw new Error("Install Apple's Command Line Tools using xcode-select --install, complete Apple's installation/license prompts, then retry. The Bhash SDK does not include Apple's SDK or linker.");}
+    }
     if (platform === 'linux') {
     const libc = (await run('getconf', ['GNU_LIBC_VERSION'], env, signal)).trim();
     const match = /^glibc (\d+)\.(\d+)$/.exec(libc);
@@ -94,7 +107,7 @@ export async function ensureNative(options: NativeOptions, log: (message: string
     let current = repair ? {installed: false} : await status();
     if (!repair && current.installed && current.archiveSha256 === sdk.sha256) return;
     log(`Downloading Bhash native SDK from GitHub Releases. SHA-256: ${sdk.sha256}`);
-    log('Setup includes LLVM, the linker, and C runtime headers/libraries. No administrator access is required.');
+    log(platform === 'darwin' ? "Setup includes LLVM tools. Apple's locally installed Command Line Tools provide the SDK/linker." : 'Setup includes LLVM, the linker, and C runtime headers/libraries. No administrator access is required.');
     const deadline = Date.now() + 6 * 60 * 1000;
     for (;;) {
         signal?.throwIfAborted();

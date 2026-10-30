@@ -1,0 +1,58 @@
+name: Publish verified macOS native SDK
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Successful macOS native validation run from this repository
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-macos-native-sdk-1
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_RUN: ${{ inputs.source_run }}
+    steps:
+      - name: Verify successful SDK and application validation provenance
+        run: |
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]] || exit 1
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN" > run.json
+          python3 - <<'PY'
+          import json, os, pathlib
+          run=json.load(open('run.json'))
+          assert run['conclusion']=='success' and run['event'] in ('push','pull_request')
+          assert run['path']=='.github/workflows/native-macos.yml'
+          assert run['head_repository']['full_name']==os.environ['GH_REPO']
+          assert run['head_branch'] in ('main','feature/macos-arm64-native')
+          pathlib.Path('validated-head.txt').write_text(run['head_sha'])
+          PY
+      - name: Verify the tested artifact against the immutable extension catalog
+        run: |
+          gh run download "$SOURCE_RUN" -n bhash-macos-sdk -D sdk
+          cd sdk
+          echo 'c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d  bhash-macos-arm64-llvm18-v1.zip' | sha256sum -c -
+      - name: Publish immutable macOS LLVM assets
+        run: |
+          cat > notes.md <<'NOTES'
+          Managed LLVM 18.1.8 SDK for Bhash on macOS 14+ Apple Silicon (ARM64).
+
+          Install Apple's Command Line Tools separately (`xcode-select --install`). Apple's SDK, linker and system headers are not redistributed. The compiler requires Java 17+; generated applications require neither Java nor .NET nor LLVM nor development tools.
+
+          Includes official LLVM tools/resource libraries, Apache-2.0 WITH LLVM-exception notices, and pinned upstream source/archive provenance. Preserve these notices when redistributing. Tools have local ad-hoc signatures; Developer ID signing and Apple notarization are not claimed.
+
+          SHA-256: `c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d`.
+
+          The source validation run checks SDK reproducibility, native/JVM/CLR behavior, forced GC, sanitizer runtime tests, executable packaging and standalone execution on macOS 15 and 26 ARM64. The macOS 14 minimum was separately validated before its hosted runner retirement.
+          NOTES
+          BHASH_SDK_HEAD=$(cat validated-head.txt)
+          gh release create native-sdk-macos-1.0.0 --draft --target "$BHASH_SDK_HEAD" --title 'Bhash macOS ARM64 native SDK 1.0.0 (LLVM 18)' --notes-file notes.md
+          gh release upload native-sdk-macos-1.0.0 sdk/bhash-macos-arm64-llvm18-v1.zip sdk/bhash-macos-arm64-llvm18-v1.zip.sha256
+          gh release edit native-sdk-macos-1.0.0 --draft=false --latest=false

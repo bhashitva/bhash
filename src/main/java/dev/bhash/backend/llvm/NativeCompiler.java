@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
-/** Experimental Linux/Windows x86-64 executable backend using LLVM 18 directly. */
+/** Experimental Linux/Windows x86-64 and macOS ARM64 executable backend using LLVM 18 directly. */
 public final class NativeCompiler {
 
     private final boolean sanitize, debug;
@@ -33,7 +33,7 @@ public final class NativeCompiler {
     }
     private List<String> clangCommand(List<String> args){
         var command=new ArrayList<>(args);
-        command.addAll(List.of("--target="+NativeBuildInfo.TARGET,"-march=x86-64","-mtune=generic"));
+        command.addAll(NativePlatform.macos()?List.of("--target="+NativeBuildInfo.TARGET,"-mcpu=apple-m1"):List.of("--target="+NativeBuildInfo.TARGET,"-march=x86-64","-mtune=generic"));
         if(debug)command.addAll(List.of("-g","-fno-omit-frame-pointer","-fno-optimize-sibling-calls"));
         if(NativePlatform.windows())command.addAll(List.of("-gno-record-command-line","-fno-record-command-line"));
         if(sanitize)command.addAll(List.of("-fsanitize=address,undefined","-fno-omit-frame-pointer"));
@@ -46,7 +46,11 @@ public final class NativeCompiler {
         Path destination=output.toAbsolutePath().normalize();
         if(destination.getParent()==null || Files.isSymbolicLink(destination) || Files.isDirectory(destination))
             throw new IOException("Native output must be an executable file, not a directory or symbolic link.");
-        Path work=Files.createTempDirectory("bhash-native-"); Path staged=null;
+        Path work=Files.createTempDirectory("bhash-native-");
+        if(NativePlatform.macos())work=work.toRealPath();
+        Path staged=null,stagedSymbols=null;
+        Path symbols=destination.resolveSibling(destination.getFileName()+".dwarf");
+        if(NativePlatform.macos() && debug && (Files.isSymbolicLink(symbols) || Files.isDirectory(symbols)))throw new IOException("Debug symbol output must be a regular file: "+symbols);
         try {
             var tools=NativeToolchain.require(work);String clang=tools.clang(),opt=tools.opt();
             Path sdk=tools.managed()?Path.of(clang).getParent().getParent():null;
@@ -68,8 +72,29 @@ public final class NativeCompiler {
             if(!NativePlatform.windows())NativeToolchain.run(work,List.of(opt,"-passes=verify","-disable-output","program.ll"));
             NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,debug?"-O0":"-O2","-Xclang","-llvm-verify-each","-c","program.ll","-o","program.o"))));
             NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"))));
-            NativeToolchain.run(work,clangCommand(List.of(clang,"program.o","runtime.o","-lm",NativePlatform.windows()?"-Wl,--no-insert-timestamp":"-Wl,--build-id=sha1","-o","program"+NativePlatform.executableSuffix())));
+            if(NativePlatform.macos() && debug){
+                for(String object:List.of("program.o","runtime.o"))Files.setLastModifiedTime(work.resolve(object),java.nio.file.attribute.FileTime.fromMillis(0));
+            }
+            var link=new ArrayList<>(List.of(clang,"program.o","runtime.o","-lm"));
+            // Darwin's content-derived UUID is required by current dyld, including release builds.
+            if(NativePlatform.macos()){
+                if(debug)link.add("-Wl,-no_deduplicate,-oso_prefix,"+work+"/");
+            }else link.add(NativePlatform.windows()?"-Wl,--no-insert-timestamp":"-Wl,--build-id=sha1");
+            link.addAll(List.of("-o","program"+NativePlatform.executableSuffix()));
+            NativeToolchain.run(work,clangCommand(link));
+            if(NativePlatform.macos() && debug){
+                String dsym=tools.managed()?Path.of(clang).resolveSibling("dsymutil").toString():System.getenv().getOrDefault("BHASH_DSYMUTIL","dsymutil");
+                String symbolsLog=NativeToolchain.run(work,List.of(dsym,"--flat","--oso-prepend-path="+work,"-o","program.dwarf","program"));
+                MacosToolchain.requireDebugInfo(work.resolve("program.dwarf"),symbolsLog);
+                NativeToolchain.run(work,List.of("/usr/bin/strip","-S","program"));
+                NativeToolchain.run(work,List.of("/usr/bin/codesign","--force","--sign","-","--timestamp=none","program"));
+            }
             Files.createDirectories(destination.getParent());
+            if(NativePlatform.macos() && debug){
+                stagedSymbols=Files.createTempFile(destination.getParent(),".bhash-symbols-",".tmp");
+                Files.copy(work.resolve("program.dwarf"),stagedSymbols,StandardCopyOption.REPLACE_EXISTING);
+                Files.move(stagedSymbols,symbols,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
+            }
             staged=Files.createTempFile(destination.getParent(),".bhash-native-",".tmp");
             Files.copy(work.resolve("program"+NativePlatform.executableSuffix()),staged,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.COPY_ATTRIBUTES);
             if(!NativePlatform.windows() && !staged.toFile().setExecutable(true,false))throw new IOException("Cannot set executable permissions: "+staged);
@@ -77,6 +102,7 @@ public final class NativeCompiler {
             catch(AtomicMoveNotSupportedException e){Files.move(staged,destination,StandardCopyOption.REPLACE_EXISTING);}
         } finally {
             if(staged!=null)Files.deleteIfExists(staged);
+            if(stagedSymbols!=null)Files.deleteIfExists(stagedSymbols);
             try(var files=Files.walk(work)){
                 for(Path p:files.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(p);
             }
