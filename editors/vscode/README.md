@@ -224,7 +224,8 @@ until saved to a `.bhash` path. No Java runtime is downloaded automatically.
 The editor resolves declared types and common expression chains conservatively;
 unknown or ambiguous receiver types produce no member suggestions. It is not a
 complete semantic binding graph: semantic rename/references, formatting and source
-debugging remain pending. Signature help lists overloads and selects a signature
+debugging for JVM/CLR remain pending; Linux/WSL native debugging is described above.
+Signature help lists overloads and selects a signature
 with enough parameters; it does not promise full overload selection while a call
 is incomplete. Generic member declarations remain a language limitation.
 
