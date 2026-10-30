@@ -74,7 +74,7 @@ Supported hosts:
 - **Linux x86-64, glibc 2.35+**, including Ubuntu 22.04+ in WSL. Install Bhash and
   Java inside WSL when using a WSL workspace; its SDK runs inside that distribution.
 
-- **macOS 14+ Apple Silicon ARM64**: use ARM64 VS Code, Java 17+, and Apple’s
+- **macOS 14+ Apple Silicon ARM64**: use ARM64 VS Code, ARM64 Java 17+, and Apple’s
   Command Line Tools (`xcode-select --install`). Bhash downloads a pinned LLVM 18
   SDK; Apple’s SDK and linker are not redistributed. See [macOS setup and distribution](https://github.com/bhashitva/bhash/blob/main/docs/native-macos.md).
 
