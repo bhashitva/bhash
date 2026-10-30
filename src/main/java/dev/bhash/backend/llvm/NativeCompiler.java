@@ -46,7 +46,7 @@ public final class NativeCompiler {
         Path destination=output.toAbsolutePath().normalize();
         if(destination.getParent()==null || Files.isSymbolicLink(destination) || Files.isDirectory(destination))
             throw new IOException("Native output must be an executable file, not a directory or symbolic link.");
-        Path work=Files.createTempDirectory("bhash-native-"); Path staged=null,stagedSymbols=null;
+        Path work=Files.createTempDirectory("bhash-native-").toRealPath(); Path staged=null,stagedSymbols=null;
         Path symbols=destination.resolveSibling(destination.getFileName()+".dwarf");
         if(NativePlatform.macos() && debug && (Files.isSymbolicLink(symbols) || Files.isDirectory(symbols)))throw new IOException("Debug symbol output must be a regular file: "+symbols);
         try {
@@ -76,7 +76,8 @@ public final class NativeCompiler {
             NativeToolchain.run(work,clangCommand(List.of(clang,"program.o","runtime.o","-lm",NativePlatform.macos()?(debug?"-Wl,-no_deduplicate,-oso_prefix,"+work+"/":"-Wl,-no_uuid"):NativePlatform.windows()?"-Wl,--no-insert-timestamp":"-Wl,--build-id=sha1","-o","program"+NativePlatform.executableSuffix())));
             if(NativePlatform.macos() && debug){
                 String dsym=tools.managed()?Path.of(clang).resolveSibling("dsymutil").toString():System.getenv().getOrDefault("BHASH_DSYMUTIL","dsymutil");
-                NativeToolchain.run(work,List.of(dsym,"--flat","--oso-prepend-path="+work,"-o","program.dwarf","program"));
+                String symbolsLog=NativeToolchain.run(work,List.of(dsym,"--flat","--oso-prepend-path="+work,"-o","program.dwarf","program"));
+                MacosToolchain.requireDebugInfo(work.resolve("program.dwarf"),symbolsLog);
                 NativeToolchain.run(work,List.of("/usr/bin/strip","-S","program"));
                 NativeToolchain.run(work,List.of("/usr/bin/codesign","--force","--sign","-","--timestamp=none","program"));
             }
