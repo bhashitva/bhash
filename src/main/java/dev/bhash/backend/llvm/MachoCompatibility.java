@@ -32,7 +32,7 @@ final class MachoCompatibility {
     private NativeCompatibility.Report inspect(boolean strict)throws IOException,CompilationException{
         if(data.getInt(0)!=0xfeedfacf || data.getInt(4)!=0x0100000c || data.getInt(8)!=0 || data.getInt(12)!=2)throw invalid("Expected a thin macOS ARM64 executable (not arm64e, Intel, universal, or a library)");
         int count=number(16),size=number(20);if(count<1 || count>4096 || size>bytes.length-32)throw invalid("Invalid Mach-O load commands");
-        int at=32,end=32+size;String metadata=null,minimum=null,loader=null;var libraries=new TreeSet<String>();
+        int at=32,end=32+size;String metadata=null,minimum=null,loader=null;boolean uuid=false;var libraries=new TreeSet<String>();
         for(int i=0;i<count;i++){
             if(at>end-8)throw invalid("Truncated Mach-O load commands");
             int command=data.getInt(at),length=number(at+4);if(length<8 || length%8!=0 || length>end-at)throw invalid("Invalid Mach-O load command size");
@@ -46,6 +46,9 @@ final class MachoCompatibility {
                         metadata=string(offset,offset+(int)n);
                     }
                 }
+            }else if(command==0x1b){
+                if(length!=24 || uuid || data.getLong(at+8)==0 && data.getLong(at+16)==0)throw invalid("Invalid/duplicate Mach-O UUID");
+                uuid=true;
             }else if(command==0x32){
                 if(length<24 || data.getInt(at+8)!=1 || minimum!=null)throw invalid("Expected one macOS build-version command");minimum=version(data.getInt(at+12));
             }else if(command==0xe || command==0xc || command==0x20 || command==0x80000018 || command==0x8000001f || command==0x80000023){
@@ -56,6 +59,7 @@ final class MachoCompatibility {
             else if(command==0x8000001c)throw invalid("Embedded Mach-O library search paths are not supported for distribution");
             at+=length;
         }
+        if(!uuid)throw invalid("Missing Mach-O LC_UUID; rebuild for compatibility with current macOS loaders");
         if(at!=end || metadata==null || minimum==null || !"/usr/lib/dyld".equals(loader) || !libraries.equals(new TreeSet<>(Set.of("/usr/lib/libSystem.B.dylib"))))throw invalid("Expected macOS build metadata and only the system libSystem dependency");
         if(NativeCompatibility.compareVersions(minimum,NativePlatform.MINIMUM_MACOS)!=0)throw invalid("Unexpected macOS deployment minimum: "+minimum);
         JsonObject info=JsonParser.parseString(metadata).getAsJsonObject();

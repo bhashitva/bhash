@@ -75,7 +75,13 @@ public final class NativeCompiler {
             if(NativePlatform.macos() && debug){
                 for(String object:List.of("program.o","runtime.o"))Files.setLastModifiedTime(work.resolve(object),java.nio.file.attribute.FileTime.fromMillis(0));
             }
-            NativeToolchain.run(work,clangCommand(List.of(clang,"program.o","runtime.o","-lm",NativePlatform.macos()?(debug?"-Wl,-no_deduplicate,-oso_prefix,"+work+"/":"-Wl,-no_uuid"):NativePlatform.windows()?"-Wl,--no-insert-timestamp":"-Wl,--build-id=sha1","-o","program"+NativePlatform.executableSuffix())));
+            var link=new ArrayList<>(List.of(clang,"program.o","runtime.o","-lm"));
+            // Darwin's content-derived UUID is required by current dyld, including release builds.
+            if(NativePlatform.macos()){
+                if(debug)link.add("-Wl,-no_deduplicate,-oso_prefix,"+work+"/");
+            }else link.add(NativePlatform.windows()?"-Wl,--no-insert-timestamp":"-Wl,--build-id=sha1");
+            link.addAll(List.of("-o","program"+NativePlatform.executableSuffix()));
+            NativeToolchain.run(work,clangCommand(link));
             if(NativePlatform.macos() && debug){
                 String dsym=tools.managed()?Path.of(clang).resolveSibling("dsymutil").toString():System.getenv().getOrDefault("BHASH_DSYMUTIL","dsymutil");
                 String symbolsLog=NativeToolchain.run(work,List.of(dsym,"--flat","--oso-prepend-path="+work,"-o","program.dwarf","program"));
