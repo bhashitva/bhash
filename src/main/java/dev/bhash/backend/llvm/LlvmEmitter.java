@@ -518,11 +518,14 @@ public final class LlvmEmitter {
             if(f.result().reference())line("%return = getelementptr ["+rootCount+" x ptr], ptr %roots, i64 0, i64 "+returnRoot);
             else line("%return = alloca "+llvm(f.result()));
         }
-        environment(false);declareVariables(f.parameters());
+        environment(false);
         for(int i=0;i<f.parameters().size();i++) {
             var b=f.parameters().get(i);line("store "+llvm(b.type())+" %arg"+i+", ptr "+address(b));
         }
         line("call void @bh_roots_push(ptr %frame, ptr %roots, i64 "+rootCount+")");
+        // The first debugger stop must follow parameter stores/root registration.
+        // Declaring earlier makes GDB end the prologue before arguments are valid.
+        declareVariables(f.parameters());
         debugSource=f.source();
         if(f.initialization()>=0)initialize(f.initialization());
         statement(f.body());
