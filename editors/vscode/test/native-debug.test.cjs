@@ -42,7 +42,7 @@ test('debug build uses managed setup, source debug flags, and removes partial fa
     await assert.rejects(fs.stat(path.dirname(program)));
     const abort=new AbortController();abort.abort();calls.length=0;
     await assert.rejects(prepareNativeDebug(options,()=>{},abort.signal,dependencies));
-    assert.deepEqual(calls,['gdb'],'cancelled launch must not install an SDK or build');
+    assert.deepEqual(calls,[],'cancelled launch must not probe, install an SDK or build');
 });
 
 

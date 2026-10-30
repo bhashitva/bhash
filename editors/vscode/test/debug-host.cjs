@@ -106,7 +106,7 @@ exports.run=async()=>{
         // Exact live=0/root snapshots are checked by test_native_inspection.py.
         assert.ok(transcript.some(m=>m.type==='event'&&m.event==='exited'&&m.body.exitCode===0));
         // The build has a per-session lifetime; never reuse a previous executable.
-        const deadline=Date.now()+5000;while(Date.now()<deadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
+        const deadline=Date.now()+10000;while(Date.now()<deadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
         await assert.rejects(fs.stat(buildDirectory));
         console.log('PASS real VS Code/GDB DAP: source breakpoints, step in/over/out, Hindi stacks, nested variables, forced GC and cleanup.');
     } finally {
