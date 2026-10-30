@@ -3,40 +3,105 @@ on: [push, pull_request]
 permissions:
   contents: read
 concurrency:
-  group: native-macos-${{ github.event.pull_request.number || github.ref }}
+  group: native-macos-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
-  upstream:
-    runs-on: ubuntu-24.04
-    outputs:
-      sha256: ${{ steps.llvm.outputs.sha256 }}
-    steps:
-      - id: llvm
-        name: Inspect official LLVM 18 archive
-        run: |
-          curl --fail --location --retry 3 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-arm64-apple-macos11.tar.xz' -o llvm-upstream.tar.xz
-          shasum -a 256 llvm-upstream.tar.xz
-          echo "sha256=$(sha256sum llvm-upstream.tar.xz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
-          tar -tf llvm-upstream.tar.xz > llvm-upstream-files.txt
-          sed -n '1,20p' llvm-upstream-files.txt
-  macos-native:
-    needs: upstream
+  macos-sdk:
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11.9'
-      - name: Build relocatable Apple Silicon SDK
-        env:
-          LLVM_SHA: ${{ needs.upstream.outputs.sha256 }}
+      - uses: actions/cache@v4
+        with:
+          path: llvm-upstream.tar.xz
+          key: macos-llvm-18.1.8-4573b7f25f46d2a9
+      - name: Authenticate upstream and reproduce the managed LLVM SDK
         run: |
           test "$(uname -m)" = arm64
-          xcrun --sdk macosx --show-sdk-path
-          curl --fail --location --retry 3 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-arm64-apple-macos11.tar.xz' -o llvm-upstream.tar.xz
-          python3 scripts/build_macos_native_toolchain.py llvm-upstream.tar.xz --upstream-sha256 "$LLVM_SHA"
+          if [ ! -f llvm-upstream.tar.xz ]; then
+            curl --fail --location --retry 3 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-arm64-apple-macos11.tar.xz' -o llvm-upstream.tar.xz
+          fi
+          python3 scripts/build_macos_native_toolchain.py llvm-upstream.tar.xz
+          python3 scripts/build_macos_native_toolchain.py llvm-upstream.tar.xz --output target/macos-sdk-again
+          cmp target/macos-sdk/bhash-macos-arm64-llvm18-v1.zip target/macos-sdk-again/bhash-macos-arm64-llvm18-v1.zip
+          cd target/macos-sdk
+          echo 'c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d  bhash-macos-arm64-llvm18-v1.zip' | shasum -a 256 -c -
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-sdk-bootstrap
+          name: bhash-macos-sdk
           path: target/macos-sdk/*
+          if-no-files-found: error
+  macos-native:
+    needs: macos-sdk
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      BHASH_NATIVE_TOOLCHAIN: managed
+      BHASH_REQUIRE_NATIVE: 'true'
+      BHASH_REQUIRE_CLR: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      # LeakSanitizer is unavailable on Darwin. Precise collector live-count tests remain mandatory.
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bhash-macos-sdk
+          path: target/macos-sdk
+      - name: Build compiler and activate the authenticated local SDK
+        run: |
+          test "$(uname -m)" = arm64
+          mvn --batch-mode --no-transfer-progress -DskipTests package
+          export BHASH_TOOLCHAIN_HOME="$RUNNER_TEMP/Bhash SDK भारत"
+          echo "BHASH_TOOLCHAIN_HOME=$BHASH_TOOLCHAIN_HOME" >> "$GITHUB_ENV"
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native toolchain install --archive target/macos-sdk/bhash-macos-arm64-llvm18-v1.zip --sha256 c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d --json
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native toolchain verify --json
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native doctor --json
+          python3 - <<'PYTHON'
+          import json, os, pathlib
+          cache=pathlib.Path(os.environ['BHASH_TOOLCHAIN_HOME'])
+          active=json.loads((cache/'active.json').read_text())
+          with open(os.environ['GITHUB_PATH'],'a') as out:
+              out.write(str(cache/'installations'/active['directory']/'bin')+'\n')
+          PYTHON
+          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
+      - name: Validate collector, binary64 formatting and exception cleanup under sanitizers
+        run: |
+          python3 scripts/test_native_runtime.py --sanitize
+          python3 scripts/test_native_fixed.py
+      - name: Cross-validate native language behavior against JVM and CLR with forced GC
+        run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,MacosCompatibilityTest test
+      - name: Verify reproducible release packages, Mach-O inspection, symbols and standalone execution
+        run: python3 scripts/test_macos_native_release.py
+      - name: Compile every applicable native example
+        run: |
+          python3 -m unittest discover -s scripts -p test_build_examples.py
+          python3 scripts/build_examples.py --target native --require-native
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bhash-macos-${{ matrix.os }}-validation
+          path: |
+            target/surefire-reports/
+            target/macos-release/
+            target/examples/build-report.json
+            target/examples/logs/
+          if-no-files-found: warn
