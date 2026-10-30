@@ -122,7 +122,7 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
-        err.println("Native output is an experimental Linux/Windows x86-64 executable; LLVM 18 is required for builds.");
+        err.println("Native output is an experimental Linux/Windows x86-64 or macOS 14+ ARM64 executable; LLVM 18 is required for builds.");
         err.println("check validates syntax only; compile/run also validate names, types and control flow.");
         return 2;
     }
@@ -145,7 +145,7 @@ public final class Main {
                     case "clr" -> Target.CLR;
                     case "native" -> Target.NATIVE;
                     case "wasm-browser", "wasm" -> Target.WASM;
-                    default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm), native (experimental Linux/Windows x86-64).");
+                    default -> throw new IllegalArgumentException("Implemented targets: jvm, clr, wasm-browser (alias wasm), native (experimental Linux/Windows x86-64 or macOS 14+ ARM64).");
                 };
             } else if(args[i].equals("--source-root") && sourceRoot==null && i+1<args.length){sourceRoot=Path.of(args[++i]);
             } else if(args[i].equals("--debug") && !debug){debug=true;
