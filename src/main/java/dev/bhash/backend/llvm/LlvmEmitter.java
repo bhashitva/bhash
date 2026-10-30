@@ -60,7 +60,13 @@ public final class LlvmEmitter {
     }
     public static String emit(CoreProgram program,String notices,boolean debugging,String buildInfo){var emitter=new LlvmEmitter();emitter.debugEnabled=debugging;emitter.buildInfo=buildInfo;return emitter.program(program,notices);}
     private String program(CoreProgram program,String notices){
-        if(debugEnabled)debug=new NativeDebugInfo(program.functions().get(0).source());
+        if(debugEnabled){
+            debug=new NativeDebugInfo(program.functions().get(0).source());
+            byte[] schema=NativeDebugInfo.schema(program).getBytes(StandardCharsets.UTF_8);
+            globals.append("@bhash_debug_schema = constant { i64, [").append(schema.length).append(" x i8] } { i64 ").append(schema.length).append(", [").append(schema.length).append(" x i8] c\"");
+            for(byte b:schema)globals.append(String.format(Locale.ROOT,"\\%02X",b&255));
+            globals.append("\" }, align 8\n");
+        }
         boxMetadata();
         collectionMetadata(program.collections());
         String dataInit="";
@@ -498,7 +504,10 @@ public final class LlvmEmitter {
         code.append("define internal ").append(llvm(f.result())).append(" @bfn").append(f.id()).append('(');
         var arguments=new ArrayList<String>();
         for(int i=0;i<f.parameters().size();i++)arguments.add(llvm(f.parameters().get(i).type())+" %arg"+i);
-        code.append(String.join(", ",arguments)).append(")").append(debug==null?"":" noinline optnone !dbg !"+debugScope).append(" {\n");block("entry");debugSource=null;
+        code.append(String.join(", ",arguments)).append(")").append(debug==null?"":" noinline optnone !dbg !"+debugScope).append(" {\n");block("entry");
+        // Missing locations make LLVM attribute generated calls to the function's
+        // declaration line. Explicit line zero keeps GDB out of the prologue.
+        debugSource=debug==null?null:new Source(f.source().file(),0,0);
         if(traced){line("%trace = alloca %TraceFrame, align 8");line("call void @bh_trace_enter(ptr %trace, ptr "+text(f.name())+", ptr "+text(f.source().toString())+")");}
         line("%frame = alloca %RootFrame, align 8");
         line("%roots = alloca ["+rootCount+" x ptr], align 8");
@@ -512,11 +521,14 @@ public final class LlvmEmitter {
             if(f.result().reference())line("%return = getelementptr ["+rootCount+" x ptr], ptr %roots, i64 0, i64 "+returnRoot);
             else line("%return = alloca "+llvm(f.result()));
         }
-        environment(false);declareVariables(f.parameters());
+        environment(false);
         for(int i=0;i<f.parameters().size();i++) {
             var b=f.parameters().get(i);line("store "+llvm(b.type())+" %arg"+i+", ptr "+address(b));
         }
         line("call void @bh_roots_push(ptr %frame, ptr %roots, i64 "+rootCount+")");
+        // The first debugger stop must follow parameter stores/root registration.
+        // Declaring earlier makes GDB end the prologue before arguments are valid.
+        declareVariables(f.parameters());
         debugSource=f.source();
         if(f.initialization()>=0)initialize(f.initialization());
         statement(f.body());

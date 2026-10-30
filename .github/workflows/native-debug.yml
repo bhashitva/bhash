@@ -1,0 +1,61 @@
+name: Bhash native VS Code debugging
+on: [pull_request, workflow_dispatch]
+concurrency:
+  group: native-debug-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  debug:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      BHASH_NATIVE_TOOLCHAIN: managed
+      BHASH_TOOLCHAIN_HOME: ${{ github.workspace }}/target/debug-toolchain
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y gdb xvfb
+      - run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - run: npm ci --prefix editors/vscode && npm run build --prefix editors/vscode && npm test --prefix editors/vscode
+      - name: Install the ordinary managed native SDK
+        run: |
+          node - <<'JS'
+          const path=require('node:path');
+          require('./editors/vscode/dist/native.js').ensureNative({java:'java',jar:path.resolve('target/bhash-compiler-0.1.0-SNAPSHOT.jar'),mode:'managed'},console.log).catch(error=>{console.error(error);process.exitCode=1;});
+          JS
+      - name: Real GDB inspection and forced-GC safety
+        id: inspection
+        continue-on-error: true
+        run: python3 scripts/test_native_inspection.py && python3 scripts/test_native_debugger.py
+      - run: npm run package --prefix editors/vscode
+      - name: Real VS Code GDB launch, breakpoints, stepping, stacks and variables
+        id: vscode
+        continue-on-error: true
+        run: xvfb-run -a node editors/vscode/test/debug-run.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-debug-${{ matrix.os }}
+          path: |
+            target/native-inspection/
+            target/native-debugger/
+            target/vscode-debug/dap.log
+      - name: Require both debugger integration tests
+        if: always()
+        run: test '${{ steps.inspection.outcome }}' = success && test '${{ steps.vscode.outcome }}' = success
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-debug-vsix-${{ matrix.os }}
+          path: target/bhash-vscode-0.8.0.vsix

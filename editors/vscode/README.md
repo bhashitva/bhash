@@ -30,6 +30,20 @@ No Maven or Node installation is needed to use the packaged extension. The exten
 available on the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash).
 A locally packaged or Actions-built version can be installed before its Marketplace update is published.
 
+## Native debugging on Linux and WSL
+
+Run **Bhash: Debug Native (Linux/WSL)** to save and compile the active Bhash project
+with source debug information, then launch VS Code's GDB debugger. Install Microsoft's
+**C/C++** extension and **GDB 12+ with Python 3 support** on the Linux/WSL extension
+host (`sudo apt install gdb` on Ubuntu). Java 17+ remains required for compilation;
+the ordinary managed native SDK supplies LLVM automatically.
+
+Source breakpoints, step into/over/out, Hindi call stacks and scalar/text/object/
+collection inspection are supported. Inspection reads memory without calling program
+functions or changing GC roots. Windows/macOS native build/run are unchanged; debugger
+integration starts with Linux/WSL. See the [Hindi debugging guide](../../docs/native-vscode-debug.md)
+for launch configurations, limits, GC safety and troubleshooting.
+
 ## Features
 
 - Highlighting generated from the current ANTLR keyword definitions, with
@@ -210,7 +224,8 @@ until saved to a `.bhash` path. No Java runtime is downloaded automatically.
 The editor resolves declared types and common expression chains conservatively;
 unknown or ambiguous receiver types produce no member suggestions. It is not a
 complete semantic binding graph: semantic rename/references, formatting and source
-debugging remain pending. Signature help lists overloads and selects a signature
+debugging for JVM/CLR remain pending; Linux/WSL native debugging is described above.
+Signature help lists overloads and selects a signature
 with enough parameters; it does not promise full overload selection while a call
 is incomplete. Generic member declarations remain a language limitation.
 

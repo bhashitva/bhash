@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0
+
+- Add Linux/WSL native debugging through VS Code's Microsoft C/C++ GDB adapter: source breakpoints, stepping, Hindi call stacks and expandable Bhash variables.
+- Build a fresh `--debug` executable for each session, check GDB/Python setup, reuse managed LLVM setup, support cancellation and remove session outputs on termination.
+- Add read-only UTF-8 text/object/collection/boxing inspection and real GDB/VS Code tests across forced collections. GDB and Microsoft C/C++ are separate debugger prerequisites.
+
 ## 0.7.1
 
 - Add a Discord community/support link and Command Palette shortcut.
