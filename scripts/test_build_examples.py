@@ -9,10 +9,26 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from build_examples import artifact_path, discover, main, unsupported_native
+from build_examples import artifact_path, discover, main, unsupported_native, windows_native_container_command
 
 
 class ExampleBuildTest(unittest.TestCase):
+    def test_windows_container_preserves_paths_and_rejects_unmounted_sources(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            with patch('build_examples.ROOT', root), patch.dict('os.environ', {
+                    'JAVA_HOME': str(root / 'jdk'), 'BHASH_TOOLCHAIN_HOME': str(root / 'sdk')}):
+                command = windows_native_container_command(root / 'compiler.jar',
+                    root / 'examples/भारत & space.bhash', root / 'target/native/hello.exe', root / 'target/tmp')
+                self.assertEqual(['docker', 'run', '--rm', '--network', 'none'], command[:5])
+                self.assertEqual(r'C:\repo\examples\भारत & space.bhash', command[command.index('compile') + 1])
+                self.assertEqual(r'C:\repo\target\native\hello.exe', command[-1])
+                self.assertIn('BHASH_NATIVE_TOOLCHAIN=managed', command)
+                self.assertNotIn('cmd.exe', command)
+                with self.assertRaises(ValueError):
+                    windows_native_container_command(root / 'compiler.jar', root.parent / 'outside.bhash',
+                                                     root / 'out.exe', root / 'tmp')
+
     def test_discovery_groups_projects_and_ignores_dependency_snapshots(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

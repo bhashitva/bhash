@@ -17,8 +17,8 @@ export function sdkForHost(platform = process.platform) {return platform === 'wi
 export const sdk = sdkForHost();
 export interface NativeOptions {java: string; jar: string; mode: 'managed' | 'system'; home?: string;}
 export type Runner = (command: string, args: string[], env: NodeJS.ProcessEnv, signal?: AbortSignal, cwd?: string) => Promise<string>;
-export function compilerInvocation(jar: string, args: string[], platform = process.platform): {args:string[]; cwd?:string} {
-    if (platform === 'win32') return {args:['-Dfile.encoding=UTF-8','-Dstdout.encoding=UTF-8','-Dstderr.encoding=UTF-8','-jar',path.basename(jar),'--utf8-args',Buffer.from(JSON.stringify({args,cwd:process.cwd()}),'utf8').toString('base64')],cwd:path.dirname(path.resolve(jar))};
+export function compilerInvocation(jar: string, args: string[], platform = process.platform, callerDirectory = process.cwd()): {args:string[]; cwd?:string} {
+    if (platform === 'win32') return {args:['-Dfile.encoding=UTF-8','-Dstdout.encoding=UTF-8','-Dstderr.encoding=UTF-8','-jar',path.basename(jar),'--utf8-args',Buffer.from(JSON.stringify({args,cwd:callerDirectory}),'utf8').toString('base64')],cwd:path.dirname(path.resolve(jar))};
     return {args:['-Dfile.encoding=UTF-8','-jar',jar,...args]};
 }
 export function requireNativeHost(platform = process.platform, arch = process.arch): void {
@@ -46,7 +46,7 @@ export function terminateTree(child: ChildProcess, signal: NodeJS.Signals = 'SIG
 }
 export const capture: Runner = (command, args, env, signal, cwd) => new Promise((resolve, reject) => {
     signal?.throwIfAborted();
-    const child = spawn(command, args, {env, cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform === 'linux'});
+    const child = spawn(command, args, {env, cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform === 'linux'});
     let stdout = '', stderr = '', overflow = false, timedOut = false;
     let escalation: ReturnType<typeof setTimeout> | undefined;
     const terminate = () => {

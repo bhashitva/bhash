@@ -57,7 +57,7 @@ A locally packaged or Actions-built version can be installed before its Marketpl
 
 ## Native on Windows, Linux and WSL
 
-Native builds use the compiler bundled in version 0.6.0. Choose `native` from
+Native builds use the compiler bundled in version 0.6.4. Choose `native` from
 **Bhash: Build Project or File** or **Bhash: Run Project or File**. The first task
 downloads the [versioned SDK](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.1.0)
 (110 MiB), checks its bundled SHA-256, verifies the installation, and activates it

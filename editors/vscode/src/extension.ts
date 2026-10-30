@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import {NativeOptions, requireNativeHost} from './native';
+import {TaskConsole} from './task-console';
 import {LanguageClient, LanguageClientOptions, ServerOptions} from 'vscode-languageclient/node';
 
 let client: LanguageClient | undefined;
@@ -66,26 +67,36 @@ function taskFor(definition: BhashTask, folder: vscode.WorkspaceFolder | undefin
     const target = definition.target || vscode.workspace.getConfiguration('bhash', folder?.uri).get<Target>('target', 'jvm');
     if (!targets.includes(target) || definition.command === 'run' && target === 'wasm-browser') throw new Error('Use Build for wasm-browser, then serve the output directory over HTTP. Run supports JVM, CLR and Native.');
     const {java,jar} = tools();
-    const execution = target === 'native' ? nativeExecution(definition.command, input, folder) : new vscode.ProcessExecution(java, ['-Dfile.encoding=UTF-8', '-jar', jar, definition.command === 'build' ? 'compile' : 'run', input, '--target', target], {cwd: folder?.uri.fsPath || path.dirname(input)});
+    const execution = target === 'native' || process.platform === 'win32' ? compilerExecution(definition.command, input, folder, target) : new vscode.ProcessExecution(java, ['-Dfile.encoding=UTF-8', '-jar', jar, definition.command === 'build' ? 'compile' : 'run', input, '--target', target], {cwd: folder?.uri.fsPath || path.dirname(input)});
     const task = new vscode.Task(definition, folder || vscode.TaskScope.Global, `${definition.command} ${path.basename(input)} (${target})`, 'Bhash', execution, ['$bhash']);
     task.group = definition.command === 'build' ? vscode.TaskGroup.Build : undefined;
-    task.presentationOptions = {reveal: vscode.TaskRevealKind.Always, focus: definition.command === 'run', panel: vscode.TaskPanelKind.Dedicated, clear: true};
+    task.presentationOptions = {echo: false, reveal: vscode.TaskRevealKind.Always, focus: definition.command === 'run', panel: vscode.TaskPanelKind.Dedicated, clear: true};
     return task;
 }
-function nativeExecution(operation: 'build' | 'run' | 'setup' | 'check' | 'repair', input?: string, folder?: vscode.WorkspaceFolder): vscode.ProcessExecution {
-    requireNativeHost();
+function compilerExecution(operation: 'build' | 'run' | 'setup' | 'check' | 'repair', input?: string, folder?: vscode.WorkspaceFolder, target: Target = 'native'): vscode.ProcessExecution | vscode.CustomExecution {
+    if (target === 'native') requireNativeHost();
     const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
     const {java, jar} = tools();
     const options: NativeOptions = {java, jar, mode: config.get('native.toolchainMode', 'managed'), home: config.get('native.toolchainHome', '')};
-    return new vscode.ProcessExecution(process.execPath, [context.asAbsolutePath('dist/native-task.js'), JSON.stringify({...options, operation, input})],
-        {cwd: folder?.uri.fsPath || (input ? path.dirname(input) : path.dirname(jar)), env: {ELECTRON_RUN_AS_NODE: '1'}});
+    const cwd = folder?.uri.fsPath || (input ? path.dirname(input) : path.dirname(jar));
+    if (process.platform === 'win32') return new vscode.CustomExecution(async () => {
+        const written = new vscode.EventEmitter<string>();
+        const closed = new vscode.EventEmitter<number>();
+        const terminal = new TaskConsole({...options, operation, input, target}, cwd,
+            text => written.fire(text), code => closed.fire(code));
+        return {onDidWrite: written.event, onDidClose: closed.event,
+            open: () => {void terminal.start();}, close: () => {terminal.close(); written.dispose(); closed.dispose();},
+            handleInput: (data: string) => terminal.handleInput(data)};
+    });
+    return new vscode.ProcessExecution(process.execPath, [context.asAbsolutePath('dist/native-task.js'), JSON.stringify({...options, operation, input, target})],
+        {cwd, env: {ELECTRON_RUN_AS_NODE:'1'}});
 }
 async function nativeTools(operation: 'setup' | 'check' | 'repair') {
     if (!trusted()) return;
     const folder = vscode.workspace.workspaceFolders?.find(f => f.uri.scheme === 'file');
     const task = new vscode.Task({type:'bhash-native-tools', operation}, folder || vscode.TaskScope.Global,
-        `${operation} native tools`, 'Bhash', nativeExecution(operation, undefined, folder));
-    task.presentationOptions = {reveal:vscode.TaskRevealKind.Always, panel:vscode.TaskPanelKind.Dedicated, clear:true};
+        `${operation} native tools`, 'Bhash', compilerExecution(operation, undefined, folder));
+    task.presentationOptions = {echo: false, reveal:vscode.TaskRevealKind.Always, panel:vscode.TaskPanelKind.Dedicated, clear:true};
     await vscode.tasks.executeTask(task);
 }
 async function execute(command: 'build' | 'run') {
@@ -113,7 +124,7 @@ async function dependencies(action: 'lock' | 'restore' | 'verify') {
     const task = new vscode.Task({type: 'bhash-dependencies', action}, folder || vscode.TaskScope.Global,
         `${action} dependencies`, 'Bhash', new vscode.ProcessExecution(java,
             ['-Dfile.encoding=UTF-8','-jar',jar,'deps',action,input], {cwd: path.dirname(input)}));
-    task.presentationOptions = {reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, clear: true};
+    task.presentationOptions = {echo: false, reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, clear: true};
     const execution = await vscode.tasks.executeTask(task);
     const listener = vscode.tasks.onDidEndTaskProcess(event => {
         if (event.execution !== execution) return;

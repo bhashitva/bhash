@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.4
+
+- Prevent native LLVM wrapper/linker subprocesses from creating console windows: invoke the real Windows compiler and GNU linker directly, keeping compiler jobs integrated.
+- Keep UTF-8 input/output and the direct integrated terminal for all targets.
+
+## 0.6.3
+
+- Run Windows tasks directly from the extension into the integrated terminal, removing the desktop Code.exe and PowerShell helper processes.
+- Preserve UTF-8 output, line input, backspace, cancellation and exit codes with an extension-owned terminal.
+
+## 0.6.2
+
+- Configure the Windows task terminal for UTF-8 on JVM, CLR and Native targets.
+- Suppress separate console windows when the task launcher starts Java subprocesses.
+- Replace the displayed encoded PowerShell command with a readable command; task requests remain data in the environment.
+
+## 0.6.1
+
+- Run Windows native tasks through a waiting console launcher so output, console input, and exit status remain attached to the task.
+- Set Node mode inside the launcher and pass task requests as UTF-8 base64 data to preserve paths and avoid shell interpretation.
+- Test the launcher with desktop VS Code, delayed output, Hindi text, standard input, and failing exit codes.
+
 ## 0.6.0
 
 - Native build/run on Windows 10+ x64, without WSL or Visual Studio.

@@ -5,7 +5,7 @@ import argparse
 from dataclasses import dataclass
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import platform
 import re
 import shutil
@@ -88,6 +88,23 @@ def relative(path, base):
         return str(path)
 
 
+def windows_native_container_command(compiler, source, destination, temporary):
+    """Compile one example in a fresh offline Windows container for stress CI."""
+    def mounted(path):
+        return str(PureWindowsPath(r'C:\repo').joinpath(*path.relative_to(ROOT).parts))
+    java_home = Path(os.environ['JAVA_HOME'])
+    toolchain_home = Path(os.environ['BHASH_TOOLCHAIN_HOME'])
+    return [
+        'docker', 'run', '--rm', '--network', 'none', '--workdir', r'C:\repo',
+        '-v', f'{ROOT}:C:\\repo', '-v', f'{java_home}:C:\\java:ro',
+        '-v', f'{toolchain_home}:C:\\toolchains:ro',
+        '-e', 'BHASH_NATIVE_TOOLCHAIN=managed', '-e', r'BHASH_TOOLCHAIN_HOME=C:\toolchains',
+        'mcr.microsoft.com/windows/servercore:ltsc2022', r'C:\java\bin\java.exe',
+        '-Djava.io.tmpdir=' + mounted(temporary), '-jar', mounted(compiler),
+        'compile', mounted(source), '--target', 'native', '-o', mounted(destination),
+    ]
+
+
 def main(argv=None):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -97,10 +114,14 @@ def main(argv=None):
     parser.add_argument("--examples", type=Path, default=ROOT / "examples")
     parser.add_argument("--output-root", type=Path, default=ROOT / "target/examples")
     parser.add_argument("--require-native", action="store_true", help="Fail if the native platform/toolchain is unavailable")
+    parser.add_argument("--windows-native-container", action="store_true",
+                        help="CI: isolate each native compilation in a fresh offline Windows container; paths must be inside this repository")
     args = parser.parse_args(argv)
     targets = list(dict.fromkeys(args.target or TARGETS))
     if args.require_native and "native" not in targets:
         parser.error("--require-native needs the native target")
+    if args.windows_native_container and (os.name != 'nt' or 'native' not in targets):
+        parser.error("--windows-native-container requires Windows and the native target")
     compiler, examples, output = (p.resolve() for p in (args.compiler, args.examples, args.output_root))
     if not compiler.is_file():
         parser.error("Build the compiler first: mvn package -DskipTests")
@@ -150,6 +171,8 @@ def main(argv=None):
                 log.parent.mkdir(parents=True, exist_ok=True)
                 command = [java, "-Djava.io.tmpdir=" + str(temporary), "-jar", str(compiler), "compile", str(unit.source), "--target", target, "-o", str(destination)]
                 try:
+                    if args.windows_native_container and target == 'native':
+                        command = windows_native_container_command(compiler, unit.source, destination, temporary)
                     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True,
                                             encoding="utf-8", errors="replace", timeout=180)
                     diagnostics = result.stdout + result.stderr
@@ -165,7 +188,7 @@ def main(argv=None):
                         entry.update(status="unsupported", reason="outside the native language profile (BH9001)")
                     else:
                         entry.update(status="failed", reason=f"compiler exited with status {result.returncode}")
-                except (OSError, subprocess.TimeoutExpired) as error:
+                except (OSError, ValueError, KeyError, subprocess.TimeoutExpired) as error:
                     log.write_text(str(error), encoding="utf-8")
                     entry.update(status="failed", reason=str(error), log=relative(log, output))
                 if entry["status"] == "failed":
