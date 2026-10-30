@@ -76,7 +76,7 @@ export class TaskConsole {
             }
             if (!this.request.input) throw new Error('Task input is missing.');
             const invocation = compilerInvocation(this.request.jar,[this.request.operation === 'build' ? 'compile' : 'run',path.resolve(this.cwd,this.request.input),'--target',target],process.platform,this.cwd);
-            this.child = this.launch(this.request.java,invocation.args,{env,cwd:invocation.cwd || this.cwd,windowsHide:true,stdio:'pipe',detached:process.platform === 'linux'});
+            this.child = this.launch(this.request.java,invocation.args,{env,cwd:invocation.cwd || this.cwd,windowsHide:true,stdio:'pipe',detached:process.platform !== 'win32'});
             const child=this.child;
             child.stdin?.on('error',()=>{}); // A program may exit before queued input is consumed.
             child.stdout?.setEncoding('utf8').on('data',(text:string)=>this.output(text));

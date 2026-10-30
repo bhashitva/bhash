@@ -24,7 +24,7 @@ async function main() {
     if (!request.input) throw new Error('Task input is missing.');
     abort.signal.throwIfAborted();
     const invocation=compilerInvocation(request.jar,[request.operation === 'build' ? 'compile' : 'run',path.resolve(request.input),'--target',target]);
-    const child = spawn(request.java, invocation.args, {env, cwd:invocation.cwd, windowsHide:true, stdio:'inherit', detached:process.platform === 'linux'});
+    const child = spawn(request.java, invocation.args, {env, cwd:invocation.cwd, windowsHide:true, stdio:'inherit', detached:process.platform !== 'win32'});
     const stop = () => terminateTree(child);
     abort.signal.addEventListener('abort', stop, {once:true});
     await new Promise<void>((resolve, reject) => {
