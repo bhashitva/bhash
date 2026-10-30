@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import {NativeOptions, requireNativeHost} from './native';
 import {TaskConsole} from './task-console';
+import {registerNativeDebug} from './debug-integration';
 import {LanguageClient, LanguageClientOptions, ServerOptions} from 'vscode-languageclient/node';
 
 let client: LanguageClient | undefined;
@@ -102,15 +103,18 @@ async function nativeTools(operation: 'setup' | 'check' | 'repair') {
 async function execute(command: 'build' | 'run') {
     if (!trusted()) return;
     const {input,folder} = await activeInput();
-    // Run/build use disk contents. Never silently compile stale editor buffers.
+    await saveInput(input);
+    const available: Target[] = command === 'run' ? targets.filter(t => t !== 'wasm-browser') : [...targets];
+    const target = await vscode.window.showQuickPick(available, {title: `Bhash: ${command}`, placeHolder: 'Select the target platform'});
+    if (target) await vscode.tasks.executeTask(taskFor({type: 'bhash', command, target: target as Target}, folder, input));
+}
+async function saveInput(input: string) {
+    // Build/run/debug use disk contents. Never silently compile stale editor buffers.
     for (const document of vscode.workspace.textDocuments) {
         if (!document.isDirty || document.uri.scheme !== 'file' || !['bhash', 'bhash-project'].includes(document.languageId)) continue;
         const owner = client ? await client.sendRequest<string>('bhash/projectInput', {uri: document.uri.toString()}) : document.uri.fsPath;
         if (owner === input && !await document.save()) throw new Error('Save the Bhash project files before building or running.');
     }
-    const available: Target[] = command === 'run' ? targets.filter(t => t !== 'wasm-browser') : [...targets];
-    const target = await vscode.window.showQuickPick(available, {title: `Bhash: ${command}`, placeHolder: 'Select the target platform'});
-    if (target) await vscode.tasks.executeTask(taskFor({type: 'bhash', command, target: target as Target}, folder, input));
 }
 async function dependencies(action: 'lock' | 'restore' | 'verify') {
     if (!trusted()) return;
@@ -152,6 +156,10 @@ async function newProject() {
 export function activate(extensionContext: vscode.ExtensionContext) {
     context = extensionContext;
     output = vscode.window.createOutputChannel('Bhash');context.subscriptions.push(output);
+    registerNativeDebug(context, {activeInput, save: saveInput, log: text => output.appendLine(text), tools: folder => {
+        const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
+        return {...tools(), mode: config.get('native.toolchainMode', 'managed'), home: config.get('native.toolchainHome', '')};
+    }});
     const command = (id: string, action: () => unknown) => context.subscriptions.push(vscode.commands.registerCommand(id, async () => {try {await action();}catch(error){void vscode.window.showErrorMessage(`Bhash: ${error instanceof Error ? error.message : String(error)}`);}}));
     command('bhash.build', () => execute('build'));command('bhash.run', () => execute('run'));command('bhash.newProject',newProject);
     command('bhash.setupNativeTools',()=>nativeTools('setup'));
