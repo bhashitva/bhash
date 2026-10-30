@@ -60,6 +60,8 @@ exports.run=async()=>{
             assert.ok((await child('अभिलेखमान')).some(v=>v.name==='व'&&v.value==='55'));
         };
         await inspect(stack.stackFrames[0]);
+        const initialCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:stack.stackFrames[0].id,context:'watch'})).result);
+        assert.ok(Number.isFinite(initialCollections));
         await session.customRequest('stepIn',{threadId:first.threadId});const into=await stopped();
         const inner=await session.customRequest('stackTrace',{threadId:into.threadId});
         assert.match(inner.stackFrames[0].name,/दुगुना/);assert.ok(inner.stackFrames.some(f=>/^मुख्य(?:\(.*\))?$/.test(f.name)));
@@ -70,12 +72,16 @@ exports.run=async()=>{
         await session.customRequest('continue',{threadId:out.threadId});const after=await stopped();
         const finalStack=await session.customRequest('stackTrace',{threadId:after.threadId});
         assert.equal(finalStack.stackFrames[0].line,marker('DEBUG_AFTER')+1);await inspect(finalStack.stackFrames[0]);
+        const finalCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:finalStack.stackFrames[0].id,context:'watch'})).result);
+        assert.ok(finalCollections>initialCollections+200,'forced collections must occur between inspections');
         const ended=new Promise((resolve,reject)=>{
             const timer=setTimeout(()=>{listener.dispose();reject(Error('Debug program did not terminate'));},30000);
             const listener=vscode.debug.onDidTerminateDebugSession(value=>{if(value.id===session.id){clearTimeout(timer);listener.dispose();resolve();}});
         });
         await session.customRequest('continue',{threadId:after.threadId});await ended;
-        assert.ok(outputs.join('').includes('live=0'),outputs.join(''));
+        // Application streams use the integrated terminal, not DAP output events.
+        // Exact live=0/root snapshots are checked by test_native_inspection.py.
+        assert.ok(transcript.some(m=>m.type==='event'&&m.event==='exited'&&m.body.exitCode===0));
         // The build has a per-session lifetime; never reuse a previous executable.
         const deadline=Date.now()+5000;while(Date.now()<deadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
         await assert.rejects(fs.stat(buildDirectory));
