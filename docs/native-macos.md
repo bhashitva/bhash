@@ -113,3 +113,8 @@ managed LLVM 18 से पूरे runtime suite के सामान्य b
 (Xcode/Command Line Tools 26.4+) से उसी suite के ASan/UBSan builds दोनों अनिवार्य
 हैं। macOS 15 पर LLVM 18 sanitizer validation भी जारी रहती है। इस कारण
 forced-GC या sanitizer checks छोड़े नहीं जाते।
+
+macOS 26 पर सारे Bhash/JVM/CLR conformance cases भी production LLVM 18 mode
+में चलते हैं; forced-GC और live-root assertions बने रहते हैं। पुराने LLVM
+ASan को उन generated programs में link नहीं किया जाता। macOS 14/15 और Linux
+पर generated-program sanitizer coverage भी बनी रहती है।
