@@ -51,7 +51,7 @@ jobs:
           path: |
             target/native-inspection/
             target/native-debugger/
-            target/vscode-debug/
+            target/vscode-debug/dap.log
       - name: Require both debugger integration tests
         if: always()
         run: test '${{ steps.inspection.outcome }}' = success && test '${{ steps.vscode.outcome }}' = success
