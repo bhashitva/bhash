@@ -7,17 +7,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 
-/** DWARF metadata for original Bhash sources; release linkage names remain stable ASCII. */
+/** DWARF metadata for original Bhash sources; LLVM linkage names remain stable ASCII. */
 final class NativeDebugInfo {
     private final List<String> nodes=new ArrayList<>();
     private final Map<String,Integer> files=new LinkedHashMap<>(),locations=new HashMap<>();
     private final Map<Type,Integer> types=new EnumMap<>(Type.class);
-    private final Map<String,String> symbols=new LinkedHashMap<>();
-    private final Set<String> usedSymbols=new HashSet<>();
     private final int unit,expression;
     NativeDebugInfo(Source source){
         int retained=add("!{}");
-        int file=file(source);unit=add("distinct !DICompileUnit(language: DW_LANG_C, file: !"+file+", producer: "+quote("Bhash native LLVM")+", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, retainedTypes: !"+retained+")");
+        // GDB's x64 step logic trusts LLVM line notes only for a recognized
+        // Clang producer. Clang compiles our LLVM IR; identify both stages.
+        int file=file(source);unit=add("distinct !DICompileUnit(language: DW_LANG_C, file: !"+file+", producer: "+quote("clang (Bhash native LLVM IR)")+", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, retainedTypes: !"+retained+")");
         expression=add("!DIExpression()");
         for(var reference:List.of(Type.TEXT,Type.OBJECT,Type.ANY))type(reference);
         nodes.set(retained,"!{"+String.join(", ",List.of(Type.TEXT,Type.OBJECT,Type.ANY).stream().map(t->"!"+type(t)).toList())+"}");
@@ -31,16 +31,11 @@ final class NativeDebugInfo {
     });}
     int function(Function f,String linkage,boolean artificial){
         String name=f.name().isEmpty()?"<निर्मित सहायक>":f.name()+(artificial?".<सहायक>":"");
-        // GDB's step prologue lookup requires ELF and DWARF names to agree.
-        // Keep source names in debug symbols; disambiguate overloads/helpers.
-        String symbol=name.chars().allMatch(c->c<128)?"भाष."+name+"."+linkage:name;
-        if(!usedSymbols.add(symbol)){symbol+="."+linkage;usedSymbols.add(symbol);}
-        symbols.put(linkage,symbol);
         boolean callback=linkage.startsWith("btry");
         var arguments=new ArrayList<String>();Type result=callback?Type.INT:f.result();arguments.add(result==Type.VOID?"null":"!"+type(result));
         if(callback)arguments.add("!"+type(Type.OBJECT));else for(var parameter:f.parameters())arguments.add("!"+type(parameter.type()));
         int signature=add("!DISubroutineType(types: !"+add("!{"+String.join(", ",arguments)+"}")+")");
-        return add("distinct !DISubprogram(name: "+quote(name)+", linkageName: "+quote(symbol)+", scope: !"+file(f.source())+", file: !"+file(f.source())+", line: "+f.source().line()+", type: !"+signature+", scopeLine: "+f.source().line()+", flags: DIFlagPrototyped"+(artificial?" | DIFlagArtificial":"")+", spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !"+unit+")");
+        return add("distinct !DISubprogram(name: "+quote(name)+", scope: !"+file(f.source())+", file: !"+file(f.source())+", line: "+f.source().line()+", type: !"+signature+", scopeLine: "+f.source().line()+", flags: DIFlagPrototyped"+(artificial?" | DIFlagArtificial":"")+", spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !"+unit+")");
     }
     int location(int scope,Source source){return locations.computeIfAbsent(scope+":"+source,k->{
         // Lexical file scopes also handle generated constructor/base initialization from other files.
@@ -80,10 +75,6 @@ final class NativeDebugInfo {
             entry.addProperty("key",type.keyKind());entry.addProperty("value",type.valueKind());collections.add(Integer.toString(type.id()),entry);
         }
         root.add("collections",collections);return root.toString();
-    }
-    String relink(String ir){
-        var matcher=java.util.regex.Pattern.compile("@(bfn[0-9]+|btry[0-9]+)(?![A-Za-z0-9_])").matcher(ir);
-        return matcher.replaceAll(match->java.util.regex.Matcher.quoteReplacement("@"+quote(symbols.get(match.group(1)))));
     }
     String render(){
         int dwarf=add("!{i32 2, !\"Dwarf Version\", i32 4}"),debug=add("!{i32 2, !\"Debug Info Version\", i32 3}");
