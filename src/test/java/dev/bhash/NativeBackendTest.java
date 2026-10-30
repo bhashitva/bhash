@@ -2251,6 +2251,7 @@ class NativeBackendTest {
         assertTrue(program.classes().stream().flatMap(c->c.fields().stream()).anyMatch(f->f.name().equals("नाम")));
         String release=LlvmEmitter.emit(program),debug=LlvmEmitter.emit(program,"",true);
         assertFalse(release.contains("@bhash_debug_schema"));assertTrue(debug.contains("retainedTypes:"));
+        assertTrue(debug.contains("!DILocation(line: 0, column: 0"),"generated prologue calls must not inherit a source line");
         String schemaLine=debug.lines().filter(line->line.startsWith("@bhash_debug_schema =")).findFirst().orElseThrow();
         String encoded=schemaLine.substring(schemaLine.indexOf("c\"")+2,schemaLine.lastIndexOf('"'));
         var json=com.google.gson.JsonParser.parseString(new String(java.util.HexFormat.of().parseHex(encoded.replace("\\","")),StandardCharsets.UTF_8)).getAsJsonObject();
