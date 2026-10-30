@@ -58,7 +58,7 @@ public final class LlvmEmitter {
         try{return emit(program,notices,debugging,NativeBuildInfo.describe(debugging,false,"development"));}
         catch(java.io.IOException | dev.bhash.backend.CompilationException error){throw new IllegalStateException(error);}
     }
-    public static String emit(CoreProgram program,String notices,boolean debugging,String buildInfo){var emitter=new LlvmEmitter();emitter.debugEnabled=debugging;emitter.buildInfo=buildInfo;return emitter.program(program,notices);}
+    public static String emit(CoreProgram program,String notices,boolean debugging,String buildInfo){var emitter=new LlvmEmitter();emitter.debugEnabled=debugging;emitter.buildInfo=buildInfo;String ir=emitter.program(program,notices);return emitter.debug==null?ir:emitter.debug.relink(ir);}
     private String program(CoreProgram program,String notices){
         if(debugEnabled){
             debug=new NativeDebugInfo(program.functions().get(0).source());
