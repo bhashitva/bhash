@@ -138,9 +138,24 @@ class BhashValue:
             yield '<unavailable>', gdb.Value(str(error))
 
 
+class BhashLeaf:
+    # GDB 12 MI renders a printer with an empty children() method as {...}.
+    # Text/null are scalar previews, so expose no child iterator at all.
+    def __init__(self, printer):
+        self.printer = printer
+
+    def to_string(self):
+        return self.printer.to_string()
+
+
 def lookup(original):
     kind = {'पाठ': 'TEXT', 'वस्तु': 'OBJECT', 'सर्ववस्तु': 'ANY'}.get(str(original.type))
-    return BhashValue(original, kind) if kind else None
+    if not kind:
+        return None
+    printer = BhashValue(original, kind)
+    if kind == 'TEXT' or (not original.is_optimized_out and int(original) == 0):
+        return BhashLeaf(printer)
+    return printer
 
 
 class BhashFrame(FrameDecorator):
