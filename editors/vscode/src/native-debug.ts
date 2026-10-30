@@ -48,7 +48,7 @@ export async function removeDebugBuild(directory: string): Promise<void> {
     const resolved = path.resolve(directory);
     if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith('bhash-debug-'))
         throw Error('Refusing to remove a directory outside the Bhash debug temporary area.');
-    await fs.rm(resolved, {recursive: true, force: true});
+    await fs.rm(resolved, {recursive: true, force: true, maxRetries: 10, retryDelay: 100});
 }
 export async function prepareNativeDebug(options: DebugOptions, log: (text: string) => void, signal?: AbortSignal,
     dependencies: {probe: typeof probeGdb; ensure: typeof ensureNative; run: Runner; debugger?: typeof ensureDebugger} = {probe: probeGdb, ensure: ensureNative, run: capture, debugger: ensureDebugger}): Promise<{program: string; directory: string; gdb: string; setupCommands: ReturnType<typeof gdbSetup>}> {

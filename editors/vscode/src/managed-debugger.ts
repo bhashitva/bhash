@@ -18,7 +18,7 @@ export async function ensureDebugger(options: NativeOptions, configured: string,
     };
     // Full per-file verification is performed by status; damaged caches are repaired.
     let status: {installed?:boolean; archiveSha256?:string; gdb?:string} | undefined;
-    try {status = await invoke(['status']);} catch (error) {if (signal?.aborted) throw error; log('Repairing unavailable debugger cacheÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦');}
+    try {status = await invoke(['status']);} catch (error) {if (signal?.aborted) throw error; log('Repairing unavailable debugger cache...');}
     const ready = () => status?.installed === true && status.archiveSha256 === catalog.sha256 && typeof status.gdb === 'string' && path.win32.isAbsolute(status.gdb);
     if (ready()) return status!.gdb!;
     log('Setting up the Bhash Windows debugger (GDB and Python), verified by SHA-256. No administrator access is required.');
@@ -33,7 +33,8 @@ export async function ensureDebugger(options: NativeOptions, configured: string,
                 const timer = setTimeout(() => {signal?.removeEventListener('abort',abort); resolve();},1000);
                 signal?.addEventListener('abort',abort,{once:true}); if(signal?.aborted)abort();
             });
-            status = await invoke(['status']); if(ready())return status!.gdb!;
+            try {status = await invoke(['status']);} catch (error) {if(signal?.aborted)throw error;}
+            if(ready())return status!.gdb!;
         }
     }
     if (!ready()) throw Error('Windows debugger activation could not be verified.');
