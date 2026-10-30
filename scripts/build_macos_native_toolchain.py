@@ -14,6 +14,7 @@ import tempfile
 from build_native_toolchain import write_zip
 
 ID = 'bhash-macos-arm64-llvm18-v1'
+UPSTREAM_SHA256 = '4573b7f25f46d2a9c8882993f091c52f416c83271db6f5b213c93f0bd0346a10'
 UPSTREAM = 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-arm64-apple-macos11.tar.xz'
 
 
@@ -27,7 +28,7 @@ def run(*args):
 
 
 def build(archive, digest, output):
-    if not re.fullmatch('[0-9a-f]{64}', digest) or sha(archive) != digest:
+    if digest != UPSTREAM_SHA256 or sha(archive) != digest:
         raise ValueError('Official LLVM archive SHA-256 mismatch')
     if run('uname', '-s') != 'Darwin' or run('uname', '-m') != 'arm64':
         raise RuntimeError('Build on an Apple Silicon Mac; cross compilation is not supported')
@@ -119,7 +120,7 @@ def build(archive, digest, output):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('archive', type=Path)
-    parser.add_argument('--upstream-sha256', required=True)
+    parser.add_argument('--upstream-sha256', default=UPSTREAM_SHA256)
     parser.add_argument('--output', type=Path, default=Path('target/macos-sdk'))
     args = parser.parse_args()
     build(args.archive, args.upstream_sha256, args.output)
