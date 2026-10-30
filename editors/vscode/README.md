@@ -286,7 +286,7 @@ The lockfile version should be `3`. If the same error persists, inspect
 
 ## Native debugging on Windows x64
 
-Version 0.9.0 extends native debugging to ordinary Windows VS Code. Install Java 17+
+Version 0.9.0 extends native debugging to ordinary Windows VS Code on Windows 10 version 1903 or later. Install Java 17+
 (JDK for JVM builds) and Microsoft's C/C++ extension on that host, leave
 `bhash.native.gdbPath` empty, then run **Bhash: Debug Native**. The first debug launch
 installs a separate checksum-pinned GDB/Python runtime; later launches reuse the
@@ -298,3 +298,7 @@ for stepping. Hindi stacks and read-only scalar/text/object/collection inspectio
 share the Linux implementation and GC safety contract. Windows/macOS build/run
 support is unchanged; macOS debugger integration remains pending. See the
 [Hindi debugger guide](../../docs/native-vscode-debug.md).
+
+The Windows GDB process manifest enables UTF-8 for Hindi paths (Windows 10 1903+).
+The manifest patch script is retained with the corresponding sources; debugger
+instructions and other upstream binaries are unchanged.
