@@ -1,5 +1,7 @@
 # Contributing to Bhash
 
+For questions or collaboration, join the [Bhash Discord community](https://discord.gg/qC5zdJy6Qw) or read [SUPPORT.md](SUPPORT.md).
+
 Issues, language-design feedback, tests, documentation and pull requests are welcome.
 Please describe the problem and include a small Bhash example where possible.
 

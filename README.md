@@ -7,6 +7,16 @@ A Devanagari-first programming language with a compiler written in Java.
 Bhash source (`.bhash`) compiles to a **JVM executable JAR**, a **.NET CLR managed assembly**, or a **browser WebAssembly application**.
 All three targets support the same factorial source.
 
+## Community and support / समुदाय और सहायता
+
+Join the [Bhash Discord community](https://discord.gg/qC5zdJy6Qw) to learn with other Bhash users,
+share projects, collaborate, and reach Bhashitva support for questions, issues or help.
+
+भाष उपयोगकर्ताओं के साथ सीखें, अपनी रचनाएँ साझा करें और प्रश्नों या समस्याओं में
+भाषित्व की सहायता पाने के लिए हमारे [Discord समुदाय](https://discord.gg/qC5zdJy6Qw) से जुड़ें।
+
+See [SUPPORT.md](SUPPORT.md) for help and bug-report guidance.
+
 ## Learn and teach Bhash
 
 The [12-lesson classroom course](lessons/README.md) includes Hindi lesson plans,
