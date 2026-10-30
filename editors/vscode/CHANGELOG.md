@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Native build/run on Windows 10+ x64, without WSL or Visual Studio.
+- Automatic pinned LLVM 18/UCRT SDK setup, cache reuse and repair on Windows.
+- Windows `.exe` output, UTF-8 console and Unicode file paths, static dependency inspection, and reproducible ZIP application packages.
+
+
 ## 0.5.2 — 2026-10-29
 
 - Support managed native tools on Ubuntu 22.04/WSL with glibc 2.35 using a pinned Jammy LLVM 18 SDK.

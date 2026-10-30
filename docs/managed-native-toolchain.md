@@ -1,5 +1,7 @@
 # प्रबंधित नेटिव टूलचेन (Managed native toolchain)
 
+Windows 10+ x64 के managed SDK, setup और distribution के लिए [Windows native support](native-windows.md) देखें। नीचे के sysroot/glibc विवरण Linux SDK के लिए हैं।
+
 यह VS Code में native support जोड़ने की तैयारी है। इस milestone में extension UI नहीं बदलता। Compiler के `compile --target native`, `run --target native`, `native doctor`, `native inspect` और `native package` एक user-local managed installation खोज सकते हैं।
 
 ## आवश्यकता और दायरा (Requirements and scope)

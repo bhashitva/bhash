@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <io.h>
 #else
 #include <unistd.h>
@@ -26,7 +26,7 @@ static void failure(bh_protected_callback callback,const char *message){
 int main(int argc,char **argv){
     bh_runtime_init();bh_gc_stress(1);bh_exception_configure(&exception_type,&exception_info);
     if(argc>1){
-#ifdef _MSC_VER
+#ifdef _WIN32
         assert(_close(0)==0);
 #else
         assert(close(0)==0);

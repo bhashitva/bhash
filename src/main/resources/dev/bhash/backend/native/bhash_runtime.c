@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-#ifdef _MSC_VER
+#ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 #include "bhash_runtime.h"
@@ -14,15 +14,17 @@ _Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
 #include <errno.h>
 #include <sys/stat.h>
 #include <setjmp.h>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <io.h>
 #include <fcntl.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #else
 #include <unistd.h>
 #endif
 /* Precise, single-threaded stop-the-world collection. The intrusive mark worklist
    makes collection allocation-free and avoids recursive graph traversal. */
-#ifdef _MSC_VER
+#ifdef _WIN32
 typedef union { long double real; void *reference; int64_t integer; } bh_alignment;
 #else
 typedef max_align_t bh_alignment;
@@ -91,7 +93,7 @@ static uint64_t allocations, collections, peak_bytes, next_identity = 1;
 static void emergency_write(const char *s) {
     size_t remaining = strlen(s);
     while (remaining) {
-#ifdef _MSC_VER
+#ifdef _WIN32
         int count = _write(2, s, (unsigned int)remaining);
 #else
         ssize_t count = write(2, s, remaining);
@@ -209,7 +211,7 @@ void bh_reference_store(void *owner, uint64_t offset, void *value) {
     memcpy(o->payload + offset, &value, sizeof value);
 }
 static int environment_flag(const char *name) {
-#ifdef _MSC_VER
+#ifdef _WIN32
     char *value = NULL; size_t length = 0;
     if (_dupenv_s(&value, &length, name)) return 0;
     int enabled = value && strcmp(value, "1") == 0;
@@ -221,8 +223,11 @@ static int environment_flag(const char *name) {
 }
 void bh_runtime_init(void) {
     console_skip_lf=0;
-#ifdef _MSC_VER
+#ifdef _WIN32
     (void)_setmode(_fileno(stdin),_O_BINARY);
+    (void)_setmode(_fileno(stdout),_O_BINARY);
+    (void)_setmode(_fileno(stderr),_O_BINARY);
+    (void)SetConsoleCP(CP_UTF8); (void)SetConsoleOutputCP(CP_UTF8);
 #endif
     struct timespec now = {0,0}; (void)timespec_get(&now, TIME_UTC);
     random_state = (uint64_t)now.tv_sec ^ ((uint64_t)now.tv_nsec << 32) ^ (uint64_t)clock();
@@ -544,9 +549,48 @@ static void *ascii_text(const char *value, const void *location) {
 void *bh_text_fixed(double value, int64_t places, const void *location) {
     if (!isfinite(value)) runtime_error(location, "एक सीमित दशमलव मान आवश्यक है।");
     if (places < 0 || places > 15) runtime_error(location, "दशमलव स्थान ० से १५ तक होने चाहिए।");
-    /* Largest finite binary64: 309 integer digits + sign, dot and 15 places. */
-    char buffer[512]; int n = snprintf(buffer, sizeof buffer, "%.*f", (int)places, value);
-    if (n < 0 || (size_t)n >= sizeof buffer) fatal("आंतरिक दशमलव प्रारूप सीमा।");
+    /* Exact integer arithmetic computes abs(value)*10^places, then rounds to
+       nearest with ties to even. MinGW printf rounds halfway cases away from
+       zero, unlike the JVM/CLR contract, so no host printf participates here.
+       400 decimal digits cover every finite binary64 scaled by 10^15. */
+    uint64_t bits;memcpy(&bits,&value,sizeof bits);
+    uint64_t mantissa=bits&UINT64_C(0x000fffffffffffff);
+    int encoded=(int)((bits>>52)&2047);
+    int exponent=encoded?encoded-1023-52:-1074;
+    if(encoded)mantissa|=UINT64_C(0x0010000000000000);
+    unsigned char digits[400]={0};int count=0;
+    do{digits[count++]=(unsigned char)(mantissa%10);mantissa/=10;}while(mantissa);
+    for(int i=0;i<(int)places;++i){
+        int carry=0;
+        for(int j=0;j<count;++j){int n=digits[j]*5+carry;digits[j]=(unsigned char)(n%10);carry=n/10;}
+        if(carry)digits[count++]=(unsigned char)carry;
+    }
+    int shift=exponent+(int)places;
+    if(shift>=0){
+        for(int i=0;i<shift;++i){
+            int carry=0;
+            for(int j=0;j<count;++j){int n=digits[j]*2+carry;digits[j]=(unsigned char)(n%10);carry=n/10;}
+            if(carry)digits[count++]=(unsigned char)carry;
+        }
+    }else{
+        int sticky=0,half=0;
+        for(int i=0;i<-shift;++i){
+            int carry=0;
+            for(int j=count-1;j>=0;--j){int n=carry*10+digits[j];digits[j]=(unsigned char)(n/2);carry=n%2;}
+            while(count>1&&!digits[count-1])--count;
+            if(i==-shift-1)half=carry;else sticky|=carry;
+        }
+        if(half&&(sticky||(digits[0]&1))){
+            int j=0;while(j<count&&digits[j]==9)digits[j++]=0;
+            if(j==count)digits[count++]=1;else ++digits[j];
+        }
+    }
+    char buffer[512];size_t at=0;
+    if(signbit(value))buffer[at++]='-';
+    if(count<=places)buffer[at++]='0';
+    else for(int j=count-1;j>=places;--j)buffer[at++]=(char)('0'+digits[j]);
+    if(places){buffer[at++]='.';for(int j=(int)places-1;j>=0;--j)buffer[at++]=(char)('0'+(j<count?digits[j]:0));}
+    buffer[at]=0;
     return ascii_text(buffer, location);
 }
 void *bh_text_real(double value, const void *location) {
@@ -1409,6 +1453,27 @@ static void *file_path(const void *path,const void *location) {
     memcpy(text_data(result),text_data(input),(size_t)n);text_data(result)[n]=0;
     bh_roots_pop(&frame);return result;
 }
+/* Convert only at the OS boundary; Bhash paths and file contents stay UTF-8.
+   This temporary allocation contains no GC references and is freed before any throw. */
+#ifdef _WIN32
+static wchar_t *file_wide(const void *name) {
+    const char *path=(const char *)text_data(name);
+    int count=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path,-1,NULL,0);
+    if(count<=0)return NULL;
+    wchar_t *wide=malloc((size_t)count*sizeof *wide);
+    if(!wide)return NULL;
+    if(!MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path,-1,wide,count)){free(wide);return NULL;}
+    return wide;
+}
+#endif
+static FILE *file_open(const void *name,int writing) {
+#ifdef _WIN32
+    wchar_t *wide=file_wide(name);if(!wide)return NULL;
+    FILE *file=_wfopen(wide,writing?L"wb":L"rb");free(wide);return file;
+#else
+    return fopen((const char *)text_data(name),writing?"wb":"rb");
+#endif
+}
 static void file_dispose(void *file) {(void)fclose((FILE *)file);}
 static int file_close(FILE *file,bh_cleanup *cleanup) {
     int status=fclose(file);cleanups=cleanup->previous;return status;
@@ -1416,9 +1481,13 @@ static int file_close(FILE *file,bh_cleanup *cleanup) {
 int bh_file_supported(const void *location) {(void)location;return 1;}
 int bh_file_exists(const void *path,const void *location) {
     void *name=file_path(path,location); /* No allocation during stat. */
-#ifdef _MSC_VER
-    struct _stat info;
-    return !_stat((const char *)text_data(name),&info)&&(info.st_mode&_S_IFMT)==_S_IFREG;
+#ifdef _WIN32
+    wchar_t *wide=file_wide(name);if(!wide)return 0;
+    HANDLE file=CreateFileW(wide,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);free(wide);
+    if(file==INVALID_HANDLE_VALUE)return 0;
+    BY_HANDLE_FILE_INFORMATION info;
+    int regular=GetFileType(file)==FILE_TYPE_DISK && GetFileInformationByHandle(file,&info) && !(info.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY);
+    (void)CloseHandle(file);return regular;
 #else
     struct stat info;
     return !stat((const char *)text_data(name),&info)&&S_ISREG(info.st_mode);
@@ -1427,7 +1496,7 @@ int bh_file_exists(const void *path,const void *location) {
 static void *file_read(const void *path,const bh_collection_info *info,const void *location) {
     void *slots[2]={NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
     slots[0]=file_path(path,location);
-    FILE *file=fopen((const char *)text_data(slots[0]),"rb");
+    FILE *file=file_open(slots[0],0);
     if(!file)runtime_error(location,"फ़ाइल पढ़ी नहीं जा सकी।");
     bh_cleanup cleanup={cleanups,file,file_dispose};cleanups=&cleanup;
     data_buffer buffer;buffer_init(&buffer,BH_FILE_LIMIT,"फ़ाइल १६ MiB सीमा से बड़ी है।",location);
@@ -1452,7 +1521,7 @@ static void file_write(const void *path,const void *value,int binary,const void 
     if(n>BH_FILE_LIMIT)runtime_error(location,"फ़ाइल १६ MiB सीमा से बड़ी है।");
     void *slots[2]={(void *)value,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
     slots[1]=file_path(path,location);
-    FILE *file=fopen((const char *)text_data(slots[1]),"wb");
+    FILE *file=file_open(slots[1],1);
     if(!file)runtime_error(location,"फ़ाइल लिखी नहीं जा सकी।");
     /* All validation/allocation precedes truncation. No safepoint until close. */
     const void *bytes=binary?(const void *)((bh_collection *)slots[0])->data:(const void *)text_data(slots[0]);
@@ -1565,6 +1634,16 @@ int64_t bh_time_year(int64_t value,const void *location){return time_calendar(va
 int64_t bh_time_month(int64_t value,const void *location){return time_calendar(value,location).month;}
 int64_t bh_time_day(int64_t value,const void *location){return time_calendar(value,location).day;}
 int64_t bh_time_now(const void *location){
+#ifdef _WIN32
+    /* Use the precise Windows wall clock; legacy C clocks can lag by a timer tick. */
+    FILETIME now;GetSystemTimePreciseAsFileTime(&now);
+    uint64_t ticks=((uint64_t)now.dwHighDateTime<<32)|now.dwLowDateTime;
+    const uint64_t epoch=UINT64_C(116444736000000000);
+    if(ticks<epoch)return -(int64_t)((epoch-ticks+9999)/10000);
+    uint64_t milliseconds=(ticks-epoch)/10000;
+    if(milliseconds>INT64_MAX)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
+    return (int64_t)milliseconds;
+#else
     struct timespec now;
     if(timespec_get(&now,TIME_UTC)!=TIME_UTC||now.tv_nsec<0||now.tv_nsec>=1000000000L)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
     int64_t seconds=(int64_t)now.tv_sec,fraction=now.tv_nsec/1000000;
@@ -1572,6 +1651,7 @@ int64_t bh_time_now(const void *location){
     int64_t result=seconds*1000;
     if(result>INT64_MAX-fraction)runtime_error(location,"वर्तमान समय उपलब्ध नहीं है।");
     return result+fraction;
+#endif
 }
 
 /* Buffer only raw bytes ahead of the next call; UTF-8 decoding is line-local.

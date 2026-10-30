@@ -50,7 +50,7 @@ class ExampleBuildTest(unittest.TestCase):
         root = Path("target/examples")
         self.assertEqual(root / "jvm/native/hello.jar", artifact_path(root, "jvm", "native/hello"))
         self.assertEqual(root / "dotnet/native/hello", artifact_path(root, "clr", "native/hello"))
-        self.assertEqual(root / "native/native/hello", artifact_path(root, "native", "native/hello"))
+        self.assertEqual(root / ("native/native/hello.exe" if __import__("os").name == "nt" else "native/native/hello"), artifact_path(root, "native", "native/hello"))
 
     def test_only_explicit_native_profile_diagnostics_can_be_skipped(self):
         self.assertTrue(unsupported_native(1, "a:1:1: [BH9001] unsupported"))
