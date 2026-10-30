@@ -1,0 +1,27 @@
+name: Windows native debugging
+on: [pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: windows-debug-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  debugger:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y zstd
+      - name: Build locked GDB/Python distribution and corresponding sources
+        run: |
+          if test -f scripts/windows-debugger-packages.lock.json; then
+            python3 scripts/build_windows_debugger.py
+          else
+            python3 scripts/build_windows_debugger.py --resolve
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-debugger-sdk
+          path: |
+            target/windows-debugger-sdk/
+            scripts/windows-debugger-packages.lock.json
