@@ -65,6 +65,9 @@ exports.run=async()=>{
         await session.customRequest('stepIn',{threadId:first.threadId});const into=await stopped();
         const inner=await session.customRequest('stackTrace',{threadId:into.threadId});
         assert.match(inner.stackFrames[0].name,/दुगुना/);assert.ok(inner.stackFrames.some(f=>/^मुख्य(?:\(.*\))?$/.test(f.name)));
+        const parameterScopes=await session.customRequest('scopes',{frameId:inner.stackFrames[0].id});
+        const parameters=[];for(const scope of parameterScopes.scopes.filter(s=>!s.expensive))parameters.push(...(await session.customRequest('variables',{variablesReference:scope.variablesReference})).variables);
+        assert.ok(parameters.some(v=>v.name==='मूल'&&v.value==='21'),'arguments must be valid at the first source stop');
         await session.customRequest('next',{threadId:into.threadId});const next=await stopped();
         const advanced=await session.customRequest('stackTrace',{threadId:next.threadId});assert.match(advanced.stackFrames[0].name,/दुगुना/);
         await session.customRequest('stepOut',{threadId:next.threadId});const out=await stopped();

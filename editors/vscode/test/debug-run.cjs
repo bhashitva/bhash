@@ -7,17 +7,21 @@ const {runTests,downloadAndUnzipVSCode,resolveCliArgsFromVSCodeExecutablePath}=r
 (async()=>{
     const root=path.resolve(__dirname,'../../..');
     const output=path.join(root,'target/vscode-debug');
-    const workspace=path.join(output,'workspace');
+    const workspace=path.join(output,'workspace हिन्दी');
     const extensions=path.join(output,'extensions');
     const userData=path.join(output,'user-data');
     await fs.mkdir(workspace,{recursive:true});
     await fs.copyFile(path.join(root,'examples/native/debug-inspection.bhash'),path.join(workspace,'debug-inspection.bhash'));
+    // Exercise the shipped package, including script loading from a quoted Unicode
+    // extension path. No source-tree-only files may be required by the debugger.
+    const development=path.join(output,'Bhash extension हिन्दी "quotes"');
+    await promisify(execFile)('python3',['-m','zipfile','-e',path.join(root,'target/bhash-vscode-0.8.0.vsix'),development]);
     const executable=await downloadAndUnzipVSCode('stable');
     const [cli,...prefix]=resolveCliArgsFromVSCodeExecutablePath(executable,{reuseMachineInstall:true});
     const {stdout,stderr}=await promisify(execFile)(cli,[...prefix,'--extensions-dir',extensions,'--user-data-dir',userData,
         '--install-extension','ms-vscode.cpptools','--force'],{encoding:'utf8',timeout:180000,env:{...process.env,ELECTRON_RUN_AS_NODE:'1'}});
     console.log(stdout,stderr);
-    await runTests({vscodeExecutablePath:executable,extensionDevelopmentPath:path.resolve(__dirname,'..'),
+    await runTests({vscodeExecutablePath:executable,extensionDevelopmentPath:path.join(development,'extension'),
         extensionTestsPath:path.join(__dirname,'debug-host.cjs'),
         launchArgs:[workspace,'--extensions-dir',extensions,'--user-data-dir',userData,'--disable-workspace-trust',
             '--skip-welcome','--skip-release-notes','--no-sandbox','--disable-gpu'],
