@@ -59,9 +59,12 @@ try {
     fs.mkdirSync(relocated);const source2=path.join(relocated,'hello.bhash');fs.copyFileSync(hello,source2);
     const originalCache=env.BHASH_TOOLCHAIN_HOME;
     // A Windows Docker volume root is a junction; copy its contents, not the mountpoint.
+    const receiptPath=path.join('installations',JSON.parse(fs.readFileSync(active,'utf8')).directory,'.installed.json');
+    assert.ok(fs.existsSync(path.join(originalCache,receiptPath)),'original cache must contain its installation receipt');
     fs.mkdirSync(cache);
-    for(const entry of fs.readdirSync(originalCache))fs.cpSync(path.join(originalCache,entry),path.join(cache,entry),{recursive:true});
+    for(const entry of fs.readdirSync(originalCache))fs.cpSync(path.join(originalCache,entry),path.join(cache,entry),{recursive:true,dereference:true});
     assert.ok(fs.existsSync(path.join(cache,'active.json')),'relocated cache must contain its active receipt');
+    assert.ok(fs.existsSync(path.join(cache,receiptPath)),'relocated cache must contain its installation receipt');
     env.BHASH_TOOLCHAIN_HOME=cache;
     const zip2=path.join(home,'hello-again.zip');cli(['native','package',source2,'--name','hello','--version','1','--debug','-o',zip2]);
     assert.deepEqual(fs.readFileSync(zip2),fs.readFileSync(zip),'debug release changes across source and SDK cache relocation');
