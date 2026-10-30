@@ -108,7 +108,7 @@ def build(lock_path, output):
                 subprocess.run(['zstd', '-d', '-c', str(archive)], stdout=stream, check=True)
             with tarfile.open(expanded) as files:
                 for entry in files:
-                    if not keep(entry.name):
+                    if entry.isdir() or not keep(entry.name):
                         continue
                     if not entry.isfile() or any(p in ('..', '.') for p in PurePosixPath(entry.name).parts):
                         raise ValueError('Unsupported debugger archive member: ' + entry.name)
