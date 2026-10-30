@@ -10,7 +10,9 @@ import java.util.regex.*;
 
 /** Static ELF/PE inspection: never executes the input or invokes a dynamic loader. */
 public final class NativeCompatibility {
-    public record Report(String target,String interpreter,String minimumGlibc,List<String> libraries,JsonObject buildInfo,boolean runtimeMatchesCompiler){}
+    public record Report(String target,String interpreter,String minimumGlibc,List<String> libraries,JsonObject buildInfo,boolean runtimeMatchesCompiler,String minimumMacos){
+        public Report(String target,String interpreter,String minimumGlibc,List<String> libraries,JsonObject buildInfo,boolean runtimeMatchesCompiler){this(target,interpreter,minimumGlibc,libraries,buildInfo,runtimeMatchesCompiler,null);}
+    }
     private static final Set<String> SYSTEM_LIBRARIES=Set.of("libc.so.6","libm.so.6","libgcc_s.so.1","libpthread.so.0","libdl.so.2","librt.so.1");
     private NativeCompatibility(){}
     private static CompilationException invalid(String message){return new CompilationException("[BH9106] "+message);}
@@ -43,6 +45,7 @@ public final class NativeCompatibility {
         Path file=binary.toAbsolutePath().normalize();
         try(var input=Files.newInputStream(file)){if(input.read()=='M' && input.read()=='Z')return PeCompatibility.inspect(file,strict);}
         byte[] bytes;try(var in=Files.newInputStream(file)){bytes=in.readNBytes(24);}
+        if(bytes.length>=4 && ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt()==0xfeedfacf)return MachoCompatibility.inspect(file,strict);
         if(bytes.length<24 || bytes[0]!=127 || bytes[1]!='E' || bytes[2]!='L' || bytes[3]!='F' || bytes[4]!=2 || bytes[5]!=1 || ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getShort(18)!=62)throw invalid("Expected a little-endian Linux x86-64 ELF executable");
         short type=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getShort(16);if(type!=2 && type!=3)throw invalid("ELF input is not an executable or PIE");
         // Absolute input paths prevent option interpretation; LLVM readelf 18 rejects a bare --.

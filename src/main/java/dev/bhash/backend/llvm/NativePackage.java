@@ -17,18 +17,24 @@ public final class NativePackage {
     }
     public static long epoch(){String value=System.getenv().getOrDefault("SOURCE_DATE_EPOCH","0");try{long n=Long.parseLong(value);if(n<0 || n>8589934591L)throw new NumberFormatException();return n;}catch(NumberFormatException error){throw new IllegalArgumentException("SOURCE_DATE_EPOCH must be between 0 and 8589934591");}}
     public static Result build(List<SourceFile> sources,Path root,Path output,String name,String version,boolean debug,String maximumGlibc)throws IOException,CompilationException{
-        validateName(name,version);long epoch=epoch();boolean windows=NativePlatform.windows();if(!windows)NativeCompatibility.compareVersions(maximumGlibc,maximumGlibc);
+        validateName(name,version);long epoch=epoch();boolean windows=NativePlatform.windows();if(!windows && !NativePlatform.macos())NativeCompatibility.compareVersions(maximumGlibc,maximumGlibc);
         Path destination=output.toAbsolutePath().normalize();if(destination.getFileName()==null || !destination.getFileName().toString().endsWith(windows?".zip":".tar.gz") || Files.isDirectory(destination) || Files.isSymbolicLink(destination))throw new IOException("Native package output must be a "+(windows?".zip":".tar.gz")+" file, not a directory or symbolic link.");
         var mapped=NativeCompiler.normalizeSources(sources,root);Path work=Files.createTempDirectory("bhash-release-");Path staged=null;
         try{
             String executable=name+NativePlatform.executableSuffix();Path binary=work.resolve(executable);new NativeCompiler(false,debug,root).compile(sources,binary);var compatibility=NativeCompatibility.inspect(binary,true);
-            if(!windows && NativeCompatibility.compareVersions(compatibility.minimumGlibc(),maximumGlibc)>0)throw new CompilationException("[BH9106] Executable needs glibc "+compatibility.minimumGlibc()+", exceeding --max-glibc "+maximumGlibc+". Build against an older pinned sysroot/builder.");
+            if(!windows && !NativePlatform.macos() && NativeCompatibility.compareVersions(compatibility.minimumGlibc(),maximumGlibc)>0)throw new CompilationException("[BH9106] Executable needs glibc "+compatibility.minimumGlibc()+", exceeding --max-glibc "+maximumGlibc+". Build against an older pinned sysroot/builder.");
             if(Files.size(binary)>256L*1024*1024)throw new IOException("Native release executable exceeds the 256 MiB package limit");
-            var files=new TreeMap<String,byte[]>();files.put("bin/"+executable,Files.readAllBytes(binary));
+            var files=new TreeMap<String,byte[]>();
+            if(NativePlatform.macos() && debug)files.put("symbols/"+name+".dwarf",Files.readAllBytes(binary.resolveSibling(binary.getFileName()+".dwarf")));
+            files.put("bin/"+executable,Files.readAllBytes(binary));
             for(String license:List.of("LICENSE","NOTICE","LICENSING.md","THIRD_PARTY_NOTICES.md"))files.put(license,NativeBuildInfo.resource("/META-INF/bhash/"+license));
             if(windows){
                 files.put("MINGW_RUNTIME_NOTICES.txt",NativeBuildInfo.resource("/dev/bhash/backend/native/MINGW_RUNTIME_NOTICES.txt"));
                 files.put("README.txt",("Bhash native release: "+name+" "+version+"\nWindows 10+ x64 / UCRT.\nNo JVM, .NET, LLVM, WSL or Visual Studio is needed to run this program.\nRun: .\\bin\\"+executable+"\nInspect provenance: .\\bin\\"+executable+" --bhash-build-info\nSHA256SUMS records SHA-256 hashes; these are not signatures.\n").getBytes(StandardCharsets.UTF_8));
+            }else if(NativePlatform.macos()){
+                files.put("check-host.sh",macosHostCheck().getBytes(StandardCharsets.UTF_8));
+                files.put("run.sh",("#!/bin/sh\nset -eu\ncd -- \"$(dirname -- \"$0\")\"\n./check-host.sh\nexec ./bin/"+name+" \"$@\"\n").getBytes(StandardCharsets.UTF_8));
+                files.put("README.txt",("Bhash native release: "+name+" "+version+"\nmacOS 14+ Apple Silicon (ARM64).\nNo JVM, .NET, LLVM or Apple development tools are needed to run this program.\nVerify: shasum -a 256 -c SHA256SUMS\nRun: ./run.sh\nLocal ad-hoc signature only; Developer ID signing and notarization are separate distribution steps.\nChecksums detect corruption; they are not signatures or proof of authorship.\n").getBytes(StandardCharsets.UTF_8));
             }else{
             files.put("check-host.sh",hostCheck(compatibility.minimumGlibc()).getBytes(StandardCharsets.UTF_8));
             files.put("run.sh",("#!/bin/sh\nset -eu\ncd -- \"$(dirname -- \"$0\")\"\n./check-host.sh\nexec ./bin/"+name+" \"$@\"\n").getBytes(StandardCharsets.UTF_8));
@@ -36,11 +42,12 @@ public final class NativePackage {
             }
             var manifest=new LinkedHashMap<String,Object>();manifest.put("format",1);manifest.put("name",name);manifest.put("version",version);manifest.put("target",compatibility.target());manifest.put("build",compatibility.buildInfo());manifest.put("minimum_glibc",compatibility.minimumGlibc());manifest.put("interpreter",compatibility.interpreter());manifest.put("libraries",compatibility.libraries());manifest.put("source_date_epoch",epoch);
             if(windows){manifest.put("minimum_windows","10.0");manifest.put("c_runtime","ucrt");}
+            if(NativePlatform.macos()){manifest.put("minimum_macos",compatibility.minimumMacos());manifest.put("c_runtime","libSystem");}
             var hashes=new TreeMap<String,String>();for(var source:mapped)hashes.put(source.name(),NativeBuildInfo.hash(source.text().getBytes(StandardCharsets.UTF_8)));manifest.put("source_sha256",hashes);
             manifest.put("executable_sha256",NativeBuildInfo.fileHash(binary));files.put("manifest.json",(NativeBuildInfo.JSON.toJson(manifest)+"\n").getBytes(StandardCharsets.UTF_8));
             var checksums=new StringBuilder();for(var entry:files.entrySet())checksums.append(NativeBuildInfo.hash(entry.getValue())).append("  ").append(entry.getKey()).append('\n');files.put("SHA256SUMS",checksums.toString().getBytes(StandardCharsets.UTF_8));
             Files.createDirectories(destination.getParent());staged=Files.createTempFile(destination.getParent(),".bhash-release-",".tmp");
-            try(var archive=Files.newOutputStream(staged)){if(windows)writeZip(archive,name+"-"+version+"-windows-x86_64",files,epoch);else writeArchive(archive,name+"-"+version+"-linux-x86_64",files,epoch);}
+            try(var archive=Files.newOutputStream(staged)){if(windows)writeZip(archive,name+"-"+version+"-windows-x86_64",files,epoch);else writeArchive(archive,name+"-"+version+(NativePlatform.macos()?"-macos-arm64":"-linux-x86_64"),files,epoch);}
             String digest=NativeBuildInfo.fileHash(staged);try{Files.move(staged,destination,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}catch(AtomicMoveNotSupportedException e){Files.move(staged,destination,StandardCopyOption.REPLACE_EXISTING);}
             return new Result(destination,digest,compatibility.minimumGlibc());
         }finally{if(staged!=null)Files.deleteIfExists(staged);try(var paths=Files.walk(work)){for(var p:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(p);}}
@@ -67,6 +74,15 @@ public final class NativePackage {
     }
     private static void field(byte[] bytes,int offset,int size,String value)throws IOException{byte[] data=value.getBytes(StandardCharsets.US_ASCII);if(data.length>size)throw new IOException("Archive header field is too long");System.arraycopy(data,0,bytes,offset,data.length);}
     private static void octal(byte[] bytes,int offset,int size,long n)throws IOException{String value=Long.toOctalString(n);if(value.length()>=size)throw new IOException("Archive numeric field overflow");field(bytes,offset,size,"0".repeat(size-1-value.length())+value+"\0");}
+    static String macosHostCheck(){return """
+        #!/bin/sh
+        set -eu
+        [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] || { echo "Requires macOS Apple Silicon (ARM64)" >&2; exit 1; }
+        bhash_version=$(/usr/bin/sw_vers -productVersion)
+        bhash_major=${bhash_version%%.*}
+        case "$bhash_major" in *[!0-9]*|'') echo "Invalid macOS version" >&2; exit 1;; esac
+        [ "$bhash_major" -ge 14 ] || { echo "Requires macOS 14 or later" >&2; exit 1; }
+        """;}
     private static String hostCheck(String minimum){
         String[] v=minimum.split("\\.");return """
             #!/bin/sh

@@ -15,7 +15,7 @@ public final class NativeToolchain {
     private NativeToolchain(){}
     public static void requirePlatform()throws CompilationException{
         if(!NativePlatform.supported())
-            throw new CompilationException("[BH9101] Native compilation requires Linux or Windows x86-64 with LLVM 18. macOS, ARM and cross-compilation are not enabled.");
+            throw new CompilationException("[BH9101] Native compilation requires Linux/Windows x86-64 or macOS 14+ Apple Silicon (ARM64), with LLVM 18. Intel Macs, other ARM hosts and cross-compilation are not enabled.");
     }
     private static void requireWindowsVersion()throws CompilationException{
         if(NativePlatform.windows() && NativeCompatibility.compareVersions(System.getProperty("os.version"),"10.0")<0)throw new CompilationException("[BH9111] Native Windows support requires Windows 10 or later (x64 / UCRT).");
@@ -33,26 +33,28 @@ public final class NativeToolchain {
         var installed=forced;
         if(installed==null && !mode.equals("system") && !override)installed=ManagedToolchain.active();
         if(installed==null && mode.equals("managed"))throw new CompilationException("[BH9110] No managed native toolchain installed. Use native toolchain install --archive <zip> --sha256 <trusted-hash>.");
+        if(installed!=null && NativePlatform.macos()){Path bin=installed.root().resolve("bin");return new Selection(bin.resolve("clang-18").toString(),bin.resolve("opt-18").toString(),bin.resolve("llvm-readobj").toString(),null,installed);}
         if(installed!=null && NativePlatform.windows()){Path bin=installed.root().resolve("bin");return new Selection(bin.resolve("clang.exe").toString(),bin.resolve("clang.exe").toString(),bin.resolve("llvm-readobj.exe").toString(),bin.resolve("ld.lld.exe").toString(),installed);}
         if(installed!=null){Path bin=installed.root().resolve("bin");return new Selection(bin.resolve("clang-18").toString(),bin.resolve("opt-18").toString(),bin.resolve("llvm-readelf").toString(),bin.resolve("ld.lld").toString(),installed);}
         if(NativePlatform.windows())return new Selection(System.getenv().getOrDefault("BHASH_CLANG","clang.exe"),System.getenv().getOrDefault("BHASH_CLANG","clang.exe"),System.getenv().getOrDefault("BHASH_READELF","llvm-readobj.exe"),null,null);
-        return new Selection(System.getenv().getOrDefault("BHASH_CLANG","clang-18"),System.getenv().getOrDefault("BHASH_LLVM_OPT","opt-18"),System.getenv().getOrDefault("BHASH_READELF","readelf"),null,null);
+        return new Selection(System.getenv().getOrDefault("BHASH_CLANG","clang-18"),System.getenv().getOrDefault("BHASH_LLVM_OPT","opt-18"),System.getenv().getOrDefault("BHASH_READELF",NativePlatform.macos()?"llvm-readobj":"readelf"),null,null);
     }
     public static String readelf()throws IOException,CompilationException{return select(null).readelf();}
     public static Report require(Path work)throws IOException,CompilationException{return require(work,null);}
     private static Report require(Path work,ManagedToolchain.Installation forced)throws IOException,CompilationException{
         requirePlatform();requireWindowsVersion();var identity=NativeBuildInfo.identity();var selected=select(forced);
-        String libc=NativePlatform.windows()?"Windows UCRT (Windows 10+)":run(work,List.of("getconf","GNU_LIBC_VERSION")).strip();
+        var apple=NativePlatform.macos()?MacosToolchain.require(work):null;
+        String libc=apple!=null?"macOS "+NativePlatform.MINIMUM_MACOS+"+ / libSystem / Apple SDK "+apple.sdkVersion():NativePlatform.windows()?"Windows UCRT (Windows 10+)":run(work,List.of("getconf","GNU_LIBC_VERSION")).strip();
         var installed=selected.installation();
-        if(installed!=null && !NativePlatform.windows()){
+        if(installed!=null && !NativePlatform.windows() && !NativePlatform.macos()){
             String current=libc.startsWith("glibc ")?libc.substring(6):"0.0";
             if(NativeCompatibility.compareVersions(current,installed.minimumGlibc())<0)throw new CompilationException("[BH9111] Managed LLVM needs host glibc >= "+installed.minimumGlibc()+"; found "+libc+". Use a compatible Linux/WSL distribution or select a compatible system toolchain.");
         }
         String cv=version(run(work,List.of(selected.clang(),"--version"))),ov=version(run(work,List.of(selected.opt(),"--version")));
         if(!cv.equals(ov) || installed!=null && !cv.equals(installed.llvmVersion()))throw new CompilationException("[BH9103] clang and opt versions differ from each other or the selected manifest: "+cv+" / "+ov+". Select a matching LLVM 18 installation.");
-        String target=run(work,List.of(selected.clang(),"-dumpmachine")).strip();if(!(NativePlatform.windows()?target.matches("x86_64-(?:w64|pc)-(?:windows-gnu|mingw32)"):target.matches("x86_64-(?:[^-]+-)?linux-gnu")))throw new CompilationException("[BH9104] clang targets "+target+"; select an LLVM 18 toolchain for "+NativeBuildInfo.TARGET+".");
-        String linker=selected.linker()!=null?selected.linker():run(work,List.of(selected.clang(),"--print-prog-name="+(NativePlatform.windows()?"ld.lld":"ld"))).strip();
-        String lv=run(work,List.of(linker,"--version")).lines().findFirst().orElse("");
+        String target=run(work,List.of(selected.clang(),"-dumpmachine")).strip();if(!(NativePlatform.macos()?target.matches("(?:arm64|aarch64)-apple-(?:darwin|macosx)[0-9.]*"):NativePlatform.windows()?target.matches("x86_64-(?:w64|pc)-(?:windows-gnu|mingw32)"):target.matches("x86_64-(?:[^-]+-)?linux-gnu")))throw new CompilationException("[BH9104] clang targets "+target+"; select an LLVM 18 toolchain for "+NativeBuildInfo.TARGET+".");
+        String linker=apple!=null?apple.linker():selected.linker()!=null?selected.linker():run(work,List.of(selected.clang(),"--print-prog-name="+(NativePlatform.windows()?"ld.lld":"ld"))).strip();
+        String lv=apple!=null?"Apple ld; SDK "+apple.sdkVersion()+"; SHA256 "+NativeBuildInfo.fileHash(Path.of(linker)):run(work,List.of(linker,"--version")).lines().findFirst().orElse("");
         return new Report(NativeBuildInfo.TARGET,cv,selected.clang(),NativePlatform.windows()?null:selected.opt(),NativeBuildInfo.ABI,(String)identity.get("runtime_sha256"),lv,libc,installed!=null,installed==null?"system":installed.id(),installed==null?null:installed.archiveSha256(),selected.readelf());
     }
     public static Report doctor()throws IOException,CompilationException{return doctor(null);}
@@ -67,7 +69,7 @@ public final class NativeToolchain {
                 }else run(work,List.of(report.clang(),"--target="+report.target(),"-std=c17","probe.c","-lm","-o","probe"+NativePlatform.executableSuffix()));
             }
             catch(CompilationException error){throw new CompilationException("[BH9105] C17/system-linker probe failed. For system tools install target C17 headers/libraries; for managed tools verify or reinstall the trusted archive.\n"+error.getMessage());}
-            run(work,NativePlatform.windows()?List.of(report.readelf(),"--file-headers","probe.exe"):List.of(report.readelf(),"-W","-h","probe"));
+            run(work,NativePlatform.windows() || NativePlatform.macos()?List.of(report.readelf(),"--file-headers","probe"+NativePlatform.executableSuffix()):List.of(report.readelf(),"-W","-h","probe"));
             run(work,List.of(work.resolve("probe"+NativePlatform.executableSuffix()).toString()));return report;
         }finally{ManagedToolchain.delete(work);}
     }
@@ -116,6 +118,11 @@ public final class NativeToolchain {
         }catch(RuntimeException error){throw new CompilationException("[BH9103] Unsupported Windows LLVM linker plan: "+error.getMessage());}
     }
     public static String run(Path work,List<String> args)throws IOException,CompilationException{
+        if(NativePlatform.macos()){
+            String name=Path.of(args.get(0)).getFileName().toString();
+            if((name.equals("clang") || name.equals("clang-18")) && (args.contains("-c") || args.contains("-o")))
+                return runProcess(work,MacosToolchain.compilerCommand(args,MacosToolchain.require(work)));
+        }
         if(NativePlatform.windows()){
             String name=Path.of(args.get(0)).getFileName().toString().toLowerCase(Locale.ROOT);
             if(name.equals("clang.exe") || name.equals("clang-18.exe")){
