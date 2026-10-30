@@ -5,6 +5,16 @@ bundles the Bhash compiler and a Java language server. Source analysis stays on
 the extension host; it does not send code to the public playground or execute
 programs while you edit.
 
+## Community and support / समुदाय और सहायता
+
+Join the [Bhash Discord community](https://discord.gg/qC5zdJy6Qw) to learn with other Bhash users,
+share projects, collaborate, and reach Bhashitva support for questions, issues or help.
+
+भाष उपयोगकर्ताओं के साथ सीखें, अपनी रचनाएँ साझा करें और प्रश्नों या समस्याओं में
+भाषित्व की सहायता पाने के लिए हमारे [Discord समुदाय](https://discord.gg/qC5zdJy6Qw) से जुड़ें।
+
+In VS Code, run **Bhash: Community & Support (Discord)** from the Command Palette.
+
 ## Install
 
 1. Download the `.vsix` package from the **Bhash VS Code extension** GitHub

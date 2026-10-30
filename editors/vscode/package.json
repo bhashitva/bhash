@@ -2,7 +2,7 @@
   "name": "bhash",
   "displayName": "Bhash (भाष)",
   "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "publisher": "bhashitva",
   "license": "Apache-2.0",
   "repository": {
@@ -116,6 +116,10 @@
       {
         "command": "bhash.openPlayground",
         "title": "Bhash: Open Browser Playground"
+      },
+      {
+        "command": "bhash.openCommunity",
+        "title": "Bhash: Community & Support (Discord)"
       },
       {
         "command": "bhash.lockDependencies",
@@ -271,7 +275,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.cjs",
     "test:integration": "node test/run.cjs",
-    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.7.0.vsix"
+    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.7.1.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+
+- Add a Discord community/support link and Command Palette shortcut.
+- Help Bhash users collaborate and contact Bhashitva support.
+
 ## 0.7.0
 
 - Add macOS 14+ Apple Silicon Native build/run and a pinned managed LLVM 18 SDK.
