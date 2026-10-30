@@ -103,7 +103,7 @@ jobs:
           path: |
             target/windows-sdk/*.zip
             target/windows-sdk/*.sha256
-            target/bhash-vscode-0.6.0.vsix
+            target/bhash-vscode-*.vsix
             target/surefire-reports/
             target/examples/build-report.json
             target/examples/logs/
