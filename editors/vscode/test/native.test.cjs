@@ -2,8 +2,8 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
-const {linuxSdk:sdk,windowsSdk,ensureNative:ensure,nativeEnvironment,requireNativeHost,capture,compilerInvocation}=require('../dist/native.js');
-const ensureNative=(options,log,signal,repair,run)=>ensure(options,log,signal,repair,run,'linux');
+const {linuxSdk:sdk,windowsSdk,macosSdk,sdkForHost,ensureNative:ensure,nativeEnvironment,requireNativeHost,capture,compilerInvocation}=require('../dist/native.js');
+const ensureNative=(options,log,signal,repair,run)=>ensure(options,log,signal,repair,run,'linux','x64');
 const options={java:'java with spaces',jar:'/compiler हिन्दी.jar',mode:'managed'};
 function fake({installed=false,libc='glibc 2.35',busy=false,fail=false,wrong=false}={}) {
     const calls=[];let active=installed;
@@ -22,8 +22,8 @@ function fake({installed=false,libc='glibc 2.35',busy=false,fail=false,wrong=fal
     return {calls,run};
 }
 test('Linux/WSL host supported, unsupported hosts give actionable guidance',()=>{
-    requireNativeHost('linux','x64');requireNativeHost('win32','x64');
-    for(const [platform,arch] of [['win32','arm64'],['darwin','arm64'],['linux','arm64']])assert.throws(()=>requireNativeHost(platform,arch),/WSL/);
+    requireNativeHost('linux','x64');requireNativeHost('win32','x64');requireNativeHost('darwin','arm64');
+    for(const [platform,arch] of [['win32','arm64'],['darwin','x64'],['linux','arm64']])assert.throws(()=>requireNativeHost(platform,arch),/WSL/);
 });
 test('managed mode ignores ambient tool overrides and reuses CLI cache environment',()=>{
     const base={PATH:'path',BHASH_CLANG:'bad',BHASH_LLVM_OPT:'bad',BHASH_READELF:'bad',BHASH_TOOLCHAIN_HOME:'cache'};
@@ -97,7 +97,7 @@ test('Windows managed setup selects Windows asset and never invokes getconf',asy
         if(args.includes('status'))return JSON.stringify({installed:active,archiveSha256:active?windowsSdk.sha256:undefined});
         if(args.includes('install')){assert.ok(args.includes(windowsSdk.url));assert.ok(args.includes(windowsSdk.sha256));active=true;}
         return '{}';
-    },'win32');
+    },'win32','x64');
     assert.equal(calls.filter(c=>c.args.includes('install')).length,1);
     assert.match(windowsSdk.sha256,/^[a-f0-9]{64}$/);
 });
@@ -109,4 +109,32 @@ test('Windows compiler envelope preserves Unicode, literal arguments and caller 
     const decoded=JSON.parse(Buffer.from(invocation.args.at(-1),'base64').toString('utf8'));
     assert.deepEqual(decoded,{args,cwd:process.cwd()});
     assert.match(invocation.args.at(-1),/^[A-Za-z0-9+/=]+$/);
+});
+
+
+test('Apple Silicon preflights CLT, selects pinned Mac catalog and caches setup',async()=>{
+    assert.equal(sdkForHost('darwin'),macosSdk);
+    const calls=[];let active=false;
+    const run=async(command,args)=>{
+        calls.push({command,args});
+        if(command==='/usr/bin/sw_vers')return '14.7.6';
+        if(command==='/usr/bin/xcrun')return '/Apple SDK with spaces';
+        if(args.includes('status'))return JSON.stringify({installed:active,archiveSha256:active?macosSdk.sha256:undefined});
+        if(args.includes('install')){active=true;return '{}';}
+        throw Error('Unexpected command: '+command);
+    };
+    await ensure(options,()=>{},undefined,false,run,'darwin','arm64');
+    const install=calls.find(c=>c.args.includes('install'));assert.ok(install.args.includes(macosSdk.url));assert.ok(install.args.includes(macosSdk.sha256));
+    const count=calls.length;await ensure(options,()=>{},undefined,false,run,'darwin','arm64');
+    assert.ok(!calls.slice(count).some(c=>c.args.includes('install')));
+    assert.ok(!calls.some(c=>c.command==='getconf'));
+});
+
+test('missing Apple tools and older macOS fail before any download',async()=>{
+    for(const version of ['13.7.1','14.7.6']){
+        const calls=[];
+        const run=async(command,args)=>{calls.push({command,args});if(command==='/usr/bin/sw_vers')return version;throw Error('No selected Apple SDK');};
+        await assert.rejects(ensure(options,()=>{},undefined,false,run,'darwin','arm64'),version.startsWith('13')?/macOS 14/:/xcode-select --install/);
+        assert.ok(!calls.some(c=>c.args.includes('install')));
+    }
 });
