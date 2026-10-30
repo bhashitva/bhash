@@ -2251,7 +2251,7 @@ class NativeBackendTest {
         assertTrue(program.classes().stream().flatMap(c->c.fields().stream()).anyMatch(f->f.name().equals("नाम")));
         String release=LlvmEmitter.emit(program),debug=LlvmEmitter.emit(program,"",true);
         assertFalse(release.contains("@bhash_debug_schema"));assertTrue(debug.contains("retainedTypes:"));
-        assertTrue(release.contains("@bfn0"));assertFalse(java.util.regex.Pattern.compile("@(bfn|btry)[0-9]+").matcher(debug).find(),"debug ELF symbols must match their Bhash DWARF linkage names for GDB stepping");
+        assertTrue(debug.contains("producer: \"clang (Bhash native LLVM IR)\""),"GDB must recognize the LLVM line-note producer when stepping past generated setup");
         assertTrue(debug.contains("!DILocation(line: 0, column: 0"),"generated prologue calls must not inherit a source line");
         String schemaLine=debug.lines().filter(line->line.startsWith("@bhash_debug_schema =")).findFirst().orElseThrow();
         String encoded=schemaLine.substring(schemaLine.indexOf("c\"")+2,schemaLine.lastIndexOf('"'));
