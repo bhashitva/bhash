@@ -89,7 +89,7 @@ def main():
     commands += 'break ' + json.dumps(str(SOURCE)) + ':' + str(markers['DEBUG_BEFORE']) + '\n'
     commands += 'break ' + json.dumps(str(SOURCE)) + ':' + str(markers['DEBUG_AFTER']) + '\nrun\n'
     commands += python_command(INSPECT)
-    commands += 'step\n' + python_command("assert gdb.selected_frame().name() == 'दुगुना'; assert int(gdb.selected_frame().read_var('मूल')) == 21; assert int(gdb.parse_and_eval('roots')) != before_roots[0][0], 'callee roots not registered at source stop'")
+    commands += 'step\ninfo frame\ninfo line *$pc\nx/8i $pc\nmaintenance info line-table debug-inspection.bhash\n' + python_command("assert gdb.selected_frame().name() == 'दुगुना'; assert int(gdb.selected_frame().read_var('मूल')) == 21; assert int(gdb.parse_and_eval('roots')) != before_roots[0][0], 'callee roots not registered at source stop'")
     commands += 'next\nfinish\ncontinue\n' + python_command(INSPECT)
     # Function evaluation must be rejected, rather than introducing a GC safepoint.
     commands += python_command("\ntry:\n gdb.parse_and_eval('bh_heap_objects()')\nexcept gdb.error:\n print('PASS inferior calls disabled')\nelse:\n raise AssertionError('inferior call unexpectedly permitted')\n")
