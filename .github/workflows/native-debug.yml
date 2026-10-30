@@ -37,6 +37,7 @@ jobs:
           JS
       - name: Real GDB inspection and forced-GC safety
         run: python3 scripts/test_native_inspection.py && python3 scripts/test_native_debugger.py
+      - run: npm run package --prefix editors/vscode
       - name: Real VS Code GDB launch, breakpoints, stepping, stacks and variables
         run: xvfb-run -a node editors/vscode/test/debug-run.cjs
       - uses: actions/upload-artifact@v4
@@ -47,7 +48,6 @@ jobs:
             target/native-inspection/
             target/native-debugger/
             target/vscode-debug/
-      - run: npm run package --prefix editors/vscode
       - uses: actions/upload-artifact@v4
         with:
           name: native-debug-vsix-${{ matrix.os }}
