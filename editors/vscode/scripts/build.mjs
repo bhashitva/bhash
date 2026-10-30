@@ -5,6 +5,11 @@ import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
 const root = new URL('../../../', import.meta.url);
 const manifest = JSON.parse(await readFile('package.json', 'utf8'));
+const debuggerCatalog = JSON.parse(await readFile('src/windows-debugger.json','utf8'));
+if (debuggerCatalog.id !== 'bhash-windows-x86_64-gdb-v1' || !/^[0-9a-f]{64}$/.test(debuggerCatalog.sha256)
+    || /^0+$/.test(debuggerCatalog.sha256) || !debuggerCatalog.url.startsWith('https://github.com/bhashitva/bhash/releases/download/'))
+    throw new Error('Refusing to package an unpinned Windows debugger catalog.');
+
 const hindiName = '\u092d\u093e\u0937';
 if (manifest.displayName !== `Bhash (${hindiName})` || !manifest.contributes.languages.find(language => language.id === 'bhash')?.aliases.includes(hindiName))
     throw new Error('The Bhash Hindi display name and language alias must be valid UTF-8 before packaging.');
