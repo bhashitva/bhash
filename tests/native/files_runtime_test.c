@@ -37,7 +37,12 @@ static void failure(bh_protected_callback callback,void *input,const char *messa
 static int descriptors(void) {DWORD count=0;assert(GetProcessHandleCount(GetCurrentProcess(),&count));return (int)count;}
 #else
 static int descriptors(void) {
-    DIR *dir=opendir("/proc/self/fd");assert(dir);int n=0;
+    #ifdef __APPLE__
+    DIR *dir=opendir("/dev/fd");
+    #else
+    DIR *dir=opendir("/proc/self/fd");
+    #endif
+    assert(dir);int n=0;
     while(readdir(dir))++n;
     assert(!closedir(dir));return n;
 }
