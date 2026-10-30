@@ -59,7 +59,7 @@ exports.run=async()=>{
         start.dispose();
         const first=await stopped();assert.ok(session);
         const stack=await stackAt(first);
-        assert.match(stack.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);assert.equal(stack.stackFrames[0].source.path,source);
+        assert.match(stack.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);assert.equal(path.normalize(stack.stackFrames[0].source.path).toLowerCase(),path.normalize(source).toLowerCase());
         assert.equal(stack.stackFrames[0].line,marker('DEBUG_BEFORE')+1);
         const inspect=async(frame)=>{
             const scopes=await session.customRequest('scopes',{frameId:frame.id});
