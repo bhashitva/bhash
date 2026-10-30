@@ -99,7 +99,18 @@ jobs:
       - name: Validate collector, binary64 formatting and exception cleanup under sanitizers
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
-          python3 scripts/test_native_runtime.py --sanitize
+          if [ "${{ matrix.os }}" = macos-26 ]; then
+            # LLVM 18's ASan runtime deadlocks before main on macOS 26.4+:
+            # https://github.com/llvm/llvm-project/issues/200447
+            # Exercise the shipped LLVM uninstrumented, then require the same
+            # complete runtime suite under Apple's current compatible sanitizers.
+            python3 scripts/test_native_runtime.py
+            apple_clang="$(xcrun --find clang)"
+            "$apple_clang" --version
+            python3 scripts/test_native_runtime.py --cc "$apple_clang" --sanitize
+          else
+            python3 scripts/test_native_runtime.py --sanitize
+          fi
           python3 scripts/test_native_fixed.py
       - name: Verify reproducible release packages, Mach-O inspection, symbols and standalone execution
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
