@@ -10,7 +10,7 @@ exports.run=async()=>{
     const lines=(await fs.readFile(source,'utf8')).split('\n');
     const marker=name=>lines.findIndex(line=>line.includes(name));
     const uri=vscode.Uri.file(source);
-    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+    const editor=await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
     const extension=vscode.extensions.getExtension('bhashitva.bhash');assert.ok(extension);await extension.activate();
     assert.ok(vscode.extensions.getExtension('ms-vscode.cpptools'),'real Microsoft GDB adapter installed');
     const events=[],transcript=[],outputs=[];let wake;
@@ -40,8 +40,17 @@ exports.run=async()=>{
         } while(Date.now()<deadline);
         assert.fail('No Bhash stack after stop: '+JSON.stringify({stop,stack,events,recent:transcript.slice(-15)}));
     };
-    const points=['DEBUG_BEFORE','DEBUG_AFTER'].map(name=>new vscode.SourceBreakpoint(new vscode.Location(uri,new vscode.Position(marker(name),0))));
-    vscode.debug.addBreakpoints(points);
+    assert.equal(editor.document.languageId,'bhash');
+    assert.equal(vscode.workspace.getConfiguration('debug',uri).get('allowBreakpointsEverywhere'),false);
+    const points=[];
+    // Exercise the same language permission gate as gutter clicks and F9.
+    for(const name of ['DEBUG_BEFORE','DEBUG_AFTER']){
+        editor.selection=new vscode.Selection(marker(name),0,marker(name),0);
+        await vscode.commands.executeCommand('editor.debug.action.toggleBreakpoint');
+        const point=vscode.debug.breakpoints.find(b=>b instanceof vscode.SourceBreakpoint&&b.location.uri.toString()===uri.toString()&&b.location.range.start.line===marker(name));
+        assert.ok(point,'Editor breakpoint creation must work for '+name);
+        points.push(point);
+    }
     try {
         const start=vscode.debug.onDidStartDebugSession(value=>{session=value;buildDirectory=value.configuration.bhashBuildDirectory;});
         assert.ok(await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0],{
