@@ -29,6 +29,17 @@ exports.run=async()=>{
         return events.shift();
     };
     let session,buildDirectory;
+    // A stopped event can precede cppdbg's refreshed stack cache (GDB 12).
+    // Request explicit paging and require a usable stack within a bounded time.
+    const stackAt=async(stop)=>{
+        const deadline=Date.now()+5000;let stack;
+        do {
+            stack=await session.customRequest('stackTrace',{threadId:stop.threadId,startFrame:0,levels:50});
+            if(stack.stackFrames?.length)return stack;
+            await new Promise(resolve=>setTimeout(resolve,50));
+        } while(Date.now()<deadline);
+        assert.fail('No Bhash stack after stop: '+JSON.stringify({stop,stack,events,recent:transcript.slice(-15)}));
+    };
     const points=['DEBUG_BEFORE','DEBUG_AFTER'].map(name=>new vscode.SourceBreakpoint(new vscode.Location(uri,new vscode.Position(marker(name),0))));
     vscode.debug.addBreakpoints(points);
     try {
@@ -38,7 +49,7 @@ exports.run=async()=>{
             environment:[{name:'BHASH_GC_STRESS',value:'1'},{name:'BHASH_GC_STATS',value:'1'}],stopAtEntry:false,args:[]}));
         start.dispose();
         const first=await stopped();assert.ok(session);
-        const stack=await session.customRequest('stackTrace',{threadId:first.threadId});
+        const stack=await stackAt(first);
         assert.match(stack.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);assert.equal(stack.stackFrames[0].source.path,source);
         assert.equal(stack.stackFrames[0].line,marker('DEBUG_BEFORE')+1);
         const inspect=async(frame)=>{
@@ -63,17 +74,17 @@ exports.run=async()=>{
         const initialCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:stack.stackFrames[0].id,context:'watch'})).result);
         assert.ok(Number.isFinite(initialCollections));
         await session.customRequest('stepIn',{threadId:first.threadId});const into=await stopped();
-        const inner=await session.customRequest('stackTrace',{threadId:into.threadId});
+        const inner=await stackAt(into);
         assert.match(inner.stackFrames[0].name,/दुगुना/);assert.ok(inner.stackFrames.some(f=>/^मुख्य(?:\(.*\))?$/.test(f.name)));
         const parameterScopes=await session.customRequest('scopes',{frameId:inner.stackFrames[0].id});
         const parameters=[];for(const scope of parameterScopes.scopes.filter(s=>!s.expensive))parameters.push(...(await session.customRequest('variables',{variablesReference:scope.variablesReference})).variables);
         assert.ok(parameters.some(v=>v.name==='मूल'&&v.value==='21'),'arguments must be valid at the first source stop');
         await session.customRequest('next',{threadId:into.threadId});const next=await stopped();
-        const advanced=await session.customRequest('stackTrace',{threadId:next.threadId});assert.match(advanced.stackFrames[0].name,/दुगुना/);
+        const advanced=await stackAt(next);assert.match(advanced.stackFrames[0].name,/दुगुना/);
         await session.customRequest('stepOut',{threadId:next.threadId});const out=await stopped();
-        const caller=await session.customRequest('stackTrace',{threadId:out.threadId});assert.match(caller.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);
+        const caller=await stackAt(out);assert.match(caller.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);
         await session.customRequest('continue',{threadId:out.threadId});const after=await stopped();
-        const finalStack=await session.customRequest('stackTrace',{threadId:after.threadId});
+        const finalStack=await stackAt(after);
         assert.equal(finalStack.stackFrames[0].line,marker('DEBUG_AFTER')+1);await inspect(finalStack.stackFrames[0]);
         const finalCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:finalStack.stackFrames[0].id,context:'watch'})).result);
         assert.ok(finalCollections>initialCollections+200,'forced collections must occur between inspections');
