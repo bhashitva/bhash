@@ -8,7 +8,6 @@ Linux builder requires tar with zstd support; the resulting ZIP is Windows-only.
 """
 import argparse
 import hashlib
-import io
 import json
 from pathlib import Path, PurePosixPath
 import re
