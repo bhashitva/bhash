@@ -5,7 +5,7 @@
 macOS 14 और बाद के Apple Silicon Mac पर भाष सीधे ARM64 executable बनाता है।
 Target `arm64-apple-macosx14.0.0` है। Intel Mac, Rosetta में चलने वाला x64 extension
 host, iOS और cross compilation इस milestone में शामिल नहीं हैं। ARM64 VS Code और
-Java 17+ इस्तेमाल करें। Compiler को Java चाहिए; बने हुए application को JVM, .NET,
+ARM64 Java 17+ इस्तेमाल करें। Compiler को Java चाहिए; बने हुए application को JVM, .NET,
 LLVM या Apple development tools नहीं चाहिए। Application macOS के `libSystem` से जुड़ता है।
 
 एक बार Apple's Command Line Tools स्थापित करें:
@@ -36,11 +36,11 @@ java -jar bhash-compiler.jar run hello.bhash --target native
 java -jar bhash-compiler.jar native inspect ./hello --json --require-runtime-match
 ```
 
-Offline setup में trusted ZIP और उसका published SHA-256 इस्तेमाल करें:
+Offline setup में [versioned SDK release](https://github.com/bhashitva/bhash/releases/tag/native-sdk-macos-1.0.0) का ZIP और उसका published SHA-256 इस्तेमाल करें:
 
 ```sh
 java -jar bhash-compiler.jar native toolchain install \
-  --archive bhash-macos-arm64-llvm18-v1.zip --sha256 <published-sha256>
+  --archive bhash-macos-arm64-llvm18-v1.zip --sha256 c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d
 ```
 
 System mode (`BHASH_NATIVE_TOOLCHAIN=system`) में matching LLVM 18 `clang-18`,
@@ -78,7 +78,13 @@ embedded library search paths और incompatible targets release distribution �
 SDK/linker inputs पर लागू होती है; अलग Apple SDK versions के बीच समान bytes का दावा नहीं है।
 
 `--debug` adjacent `<executable>.dwarf` symbol file देता है। इसे executable के साथ रखें।
-Debug packages में `symbols/<name>.dwarf` रहता है। LLDB में symbols और source mapping दें:
+Debug packages में `symbols/<name>.dwarf` रहता है। Direct debug build के लिए:
+
+```sh
+java -jar bhash-compiler.jar compile hello.bhash --target native --debug --source-root . -o hello
+```
+
+LLDB में symbols और source mapping दें:
 
 ```text
 target create ./hello
