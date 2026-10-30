@@ -88,6 +88,11 @@ blank lines या generated constructor paths पर GDB नज़दीकी 
 अलग lexical scopes में same-name locals का display अभी existing compiler debug-scope
 सीमाओं के अधीन है।
 
+Protected `प्रयास`/`पकड़ो`/`अंततः` bodies generated callbacks में चलती हैं। उनके अंदर
+source breakpoint लगाकर locals inspect कर सकते हैं। Runtime boundary पर सामान्य GDB
+stepping पूरा protected body चला सकती है; Bhash expression evaluation और exact lexical
+scope reconstruction इस initial integration में नहीं जोड़े गए हैं।
+
 ## संग्रहकर्ता सुरक्षा (GC Safety)
 
 Printer केवल stopped process की memory पढ़ती है। वह inferior functions नहीं बुलाती,
