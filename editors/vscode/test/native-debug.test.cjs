@@ -18,7 +18,7 @@ test('GDB setup preserves breakpoints and quotes paths while disabling inferior 
     assert.ok(commands.some(c=>c.text==='-enable-pretty-printing'));
     assert.ok(commands.some(c=>c.text==='-enable-frame-filters'));
     assert.ok(!commands.some(c=>c.text==='set may-write-memory off'),'software breakpoints need memory writes');
-    assert.ok(commands.some(c=>c.text==='source "/space हिन्दी/quote\\\"/bhash_gdb.py"'));
+    assert.ok(commands.some(c=>c.text.startsWith('python exec(compile(open("/space हिन्दी/quote\\\"/bhash_gdb.py"')));
     assert.throws(()=>gdbSetup('/tmp/file\ncall evil'),/newline/);
 });
 test('cleanup refuses workspace, temp root and arbitrary launch outputs',async()=>{
