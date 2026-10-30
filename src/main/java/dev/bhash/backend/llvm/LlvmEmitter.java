@@ -504,7 +504,10 @@ public final class LlvmEmitter {
         code.append("define internal ").append(llvm(f.result())).append(" @bfn").append(f.id()).append('(');
         var arguments=new ArrayList<String>();
         for(int i=0;i<f.parameters().size();i++)arguments.add(llvm(f.parameters().get(i).type())+" %arg"+i);
-        code.append(String.join(", ",arguments)).append(")").append(debug==null?"":" noinline optnone !dbg !"+debugScope).append(" {\n");block("entry");debugSource=null;
+        code.append(String.join(", ",arguments)).append(")").append(debug==null?"":" noinline optnone !dbg !"+debugScope).append(" {\n");block("entry");
+        // Missing locations make LLVM attribute generated calls to the function's
+        // declaration line. Explicit line zero keeps GDB out of the prologue.
+        debugSource=debug==null?null:new Source(f.source().file(),0,0);
         if(traced){line("%trace = alloca %TraceFrame, align 8");line("call void @bh_trace_enter(ptr %trace, ptr "+text(f.name())+", ptr "+text(f.source().toString())+")");}
         line("%frame = alloca %RootFrame, align 8");
         line("%roots = alloca ["+rootCount+" x ptr], align 8");

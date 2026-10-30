@@ -38,7 +38,8 @@ final class NativeDebugInfo {
     int location(int scope,Source source){return locations.computeIfAbsent(scope+":"+source,k->{
         // Lexical file scopes also handle generated constructor/base initialization from other files.
         int local=add("!DILexicalBlockFile(scope: !"+scope+", file: !"+file(source)+", discriminator: 0)");
-        return add("!DILocation(line: "+Math.max(1,source.line())+", column: "+Math.min(65535,Math.max(1,source.column()))+", scope: !"+local+")");
+        int line=Math.max(0,source.line());
+        return add("!DILocation(line: "+line+", column: "+(line==0?0:Math.min(65535,Math.max(1,source.column())))+", scope: !"+local+")");
     });}
     int type(Type type){return types.computeIfAbsent(type,t->switch(t){
         case INT->add("!DIBasicType(name: "+quote("पूर्णांक")+", size: 64, encoding: DW_ATE_signed)");
