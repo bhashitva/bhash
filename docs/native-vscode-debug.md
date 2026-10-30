@@ -159,8 +159,7 @@ java -jar bhash-compiler.jar native debugger status --json
 java -jar bhash-compiler.jar native debugger verify --json
 ```
 
-GDB/Python package में compiler या C headers नहीं हैं। यह MSYS2 के unmodified Windows
-packages से बनता है; licenses, package lock तथा corresponding source archives अलग
+GDB/Python package में compiler या C headers नहीं हैं। यह MSYS2 के Windows packages से बनता है; licenses, package lock तथा corresponding source archives अलग
 GitHub debugger release में रहते हैं। GDB की GPL licensing application को JVM/.NET
 पर निर्भर नहीं बनाती; generated Bhash application अपने सामान्य runtime contract पर
 चलती है। Windows debugger PE/DWARF symbols उपयोग करता है; PDB/MSVC debugger इस
@@ -170,3 +169,7 @@ Debugger Python environment ignore करती है और bytecode cache न
 GDB initialization तथा executable auto-load बंद हैं; केवल bundled Bhash inspector
 स्पष्ट रूप से load होता है। Watch से inferior function calls बंद रहती हैं। Existing
 Bhash-expression और protected-body stepping सीमाएँ Windows पर भी लागू होती हैं।
+
+Hindi paths के लिए GDB process manifest में UTF-8 सक्षम है; Windows 10 version
+1903+ आवश्यक है। Manifest patch script corresponding-source archive में है।
+Debugger instructions तथा दूसरे upstream binaries में बदलाव नहीं है।
