@@ -144,6 +144,10 @@ def lookup(original):
 
 
 class BhashFrame(FrameDecorator):
+    def filename(self):
+        location = self.inferior_frame().find_sal()
+        return location.symtab.fullname() if location.symtab else super().filename()
+
     def function(self):
         name = self.inferior_frame().name() or '<unknown>'
         return name.replace('.<सहायक>', ' (प्रयास/पकड़ो/अंततः)')
