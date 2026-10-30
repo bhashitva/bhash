@@ -100,9 +100,13 @@ Upstream toolchain: https://github.com/mstorsjo/llvm-mingw/releases/tag/20240619
 ## Optional Windows native debugger
 
 The VS Code native debugger downloads a separate, checksum-pinned distribution of
-unmodified MSYS2 UCRT64 GDB, Python, and runtime dependencies. These tools are not
+MSYS2 UCRT64 GDB, Python, and runtime dependencies. These tools are not
 linked into generated Bhash applications and are not included in the compiler JAR.
 GDB is GPL-3.0-or-later; Python and other dependencies retain their respective
 upstream licenses. The debugger payload retains package license notices, and its
 GitHub release includes the exact package lock and corresponding source archives.
 See `docs/native-vscode-debug.md` and `scripts/build_windows_debugger.py`.
+
+The Windows GDB process manifest enables UTF-8 for Hindi paths (Windows 10 1903+).
+The manifest patch script is retained with the corresponding sources; debugger
+instructions and other upstream binaries are unchanged.
