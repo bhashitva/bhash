@@ -83,13 +83,13 @@ def main():
          '--target', 'native', '--debug', '-o', program])
     markers = {name: next(i for i, line in enumerate(SOURCE.read_text(encoding='utf-8').splitlines(), 1)
                           if name in line) for name in ('DEBUG_BEFORE', 'DEBUG_AFTER', 'DEBUG_INNER')}
-    commands = 'set pagination off\nset confirm off\nset disable-randomization off\nset charset UTF-8\n'
+    commands = 'set pagination off\nset confirm off\nset disable-randomization off\nset charset UTF-8\nset language c\n'
     commands += 'set may-call-functions off\n' + python_command('exec(compile(open(' + repr(str(PRINTER)) + ', "rb").read(), ' + repr(str(PRINTER)) + ', "exec"))')
     commands += 'skip -rfu ^bh_\nskip -rfu ^bhash_\n'
     commands += 'break ' + json.dumps(str(SOURCE)) + ':' + str(markers['DEBUG_BEFORE']) + '\n'
     commands += 'break ' + json.dumps(str(SOURCE)) + ':' + str(markers['DEBUG_AFTER']) + '\nrun\n'
     commands += python_command(INSPECT)
-    commands += 'step\n' + python_command("assert gdb.selected_frame().name() == 'दुगुना'; assert int(gdb.selected_frame().read_var('मूल')) == 21")
+    commands += 'step\n' + python_command("assert gdb.selected_frame().name() == 'दुगुना'; assert int(gdb.selected_frame().read_var('मूल')) == 21; assert int(gdb.parse_and_eval('roots')) != before_roots[0][0], 'callee roots not registered at source stop'")
     commands += 'next\nfinish\ncontinue\n' + python_command(INSPECT)
     # Function evaluation must be rejected, rather than introducing a GC safepoint.
     commands += python_command("\ntry:\n gdb.parse_and_eval('bh_heap_objects()')\nexcept gdb.error:\n print('PASS inferior calls disabled')\nelse:\n raise AssertionError('inferior call unexpectedly permitted')\n")
