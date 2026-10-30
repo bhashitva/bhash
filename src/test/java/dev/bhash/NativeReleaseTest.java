@@ -29,7 +29,7 @@ class NativeReleaseTest {
         var identity=NativeBuildInfo.identity();assertEquals(15,identity.get("runtime_abi"));
         String source="कार्य मुख्य() -> शून्य { लिखो(१); }";
         String ir=LlvmEmitter.emit(ManagedEmitter.core(List.of(new SourceFile("hello.bhash",source))));
-        assertTrue(ir.contains("call void @bh_runtime_abi_v15()"));assertTrue(ir.contains("section \""+(NativePlatform.windows()?".bhash":".bhash.build")+"\""));assertTrue(ir.contains("@llvm.used"));
+        assertTrue(ir.contains("call void @bh_runtime_abi_v15()"));assertTrue(ir.contains("section \""+(NativePlatform.macos()?"__DATA,__bhash_build":NativePlatform.windows()?".bhash":".bhash.build")+"\""));assertTrue(ir.contains("@llvm.used"));
         assertEquals(identity,NativeBuildInfo.identity());
     }
     @Test void inspectionEnforcesAbiDependenciesMetadataAndFingerprints()throws Exception{
