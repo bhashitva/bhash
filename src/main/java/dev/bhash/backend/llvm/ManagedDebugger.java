@@ -48,7 +48,8 @@ public final class ManagedDebugger {
         return new Status(true,hash,root.toString(),root.resolve("bin/gdb.exe").toString());
     }
     private static void probe(Path root)throws IOException{
-        var builder=new ProcessBuilder(root.resolve("bin/gdb.exe").toString(),"--nx","--nh","--batch","-eiex","set python ignore-environment on","-eiex","set python dont-write-bytecode on","-iex","set auto-load off","-ex","python import gdb, json, struct, sys; from gdb.FrameDecorator import FrameDecorator; assert sys.version_info.major == 3; print('BHASH_GDB_READY')");
+        String prefix=NativeBuildInfo.JSON.toJson(root.toString());
+        var builder=new ProcessBuilder(root.resolve("bin/gdb.exe").toString(),"--data-directory="+root.resolve("share/gdb"),"--nx","--nh","--batch","-eiex","set python ignore-environment on","-eiex","set python dont-write-bytecode on","-iex","set auto-load off","-ex","python import gdb, json, struct, sys, ctypes, os; assert os.path.normcase(os.path.realpath(sys.prefix)) == os.path.normcase(os.path.realpath("+prefix+")), 'Bundled Python prefix required'; assert ctypes.windll.kernel32.GetACP() == 65001, 'Windows 10 1903+ UTF-8 process support required'; from gdb.FrameDecorator import FrameDecorator; assert sys.version_info.major == 3; print('BHASH_GDB_READY')");
         builder.directory(root.toFile());builder.redirectErrorStream(true);
         builder.environment().keySet().removeIf(key->Set.of("PYTHONHOME","PYTHONPATH","PYTHONSTARTUP").contains(key.toUpperCase(Locale.ROOT)));
         Path output=Files.createTempFile(root,".probe-",".log");
