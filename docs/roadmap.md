@@ -59,7 +59,9 @@ design are under development. See [native compilation](native-compilation-design
 for the Linux x86-64 scope and required validation gates. Native now supports the current
 scalar, text, object, collection, exception, standard-library, enum and record milestones,
 including [user-defined generics](native-generics.md). Native exception traces and initial [DWARF/source debugging](native-diagnostics.md) are
-implemented. Rich object inspection, debugger/editor integration, additional platforms and
+implemented. Linux/WSL [VS Code native debugging](native-vscode-debug.md) adds GDB
+breakpoints, stepping, Hindi stacks and read-only scalar/text/object/collection inspection.
+Windows/macOS editor debugging, Bhash expression evaluation, additional platforms and
 deployment/toolchain improvements remain follow-ups.
 
 - Prototype LLVM IR emission from Java and pin an external LLVM toolchain.
