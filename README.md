@@ -54,8 +54,8 @@ The generated JAR requires **Java 17+ only**. It includes its small console runt
 and does not need Maven, the Bhash compiler or ANTLR to run. Building Bhash programs
 requires a full JDK because this backend lowers checked Bhash to Java source and
 uses the JDK compiler to produce JVM bytecode. It is a compiler, not a parse-tree
-interpreter. CLR and browser WebAssembly output are also implemented (see below); the experimental Linux x86-64 native target supports the subset described in the
-[native guide](docs/native-compilation-design.md).
+interpreter. CLR and browser WebAssembly output are also implemented (see below); the experimental native target supports Linux/Windows x86-64 and macOS 14+ Apple Silicon ARM64.
+See the [native design](docs/native-compilation-design.md), [Windows setup](docs/native-windows.md), and [macOS setup](docs/native-macos.md).
 
 On Windows, if Devanagari input is garbled, run `chcp 65001` before starting Java
 and use a font with Devanagari support.
