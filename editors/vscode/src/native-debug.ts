@@ -36,13 +36,15 @@ export async function debuggerArguments(command: string): Promise<string[]> {
     const result = [...gdbArguments];
     if (process.platform === 'win32' && path.isAbsolute(command)) {
         const data = path.resolve(path.dirname(command), '..', 'share', 'gdb');
-        try {await fs.access(path.join(data, 'python', 'gdb', '__init__.py')); result.unshift('--data-directory=' + data);} catch {}
+        try {await fs.access(path.join(data, 'python', 'gdb', '__init__.py')); result.unshift('--data-directory=' + data.replaceAll('\\','/'));} catch {}
     }
     return result;
 }
 export async function probeGdb(command: string, signal?: AbortSignal): Promise<void> {
     try {
-        const {stdout} = await promisify(execFile)(command, [...await debuggerArguments(command), '--batch', '-ex', 'python import gdb, sys; from gdb.FrameDecorator import FrameDecorator; print("BHASH_GDB_READY:" + gdb.VERSION + ":" + str(sys.version_info[0]))'],
+        const python = 'import gdb, sys; from gdb.FrameDecorator import FrameDecorator; print("BHASH_GDB_READY:" + gdb.VERSION + ":" + str(sys.version_info[0]))';
+        const probe = "python import base64; exec(base64.b64decode('" + Buffer.from(python,'utf8').toString('base64') + "'))";
+        const {stdout} = await promisify(execFile)(command, [...await debuggerArguments(command), '--batch', '-ex', probe],
             {encoding: 'utf8', timeout: 15000, maxBuffer: 65536, signal, windowsHide: true});
         const match = /BHASH_GDB_READY:(\d+)[^\r\n]*:3(?:\r?\n|$)/.exec(stdout);
         if (!match || Number(match[1]) < 12) throw Error('GDB 12+ with Python 3 support is required.');
