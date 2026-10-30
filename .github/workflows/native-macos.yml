@@ -6,16 +6,37 @@ concurrency:
   group: native-macos-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  upstream:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha256: ${{ steps.llvm.outputs.sha256 }}
+    steps:
+      - id: llvm
+        name: Inspect official LLVM 18 archive
+        run: |
+          curl --fail --location --retry 3 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-arm64-apple-macos11.tar.xz' -o llvm-upstream.tar.xz
+          shasum -a 256 llvm-upstream.tar.xz
+          echo "sha256=$(sha256sum llvm-upstream.tar.xz | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+          tar -tf llvm-upstream.tar.xz > llvm-upstream-files.txt
+          sed -n '1,20p' llvm-upstream-files.txt
   macos-native:
-    runs-on: macos-14
+    needs: upstream
+    runs-on: macos-15
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
-      - name: Inspect the official LLVM 18 Apple Silicon release
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - name: Build relocatable Apple Silicon SDK
+        env:
+          LLVM_SHA: ${{ needs.upstream.outputs.sha256 }}
         run: |
           test "$(uname -m)" = arm64
           xcrun --sdk macosx --show-sdk-path
           curl --fail --location --retry 3 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-arm64-apple-macos11.tar.xz' -o llvm-upstream.tar.xz
-          shasum -a 256 llvm-upstream.tar.xz
-          tar -tf llvm-upstream.tar.xz > llvm-upstream-files.txt
-          sed -n '1,20p' llvm-upstream-files.txt
+          python3 scripts/build_macos_native_toolchain.py llvm-upstream.tar.xz --upstream-sha256 "$LLVM_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-sdk-bootstrap
+          path: target/macos-sdk/*
