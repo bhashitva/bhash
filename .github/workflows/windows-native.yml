@@ -89,7 +89,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python scripts/test_windows_native_batches.py --windows-container
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          python scripts/build_examples.py --target native --require-native
+          python scripts/build_examples.py --target native --require-native --windows-native-container
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Diagnose Windows helper startup failures
         if: failure()
