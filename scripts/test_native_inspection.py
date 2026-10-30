@@ -49,7 +49,7 @@ def roots_snapshot():
 before_counts = tuple(int(gdb.parse_and_eval(n)) for n in ('allocations', 'collections', 'live_objects'))
 before_roots = roots_snapshot()
 for repetition in range(20):
-    assert 'भारत😀' in rendered('पाठ्य') and '\u0000' in rendered('पाठ्य'), rendered('पाठ्य')
+    assert 'भारत😀' in rendered('पाठ्य') and r'\u0000' in rendered('पाठ्य'), rendered('पाठ्य')
     assert rendered('रिक्तमान') == 'रिक्त'
     obj = children('वस्तु')
     assert int(obj['अंक']) == 42
