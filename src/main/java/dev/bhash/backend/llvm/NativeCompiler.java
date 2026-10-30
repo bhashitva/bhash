@@ -46,7 +46,9 @@ public final class NativeCompiler {
         Path destination=output.toAbsolutePath().normalize();
         if(destination.getParent()==null || Files.isSymbolicLink(destination) || Files.isDirectory(destination))
             throw new IOException("Native output must be an executable file, not a directory or symbolic link.");
-        Path work=Files.createTempDirectory("bhash-native-").toRealPath(); Path staged=null,stagedSymbols=null;
+        Path work=Files.createTempDirectory("bhash-native-");
+        if(NativePlatform.macos())work=work.toRealPath();
+        Path staged=null,stagedSymbols=null;
         Path symbols=destination.resolveSibling(destination.getFileName()+".dwarf");
         if(NativePlatform.macos() && debug && (Files.isSymbolicLink(symbols) || Files.isDirectory(symbols)))throw new IOException("Debug symbol output must be a regular file: "+symbols);
         try {
