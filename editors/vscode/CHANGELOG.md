@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+
+- Add macOS 14+ Apple Silicon Native build/run and a pinned managed LLVM 18 SDK.
+- Check Apple Command Line Tools before setup; Apple SDK/linker remain local prerequisites.
+- Support cancellation of native process groups on macOS.
+- Bundle macOS ARM64 compilation, release inspection, packaging and separate debug symbols.
+
 ## 0.6.4
 
 - Prevent native LLVM wrapper/linker subprocesses from creating console windows: invoke the real Windows compiler and GNU linker directly, keeping compiler jobs integrated.
