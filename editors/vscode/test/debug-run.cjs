@@ -13,7 +13,7 @@ const {runTests,downloadAndUnzipVSCode,resolveCliArgsFromVSCodeExecutablePath}=r
     await fs.mkdir(workspace,{recursive:true});
     await fs.copyFile(path.join(root,'examples/native/debug-inspection.bhash'),path.join(workspace,'debug-inspection.bhash'));
     const executable=await downloadAndUnzipVSCode('stable');
-    const [cli,...prefix]=resolveCliArgsFromVSCodeExecutablePath(executable);
+    const [cli,...prefix]=resolveCliArgsFromVSCodeExecutablePath(executable,{reuseMachineInstall:true});
     const {stdout,stderr}=await promisify(execFile)(cli,[...prefix,'--extensions-dir',extensions,'--user-data-dir',userData,
         '--install-extension','ms-vscode.cpptools','--force'],{encoding:'utf8',timeout:180000,env:{...process.env,ELECTRON_RUN_AS_NODE:'1'}});
     console.log(stdout,stderr);
