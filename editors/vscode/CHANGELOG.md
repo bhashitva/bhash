@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0
+
+- Add native Windows x64 debugging with automatic, separate verified GDB/Python setup.
+- Support source breakpoints, stepping, Hindi stacks and read-only heap inspection.
+- Validate Windows Unicode paths, exact GC roots, offline debugger reuse, failed repair,
+  real VS Code sessions and a clean Windows container without WSL/development tools.
+
+
 ## 0.8.1
 
 - Enable normal gutter and F9 breakpoints in Bhash source files without enabling breakpoints for every language.

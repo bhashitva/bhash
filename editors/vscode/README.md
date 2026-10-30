@@ -32,7 +32,7 @@ A locally packaged or Actions-built version can be installed before its Marketpl
 
 ## Native debugging on Linux and WSL
 
-Run **Bhash: Debug Native (Linux/WSL)** to save and compile the active Bhash project
+Run **Bhash: Debug Native** to save and compile the active Bhash project
 with source debug information, then launch VS Code's GDB debugger. Install Microsoft's
 **C/C++** extension and **GDB 12+ with Python 3 support** on the Linux/WSL extension
 host (`sudo apt install gdb` on Ubuntu). Java 17+ remains required for compilation;
@@ -282,3 +282,19 @@ npm ci
 
 The lockfile version should be `3`. If the same error persists, inspect
 `type -a node npm` and the npm debug log for the underlying load error.
+
+
+## Native debugging on Windows x64
+
+Version 0.9.0 extends native debugging to ordinary Windows VS Code. Install Java 17+
+(JDK for JVM builds) and Microsoft's C/C++ extension on that host, leave
+`bhash.native.gdbPath` empty, then run **Bhash: Debug Native**. The first debug launch
+installs a separate checksum-pinned GDB/Python runtime; later launches reuse the
+verified cache offline. No WSL, MSYS2, Python, LLVM or C development installation is
+required. The existing managed compiler SDK is downloaded only if needed.
+
+Click the gutter or press F9 on executable Bhash lines, then use F10/F11/Shift+F11
+for stepping. Hindi stacks and read-only scalar/text/object/collection inspection
+share the Linux implementation and GC safety contract. Windows/macOS build/run
+support is unchanged; macOS debugger integration remains pending. See the
+[Hindi debugger guide](../../docs/native-vscode-debug.md).
