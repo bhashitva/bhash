@@ -19,7 +19,9 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record Initialize(int owner) implements Statement {}
     public record StaticRead(StaticField field, Source source) implements Expression { public Type type(){return field.type();} }
     public record StaticWrite(StaticField field, Expression value) implements Statement {}
-    public record ObjectField(int owner, int offset, Type type) {}
+    public record ObjectField(int owner, int offset, Type type, String name) {
+        public ObjectField(int owner,int offset,Type type){this(owner,offset,type,"");}
+    }
     public record RuntimeType(int id, String name, boolean contract) {}
     public record ObjectType(int id, String name, List<ObjectField> fields, List<Integer> virtualMethods,
                              List<Integer> interfaceMethods, List<Integer> assignableTypes) {}
@@ -173,7 +175,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         Binding self;
         final ManagedEmitter.ClassInfo exceptionClass;
         final Deque<Binding> caught=new ArrayDeque<>();
-        final ObjectField messageField=new ObjectField(-5,8,Type.TEXT), locationField=new ObjectField(-5,16,Type.TEXT);
+        final ObjectField messageField=new ObjectField(-5,8,Type.TEXT,"संदेश"), locationField=new ObjectField(-5,16,Type.TEXT,"स्थान");
         final Source runtimeSource=new Source("runtime",1,1);
         final boolean exceptionConstructors;
         Type resultType;
@@ -234,9 +236,10 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 var layout=new ArrayList<ObjectField>();
                 var table=new ArrayList<ManagedEmitter.Function>();
                 if(c.parent!=null){layout.addAll(layouts.get(c.parent));table.addAll(tables.get(c.parent));}
-                for(var f:c.fields.values()){
+                for(var fieldEntry:c.fields.entrySet()){
+                    var f=fieldEntry.getValue();
                     if(f.shared()){statics.put(f,new StaticField(statics.size(),classIds.get(c),type(f.type(),f.declaration())));continue;}
-                    var field=new ObjectField(classIds.get(c),8+layout.size()*8,type(f.type(),f.declaration()));
+                    var field=new ObjectField(classIds.get(c),8+layout.size()*8,type(f.type(),f.declaration()),fieldEntry.getKey());
                     fields.put(f,field);layout.add(field);
                 }
                 layouts.put(c,List.copyOf(layout));
@@ -301,7 +304,8 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     var implementation=membership.contains(required.owner)?tables.get(c).stream().filter(f->f.java.equals(required.java) && f.result==required.result && f.access==ManagedEmitter.Access.PUBLIC).findFirst().orElse(null):null;
                     itable.add(implementation==null?-1:ids.get(implementation));
                 }
-                objectTypes.add(new ObjectType(classIds.get(c),c.spelling,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList(),List.copyOf(itable),java.util.stream.Stream.concat(membership.stream().map(classIds::get),c.record()?java.util.stream.Stream.of(-4,-9):java.util.stream.Stream.of(-4)).toList()));
+                String displayName=originalName(c.declaration!=null?c.declaration.IDENTIFIER().getSymbol():c.enumeration.IDENTIFIER().getSymbol());
+                objectTypes.add(new ObjectType(classIds.get(c),displayName,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList(),List.copyOf(itable),java.util.stream.Stream.concat(membership.stream().map(classIds::get),c.record()?java.util.stream.Stream.of(-4,-9):java.util.stream.Stream.of(-4)).toList()));
                 for(var methods:c.methods.values())for(var f:methods){
                     self=f.shared?null:new Binding(nextBinding++,Type.OBJECT);
                     var parameters=new ArrayList<Binding>();if(self!=null)parameters.add(self);
