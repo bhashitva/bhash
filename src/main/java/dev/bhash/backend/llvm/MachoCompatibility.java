@@ -48,11 +48,12 @@ final class MachoCompatibility {
                 }
             }else if(command==0x32){
                 if(length<24 || data.getInt(at+8)!=1 || minimum!=null)throw invalid("Expected one macOS build-version command");minimum=version(data.getInt(at+12));
-            }else if(command==0xe || command==0xc || command==0x80000018 || command==0x8000001f || command==0x80000023){
+            }else if(command==0xe || command==0xc || command==0x20 || command==0x80000018 || command==0x8000001f || command==0x80000023){
                 int header=command==0xe?12:24;if(length<header)throw invalid("Truncated Mach-O dependency");int offset=number(at+8);if(offset<header || offset>=length)throw invalid("Invalid Mach-O dependency name");
                 String value=string(at+offset,at+length);
                 if(command==0xe){if(loader!=null)throw invalid("Duplicate Mach-O loader");loader=value;}else libraries.add(value);
-            }else if(command==0x8000001c)throw invalid("Embedded Mach-O library search paths are not supported for distribution");
+            }else if(command==0x27 || command==0x10)throw invalid("Mach-O loader environment/prebound libraries are not supported for distribution");
+            else if(command==0x8000001c)throw invalid("Embedded Mach-O library search paths are not supported for distribution");
             at+=length;
         }
         if(at!=end || metadata==null || minimum==null || !"/usr/lib/dyld".equals(loader) || !libraries.equals(new TreeSet<>(Set.of("/usr/lib/libSystem.B.dylib"))))throw invalid("Expected macOS build metadata and only the system libSystem dependency");
