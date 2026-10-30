@@ -65,6 +65,13 @@ jobs:
           $active=Get-Content "$env:BHASH_TOOLCHAIN_HOME/active.json" | ConvertFrom-Json
           $sdk=Join-Path "$env:BHASH_TOOLCHAIN_HOME/installations" $active.directory
           "BHASH_CLANG=$sdk/bin/clang.exe" >> $env:GITHUB_ENV
+      - name: Windows integrated terminal UTF-8 input and output on all targets
+        shell: pwsh
+        run: |
+          $env:BHASH_TEST_WINDOWS_TARGETS='1'
+          $env:BHASH_TEST_TOOLCHAIN_HOME=$env:BHASH_TOOLCHAIN_HOME
+          node --test editors/vscode/test/windows-targets.test.cjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Runtime, cross-target and forced-GC validation
         shell: pwsh
         run: |
@@ -74,7 +81,11 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           # BHASH_CLANG is only used by the standalone C tests; managed compiler selects its own tools.
           Remove-Item Env:BHASH_CLANG
-          mvn --batch-mode --no-transfer-progress '-Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,Utf8ArgumentsTest' '-DargLine=-Xmx768m' test
+          mvn --batch-mode --no-transfer-progress '-Dtest=WindowsToolLaunchTest,NativeReleaseTest,ManagedToolchainTest,Utf8ArgumentsTest' '-DargLine=-Xmx768m' test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python scripts/test_windows_native_batches_test.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python scripts/test_windows_native_batches.py
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python scripts/build_examples.py --target native --require-native
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
