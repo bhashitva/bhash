@@ -19,7 +19,9 @@ export function gdbSetup(script: string) {
         // Watch must not call Bhash functions, which can allocate/collect.
         // Do not globally disable memory writes: GDB needs them for breakpoints.
         {text: 'set may-call-functions off'},
-        {text: 'source ' + JSON.stringify(script)},
+        // GDB's `source` treats surrounding quotes as part of the filename.
+        // A Python literal handles spaces, quotes and Devanagari paths instead.
+        {text: 'python exec(compile(open(' + JSON.stringify(script) + ', "rb").read(), ' + JSON.stringify(script) + ', "exec"))'},
         {text: '-enable-pretty-printing'},
         {text: '-enable-frame-filters'},
         {text: 'skip -rfu ^bh_'},
