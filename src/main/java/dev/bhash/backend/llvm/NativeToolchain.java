@@ -120,7 +120,7 @@ public final class NativeToolchain {
     public static String run(Path work,List<String> args)throws IOException,CompilationException{
         if(NativePlatform.macos()){
             String name=Path.of(args.get(0)).getFileName().toString();
-            if((name.equals("clang") || name.equals("clang-18")) && (args.contains("-c") || args.contains("-o")))
+            if((name.equals("clang") || name.equals("clang-18") || args.get(0).equals(System.getenv("BHASH_CLANG"))) && (args.contains("-c") || args.contains("-o")))
                 return runProcess(work,MacosToolchain.compilerCommand(args,MacosToolchain.require(work)));
         }
         if(NativePlatform.windows()){

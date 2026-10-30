@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
-/** Experimental Linux/Windows x86-64 executable backend using LLVM 18 directly. */
+/** Experimental Linux/Windows x86-64 and macOS ARM64 executable backend using LLVM 18 directly. */
 public final class NativeCompiler {
 
     private final boolean sanitize, debug;

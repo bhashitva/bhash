@@ -8,7 +8,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.regex.*;
 
-/** Static ELF/PE inspection: never executes the input or invokes a dynamic loader. */
+/** Static ELF/PE/Mach-O inspection: never executes the input or invokes a dynamic loader. */
 public final class NativeCompatibility {
     public record Report(String target,String interpreter,String minimumGlibc,List<String> libraries,JsonObject buildInfo,boolean runtimeMatchesCompiler,String minimumMacos){
         public Report(String target,String interpreter,String minimumGlibc,List<String> libraries,JsonObject buildInfo,boolean runtimeMatchesCompiler){this(target,interpreter,minimumGlibc,libraries,buildInfo,runtimeMatchesCompiler,null);}
