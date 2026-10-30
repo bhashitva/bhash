@@ -1,5 +1,8 @@
 name: macOS Apple Silicon native compiler
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
 concurrency:
@@ -67,6 +70,7 @@ jobs:
           name: bhash-macos-sdk
           path: target/macos-sdk
       - name: Build compiler and activate the authenticated local SDK
+        id: setup
         run: |
           test "$(uname -m)" = arm64
           mvn --batch-mode --no-transfer-progress -DskipTests package
@@ -84,14 +88,18 @@ jobs:
           PYTHON
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
       - name: Validate collector, binary64 formatting and exception cleanup under sanitizers
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
           python3 scripts/test_native_runtime.py --sanitize
           python3 scripts/test_native_fixed.py
       - name: Cross-validate native language behavior against JVM and CLR with forced GC
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,MacosCompatibilityTest test
       - name: Verify reproducible release packages, Mach-O inspection, symbols and standalone execution
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: python3 scripts/test_macos_native_release.py
       - name: Compile every applicable native example
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
           python3 -m unittest discover -s scripts -p test_build_examples.py
           python3 scripts/build_examples.py --target native --require-native
