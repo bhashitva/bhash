@@ -77,8 +77,11 @@ runtime fingerprints पढ़ता है; input program को execute नह
 के अपने private DLLs SDK के अंदर रहते हैं; वे generated application की dependencies नहीं हैं।
 
 PE timestamp हटाया जाता है, build/source paths map होते हैं और command-line paths debug
-producer में record नहीं होते। `--debug` Windows GNU/DWARF symbols रखता है; यह
-milestone VS Code में Windows source-debugger integration या PDB delivery नहीं जोड़ता।
+producer में record नहीं होते। `--debug` Windows GNU/DWARF symbols रखता है।
+Windows 10 version 1903+ पर VS Code extension 0.9.0 से source breakpoints, stepping
+और read-only variable inspection के साथ [Windows native debugging](native-vscode-debug.md)
+उपलब्ध है। GDB/Python अपने आप अलग verified cache में स्थापित होते हैं। PDB/MSVC
+debugger delivery अभी शामिल नहीं है।
 
 CI pinned Python 3.11.9 से SDK दो बार बनाकर catalog SHA मिलाती है। Windows JVM/CLR/native
 conformance tests, standalone C runtime tests और forced-GC examples चलते हैं। अलग
