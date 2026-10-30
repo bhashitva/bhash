@@ -50,7 +50,7 @@ jobs:
 
           SHA-256: `c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d`.
 
-          The source validation run checks SDK reproducibility, native/JVM/CLR behavior, forced GC, sanitizer runtime tests, executable packaging and standalone execution on macOS 14 and 15 ARM64.
+          The source validation run checks SDK reproducibility, native/JVM/CLR behavior, forced GC, sanitizer runtime tests, executable packaging and standalone execution on macOS 15 and 26 ARM64. The macOS 14 minimum was separately validated before its hosted runner retirement.
           NOTES
           BHASH_SDK_HEAD=$(cat validated-head.txt)
           gh release create native-sdk-macos-1.0.0 --draft --target "$BHASH_SDK_HEAD" --title 'Bhash macOS ARM64 native SDK 1.0.0 (LLVM 18)' --notes-file notes.md

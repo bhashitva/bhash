@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, windows-latest]
+        os: [ubuntu-22.04, ubuntu-24.04, windows-latest, macos-26]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -26,6 +26,9 @@ jobs:
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
       - run: npm run build --prefix editors/vscode
       - run: npm test --prefix editors/vscode
+      - name: Test Apple Silicon launcher with local Command Line Tools and no system LLVM 18
+        if: runner.os == 'macOS'
+        run: node editors/vscode/test/native-macos.cjs
       - name: Test shipped native launcher without LLVM or C development packages
         if: runner.os == 'Linux'
         run: |
@@ -39,6 +42,11 @@ jobs:
           BHASH_TEST_NATIVE: '1'
       - if: runner.os == 'Windows'
         run: npm run test:integration --prefix editors/vscode
+      - if: runner.os == 'macOS'
+        run: npm run test:integration --prefix editors/vscode
+        env:
+          BHASH_TEST_NATIVE: '1'
+          VSCODE_VERSION: stable
       - run: npm run package --prefix editors/vscode
       - uses: actions/upload-artifact@v4
         with:
