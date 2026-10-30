@@ -1,5 +1,8 @@
 name: Bhash native VS Code debugging
-on: [push, pull_request]
+on: [pull_request, workflow_dispatch]
+concurrency:
+  group: native-debug-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
