@@ -70,7 +70,7 @@ public final class NativeToolchain {
     public static String run(Path work,List<String> args)throws IOException,CompilationException{
         Process process;
         try{process=builder(args,work).start();}
-        catch(IOException e){throw new CompilationException("[BH9102] Cannot start native tool "+args.get(0)+". Install a managed bundle with native toolchain install, or install clang-18, llvm-18, build-essential and binutils; see docs/managed-native-toolchain.md.");}
+        catch(IOException e){throw new CompilationException("[BH9102] Cannot start native tool "+args.get(0)+". Use native toolchain install for the managed SDK, or install a matching LLVM 18 target toolchain; see docs/managed-native-toolchain.md. Cause: "+e.getMessage());}
         var captured=new ByteArrayOutputStream();var overflow=new java.util.concurrent.atomic.AtomicBoolean();
         Thread reader=new Thread(()->{
             try(var input=process.getInputStream()){
@@ -85,7 +85,7 @@ public final class NativeToolchain {
             if(reader.isAlive())throw new CompilationException("Native tool output did not close: "+args.get(0));
             if(overflow.get())throw new CompilationException("Native tool output exceeded "+LOG_LIMIT+" bytes: "+args.get(0));
             String message; synchronized(captured){message=captured.toString(StandardCharsets.UTF_8);}
-            if(process.exitValue()!=0)throw new CompilationException("Native tool failed: "+args.get(0)+"\n"+message);
+            if(process.exitValue()!=0)throw new CompilationException("Native tool failed (exit code "+process.exitValue()+", "+String.format(Locale.ROOT,"0x%08X",process.exitValue())+"): "+args.get(0)+"\n"+message);
             return message;
         }catch(InterruptedException e){Thread.currentThread().interrupt();throw new IOException("Native compilation interrupted.",e);}
         finally{
