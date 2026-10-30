@@ -11,11 +11,11 @@ final class NativeCommands {
     private NativeCommands(){}
     static int run(String[] args,PrintStream out,PrintStream err){
         try{
-            if(args.length<2)throw new IllegalArgumentException("Expected native doctor, inspect or package; see docs/native-releases.md");
+            if(args.length<2)throw new IllegalArgumentException("Expected native doctor, toolchain, debugger, inspect or package; see docs/native-releases.md");
             switch(args[1]){
                 case "toolchain", "debugger" -> {
                     boolean debugger=args[1].equals("debugger");
-                    if(args.length<3)throw new IllegalArgumentException("Usage: native toolchain status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
+                    if(args.length<3)throw new IllegalArgumentException("Usage: native toolchain|debugger status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
                     var flags=new HashMap<String,String>();boolean json=false;
                     for(int i=3;i<args.length;i++){
                         if(args[i].equals("--json") && !json){json=true;continue;}
