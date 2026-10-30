@@ -1,0 +1,21 @@
+name: macOS Apple Silicon native compiler
+on: [push, pull_request]
+permissions:
+  contents: read
+concurrency:
+  group: native-macos-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  macos-native:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Inspect the official LLVM 18 Apple Silicon release
+        run: |
+          test "$(uname -m)" = arm64
+          xcrun --sdk macosx --show-sdk-path
+          curl --fail --location --retry 3 'https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-arm64-apple-macos11.tar.xz' -o llvm-upstream.tar.xz
+          shasum -a 256 llvm-upstream.tar.xz
+          tar -tf llvm-upstream.tar.xz > llvm-upstream-files.txt
+          sed -n '1,20p' llvm-upstream-files.txt
