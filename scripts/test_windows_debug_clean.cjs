@@ -11,14 +11,6 @@ const {ensureDebugger}=require('../editors/vscode/dist/native-debug.js');
  for(const tool of ['clang.exe','gcc.exe','cl.exe','gdb.exe'])assert.notEqual(spawnSync('where.exe',[tool],{windowsHide:true}).status,0,'unexpected development tool: '+tool);
  const options={java:path.join(process.env.JAVA_HOME,'bin/java.exe'),jar:path.resolve('target/bhash-compiler-0.1.0-SNAPSHOT.jar'),mode:'managed'};
  await ensureNative(options,console.log);
- // Bootstrap validation may install the candidate archive before its immutable release exists.
- // The final release validation omits this variable and tests the production download path.
- if(process.env.BHASH_TEST_DEBUGGER_ARCHIVE){
-  const archive=process.env.BHASH_TEST_DEBUGGER_ARCHIVE;
-  const hash=require('node:crypto').createHash('sha256').update(await fs.readFile(archive)).digest('hex');
-  const invoke=compilerInvocation(options.jar,['native','debugger','install','--archive',archive,'--sha256',hash,'--json']);
-  await capture(options.java,invoke.args,nativeEnvironment(options),undefined,invoke.cwd);
- }
  const gdb=await ensureDebugger(options,'',console.log);
  const before=await fs.readFile(path.join(process.env.BHASH_DEBUGGER_HOME,'active.json'),'utf8');
  // No download on the second setup, and no ambient Python installation is required by GDB.
