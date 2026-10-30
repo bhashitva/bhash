@@ -85,7 +85,9 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python scripts/test_windows_native_batches_test.py
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          python scripts/test_windows_native_batches.py
+          docker pull mcr.microsoft.com/windows/servercore:ltsc2022
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python scripts/test_windows_native_batches.py --windows-container
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python scripts/build_examples.py --target native --require-native
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
