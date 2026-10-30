@@ -2246,6 +2246,18 @@ class NativeBackendTest {
         assertTrue(normal.contains("@bh_trace_enter"));assertFalse(normal.contains("!DICompileUnit"));
         for(String metadata:List.of("!DICompileUnit","!DISubprogram","!DILocation","!DILocalVariable","@llvm.dbg.declare","noinline optnone","Debug Info Version"))assertTrue(debug.contains(metadata),metadata);
     }
+    @Test void debugInspectionSchemaPreservesFieldNamesAndDoesNotAlterReleaseRuntime()throws Exception{
+        var program=core(Files.readString(Path.of("examples/native/debug-inspection.bhash")));
+        assertTrue(program.classes().stream().flatMap(c->c.fields().stream()).anyMatch(f->f.name().equals("नाम")));
+        String release=LlvmEmitter.emit(program),debug=LlvmEmitter.emit(program,"",true);
+        assertFalse(release.contains("@bhash_debug_schema"));assertTrue(debug.contains("retainedTypes:"));
+        String schemaLine=debug.lines().filter(line->line.startsWith("@bhash_debug_schema =")).findFirst().orElseThrow();
+        String encoded=schemaLine.substring(schemaLine.indexOf("c\"")+2,schemaLine.lastIndexOf('"'));
+        var json=com.google.gson.JsonParser.parseString(new String(java.util.HexFormat.of().parseHex(encoded.replace("\\","")),StandardCharsets.UTF_8)).getAsJsonObject();
+        assertEquals(1,json.get("version").getAsInt());assertEquals(NativeBuildInfo.ABI,json.get("abi").getAsInt());
+        assertTrue(json.getAsJsonObject("classes").asMap().values().stream().anyMatch(c->c.getAsJsonObject().get("name").getAsString().equals("कड़ी")));
+        assertTrue(json.getAsJsonObject("collections").asMap().values().stream().map(c->c.getAsJsonObject().get("kind").getAsString()).collect(java.util.stream.Collectors.toSet()).containsAll(Set.of("ARRAY","LIST","MAP","BUFFER")));
+    }
     @Test void nativeRuntimeTraceUsesBhashNamesAcrossVirtualGenericAndFinallyCalls()throws Exception{
         requireTools();String source=Files.readString(Path.of("examples/native/diagnostics.bhash"));
         var result=nativeOnlyRun(List.of(new SourceFile("diagnostics.bhash",source)),GC_STRESS);
