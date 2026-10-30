@@ -1,6 +1,6 @@
 # नेटिव निर्माण और वितरण (Native builds and distribution)
 
-Bhash का समर्थित नेटिव लक्ष्य अभी **Linux x86-64 + glibc** है। निर्माण के लिए Java 17+, मिलते हुए LLVM 18 `clang`/`opt`, C17 headers, system linker और binutils चाहिए। बने हुए प्रोग्राम को चलाने के लिए Java, .NET या LLVM की आवश्यकता नहीं है। Windows/macOS, ARM और musl इस milestone में समर्थित नहीं हैं; Windows पर x86-64 Linux/WSL में निर्माण करें।
+Bhash के native targets Linux x86-64 + glibc, [Windows x64 + UCRT](native-windows.md), और [macOS 14+ Apple Silicon ARM64](native-macos.md) हैं। यह पृष्ठ Linux release workflow समझाता है। Compiler को Java 17+ और matching LLVM 18 tools चाहिए; generated application को Java, .NET या LLVM नहीं चाहिए। macOS builds के लिए स्थानीय Apple Command Line Tools आवश्यक हैं।
 
 ## स्थापना की जाँच (Toolchain doctor)
 
