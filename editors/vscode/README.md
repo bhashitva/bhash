@@ -7,7 +7,7 @@ programs while you edit.
 
 ## Install
 
-1. Download `bhash-vscode-0.5.2.vsix` from the **Bhash VS Code extension** GitHub
+1. Download the `.vsix` package from the **Bhash VS Code extension** GitHub
    Actions artifact for a successful main-branch build.
 2. In VS Code choose **Extensions → … → Install from VSIX…** and select the file.
 3. Install **Java 17 or later** on the computer running the extension host.
