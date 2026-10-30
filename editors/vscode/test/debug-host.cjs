@@ -108,7 +108,26 @@ exports.run=async()=>{
         // The build has a per-session lifetime; never reuse a previous executable.
         const deadline=Date.now()+10000;while(Date.now()<deadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
         await assert.rejects(fs.stat(buildDirectory));
-        console.log('PASS real VS Code/GDB DAP: source breakpoints, step in/over/out, Hindi stacks, nested variables, forced GC and cleanup.');
+        // Stopping a second paused session must release Windows executable handles,
+        // remove its own temporary build, and never reuse the first program.
+        const previousDirectory=buildDirectory,previousId=session.id;
+        events.length=0;
+        const restart=vscode.debug.onDidStartDebugSession(value=>{session=value;buildDirectory=value.configuration.bhashBuildDirectory;});
+        try {
+            assert.ok(await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0],{
+                type:'cppdbg',request:'launch',name:'Bhash stop cleanup test',bhashNative:true,bhashInput:source,cwd:workspace,stopAtEntry:false,args:[]}));
+        } finally {restart.dispose();}
+        await stopped();assert.notEqual(session.id,previousId);assert.notEqual(buildDirectory,previousDirectory);
+        const stoppedSession=session;
+        const terminated=new Promise((resolve,reject)=>{
+            const timer=setTimeout(()=>{listener.dispose();reject(Error('Stopped session did not terminate'));},30000);
+            const listener=vscode.debug.onDidTerminateDebugSession(value=>{if(value.id===stoppedSession.id){clearTimeout(timer);listener.dispose();resolve();}});
+        });
+        await vscode.debug.stopDebugging(stoppedSession);await terminated;
+        const stopDeadline=Date.now()+10000;
+        while(Date.now()<stopDeadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
+        await assert.rejects(fs.stat(buildDirectory));
+        console.log('PASS real VS Code/GDB DAP: source breakpoints, step in/over/out, Hindi stacks, nested variables, forced GC, repeat sessions and Stop cleanup.');
     } finally {
         await fs.writeFile(process.env.BHASH_DEBUG_LOG,JSON.stringify({transcript,outputs},null,2));
         vscode.debug.removeBreakpoints(points);tracker.dispose();if(session)await vscode.debug.stopDebugging(session);
