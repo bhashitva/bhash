@@ -16,7 +16,7 @@ class MacosCompatibilityTest {
         info.put("target",NativePlatform.MACOS_TARGET);info.put("sanitized",false);
         byte[] metadata=(NativeBuildInfo.JSON.toJson(info)+"\0").getBytes(StandardCharsets.UTF_8);
         byte[] bytes=new byte[512+metadata.length];var b=ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
-        b.putInt(0,0xfeedfacf).putInt(4,0x0100000c).putInt(8,0).putInt(12,2).putInt(16,4).putInt(20,264);
+        b.putInt(0,0xfeedfacf).putInt(4,0x0100000c).putInt(8,0).putInt(12,2).putInt(16,5).putInt(20,288);
         b.putInt(32,0x19).putInt(36,152).putInt(96,1);
         System.arraycopy("__bhash_build".getBytes(StandardCharsets.US_ASCII),0,bytes,104,13);
         System.arraycopy("__DATA".getBytes(StandardCharsets.US_ASCII),0,bytes,120,6);
@@ -27,6 +27,7 @@ class MacosCompatibilityTest {
         b.putInt(240,0xc).putInt(244,56).putInt(248,24);
         byte[] library="/usr/lib/libSystem.B.dylib".getBytes(StandardCharsets.US_ASCII);
         System.arraycopy(library,0,bytes,264,library.length);System.arraycopy(metadata,0,bytes,512,metadata.length);
+        b.putInt(296,0x1b).putInt(300,24).putLong(304,1);
         return bytes;
     }
     private NativeCompatibility.Report inspect(byte[] bytes)throws Exception{
@@ -36,7 +37,7 @@ class MacosCompatibilityTest {
         var report=inspect(executable());assertEquals(NativePlatform.MACOS_TARGET,report.target());assertEquals("14.0.0",report.minimumMacos());assertTrue(report.runtimeMatchesCompiler());assertNull(report.minimumGlibc());
     }
     @Test void rejectsWrongArchitectureDeploymentAndDependencies()throws Exception{
-        for(int[] mutation:new int[][]{{4,0x01000007},{8,2},{196,15<<16},{240,0x8000001c},{36,8}}){
+        for(int[] mutation:new int[][]{{4,0x01000007},{8,2},{196,15<<16},{240,0x8000001c},{36,8},{296,0}}){
             byte[] bytes=executable();ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putInt(mutation[0],mutation[1]);
             assertThrows(CompilationException.class,()->inspect(bytes));
         }
