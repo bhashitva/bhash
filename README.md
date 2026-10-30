@@ -450,3 +450,7 @@ Native compilation also supports Windows 10+ x64 with an automatically managed
 LLVM 18/UCRT SDK in the VS Code extension. WSL and Visual Studio are not required.
 The compiler needs Java 17+; generated `.exe` files need neither Java nor .NET.
 See [Windows native setup and distribution](docs/native-windows.md).
+
+### macOS Apple Silicon native builds
+
+Native compilation supports macOS 14+ ARM64 using a managed LLVM 18 SDK and locally installed Apple Command Line Tools. Use ARM64 VS Code and Java 17+ to build; generated applications require neither Java nor .NET nor LLVM. See [macOS native setup, packaging and debugging](docs/native-macos.md).
