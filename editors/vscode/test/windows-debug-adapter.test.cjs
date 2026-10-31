@@ -31,7 +31,7 @@ test('DAP reader handles byte-split Hindi and combined messages, rejecting malfo
         assert.throws(()=>new DapReader().accept(Buffer.from(data),()=>{}));
 });
 
-function fixture(pid=123){
+function fixture(pid=123, terminalLauncher=launcher){
     const child=new EventEmitter();child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();
     child.kill=()=>{child.killed=true;};
     const writes=[],events=[],terminals=[],logs=[];let onClose;
@@ -40,7 +40,7 @@ function fixture(pid=123){
         cwd:args.cwd,
         terminal(options){const terminal={processId:Promise.resolve(pid),options,show(){},dispose(){this.disposed=true;}};terminals.push(terminal);return terminal;},
         closed(listener){onClose=listener;return {dispose(){}};},log:text=>logs.push(text)
-    },launcher,()=>child);
+    },terminalLauncher,()=>child);
     adapter.onDidSendMessage(message=>events.push(message));
     return {adapter,child,writes,events,terminals,logs,receive:message=>child.stdout.write(dapFrame(message)),close:terminal=>onClose(terminal)};
 }
@@ -65,6 +65,37 @@ test('bridge correlates requests and reverse responses while handling terminal c
         assert.equal(f.events.at(-1).request_seq,12);
         f.close(f.terminals[0]);assert.equal(f.child.killed,true);assert.ok(f.events.some(e=>e.event==='terminated'));
     }finally{f.adapter.dispose();}
+});
+
+test('Watch and hover use encoded Bhash evaluation; explicit REPL retains GDB syntax',()=>{
+    const f=fixture();
+    try {
+        for(const context of ['watch','hover',undefined]) {
+            const expression='वस्तु.अंक + अंक[१]';
+            f.adapter.handleMessage({seq:31,type:'request',command:'evaluate',arguments:{expression,frameId:8,context}});
+            const forwarded=f.writes.at(-1);
+            assert.equal(forwarded.arguments.frameId,8);
+            assert.equal(forwarded.arguments.expression,'$bhash_watch("'+Buffer.from(expression,'utf8').toString('base64')+'")');
+            f.receive({seq:22,type:'response',command:'evaluate',request_seq:forwarded.seq,success:true,body:{result:'84'}});
+            assert.equal(f.events.at(-1).request_seq,31);
+        }
+        f.adapter.handleMessage({seq:32,type:'request',command:'evaluate',arguments:{expression:'-exec info registers',context:'repl'}});
+        assert.equal(f.writes.at(-1).arguments.expression,'-exec info registers');
+        const before=f.writes.length;
+        f.adapter.handleMessage({seq:33,type:'request',command:'evaluate',arguments:{expression:'अ'.repeat(2000),context:'watch'}});
+        assert.equal(f.writes.length,before);assert.equal(f.events.at(-1).success,false);
+    } finally {f.adapter.dispose();}
+});
+
+test('Linux forwards terminal reverse requests to VS Code and preserves correlation',()=>{
+    const f=fixture(123,null);
+    try {
+        f.receive({seq:55,type:'request',command:'runInTerminal',arguments:{kind:'integrated',cwd:'/tmp',args:['/bin/sh']}});
+        assert.equal(f.terminals.length,0);
+        assert.equal(f.events.at(-1).command,'runInTerminal');
+        f.adapter.handleMessage({seq:99,type:'response',request_seq:f.events.at(-1).seq,command:'runInTerminal',success:true,body:{shellProcessId:123}});
+        assert.equal(f.writes.at(-1).request_seq,55);
+    } finally {f.adapter.dispose();}
 });
 
 test('terminal start failures return a DAP error; Stop disposes active terminal and adapter',async()=>{
