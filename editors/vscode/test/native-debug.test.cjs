@@ -6,10 +6,10 @@ const os=require('node:os');
 const fs=require('node:fs/promises');
 const {requireDebugHost,gdbSetup,removeDebugBuild,prepareNativeDebug}=require('../dist/native-debug.js');
 
-test('debugging is Linux/WSL-only, independent of ordinary native host support',()=>{
-    requireDebugHost('linux','x64');
-    for(const [platform,arch] of [['win32','x64'],['darwin','arm64'],['linux','arm64']])
-        assert.throws(()=>requireDebugHost(platform,arch),/Linux x86-64.*WSL/);
+test('debugging supports Windows x64 and Linux/WSL with an explicit macOS diagnostic',()=>{
+    requireDebugHost('linux','x64');requireDebugHost('win32','x64');
+    for(const [platform,arch] of [['win32','arm64'],['darwin','arm64'],['linux','arm64']])
+        assert.throws(()=>requireDebugHost(platform,arch),/Windows x64 or Linux/);
 });
 test('GDB setup preserves breakpoints and quotes paths while disabling inferior calls',()=>{
     const commands=gdbSetup('/space हिन्दी/quote"/bhash_gdb.py');
@@ -42,5 +42,23 @@ test('debug build uses managed setup, source debug flags, and removes partial fa
     await assert.rejects(fs.stat(path.dirname(program)));
     const abort=new AbortController();abort.abort();calls.length=0;
     await assert.rejects(prepareNativeDebug(options,()=>{},abort.signal,dependencies));
-    assert.deepEqual(calls,['gdb'],'cancelled launch must not install an SDK or build');
+    assert.deepEqual(calls,[],'cancelled launch must not probe, install an SDK or build');
+});
+
+
+test('Windows debug preparation passes Unicode argv through Java envelope and selects a fresh exe',
+ {skip:process.platform!=='win32'},async()=>{
+ const base=path.join(os.tmpdir(),'source हिन्दी');let built;
+ const options={java:'java',jar:path.join(base,'compiler.jar'),mode:'managed',gdb:'',input:path.join(base,'main.bhash'),cwd:base,extensionRoot:base};
+ const result=await prepareNativeDebug(options,()=>{},undefined,{
+  debugger:async()=>path.join(base,'gdb.exe'),probe:async()=>{},ensure:async()=>{},
+  run:async(command,args,env,signal,cwd)=>{
+   assert.equal(cwd,base);
+   const envelope=JSON.parse(Buffer.from(args[args.indexOf('--utf8-args')+1],'base64').toString('utf8'));
+   assert.ok(envelope.args.includes(options.input));assert.ok(envelope.args.includes('--debug'));
+   built=envelope.args.at(-1);assert.equal(path.extname(built),'.exe');await fs.writeFile(built,'fixture');return '';
+  }
+ });
+ assert.equal(result.program,built);assert.equal(result.gdb,path.join(base,'gdb.exe'));
+ await removeDebugBuild(result.directory);await assert.rejects(fs.stat(built));
 });

@@ -32,7 +32,10 @@ async function startServer() {
     if (!vscode.workspace.isTrusted || client || vscode.workspace.workspaceFolders?.some(f => f.uri.scheme !== 'file')) return;
     let java: string, jar: string;
     try {({java,jar} = tools());} catch (error) {output.appendLine(String(error));void vscode.window.showErrorMessage(String(error));return;}
-    const server: ServerOptions = {command: java, args: ['-Dfile.encoding=UTF-8', '-Xmx768m', '-jar', jar, 'language-server']};
+    // Windows Java 17 can lose Unicode in the JAR argument; cwd uses the wide process API.
+    const windows = process.platform === 'win32';
+    const server: ServerOptions = {command: java, args: ['-Dfile.encoding=UTF-8', '-Xmx768m', '-jar', windows ? path.basename(jar) : jar, 'language-server'],
+        options: windows ? {cwd: path.dirname(jar)} : undefined};
     serverWatcher?.dispose();
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.{bhash,project,lock}');serverWatcher=watcher;
     const options: LanguageClientOptions = {documentSelector: schemes, outputChannel: output,

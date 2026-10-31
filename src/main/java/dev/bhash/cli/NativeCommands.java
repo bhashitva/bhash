@@ -11,10 +11,11 @@ final class NativeCommands {
     private NativeCommands(){}
     static int run(String[] args,PrintStream out,PrintStream err){
         try{
-            if(args.length<2)throw new IllegalArgumentException("Expected native doctor, inspect or package; see docs/native-releases.md");
+            if(args.length<2)throw new IllegalArgumentException("Expected native doctor, toolchain, debugger, inspect or package; see docs/native-releases.md");
             switch(args[1]){
-                case "toolchain" -> {
-                    if(args.length<3)throw new IllegalArgumentException("Usage: native toolchain status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
+                case "toolchain", "debugger" -> {
+                    boolean debugger=args[1].equals("debugger");
+                    if(args.length<3)throw new IllegalArgumentException("Usage: native toolchain|debugger status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
                     var flags=new HashMap<String,String>();boolean json=false;
                     for(int i=3;i<args.length;i++){
                         if(args[i].equals("--json") && !json){json=true;continue;}
@@ -22,11 +23,14 @@ final class NativeCommands {
                     }
                     if(args[2].equals("install")){
                         if(!flags.containsKey("--sha256") || flags.containsKey("--archive")==flags.containsKey("--url"))throw new IllegalArgumentException("Install requires exactly one --archive or --url and a trusted --sha256");
-                        ManagedToolchain.install(flags.containsKey("--archive")?Path.of(flags.get("--archive")):null,flags.containsKey("--url")?ManagedToolchain.validateUrl(flags.get("--url")):null,flags.get("--sha256"));
+                        if(debugger)ManagedDebugger.install(flags.containsKey("--archive")?Path.of(flags.get("--archive")):null,flags.containsKey("--url")?ManagedToolchain.validateUrl(flags.get("--url")):null,flags.get("--sha256"));
+                        else ManagedToolchain.install(flags.containsKey("--archive")?Path.of(flags.get("--archive")):null,flags.containsKey("--url")?ManagedToolchain.validateUrl(flags.get("--url")):null,flags.get("--sha256"));
                     }else if(Set.of("status","verify").contains(args[2])){
                         if(!flags.isEmpty())throw new IllegalArgumentException("status/verify accept only --json");
-                        if(args[2].equals("verify")){var installed=ManagedToolchain.active();if(installed==null)throw new IOException("[BH9110] No managed toolchain installed");ManagedToolchain.verifyFiles(installed.root(),false);}
+                        if(args[2].equals("verify") && debugger){if(!ManagedDebugger.status().installed())throw new IOException("No managed debugger installed");}
+                        if(args[2].equals("verify") && !debugger){var installed=ManagedToolchain.active();if(installed==null)throw new IOException("[BH9110] No managed toolchain installed");ManagedToolchain.verifyFiles(installed.root(),false);}
                     }else throw new IllegalArgumentException("Unknown toolchain action: "+args[2]);
+                    if(debugger){var status=ManagedDebugger.status();out.println(json?NativeBuildInfo.JSON.toJson(status):status.toString());break;}
                     var status=ManagedToolchain.status();out.println(json?NativeBuildInfo.JSON.toJson(status):status.installed()?"Managed toolchain: "+status.id()+" (LLVM "+status.llvmVersion()+") at "+status.path():"No managed toolchain installed. Cache: "+status.path());
                 }
                 case "doctor" -> {

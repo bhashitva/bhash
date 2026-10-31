@@ -34,11 +34,11 @@ public final class ManagedToolchain {
         if(!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost()==null || uri.getUserInfo()!=null || uri.getFragment()!=null)throw new IllegalArgumentException("Toolchain downloads require an HTTPS URL without credentials or fragments");
         return uri;
     }
-    private static JsonObject json(Path path)throws IOException{
+    static JsonObject json(Path path)throws IOException{
         if(!Files.isRegularFile(path,LinkOption.NOFOLLOW_LINKS) || Files.size(path)>MAX_MANIFEST)throw invalid("Missing or oversized toolchain manifest/receipt: "+path);
         try{return JsonParser.parseString(Files.readString(path)).getAsJsonObject();}catch(JsonParseException | IllegalStateException e){throw invalid("Invalid JSON manifest/receipt: "+path);}
     }
-    private static String string(JsonObject object,String key)throws IOException{
+    static String string(JsonObject object,String key)throws IOException{
         var value=object.get(key);if(value==null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString())throw invalid("Missing manifest string: "+key);return value.getAsString();
     }
     private static JsonObject manifest(Path root)throws IOException{
@@ -54,12 +54,16 @@ public final class ManagedToolchain {
         return data;
     }
     private static String minimumGlibc(JsonObject data)throws IOException{return NativePlatform.windows() || NativePlatform.macos()?null:string(data,"minimum_glibc");}
-    private static Path safe(Path root,String name)throws IOException{
+    static Path safe(Path root,String name)throws IOException{
         if(name.isEmpty() || name.startsWith("/") || name.contains("\\") || name.contains(":") || name.indexOf(0)>=0 || Arrays.stream(name.split("/",-1)).anyMatch(p->p.isEmpty() || p.equals(".") || p.equals("..") || p.endsWith(".") || p.endsWith(" ") || p.matches("(?i)(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?")))throw invalid("Unsafe archive path: "+name);
         Path result=root.resolve(name).normalize();if(!result.startsWith(root))throw invalid("Archive path escapes installation");return result;
     }
     /** Safe extraction is independent of platform; tools run only after integrity verification. */
     public static void extractAndVerify(Path archive,Path destination)throws IOException{
+        extractArchive(archive,destination);
+        verifyFiles(destination.toAbsolutePath().normalize(),true);
+    }
+    static void extractArchive(Path archive,Path destination)throws IOException{
         if(!Files.isRegularFile(archive) || Files.size(archive)>MAX_ARCHIVE)throw invalid("Toolchain archive must be a regular ZIP file no larger than 1 GiB");
         Path root=destination.toAbsolutePath().normalize();Files.createDirectory(root);var names=new HashSet<String>();long total=0;
         try(var zip=new ZipInputStream(Files.newInputStream(archive))){
@@ -71,7 +75,6 @@ public final class ManagedToolchain {
                 }zip.closeEntry();
             }
         }
-        verifyFiles(root,true);
     }
     public static void verifyFiles(Path root,boolean setPermissions)throws IOException{
         var data=manifest(root);var inventory=data.getAsJsonObject("files");var expected=new HashSet<String>();expected.add("toolchain.json");expected.add(".installed.json");
@@ -125,7 +128,7 @@ public final class ManagedToolchain {
         }catch(OverlappingFileLockException e){throw invalid("Another toolchain installation is in progress");}
     }
     static void delete(Path directory)throws IOException{if(!Files.exists(directory,LinkOption.NOFOLLOW_LINKS))return;try(var paths=Files.walk(directory)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}}
-    private static void download(URI url,Path output)throws IOException{
+    static void download(URI url,Path output)throws IOException{
         HttpClient client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).followRedirects(HttpClient.Redirect.NEVER).build();
         try{
             for(int redirects=0;redirects<=5;redirects++){

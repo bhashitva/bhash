@@ -2,7 +2,7 @@
   "name": "bhash",
   "displayName": "Bhash (भाष)",
   "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "publisher": "bhashitva",
   "license": "Apache-2.0",
   "repository": {
@@ -161,7 +161,7 @@
       },
       {
         "command": "bhash.debugNative",
-        "title": "Bhash: Debug Native (Linux/WSL)"
+        "title": "Bhash: Debug Native"
       }
     ],
     "configuration": {
@@ -219,9 +219,9 @@
         },
         "bhash.native.gdbPath": {
           "type": "string",
-          "default": "gdb",
+          "default": "",
           "scope": "machine",
-          "description": "GDB 12+ with Python 3 support on the Linux/WSL extension host. Install using your distribution package manager. Debugging also requires Microsoft C/C++ on that host."
+          "description": "Optional debugger executable on this host. Empty automatically installs pinned GDB/Python on Windows x64 and uses gdb on Linux/WSL. Debugging requires Microsoft C/C++ on the same host."
         }
       }
     },
@@ -291,7 +291,7 @@
               "bhashNative": {
                 "type": "boolean",
                 "default": false,
-                "description": "Build Bhash input with --target native --debug before launching GDB (Linux/WSL only)."
+                "description": "Build Bhash input with --target native --debug before launching GDB (Windows x64 or Linux/WSL)."
               },
               "bhashInput": {
                 "type": "string",
@@ -302,12 +302,12 @@
         },
         "configurationSnippets": [
           {
-            "label": "Bhash: Native (Linux/WSL)",
+            "label": "Bhash: Native",
             "description": "Compile and debug a Bhash project with GDB. Requires Microsoft C/C++.",
             "body": {
               "type": "cppdbg",
               "request": "launch",
-              "name": "Bhash: Native (Linux/WSL)",
+              "name": "Bhash: Native",
               "bhashNative": true,
               "bhashInput": "${workspaceFolder}/bhash.project",
               "program": "${workspaceFolder}/.bhash/debug/program",
@@ -329,7 +329,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.cjs",
     "test:integration": "node test/run.cjs",
-    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.8.1.vsix"
+    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.9.0.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

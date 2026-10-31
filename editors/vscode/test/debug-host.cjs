@@ -13,6 +13,20 @@ exports.run=async()=>{
     const editor=await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
     const extension=vscode.extensions.getExtension('bhashitva.bhash');assert.ok(extension);await extension.activate();
     assert.ok(vscode.extensions.getExtension('ms-vscode.cpptools'),'real Microsoft GDB adapter installed');
+    // Debugging must coexist with editor assistance when the packaged JAR is in a Hindi path.
+    const languageReady=async()=>{
+        const deadline=Date.now()+15000;
+        while(Date.now()<deadline){
+            const symbols=await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider',uri);
+            if(symbols?.some(symbol=>symbol.name==='मुख्य'))return;
+            await new Promise(resolve=>setTimeout(resolve,100));
+        }
+        throw Error('Bhash language server did not provide the source outline from the packaged Unicode path');
+    };
+    let languageTimer;
+    try {await Promise.race([languageReady(),new Promise((_,reject)=>{languageTimer=setTimeout(()=>reject(Error('Bhash language server startup timed out')),18000);})]);}
+    finally {clearTimeout(languageTimer);}
+
     const events=[],transcript=[],outputs=[];let wake;
     const tracker=vscode.debug.registerDebugAdapterTrackerFactory('cppdbg',{createDebugAdapterTracker:()=>({
         onDidSendMessage(message){
@@ -59,7 +73,7 @@ exports.run=async()=>{
         start.dispose();
         const first=await stopped();assert.ok(session);
         const stack=await stackAt(first);
-        assert.match(stack.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);assert.equal(stack.stackFrames[0].source.path,source);
+        assert.match(stack.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);assert.equal(path.normalize(stack.stackFrames[0].source.path).toLowerCase(),path.normalize(source).toLowerCase());
         assert.equal(stack.stackFrames[0].line,marker('DEBUG_BEFORE')+1);
         const inspect=async(frame)=>{
             const scopes=await session.customRequest('scopes',{frameId:frame.id});
@@ -106,9 +120,28 @@ exports.run=async()=>{
         // Exact live=0/root snapshots are checked by test_native_inspection.py.
         assert.ok(transcript.some(m=>m.type==='event'&&m.event==='exited'&&m.body.exitCode===0));
         // The build has a per-session lifetime; never reuse a previous executable.
-        const deadline=Date.now()+5000;while(Date.now()<deadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
+        const deadline=Date.now()+10000;while(Date.now()<deadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
         await assert.rejects(fs.stat(buildDirectory));
-        console.log('PASS real VS Code/GDB DAP: source breakpoints, step in/over/out, Hindi stacks, nested variables, forced GC and cleanup.');
+        // Stopping a second paused session must release Windows executable handles,
+        // remove its own temporary build, and never reuse the first program.
+        const previousDirectory=buildDirectory,previousId=session.id;
+        events.length=0;
+        const restart=vscode.debug.onDidStartDebugSession(value=>{session=value;buildDirectory=value.configuration.bhashBuildDirectory;});
+        try {
+            assert.ok(await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0],{
+                type:'cppdbg',request:'launch',name:'Bhash stop cleanup test',bhashNative:true,bhashInput:source,cwd:workspace,stopAtEntry:false,args:[]}));
+        } finally {restart.dispose();}
+        await stopped();assert.notEqual(session.id,previousId);assert.notEqual(buildDirectory,previousDirectory);
+        const stoppedSession=session;
+        const terminated=new Promise((resolve,reject)=>{
+            const timer=setTimeout(()=>{listener.dispose();reject(Error('Stopped session did not terminate'));},30000);
+            const listener=vscode.debug.onDidTerminateDebugSession(value=>{if(value.id===stoppedSession.id){clearTimeout(timer);listener.dispose();resolve();}});
+        });
+        await vscode.debug.stopDebugging(stoppedSession);await terminated;
+        const stopDeadline=Date.now()+10000;
+        while(Date.now()<stopDeadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
+        await assert.rejects(fs.stat(buildDirectory));
+        console.log('PASS real VS Code/GDB DAP: source breakpoints, step in/over/out, Hindi stacks, nested variables, forced GC, repeat sessions and Stop cleanup.');
     } finally {
         await fs.writeFile(process.env.BHASH_DEBUG_LOG,JSON.stringify({transcript,outputs},null,2));
         vscode.debug.removeBreakpoints(points);tracker.dispose();if(session)await vscode.debug.stopDebugging(session);
