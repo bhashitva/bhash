@@ -302,3 +302,7 @@ support is unchanged; macOS debugger integration remains pending. See the
 The Windows GDB process manifest enables UTF-8 for Hindi paths (Windows 10 1903+).
 The manifest patch script is retained with the corresponding sources; debugger
 instructions and other upstream binaries are unchanged.
+
+### Windows debug terminals
+
+Version 0.9.2 creates a dedicated integrated terminal for Bhash Windows debugging and starts Microsoft’s Windows debugger launcher directly. WSL, Git Bash, PowerShell, and custom default/automation profiles do not need to be changed. User and workspace terminal settings remain untouched. Existing `cppdbg` configurations with `bhashNative: true` automatically use this path on Windows; ordinary C/C++ sessions and Linux/WSL debugging keep their existing adapters. Application output and interactive input remain in the integrated terminal.

@@ -85,6 +85,10 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python scripts/test_windows_native_batches_test.py
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $dockerService=Get-Service docker
+          if ($dockerService.Status -ne 'Running') { Start-Service docker; $dockerService.WaitForStatus('Running',[TimeSpan]::FromSeconds(60)) }
+          docker info
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           docker pull mcr.microsoft.com/windows/servercore:ltsc2022
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python scripts/test_windows_native_batches.py --windows-container
@@ -151,6 +155,10 @@ jobs:
           # Server Core has no WSL, Visual Studio, LLVM or C development SDK.
           New-Item -ItemType Directory target/clean-node -Force | Out-Null
           Copy-Item (Get-Command node.exe).Source target/clean-node/node.exe
+          $dockerService=Get-Service docker
+          if ($dockerService.Status -ne 'Running') { Start-Service docker; $dockerService.WaitForStatus('Running',[TimeSpan]::FromSeconds(60)) }
+          docker info
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           docker pull mcr.microsoft.com/windows/servercore:ltsc2022
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           docker volume create bhash-windows-cache

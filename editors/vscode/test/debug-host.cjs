@@ -7,6 +7,9 @@ const path=require('node:path');
 exports.run=async()=>{
     const workspace=process.env.BHASH_DEBUG_WORKSPACE;
     const source=path.join(workspace,'debug-inspection.bhash');
+    const settingsBefore=process.platform==='win32'?await fs.readFile(process.env.BHASH_DEBUG_SETTINGS,'utf8'):undefined;
+    const debugTerminals=[];
+    const terminalListener=vscode.window.onDidOpenTerminal(terminal=>{if(terminal.name==='Bhash: Native Debug')debugTerminals.push(terminal);});
     const lines=(await fs.readFile(source,'utf8')).split('\n');
     const marker=name=>lines.findIndex(line=>line.includes(name));
     const uri=vscode.Uri.file(source);
@@ -28,7 +31,7 @@ exports.run=async()=>{
     finally {clearTimeout(languageTimer);}
 
     const events=[],transcript=[],outputs=[];let wake;
-    const tracker=vscode.debug.registerDebugAdapterTrackerFactory('cppdbg',{createDebugAdapterTracker:()=>({
+    const tracker=vscode.debug.registerDebugAdapterTrackerFactory('*',{createDebugAdapterTracker:()=>({
         onDidSendMessage(message){
             transcript.push(message);
             if(message.type==='event'&&message.event==='stopped'){events.push(message.body);if(wake){wake();wake=undefined;}}
@@ -72,6 +75,12 @@ exports.run=async()=>{
             environment:[{name:'BHASH_GC_STRESS',value:'1'},{name:'BHASH_GC_STATS',value:'1'}],stopAtEntry:false,args:[]}));
         start.dispose();
         const first=await stopped();assert.ok(session);
+        if(process.platform==='win32'){
+            assert.equal(session.type,'bhash-native-windows','legacy Bhash cppdbg config must route to native terminal bridge');
+            assert.equal(debugTerminals.length,1);
+            assert.match(debugTerminals[0].creationOptions.shellPath,/WindowsDebugLauncher\.exe$/i);
+            assert.ok(!transcript.some(m=>m.command==='runInTerminal'),'bridge must handle terminal launch itself');
+        }
         const stack=await stackAt(first);
         assert.match(stack.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);assert.equal(path.normalize(stack.stackFrames[0].source.path).toLowerCase(),path.normalize(source).toLowerCase());
         assert.equal(stack.stackFrames[0].line,marker('DEBUG_BEFORE')+1);
@@ -141,9 +150,47 @@ exports.run=async()=>{
         const stopDeadline=Date.now()+10000;
         while(Date.now()<stopDeadline){try{await fs.stat(buildDirectory);}catch{break;}await new Promise(r=>setTimeout(r,50));}
         await assert.rejects(fs.stat(buildDirectory));
-        console.log('PASS real VS Code/GDB DAP: source breakpoints, step in/over/out, Hindi stacks, nested variables, forced GC, repeat sessions and Stop cleanup.');
+        if(process.platform==='win32'){
+            const ioSource=path.join(workspace,'console-debug.bhash');
+            const ioUri=vscode.Uri.file(ioSource);
+            const readyFile=path.join(workspace,'console-ready.txt');await fs.rm(readyFile,{force:true});
+            const resultFile=path.join(workspace,'console-result.txt');await fs.rm(resultFile,{force:true});
+            const ioPoints=[new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(2,0))),
+                new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(6,0)))];
+            points.push(...ioPoints);vscode.debug.addBreakpoints(ioPoints);events.length=0;
+            const ioStart=vscode.debug.onDidStartDebugSession(value=>{session=value;buildDirectory=value.configuration.bhashBuildDirectory;});
+            try{assert.ok(await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0],{
+                type:'bhash-native-windows',request:'launch',name:'Bhash terminal input',bhashInput:ioSource,cwd:workspace,args:[]}));}
+            finally{ioStart.dispose();}
+            const beforeInput=await stopped();assert.equal(debugTerminals.length,3);
+            console.log('PASS Windows source stepping, heap inspection, GC and Stop cleanup with incompatible profiles');
+            await session.customRequest('continue',{threadId:beforeInput.threadId});
+            // GDB can reset console input as it resumes. Wait until the inferior has
+            // resumed past its output line before typing into its terminal.
+            const inputDeadline=Date.now()+10000;let ready=false;
+            while(Date.now()<inputDeadline){try{ready=(await fs.readFile(readyFile,'utf8'))==='ready';if(ready)break;}catch{}await new Promise(r=>setTimeout(r,50));}
+            assert.ok(ready,'debuggee must resume and become ready for terminal input');
+            console.log('Windows debuggee ready for Hindi terminal input');
+            debugTerminals[2].sendText('भारत😀',true);
+            const afterInput=await stopped();const ioStack=await stackAt(afterInput);
+            assert.equal(ioStack.stackFrames[0].line,7);
+            // Validate what the inferior actually read, independently of the adapter's
+            // asynchronous Locals cache. Heap/scalar variable inspection is covered above.
+            assert.equal(await fs.readFile(resultFile,'utf8'),'भारत😀','Hindi interactive input reaches the native program exactly');
+            await vscode.debug.stopDebugging(session);
+            const terminalDeadline=Date.now()+10000;
+            while(Date.now()<terminalDeadline&&vscode.window.terminals.includes(debugTerminals[2]))await new Promise(r=>setTimeout(r,50));
+            assert.ok(!vscode.window.terminals.includes(debugTerminals[2]),'interactive session terminal is closed on Stop');
+        }
+        if(process.platform==='win32'){
+            assert.equal(await fs.readFile(process.env.BHASH_DEBUG_SETTINGS,'utf8'),settingsBefore,'terminal settings must remain byte-for-byte unchanged');
+            await assert.rejects(fs.stat(process.env.BHASH_DEBUG_SHELL_MARKER),'incompatible default/automation profile must never run');
+            assert.equal(debugTerminals.length,3,'each session gets its own terminal');
+            assert.ok(!vscode.window.terminals.includes(debugTerminals[1]),'Stop closes the active debug terminal');
+        }
+        console.log('PASS real VS Code/GDB DAP: source breakpoints, step in/over/out, Hindi stacks, nested variables, forced GC, repeat sessions, Stop cleanup, incompatible Windows terminal profiles and Hindi interactive input.');
     } finally {
         await fs.writeFile(process.env.BHASH_DEBUG_LOG,JSON.stringify({transcript,outputs},null,2));
-        vscode.debug.removeBreakpoints(points);tracker.dispose();if(session)await vscode.debug.stopDebugging(session);
+        vscode.debug.removeBreakpoints(points);tracker.dispose();terminalListener.dispose();if(session)await vscode.debug.stopDebugging(session);
     }
 };

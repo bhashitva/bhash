@@ -187,3 +187,17 @@ preflight दोनों पर लागू है; antivirus की स्व
 quarantine किया गया है, तो timeout बढ़ाने से वह निर्णय नहीं बदलता। Norton को false
 positive की समीक्षा भेजने का आधिकारिक मार्ग:
 [Submit a file or URL for review](https://support.norton.com/sp/en/us/home/current/solutions/kb20090410134005EN)।
+
+## Windows में टर्मिनल चयन (Terminal Selection)
+
+0.9.2 से Windows native debugging के लिए extension अपना integrated terminal बनाती है।
+Microsoft C/C++ का `WindowsDebugLauncher.exe` उसमें सीधे चलता है; default terminal
+WSL, Git Bash या PowerShell होने पर भी Windows debugger सही host पर शुरू होता है।
+`terminal.integrated.defaultProfile.windows` या `automationProfile.windows` बदलने की
+जरूरत नहीं है। Extension इन settings को लिखती या अस्थायी रूप से बदलती नहीं है।
+मौजूदा `cppdbg` + `bhashNative: true` launch configurations Windows में अपने आप
+Bhash के Windows adapter bridge से गुजरती हैं। सामान्य C/C++ sessions अप्रभावित रहते हैं।
+Terminal में application output देखें और `पाठपढ़ो()`/`पढ़ो()` के लिए input दें।
+Windows में यह session `bhash-native-windows` type दिखाता है; वास्तविक breakpoints,
+stepping और inspection Microsoft के GDB adapter से ही चलते हैं। WSL window में
+Linux extension host और उसका GDB उपयोग होता है।

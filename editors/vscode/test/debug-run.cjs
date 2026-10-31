@@ -11,12 +11,24 @@ const {runTests,downloadAndUnzipVSCode,resolveCliArgsFromVSCodeExecutablePath}=r
     const extensions=path.join(output,'extensions');
     const userData=path.join(output,'user-data');
     await fs.mkdir(path.join(workspace,'.vscode'),{recursive:true});
+    const incompatibleMarker=path.join(output,'incompatible-shell-used');
+    const settings=path.join(userData,'User','settings.json');
+    if(process.platform==='win32'){
+        await fs.mkdir(path.dirname(settings),{recursive:true});
+        await fs.rm(incompatibleMarker,{force:true});
+        const profile={path:process.execPath,args:['-e',`require('fs').writeFileSync(${JSON.stringify(incompatibleMarker)},'wrong shell');process.exit(42)`]};
+        await fs.writeFile(settings,JSON.stringify({
+            'terminal.integrated.profiles.windows':{'Incompatible WSL-like shell':profile},
+            'terminal.integrated.defaultProfile.windows':'Incompatible WSL-like shell',
+            'terminal.integrated.automationProfile.windows':profile}));
+    }
     await fs.writeFile(path.join(workspace,'.vscode','settings.json'),JSON.stringify({'debug.allowBreakpointsEverywhere':false}));
     await fs.copyFile(path.join(root,'examples/native/debug-inspection.bhash'),path.join(workspace,'debug-inspection.bhash'));
     // Exercise the shipped package, including script loading from a quoted Unicode
     // extension path. No source-tree-only files may be required by the debugger.
     const development=path.join(output,process.platform==='win32'?"Bhash extension हिन्दी 'quotes'":'Bhash extension हिन्दी "quotes"');
     await promisify(execFile)(process.env.BHASH_TEST_PYTHON || (process.platform==='win32'?'python':'python3'),['-m','zipfile','-e',path.join(root,'target',`bhash-vscode-${require('../package.json').version}.vsix`),development]);
+    await fs.writeFile(path.join(workspace,'console-debug.bhash'),'आयात मानक.फ़ाइल उपनाम फ;\nकार्य मुख्य() -> शून्य {\n लिखो("तैयार😀"); // IO_BEFORE\n फ.पाठलिखो("console-ready.txt","ready");\n स्थिर नाम: पाठ = पाठपढ़ो();\n फ.पाठलिखो("console-result.txt",नाम);\n लिखो(नाम); // IO_AFTER\n}\n');
     const executable=await downloadAndUnzipVSCode('stable');
     const [cli,...prefix]=resolveCliArgsFromVSCodeExecutablePath(executable,{reuseMachineInstall:true});
     const installArgs=[...prefix,'--extensions-dir',extensions,'--user-data-dir',userData,
@@ -35,5 +47,5 @@ const {runTests,downloadAndUnzipVSCode,resolveCliArgsFromVSCodeExecutablePath}=r
         extensionTestsPath:testPath(path.join(__dirname,'debug-host.cjs')),
         launchArgs:[testPath(workspace),'--extensions-dir',testPath(extensions),'--user-data-dir',testPath(userData),'--disable-workspace-trust',
             '--skip-welcome','--skip-release-notes',...(process.platform==='linux'?['--no-sandbox']:[]),'--disable-gpu'],
-        extensionTestsEnv:{BHASH_DEBUG_WORKSPACE:workspace,BHASH_DEBUG_LOG:path.join(output,'dap.log'),BHASH_NATIVE_TOOLCHAIN:'managed',BHASH_TOOLCHAIN_HOME:process.env.BHASH_TOOLCHAIN_HOME}});
+        extensionTestsEnv:{BHASH_DEBUG_WORKSPACE:workspace,BHASH_DEBUG_SETTINGS:settings,BHASH_DEBUG_SHELL_MARKER:incompatibleMarker,BHASH_DEBUG_LOG:path.join(output,'dap.log'),BHASH_NATIVE_TOOLCHAIN:'managed',BHASH_TOOLCHAIN_HOME:process.env.BHASH_TOOLCHAIN_HOME}});
 })().catch(error=>{console.error(error);process.exitCode=1;});
