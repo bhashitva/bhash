@@ -128,7 +128,10 @@ export class NativeDebugAdapter implements vscode.DebugAdapter {
             const original = this.requests.get(message.request_seq!);
             if (original === undefined) return;
             this.requests.delete(message.request_seq!); message = {...message,request_seq:original.seq};
-            if (original.watch && message.success && /^char \[-1\.\.\d+\]$/.test(message.body?.type || '')) {
+            // MIEngine flattens GDB's reserved array bounds to a length. Its
+            // error printer is unquoted; ordinary literal/managed text is quoted.
+            if (original.watch && message.success && /^char \[(?:-1\.\.)?\d+\]$/.test(message.body?.type || '')
+                && typeof message.body?.result === 'string' && message.body.result.startsWith('Bhash Watch: ')) {
                 message = {...message,success:false,message:String(message.body?.result || 'Bhash Watch: evaluation failed.'),body:undefined};
             }
         }
