@@ -159,12 +159,22 @@ class BhashWatchFailure:
         return bytes(int(self.original[i]) & 255 for i in range(low, high)).decode('utf-8', 'replace')
 
 
+class BhashWatchLiteral(BhashWatchFailure):
+    def to_string(self):
+        return json.dumps(super().to_string(), ensure_ascii=False)
+
+
 def lookup(original):
     # A host-only char array with a reserved lower bound carries an evaluation
     # failure through MI var-create, which can otherwise swallow Python errors.
-    # Bhash managed arrays are OBJECT pointers; ordinary literal strings start at 0.
-    if original.type.code == gdb.TYPE_CODE_ARRAY and str(original.type.target()) == 'char' and original.type.range()[0] == -1:
-        return BhashWatchFailure(original)
+    # Bhash managed arrays are OBJECT pointers. Bound -2 instead marks a host-side
+    # quoted literal, so text resembling an error remains an ordinary value.
+    if original.type.code == gdb.TYPE_CODE_ARRAY and str(original.type.target()) == 'char':
+        lower = original.type.range()[0]
+        if lower == -1:
+            return BhashWatchFailure(original)
+        if lower == -2:
+            return BhashWatchLiteral(original)
     kind = {'पाठ': 'TEXT', 'वस्तु': 'OBJECT', 'सर्ववस्तु': 'ANY'}.get(str(original.type))
     if not kind:
         return None
@@ -337,8 +347,10 @@ class BhashWatchFunction(gdb.Function):
             if result.kind == 'NULL':
                 return reference(0, 'OBJECT')
             if result.kind == 'LITERAL_TEXT':
-                # Host-side value: GDB does not write this into the inferior.
-                return gdb.Value(result.data)
+                # A host-only array and explicit printer preserve quoted text in
+                # MIEngine, which otherwise reduces string literals to an array size.
+                content = result.data.encode('utf-8') + b'\0'
+                return gdb.Value(content, gdb.lookup_type('char').array(-2, len(content) - 3))
             if result.kind == 'BOOL':
                 return gdb.Value(result.data)
             typename = {'INT': 'long long', 'INT32': 'int', 'BYTE': 'unsigned char',
