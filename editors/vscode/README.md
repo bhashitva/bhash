@@ -40,8 +40,7 @@ the ordinary managed native SDK supplies LLVM automatically.
 
 Source breakpoints, step into/over/out, Hindi call stacks and scalar/text/object/
 collection inspection are supported. Inspection reads memory without calling program
-functions or changing GC roots. Windows/macOS native build/run are unchanged; debugger
-integration starts with Linux/WSL. See the [Hindi debugging guide](../../docs/native-vscode-debug.md)
+functions or changing GC roots. Windows debugging is also available; macOS editor debugging remains pending. See the [Hindi debugging guide](../../docs/native-vscode-debug.md)
 for launch configurations, limits, GC safety and troubleshooting.
 
 ## Features
@@ -311,4 +310,28 @@ instructions and other upstream binaries are unchanged.
 
 ### Windows debug terminals
 
-Version 0.9.2 creates a dedicated integrated terminal for Bhash Windows debugging and starts Microsoft’s Windows debugger launcher directly. WSL, Git Bash, PowerShell, and custom default/automation profiles do not need to be changed. User and workspace terminal settings remain untouched. Existing `cppdbg` configurations with `bhashNative: true` automatically use this path on Windows; ordinary C/C++ sessions and Linux/WSL debugging keep their existing adapters. Application output and interactive input remain in the integrated terminal.
+Version 0.9.2 creates a dedicated integrated terminal for Bhash Windows debugging and starts Microsoft’s Windows debugger launcher directly. WSL, Git Bash, PowerShell, and custom default/automation profiles do not need to be changed. User and workspace terminal settings remain untouched. Existing `cppdbg` configurations with `bhashNative: true` automatically use this path on Windows; ordinary C/C++ sessions keep their existing adapters. Application output and interactive input remain in the integrated terminal.
+
+
+## Bhash Watch expressions on Windows and Linux/WSL
+
+Version 0.10.0 accepts Bhash syntax in the **Watch** pane and debugger hover. Pause at a
+Bhash breakpoint, click **+** under Watch, and enter expressions such as
+`वस्तु.अंक + अंक[१]`, `शब्द["साझा"].विरासत`, `सरणी[१]`, or `भिन्न * २.०`.
+Fields, arrays/lists/maps/byte buffers, numeric and boolean operators, text equality,
+`सत्य`/`असत्य`/`रिक्त`, ASCII/Devanagari literals and parentheses are supported.
+Reference results remain expandable. Values refresh in the selected stopped frame.
+
+Evaluation reads the paused process and computes in the debugger. Calls, assignments,
+construction, casts, text concatenation, text indexing, static member access and
+structural comparisons of distinct records are rejected. There are limits of 4,096
+UTF-8 expression bytes, 256 syntax nodes, 48 nesting levels, 1 MiB of memory reads and
+1,000 map entries per lookup. Missing variables/keys and invalid indices report errors.
+The explicit **Debug Console** continues to accept advanced GDB/C syntax; it does not
+use the Bhash Watch grammar. Inferior calls remain disabled. Conditional breakpoints
+also retain GDB syntax.
+
+Linux/WSL Bhash sessions now use type `bhash-native`; Windows retains
+`bhash-native-windows`. Existing `cppdbg` configurations with `bhashNative: true` route
+automatically; no terminal settings need changing. See the
+[Hindi Watch reference](../../docs/native-vscode-debug.md#भाष-अभिव्यक्तियाँ-watch-expressions).
