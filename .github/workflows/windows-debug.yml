@@ -67,6 +67,8 @@ jobs:
           if ($catalog.sha256 -ne $candidate.sha256) { throw 'Debugger release is not reproducible from the package lock' }
           mvn --batch-mode --no-transfer-progress package -DskipTests
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          mvn --batch-mode --no-transfer-progress '-Dtest=ManagedDebuggerTest' test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm ci --prefix editors/vscode --no-audit --no-fund
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm run package --prefix editors/vscode
