@@ -1,0 +1,44 @@
+name: Bhash cross-target performance baseline
+on:
+  workflow_dispatch:
+  push:
+    branches: ['perf/**']
+  pull_request:
+    paths: ['benchmarks/**', '.github/workflows/performance.yml']
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      BHASH_NATIVE_TOOLCHAIN: system
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install LLVM build tools
+        run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18 build-essential binutils
+      - name: Build unchanged release compiler
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Test benchmark accounting and reference validation
+        run: python3 -m unittest discover -s benchmarks -p 'test_*.py'
+      - name: Collect baseline on the same machine for all targets
+        run: python3 benchmarks/run.py
+      - name: Publish comparison in job summary
+        if: success()
+        run: cat target/benchmarks/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bhash-performance-${{ github.run_id }}
+          path: target/benchmarks/
+          retention-days: 30
+          if-no-files-found: error
