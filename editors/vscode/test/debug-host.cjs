@@ -153,18 +153,26 @@ exports.run=async()=>{
         if(process.platform==='win32'){
             const ioSource=path.join(workspace,'console-debug.bhash');
             const ioUri=vscode.Uri.file(ioSource);
-            const ioPoints=[new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(1,0))),
-                new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(3,0)))];
+            const readyFile=path.join(workspace,'console-ready.txt');await fs.rm(readyFile,{force:true});
+            const ioPoints=[new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(2,0))),
+                new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(5,0)))];
             points.push(...ioPoints);vscode.debug.addBreakpoints(ioPoints);events.length=0;
             const ioStart=vscode.debug.onDidStartDebugSession(value=>{session=value;buildDirectory=value.configuration.bhashBuildDirectory;});
             try{assert.ok(await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0],{
                 type:'bhash-native-windows',request:'launch',name:'Bhash terminal input',bhashInput:ioSource,cwd:workspace,args:[]}));}
             finally{ioStart.dispose();}
             const beforeInput=await stopped();assert.equal(debugTerminals.length,3);
+            console.log('PASS Windows source stepping, heap inspection, GC and Stop cleanup with incompatible profiles');
             await session.customRequest('continue',{threadId:beforeInput.threadId});
+            // GDB can reset console input as it resumes. Wait until the inferior has
+            // resumed past its output line before typing into its terminal.
+            const inputDeadline=Date.now()+10000;let ready=false;
+            while(Date.now()<inputDeadline){try{ready=(await fs.readFile(readyFile,'utf8'))==='ready';if(ready)break;}catch{}await new Promise(r=>setTimeout(r,50));}
+            assert.ok(ready,'debuggee must resume and become ready for terminal input');
+            console.log('Windows debuggee ready for Hindi terminal input');
             debugTerminals[2].sendText('भारत😀',true);
             const afterInput=await stopped();const ioStack=await stackAt(afterInput);
-            assert.equal(ioStack.stackFrames[0].line,4);
+            assert.equal(ioStack.stackFrames[0].line,6);
             const ioScopes=await session.customRequest('scopes',{frameId:ioStack.stackFrames[0].id});
             const ioValues=[];for(const scope of ioScopes.scopes.filter(s=>!s.expensive))
                 ioValues.push(...(await session.customRequest('variables',{variablesReference:scope.variablesReference})).variables);

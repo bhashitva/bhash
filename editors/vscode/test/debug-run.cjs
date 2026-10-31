@@ -28,7 +28,7 @@ const {runTests,downloadAndUnzipVSCode,resolveCliArgsFromVSCodeExecutablePath}=r
     // extension path. No source-tree-only files may be required by the debugger.
     const development=path.join(output,process.platform==='win32'?"Bhash extension हिन्दी 'quotes'":'Bhash extension हिन्दी "quotes"');
     await promisify(execFile)(process.env.BHASH_TEST_PYTHON || (process.platform==='win32'?'python':'python3'),['-m','zipfile','-e',path.join(root,'target',`bhash-vscode-${require('../package.json').version}.vsix`),development]);
-    await fs.writeFile(path.join(workspace,'console-debug.bhash'),'कार्य मुख्य() -> शून्य {\n लिखो("तैयार😀"); // IO_BEFORE\n स्थिर नाम: पाठ = पाठपढ़ो();\n लिखो(नाम); // IO_AFTER\n}\n');
+    await fs.writeFile(path.join(workspace,'console-debug.bhash'),'आयात मानक.फ़ाइल उपनाम फ;\nकार्य मुख्य() -> शून्य {\n लिखो("तैयार😀"); // IO_BEFORE\n फ.पाठलिखो("console-ready.txt","ready");\n स्थिर नाम: पाठ = पाठपढ़ो();\n लिखो(नाम); // IO_AFTER\n}\n');
     const executable=await downloadAndUnzipVSCode('stable');
     const [cli,...prefix]=resolveCliArgsFromVSCodeExecutablePath(executable,{reuseMachineInstall:true});
     const installArgs=[...prefix,'--extensions-dir',extensions,'--user-data-dir',userData,
