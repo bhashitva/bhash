@@ -2,9 +2,10 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import {access} from 'node:fs/promises';
-import {WindowsDebugAdapter} from './windows-debug-adapter';
+import {NativeDebugAdapter} from './windows-debug-adapter';
 
 const windowsDebugType = 'bhash-native-windows';
+const nativeDebugType = 'bhash-native';
 import {DebugOptions, prepareNativeDebug, removeDebugBuild, requireDebugHost} from './native-debug';
 import {NativeOptions} from './native';
 
@@ -30,7 +31,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
     };
     const provider: vscode.DebugConfigurationProvider = {
         async resolveDebugConfigurationWithSubstitutedVariables(folder, configuration, token) {
-            if (configuration.bhashNative !== true && configuration.type !== windowsDebugType) return configuration; // Leave C/C++ sessions alone.
+            if (configuration.bhashNative !== true && configuration.type !== windowsDebugType && configuration.type !== nativeDebugType) return configuration; // Leave C/C++ sessions alone.
             let directory: string | undefined;
             try {
                 if (!vscode.workspace.isTrusted) throw Error('Trust the workspace before building or debugging Bhash programs.');
@@ -66,7 +67,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
                 } finally {cancellation?.dispose();}
                 directory = result.directory; builds.add(directory);
                 abort.signal.throwIfAborted();
-                return {...configuration, type: process.platform === 'win32' ? windowsDebugType : 'cppdbg', bhashNative: true, request: 'launch', MIMode: 'gdb',
+                return {...configuration, type: process.platform === 'win32' ? windowsDebugType : nativeDebugType, bhashNative: true, request: 'launch', MIMode: 'gdb',
                     program: result.program, cwd, miDebuggerPath: result.gdb,
                     // Load only our explicit printer, with user/system init and ELF auto-load disabled.
                     miDebuggerArgs: result.debuggerArgs.map(argument => JSON.stringify(argument)).join(' '),
@@ -80,17 +81,18 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
     };
     context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('cppdbg', provider));
     context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider(windowsDebugType, provider));
-    context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory(windowsDebugType, {
+    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider(nativeDebugType, provider));
+    for (const type of [windowsDebugType, nativeDebugType]) context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory(type, {
         async createDebugAdapterDescriptor(session) {
             try {
             requireDebugHost();
-            if (process.platform !== 'win32') throw Error('The Windows Bhash adapter requires a Windows extension host.');
             const cpp = vscode.extensions.getExtension('ms-vscode.cpptools');
             if (!cpp) throw Error('Install Microsoft C/C++ on this extension host.');
             await cpp.activate();
-            const adapter = path.join(cpp.extensionPath,'debugAdapters','bin','OpenDebugAD7.exe');
-            await access(adapter); await access(path.join(path.dirname(adapter),'WindowsDebugLauncher.exe'));
-            return new vscode.DebugAdapterInlineImplementation(new WindowsDebugAdapter(adapter, {
+            const adapter = path.join(cpp.extensionPath,'debugAdapters','bin',process.platform === 'win32' ? 'OpenDebugAD7.exe' : 'OpenDebugAD7');
+            await access(adapter);
+            if (process.platform === 'win32') await access(path.join(path.dirname(adapter),'WindowsDebugLauncher.exe'));
+            return new vscode.DebugAdapterInlineImplementation(new NativeDebugAdapter(adapter, {
                 cwd: session.configuration.cwd,
                 terminal: options=>vscode.window.createTerminal(options),
                 closed: listener=>vscode.window.onDidCloseTerminal(listener),
@@ -112,7 +114,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
             requireDebugHost();
             if (!await hasDebugger()) return;
             const {input, folder} = await services.activeInput();
-            await vscode.debug.startDebugging(folder, {type: process.platform === 'win32' ? windowsDebugType : 'cppdbg', request: 'launch', name: 'Bhash: Native',
+            await vscode.debug.startDebugging(folder, {type: process.platform === 'win32' ? windowsDebugType : nativeDebugType, request: 'launch', name: 'Bhash: Native',
                 bhashNative: true, bhashInput: input, cwd: folder?.uri.fsPath || path.dirname(input),
                 stopAtEntry: false, args: []});
         } catch (error) {void vscode.window.showErrorMessage('Bhash native debug: ' + String(error));}

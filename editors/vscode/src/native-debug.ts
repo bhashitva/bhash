@@ -24,7 +24,8 @@ export function gdbSetup(script: string) {
         {text: 'set may-call-functions off'},
         // GDB's `source` treats surrounding quotes as part of the filename.
         // A Python literal handles spaces, quotes and Devanagari paths instead.
-        {text: 'python exec(compile(open(' + JSON.stringify(script) + ', "rb").read(), ' + JSON.stringify(script) + ', "exec"))'},
+        ...[path.join(path.dirname(script),'bhash_watch.py'), script].map(file=>({text:
+            'python exec(compile(open(' + JSON.stringify(file) + ', "rb").read(), ' + JSON.stringify(file) + ', "exec"))'})),
         {text: '-enable-pretty-printing'},
         {text: '-enable-frame-filters'},
         {text: 'skip -rfu ^bh_'},

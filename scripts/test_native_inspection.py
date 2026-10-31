@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 from native_debug_support import compiler, gdb, gdb_arguments
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,6 +68,33 @@ for repetition in range(20):
     assert bool(local('सच्चा')) and float(local('भिन्न')) == 3.5
     record = children('अभिलेखमान')
     assert int(record['व']) == 55 and 'अभिलेख😀' in lookup(record['नाम']).to_string()
+    def watch(expression):
+        encoded = base64.b64encode(expression.encode('utf-8')).decode('ascii')
+        return gdb.parse_and_eval('$bhash_watch("' + encoded + '")')
+    for expression, expected in [('वस्तु.अंक + अंक[१]', 84), ('सरणी[१]', 11),
+                                 ('शब्द["साझा"].विरासत', 9), ('बफ़र[०] + १', 66),
+                                 ('अभिलेखमान.व', 55), ('-७ / ३', -2),
+                                 ('-१ >>> १', 9223372036854775807)]:
+        assert int(watch(expression)) == expected, expression
+    assert bool(watch('वस्तु.अगली == वस्तु'))
+    assert bool(watch('रिक्तमान == रिक्त'))
+    assert bool(watch('नान != नान'))
+    assert bool(watch('नानडिब्बा == नानदूसरा'))
+    assert not bool(watch('डिब्बा == छोटाडिब्बा'))
+    assert lookup(watch('"भारत"')).to_string() == '"भारत"'
+    assert lookup(watch('""')).to_string() == '""'
+    assert lookup(watch('"भारत😀\\u0000भाष"')).to_string() == '"भारत😀\\u0000भाष"'
+    assert bool(watch('पाठ्य == "भारत😀\\u0000भाष"'))
+    assert float(watch('भिन्न * २.०')) == 7.0
+    assert int(watch('वस्तु.अगली')) == int(local('वस्तु'))
+    assert 'भारत😀' in lookup(watch('वस्तु.नाम')).to_string()
+    for invalid in ('वस्तु.अंक = 99', 'दुगुना(२)', 'अंक[-१]', 'अंक[२०]',
+                    'शब्द["अनुपलब्ध"]', 'रिक्तमान.अंक', '१ / ०',
+                    '१.० + १', '-exec set variable allocations=0',
+                    'अभिलेखमान == अभिलेखप्रतिलिपि'):
+        failure = watch(invalid)
+        assert failure.type.code == gdb.TYPE_CODE_ARRAY and failure.type.range()[0] == -1, invalid
+        assert lookup(failure).to_string().startswith('Bhash Watch: '), invalid
 assert before_counts == tuple(int(gdb.parse_and_eval(n)) for n in ('allocations', 'collections', 'live_objects')), 'inspection allocated or collected'
 assert before_roots == roots_snapshot(), 'inspection changed precise roots'
 if 'previous_collections' in globals():
@@ -77,6 +105,7 @@ print('PASS inspection, immutable roots, no allocations, UTF-8/NUL, cycles, coll
 
 
 def main():
+    run([sys.executable, ROOT / "editors/vscode/test/watch_test.py"])
     OUT.mkdir(parents=True, exist_ok=True)
     program = OUT / ('inspection.exe' if os.name == 'nt' else 'inspection')
     run(compiler(ROOT, ['compile', SOURCE,
@@ -84,7 +113,9 @@ def main():
     markers = {name: next(i for i, line in enumerate(SOURCE.read_text(encoding='utf-8').splitlines(), 1)
                           if name in line) for name in ('DEBUG_BEFORE', 'DEBUG_AFTER', 'DEBUG_INNER')}
     commands = 'set pagination off\nset confirm off\nset disable-randomization off\nset charset UTF-8\nset language c\n'
-    commands += 'set may-call-functions off\n' + python_command('exec(compile(open(' + repr(str(PRINTER)) + ', "rb").read(), ' + repr(str(PRINTER)) + ', "exec"))')
+    commands += 'set may-call-functions off\n'
+    for helper in (PRINTER.with_name('bhash_watch.py'), PRINTER):
+        commands += python_command('exec(compile(open(' + repr(str(helper)) + ', "rb").read(), ' + repr(str(helper)) + ', "exec"))')
     commands += 'skip -rfu ^bh_\nskip -rfu ^bhash_\n'
     commands += 'break ' + json.dumps(SOURCE.as_posix()) + ':' + str(markers['DEBUG_BEFORE']) + '\n'
     commands += 'break ' + json.dumps(SOURCE.as_posix()) + ':' + str(markers['DEBUG_AFTER']) + '\nrun\n'

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0
+
+- Evaluate read-only Bhash expressions in Watch and hover on Windows x64 and Linux/WSL: Hindi names, fields, collection indices, scalar arithmetic, comparisons and short-circuit logic.
+- Keep evaluation inside GDB Python with bounded reads and no inferior calls, writes, allocations or cached heap references. Report unsupported expressions and invalid indices clearly.
+- Validate repeated Watch evaluation before and after forced GC, including unchanged allocation counters and exact GC roots, plus actual Windows/Linux VS Code sessions.
+
 ## 0.9.3
 
 - Replace affected minimatch versions with 11.0.1 for the language client and extension packaging tools (GHSA-g3hv-75wg-m249).

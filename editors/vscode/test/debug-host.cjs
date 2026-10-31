@@ -81,6 +81,7 @@ exports.run=async()=>{
             assert.match(debugTerminals[0].creationOptions.shellPath,/WindowsDebugLauncher\.exe$/i);
             assert.ok(!transcript.some(m=>m.command==='runInTerminal'),'bridge must handle terminal launch itself');
         }
+        assert.equal(session.type,process.platform==='win32'?'bhash-native-windows':'bhash-native');
         const stack=await stackAt(first);
         assert.match(stack.stackFrames[0].name,/^मुख्य(?:\(.*\))?$/);assert.equal(path.normalize(stack.stackFrames[0].source.path).toLowerCase(),path.normalize(source).toLowerCase());
         assert.equal(stack.stackFrames[0].line,marker('DEBUG_BEFORE')+1);
@@ -101,9 +102,19 @@ exports.run=async()=>{
             assert.ok((await child('सरणी')).some(v=>v.value==='11'));
             assert.ok((await child('बफ़र')).some(v=>v.value==='65'));
             assert.ok((await child('अभिलेखमान')).some(v=>v.name==='व'&&v.value==='55'));
+            for(const [expression,expected] of [['वस्तु.अंक + अंक[१]','84'],['शब्द["साझा"].विरासत','9'],['सरणी[१]','11'],['बफ़र[०] + १','66'],['अभिलेखमान.व','55']]) {
+                const result=await session.customRequest('evaluate',{expression,frameId:frame.id,context:'watch'});
+                assert.equal(result.result,expected,JSON.stringify(result));
+            }
+            const watched=await session.customRequest('evaluate',{expression:'वस्तु.अगली',frameId:frame.id,context:'watch'});
+            assert.ok(watched.variablesReference>0,'reference-valued Watches remain expandable');
+            for(const expression of ['वस्तु.अंक = 99','दुगुना(२)','अंक[-१]','-exec set variable allocations=0'])
+                await assert.rejects(session.customRequest('evaluate',{expression,frameId:frame.id,context:'watch'}),/Bhash Watch:/,expression);
+            assert.match((await session.customRequest('evaluate',{expression:'"Bhash Watch: user text"',frameId:frame.id,context:'watch'})).result,/Bhash Watch: user text/,'user text must not be mistaken for an error');
+            assert.equal((await session.customRequest('evaluate',{expression:'वस्तु.अंक + अंक[१]',frameId:frame.id,context:'hover'})).result,'84');
         };
         await inspect(stack.stackFrames[0]);
-        const initialCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:stack.stackFrames[0].id,context:'watch'})).result);
+        const initialCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:stack.stackFrames[0].id,context:'repl'})).result);
         assert.ok(Number.isFinite(initialCollections));
         await session.customRequest('stepIn',{threadId:first.threadId});const into=await stopped();
         const inner=await stackAt(into);
@@ -111,6 +122,8 @@ exports.run=async()=>{
         const parameterScopes=await session.customRequest('scopes',{frameId:inner.stackFrames[0].id});
         const parameters=[];for(const scope of parameterScopes.scopes.filter(s=>!s.expensive))parameters.push(...(await session.customRequest('variables',{variablesReference:scope.variablesReference})).variables);
         assert.ok(parameters.some(v=>v.name==='मूल'&&v.value==='21'),'arguments must be valid at the first source stop');
+        assert.equal((await session.customRequest('evaluate',{expression:'मूल * २',frameId:inner.stackFrames[0].id,context:'watch'})).result,'42');
+        assert.equal((await session.customRequest('evaluate',{expression:'वस्तु.अंक',frameId:inner.stackFrames.find(f=>/^मुख्य(?:\(.*\))?$/.test(f.name)).id,context:'watch'})).result,'42','Watch must use the requested caller frame');
         await session.customRequest('next',{threadId:into.threadId});const next=await stopped();
         const advanced=await stackAt(next);assert.match(advanced.stackFrames[0].name,/दुगुना/);
         await session.customRequest('stepOut',{threadId:next.threadId});const out=await stopped();
@@ -118,7 +131,7 @@ exports.run=async()=>{
         await session.customRequest('continue',{threadId:out.threadId});const after=await stopped();
         const finalStack=await stackAt(after);
         assert.equal(finalStack.stackFrames[0].line,marker('DEBUG_AFTER')+1);await inspect(finalStack.stackFrames[0]);
-        const finalCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:finalStack.stackFrames[0].id,context:'watch'})).result);
+        const finalCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:finalStack.stackFrames[0].id,context:'repl'})).result);
         assert.ok(finalCollections>initialCollections+200,'forced collections must occur between inspections');
         const ended=new Promise((resolve,reject)=>{
             const timer=setTimeout(()=>{listener.dispose();reject(Error('Debug program did not terminate'));},30000);

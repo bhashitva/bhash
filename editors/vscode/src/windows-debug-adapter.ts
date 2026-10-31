@@ -63,13 +63,14 @@ interface Services {
 }
 
 // A separate debug type avoids replacing C/C++'s registered adapter factory. All debugging
-// still uses its installed OpenDebugAD7/GDB implementation; only runInTerminal is handled here.
-export class WindowsDebugAdapter implements vscode.DebugAdapter {
+// still uses its installed OpenDebugAD7/GDB implementation. This bridge encodes automatic
+// Bhash evaluations and handles Windows terminal requests; Linux terminals go to VS Code.
+export class NativeDebugAdapter implements vscode.DebugAdapter {
     private child: ChildProcessWithoutNullStreams;
     private listeners = new Set<(message: Message)=>void>();
     private inputSeq = 0;
     private outputSeq = 0;
-    private requests = new Map<number,{seq: number; command: string}>();
+    private requests = new Map<number,{seq: number; command: string; watch: boolean}>();
     private reverse = new Map<number,number>();
     private terminals = new Set<Terminal>();
     private closed: vscode.Disposable;
@@ -81,7 +82,7 @@ export class WindowsDebugAdapter implements vscode.DebugAdapter {
         const disposable = {dispose:()=>{this.listeners.delete(bound);}};
         disposables?.push(disposable); return disposable;
     };
-    constructor(adapter: string, private services: Services, private launcher = path.win32.join(path.win32.dirname(adapter),'WindowsDebugLauncher.exe'),
+    constructor(adapter: string, private services: Services, private launcher: string | undefined = process.platform === 'win32' ? path.win32.join(path.win32.dirname(adapter),'WindowsDebugLauncher.exe') : undefined,
         start: (command: string)=>ChildProcessWithoutNullStreams = command=>spawn(command,[],{stdio:'pipe',windowsHide:true})) {
         this.closed = services.closed(terminal=>{if (this.terminals.delete(terminal) && !this.exited) this.fail('The Bhash debug terminal was closed.');});
         this.child = start(adapter);
@@ -94,9 +95,17 @@ export class WindowsDebugAdapter implements vscode.DebugAdapter {
     }
     handleMessage(message: Message) {
         if (this.disposed) return;
+        if (message.type === 'request' && message.command === 'evaluate' && message.arguments?.context !== 'repl') {
+            const expression = message.arguments?.expression;
+            if (typeof expression !== 'string' || Buffer.byteLength(expression,'utf8') > 4096) {
+                this.emit({seq:0,type:'response',request_seq:message.seq,command:'evaluate',success:false,message:'Bhash Watch: expression exceeds 4096 UTF-8 bytes.'});
+                return;
+            }
+            message = {...message,arguments:{...message.arguments,expression:'$bhash_watch("' + Buffer.from(expression,'utf8').toString('base64') + '")'}};
+        }
         const forwarded = {...message,seq:++this.inputSeq};
         if (message.type === 'request') {
-            this.requests.set(forwarded.seq,{seq:message.seq,command:message.command!});
+            this.requests.set(forwarded.seq,{seq:message.seq,command:message.command!,watch:message.command === 'evaluate' && message.arguments?.context !== 'repl'});
             if (message.command === 'initialize') forwarded.arguments = {...message.arguments,adapterID:'cppdbg'};
             if (message.command === 'launch') forwarded.arguments = {...message.arguments,type:'cppdbg'};
         } else if (message.type === 'response') {
@@ -114,11 +123,17 @@ export class WindowsDebugAdapter implements vscode.DebugAdapter {
     }
     private receive(message: Message) {
         if (this.disposed) return;
-        if (message.type === 'request' && message.command === 'runInTerminal') {void this.runTerminal(message); return;}
+        if (this.launcher && message.type === 'request' && message.command === 'runInTerminal') {void this.runTerminal(message); return;}
         if (message.type === 'response') {
             const original = this.requests.get(message.request_seq!);
             if (original === undefined) return;
             this.requests.delete(message.request_seq!); message = {...message,request_seq:original.seq};
+            // MIEngine flattens GDB's reserved array bounds to a length. Its
+            // error printer is unquoted; ordinary literal/managed text is quoted.
+            if (original.watch && message.success && /^char \[(?:-1\.\.)?\d+\]$/.test(message.body?.type || '')
+                && typeof message.body?.result === 'string' && message.body.result.startsWith('Bhash Watch: ')) {
+                message = {...message,success:false,message:String(message.body?.result || 'Bhash Watch: evaluation failed.'),body:undefined};
+            }
         }
         if (message.type === 'event' && message.event === 'exited') this.exited = true;
         if (message.type === 'request') this.reverse.set(this.outputSeq+1,message.seq);
@@ -127,7 +142,7 @@ export class WindowsDebugAdapter implements vscode.DebugAdapter {
     private async runTerminal(message: Message) {
         let terminal: Terminal | undefined;
         try {
-            terminal = this.services.terminal(windowsDebugTerminal(message.arguments,this.launcher,this.services.cwd));
+            terminal = this.services.terminal(windowsDebugTerminal(message.arguments,this.launcher!,this.services.cwd));
             this.terminals.add(terminal); terminal.show(true);
             const pid = await terminal.processId;
             if (this.disposed) {terminal.dispose(); return;}
@@ -153,3 +168,6 @@ export class WindowsDebugAdapter implements vscode.DebugAdapter {
         this.child.stdin.end(); this.child.kill(); this.listeners.clear();
     }
 }
+
+// Preserve the original internal export for callers testing the Windows terminal bridge.
+export {NativeDebugAdapter as WindowsDebugAdapter};

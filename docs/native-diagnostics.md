@@ -63,11 +63,11 @@ gdb build/debugging
 Source tree दूसरी जगह हो तो GDB का `set substitute-path OLD NEW` उपयोग करें। Debug
 metadata source paths रखता है; source files executable में embed नहीं होतीं।
 
-Named scalar parameters/locals और reference slots DWARF में उपलब्ध हैं। Linux/WSL
-VS Code integration अब read-only text previews, object fields, collections और boxing
-के pretty-printers जोड़ता है; [native VS Code debugging](native-vscode-debug.md) में
-setup, limits और forced-GC validation देखें। Bhash expression evaluation और reference
-editing अभी शामिल नहीं हैं। Generated protected callbacks machine backtrace में
+Named scalar parameters/locals और reference slots DWARF में उपलब्ध हैं। Windows/Linux/WSL
+VS Code integration read-only text previews, object fields, collections और boxing
+के pretty-printers तथा bounded Bhash Watch expressions जोड़ता है; [native VS Code debugging](native-vscode-debug.md) में
+setup, Watch examples, limits और forced-GC validation देखें। Function calls, assignments
+और reference editing समर्थित नहीं हैं। Generated protected callbacks machine backtrace में
 artificial helper frames हो सकती हैं; VS Code में उनका Bhash label रहता है। Lexical
 shadowing वाली locals फिलहाल function/helper scope में दिखाई देती हैं।
 

@@ -96,8 +96,48 @@ blank lines या generated constructor paths पर GDB नज़दीकी 
 
 Protected `प्रयास`/`पकड़ो`/`अंततः` bodies generated callbacks में चलती हैं। उनके अंदर
 source breakpoint लगाकर locals inspect कर सकते हैं। Runtime boundary पर सामान्य GDB
-stepping पूरा protected body चला सकती है; Bhash expression evaluation और exact lexical
-scope reconstruction इस initial integration में नहीं जोड़े गए हैं।
+stepping पूरा protected body चला सकती है। Exact lexical scope reconstruction अभी सीमित है।
+
+## भाष अभिव्यक्तियाँ (Watch Expressions)
+
+0.10.0 से Windows x64 और Linux/WSL में **Watch** pane के **+** पर क्लिक करके Bhash
+expression लिखें। पहले source breakpoint पर रुकें। उदाहरण file के `DEBUG_BEFORE`
+या `DEBUG_AFTER` stop पर ये expressions जाँच सकते हैं:
+
+| अभिव्यक्ति | अर्थ / परिणाम |
+| --- | --- |
+| `वस्तु.अंक + अंक[१]` | सदस्य और सूची का मान जोड़ें: `84` |
+| `शब्द["साझा"].विरासत` | पाठ कुंजी से map lookup, फिर inherited field: `9` |
+| `सरणी[१]` | शून्य से गिनने पर दूसरा element: `11` |
+| `बफ़र[०] + १` | पहला byte और पूर्णांक जोड़ें: `66` |
+| `अभिलेखमान.व` | immutable record का field: `55` |
+| `वस्तु.अगली` | reference वापस मिलेगी; expand करके उसके fields देखें |
+| `रिक्तमान == रिक्त` | null तुलना: `true` |
+| `भिन्न * २.०` | दशमलव गणना: `7` |
+
+Selected Call Stack frame के locals/parameters और उनके fields उपलब्ध हैं। Watch/hover
+में ASCII या देवनागरी numbers, `सत्य`, `असत्य`, `रिक्त`, quoted text, parentheses,
+`+ - * / %`, comparisons, `! && ||`, bitwise operators और shifts उपयोग कर सकते हैं।
+पूर्णांक wrap, division और shift-count नियम Bhash जैसे हैं। Mixed integer/decimal
+arithmetic के लिए implicit conversion नहीं होती। `&&`/`||` short-circuit होते हैं।
+Text equality UTF-8/NUL सहित पूरी value से होती है, preview से नहीं। Boxed values को
+अलग Bhash casts के बिना arithmetic operands नहीं माना जाता; variable expansion से
+उनका मूल्य देखें। Expression result reference हो तो वह भी expandable होती है।
+
+Function/method calls, assignments, object creation, casts/type tests, text जोड़ना,
+text indexing, static access और अलग record instances की structural equality अभी
+समर्थित नहीं हैं; इनके लिए स्पष्ट error मिलता है। Map में ऐसी record कुंजी भी
+इसी सीमा के अधीन है। Missing variable/key, null dereference और out-of-range index
+error दिखाते हैं; program में exception नहीं फेंकी जाती।
+
+हर evaluation की सीमा: 4096 UTF-8 bytes, 256 syntax nodes, 48 nesting levels,
+1 MiB heap reads और map lookup में अधिकतम 1000 entries। ये सीमाएँ पार होने
+पर error आती है। Target में function call, write या allocation नहीं होती। नई stop पर
+नई values पढ़ी जाती हैं; managed addresses stops के बीच cache नहीं होते।
+
+Linux/WSL Bhash sessions `bhash-native` type उपयोग करती हैं; Windows का type
+`bhash-native-windows` है। पुराना `cppdbg` + `bhashNative: true` launch अपने आप सही
+bridge चुनता है। सामान्य C/C++ sessions का behavior नहीं बदलता।
 
 ## संग्रहकर्ता सुरक्षा (GC Safety)
 
@@ -107,12 +147,7 @@ reference slots में नहीं लिखती। Mutable managed addres
 होते; continue/step के बाद GDB नई values से printers बनाता है। Immutable executable
 schema ही cache होती है और executable/exit events पर cache खाली होती है।
 
-Automatic Watch evaluation में inferior function calls disabled हैं। Reference editing,
-arbitrary Bhash expression evaluation, conditional expressions that call functions,
-और Debug Console से runtime calls इस milestone का हिस्सा नहीं हैं। GDB C expression
-syntax को Bhash expression syntax न समझें। Manual debugger writes/commands से program
-की invariants बदल सकती हैं; इस workflow में inspection उपयोग करें। Software breakpoints
-के लिए GDB की code-memory writes चालू रहती हैं।
+Automatic Watch evaluation bundled parser से चलती है; user expression को GDB/C parser या Python eval में नहीं भेजा जाता। Inferior function calls disabled हैं। Debug Console और conditional breakpoints अभी advanced GDB/C syntax उपयोग करते हैं। Manual debugger commands program बदल सकती हैं। Software breakpoints के लिए GDB की code-memory writes चालू रहती हैं।
 
 Debug-only immutable schema version 1, runtime ABI 15 तथा retained reference typedefs
 field layouts पहचानते हैं। Normal release executables में यह schema नहीं है। Allocation
@@ -122,7 +157,7 @@ layout, collector policy, runtime fingerprint और application ownership contr
 ## सत्यापन (Validation)
 
 `scripts/test_native_inspection.py` real GDB में breakpoints, step/next/finish, Hindi
-names, text/NUL/emoji, cycles, arrays/lists/maps/buffers, boxing और null जाँचती है। हर
+names, text/NUL/emoji, cycles, arrays/lists/maps/buffers, boxing और null जाँचती है। Valid/invalid Watch expressions को बार-बार दोनों stops पर जाँचा जाता है। हर
 inspection के पहले/बाद allocation/collection counters तथा exact root-slot snapshots
 समान होने चाहिए। दूसरे stop से पहले 300 forced collections होती हैं; shutdown पर
 `live=0` चाहिए। Inferior calls के निषेध को भी जाँचा जाता है।
