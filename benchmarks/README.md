@@ -11,6 +11,7 @@ No Python packages are required. Tool installation/downloads are outside timing.
 mvn --batch-mode --no-transfer-progress -DskipTests package
 python3 -m unittest discover -s benchmarks -p 'test_*.py'
 python3 benchmarks/run.py --output target/baseline-before-optimization
+python3 benchmarks/compare.py target/baseline-before-optimization/results.json --output target/baseline-before-optimization/comparison.md
 ```
 
 For a quick conformance run use `--trials 1 --compile-trials 1 --sizes small
@@ -21,12 +22,20 @@ Warm-up is a minimum observation window, not proof the JIT has reached equilibri
 Review batch rates and increase warm-up for workloads that have not stabilized.
 Startup and generated multi-file projects are run without warm-up.
 
-The `Bhash cross-target performance baseline` workflow runs the defaults and uploads
+The `Bhash cross-target performance baseline` workflow runs the defaults on manual
+dispatch or benchmark-code pushes to `perf/**` branches, and uploads
 sources, raw observations, environment, sizes and comparison report. The benchmark
 has no speed thresholds: shared hosted-runner variability makes those premature.
 Use a dedicated, otherwise idle machine for optimization acceptance. Record power
 mode, virtualization, antivirus activity and background load separately when relevant.
 The runner never changes CPU governors, security software, ASLR or host settings.
+Pull requests run the quick conformance profile for all three targets, including
+Linux accounting tests. Its output is labelled by the recorded configuration and
+must not be used as the release performance baseline. Documentation/report-only
+pushes do not automatically repeat the full measurement campaign.
+`compare.py` can regenerate Markdown and CSV from saved data without executing any
+programs; it labels shortened conformance profiles explicitly and includes
+per-workload CPU/task, memory, target ratios and variability flags.
 
 | Measurement | Definition |
 |---|---|
