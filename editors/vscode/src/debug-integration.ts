@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as vscode from 'vscode';
 import * as path from 'node:path';
+import {access} from 'node:fs/promises';
+import {WindowsDebugAdapter} from './windows-debug-adapter';
+
+const windowsDebugType = 'bhash-native-windows';
 import {DebugOptions, prepareNativeDebug, removeDebugBuild, requireDebugHost} from './native-debug';
 import {NativeOptions} from './native';
 
@@ -26,11 +30,12 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
     };
     const provider: vscode.DebugConfigurationProvider = {
         async resolveDebugConfigurationWithSubstitutedVariables(folder, configuration, token) {
-            if (configuration.bhashNative !== true) return configuration; // Leave C/C++ sessions alone.
+            if (configuration.bhashNative !== true && configuration.type !== windowsDebugType) return configuration; // Leave C/C++ sessions alone.
             let directory: string | undefined;
             try {
                 if (!vscode.workspace.isTrusted) throw Error('Trust the workspace before building or debugging Bhash programs.');
                 requireDebugHost();
+                if (configuration.type === windowsDebugType && process.platform !== 'win32') throw Error('This debugger type requires Windows. Use cppdbg with bhashNative: true on Linux/WSL.');
                 if (folder && folder.uri.scheme !== 'file') throw Error('Native debugging requires a folder on disk on the extension host.');
                 if (!await hasDebugger()) return undefined;
                 if (configuration.request !== 'launch' || configuration.MIMode && configuration.MIMode !== 'gdb')
@@ -61,7 +66,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
                 } finally {cancellation?.dispose();}
                 directory = result.directory; builds.add(directory);
                 abort.signal.throwIfAborted();
-                return {...configuration, type: 'cppdbg', request: 'launch', MIMode: 'gdb',
+                return {...configuration, type: process.platform === 'win32' ? windowsDebugType : 'cppdbg', bhashNative: true, request: 'launch', MIMode: 'gdb',
                     program: result.program, cwd, miDebuggerPath: result.gdb,
                     // Load only our explicit printer, with user/system init and ELF auto-load disabled.
                     miDebuggerArgs: result.debuggerArgs.map(argument => JSON.stringify(argument)).join(' '),
@@ -74,8 +79,27 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
         }
     };
     context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('cppdbg', provider));
+    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider(windowsDebugType, provider));
+    context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory(windowsDebugType, {
+        async createDebugAdapterDescriptor(session) {
+            try {
+            requireDebugHost();
+            if (process.platform !== 'win32') throw Error('The Windows Bhash adapter requires a Windows extension host.');
+            const cpp = vscode.extensions.getExtension('ms-vscode.cpptools');
+            if (!cpp) throw Error('Install Microsoft C/C++ on this extension host.');
+            await cpp.activate();
+            const adapter = path.join(cpp.extensionPath,'debugAdapters','bin','OpenDebugAD7.exe');
+            await access(adapter); await access(path.join(path.dirname(adapter),'WindowsDebugLauncher.exe'));
+            return new vscode.DebugAdapterInlineImplementation(new WindowsDebugAdapter(adapter, {
+                terminal: options=>vscode.window.createTerminal(options),
+                closed: listener=>vscode.window.onDidCloseTerminal(listener),
+                log: text=>services.log(text)
+            }));
+            } catch(error) {clean(session.configuration.bhashBuildDirectory);throw error;}
+        }
+    }));
     context.subscriptions.push(vscode.debug.onDidTerminateDebugSession(session => clean(session.configuration.bhashBuildDirectory)));
-    context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory('cppdbg', {
+    context.subscriptions.push(vscode.debug.registerDebugAdapterTrackerFactory('*', {
         createDebugAdapterTracker: session => session.configuration.bhashNative === true ? {
             onError: () => clean(session.configuration.bhashBuildDirectory),
             onExit: () => clean(session.configuration.bhashBuildDirectory)
@@ -87,7 +111,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
             requireDebugHost();
             if (!await hasDebugger()) return;
             const {input, folder} = await services.activeInput();
-            await vscode.debug.startDebugging(folder, {type: 'cppdbg', request: 'launch', name: 'Bhash: Native',
+            await vscode.debug.startDebugging(folder, {type: process.platform === 'win32' ? windowsDebugType : 'cppdbg', request: 'launch', name: 'Bhash: Native',
                 bhashNative: true, bhashInput: input, cwd: folder?.uri.fsPath || path.dirname(input),
                 stopAtEntry: false, args: []});
         } catch (error) {void vscode.window.showErrorMessage('Bhash native debug: ' + String(error));}
