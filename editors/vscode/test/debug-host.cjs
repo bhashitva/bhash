@@ -109,7 +109,9 @@ exports.run=async()=>{
             const watched=await session.customRequest('evaluate',{expression:'वस्तु.अगली',frameId:frame.id,context:'watch'});
             assert.ok(watched.variablesReference>0,'reference-valued Watches remain expandable');
             for(const expression of ['वस्तु.अंक = 99','दुगुना(२)','अंक[-१]','-exec set variable allocations=0'])
-                await assert.rejects(session.customRequest('evaluate',{expression,frameId:frame.id,context:'watch'}));
+                await assert.rejects(session.customRequest('evaluate',{expression,frameId:frame.id,context:'watch'}),/Bhash Watch:/,expression);
+            assert.match((await session.customRequest('evaluate',{expression:'"Bhash Watch: user text"',frameId:frame.id,context:'watch'})).result,/Bhash Watch: user text/,'user text must not be mistaken for an error');
+            assert.equal((await session.customRequest('evaluate',{expression:'वस्तु.अंक + अंक[१]',frameId:frame.id,context:'hover'})).result,'84');
         };
         await inspect(stack.stackFrames[0]);
         const initialCollections=Number((await session.customRequest('evaluate',{expression:'collections',frameId:stack.stackFrames[0].id,context:'repl'})).result);

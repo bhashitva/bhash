@@ -98,6 +98,18 @@ test('Linux forwards terminal reverse requests to VS Code and preserves correlat
     } finally {f.adapter.dispose();}
 });
 
+test('MI host-only Watch failures become DAP errors without confusing user text with errors',()=>{
+    const f=fixture();
+    try {
+        for(const [type,success] of [['char [-1..63]',false],['char [64]',true],['पाठ',true]]) {
+            f.adapter.handleMessage({seq:71,type:'request',command:'evaluate',arguments:{expression:'"Bhash Watch: user text"',context:'watch'}});
+            f.receive({seq:22,type:'response',command:'evaluate',request_seq:f.writes.at(-1).seq,success:true,body:{result:'Bhash Watch: user text',type,variablesReference:0}});
+            assert.equal(f.events.at(-1).success,success);assert.equal(f.events.at(-1).request_seq,71);
+            if(!success)assert.equal(f.events.at(-1).message,'Bhash Watch: user text');
+        }
+    } finally {f.adapter.dispose();}
+});
+
 test('terminal start failures return a DAP error; Stop disposes active terminal and adapter',async()=>{
     const f=fixture(null);
     f.receive({seq:1,type:'request',command:'runInTerminal',arguments:args});
