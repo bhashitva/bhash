@@ -32,6 +32,7 @@ jobs:
           fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
           JS
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm audit fix --package-lock-only --ignore-scripts --no-fund
           npm ci --no-audit --no-fund
           npm ls minimatch
           npm audit --json > ../../target-security-audit.json || true
@@ -44,6 +45,7 @@ jobs:
           const audit = require('../../target-security-audit.json');
           assert.ok(audit.metadata, 'audit must complete');
           assert.equal(audit.vulnerabilities?.minimatch, undefined);
+          assert.equal(audit.metadata.vulnerabilities.total, 0);
           const {createRequire} = require('node:module');
           const clientRequire = createRequire(require.resolve('vscode-languageclient/package.json'));
           const {Minimatch} = clientRequire('minimatch');
