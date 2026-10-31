@@ -13,6 +13,20 @@ exports.run=async()=>{
     const editor=await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
     const extension=vscode.extensions.getExtension('bhashitva.bhash');assert.ok(extension);await extension.activate();
     assert.ok(vscode.extensions.getExtension('ms-vscode.cpptools'),'real Microsoft GDB adapter installed');
+    // Debugging must coexist with editor assistance when the packaged JAR is in a Hindi path.
+    const languageReady=async()=>{
+        const deadline=Date.now()+15000;
+        while(Date.now()<deadline){
+            const symbols=await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider',uri);
+            if(symbols?.some(symbol=>symbol.name==='मुख्य'))return;
+            await new Promise(resolve=>setTimeout(resolve,100));
+        }
+        throw Error('Bhash language server did not provide the source outline from the packaged Unicode path');
+    };
+    let languageTimer;
+    try {await Promise.race([languageReady(),new Promise((_,reject)=>{languageTimer=setTimeout(()=>reject(Error('Bhash language server startup timed out')),18000);})]);}
+    finally {clearTimeout(languageTimer);}
+
     const events=[],transcript=[],outputs=[];let wake;
     const tracker=vscode.debug.registerDebugAdapterTrackerFactory('cppdbg',{createDebugAdapterTracker:()=>({
         onDidSendMessage(message){
