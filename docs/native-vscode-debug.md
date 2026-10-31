@@ -131,7 +131,7 @@ text indexing, static access और अलग record instances की structural
 error दिखाते हैं; program में exception नहीं फेंकी जाती।
 
 हर evaluation की सीमा: 4096 UTF-8 bytes, 256 syntax nodes, 48 nesting levels,
-1 MiB process-memory reads और map lookup में अधिकतम 1000 entries। ये सीमाएँ पार होने
+1 MiB heap reads और map lookup में अधिकतम 1000 entries। ये सीमाएँ पार होने
 पर error आती है। Target में function call, write या allocation नहीं होती। नई stop पर
 नई values पढ़ी जाती हैं; managed addresses stops के बीच cache नहीं होते।
 
