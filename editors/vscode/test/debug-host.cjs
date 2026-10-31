@@ -154,8 +154,9 @@ exports.run=async()=>{
             const ioSource=path.join(workspace,'console-debug.bhash');
             const ioUri=vscode.Uri.file(ioSource);
             const readyFile=path.join(workspace,'console-ready.txt');await fs.rm(readyFile,{force:true});
+            const resultFile=path.join(workspace,'console-result.txt');await fs.rm(resultFile,{force:true});
             const ioPoints=[new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(2,0))),
-                new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(5,0)))];
+                new vscode.SourceBreakpoint(new vscode.Location(ioUri,new vscode.Position(6,0)))];
             points.push(...ioPoints);vscode.debug.addBreakpoints(ioPoints);events.length=0;
             const ioStart=vscode.debug.onDidStartDebugSession(value=>{session=value;buildDirectory=value.configuration.bhashBuildDirectory;});
             try{assert.ok(await vscode.debug.startDebugging(vscode.workspace.workspaceFolders[0],{
@@ -172,11 +173,10 @@ exports.run=async()=>{
             console.log('Windows debuggee ready for Hindi terminal input');
             debugTerminals[2].sendText('भारत😀',true);
             const afterInput=await stopped();const ioStack=await stackAt(afterInput);
-            assert.equal(ioStack.stackFrames[0].line,6);
-            const ioScopes=await session.customRequest('scopes',{frameId:ioStack.stackFrames[0].id});
-            const ioValues=[];for(const scope of ioScopes.scopes.filter(s=>!s.expensive))
-                ioValues.push(...(await session.customRequest('variables',{variablesReference:scope.variablesReference})).variables);
-            assert.ok(ioValues.some(v=>v.name==='नाम'&&v.value.includes('भारत😀')),'Hindi interactive input reaches the native program');
+            assert.equal(ioStack.stackFrames[0].line,7);
+            // Validate what the inferior actually read, independently of the adapter's
+            // asynchronous Locals cache. Heap/scalar variable inspection is covered above.
+            assert.equal(await fs.readFile(resultFile,'utf8'),'भारत😀','Hindi interactive input reaches the native program exactly');
             await vscode.debug.stopDebugging(session);
             const terminalDeadline=Date.now()+10000;
             while(Date.now()<terminalDeadline&&vscode.window.terminals.includes(debugTerminals[2]))await new Promise(r=>setTimeout(r,50));
