@@ -62,3 +62,21 @@ test('Windows debug preparation passes Unicode argv through Java envelope and se
  assert.equal(result.program,built);assert.equal(result.gdb,path.join(base,'gdb.exe'));
  await removeDebugBuild(result.directory);await assert.rejects(fs.stat(built));
 });
+
+
+test('GDB preflight tolerates a startup delayed beyond the old 15-second deadline',async()=>{
+ const {probeGdb}=require('../dist/native-debug.js');const {execFile}=require('node:child_process');const {promisify}=require('node:util');
+ const messages=[];
+ await probeGdb(process.execPath,undefined,undefined,text=>messages.push(text),(_command,_args,options)=>
+  promisify(execFile)(process.execPath,['-e',"setTimeout(()=>console.log('BHASH_GDB_READY:18.1:3'),16000)"],options));
+ assert.ok(messages.some(text=>text.includes('Security software')));
+});
+test('GDB preflight cancellation stops a waiting process and invalid timeouts start nothing',async()=>{
+ const {probeGdb}=require('../dist/native-debug.js');const {execFile}=require('node:child_process');const {promisify}=require('node:util');
+ const abort=new AbortController();const timer=setTimeout(()=>abort.abort(),100);
+ try {await assert.rejects(probeGdb(process.execPath,abort.signal,300,()=>{},(_command,_args,options)=>
+  promisify(execFile)(process.execPath,['-e','setTimeout(()=>{},30000)'],options)),/cancelled/);}finally{clearTimeout(timer);}
+ let called=false;
+ await assert.rejects(probeGdb(process.execPath,undefined,601,()=>{},async()=>{called=true;return {stdout:''};}),/15 to 600/);
+ assert.equal(called,false);
+});
