@@ -45,6 +45,11 @@ class BenchmarksTest(unittest.TestCase):
             self.assertGreater(result["peak_rss_bytes"], 8 * 1024 * 1024)
             self.assertGreater(result["cpu_s"], 0)
             self.assertEqual(result["stdout"][0]["text"], "ok")
+            # A large observer must not become the native application's RSS floor.
+            observer_memory = bytearray(32 * 1024 * 1024)
+            tiny = measure(["/bin/true"], root, clean_env(), 10, root / "tiny.json")
+            if tiny["peak_rss_bytes"] is not None:
+                self.assertLess(tiny["peak_rss_bytes"], len(observer_memory) // 2)
             with self.assertRaises(RuntimeError):
                 measure([sys.executable, "-c", "import time; time.sleep(20)"], root, clean_env(), .05, root / "timeout.json")
             self.assertTrue(json.loads((root / "timeout.json").read_text())["timed_out"])

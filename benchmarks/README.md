@@ -4,7 +4,7 @@ This suite measures the **same generated Bhash sources** on JVM, .NET and native
 before changing compiler or runtime performance. Measurement currently runs on
 Linux/WSL. This keeps process accounting consistent across the three targets;
 it does not establish Windows or macOS performance. Python 3.10+, Java 17+, .NET
-10 SDK, LLVM/Clang 18 and the usual Linux C development tools must already exist.
+10 SDK, LLVM/Clang 18, GNU `/usr/bin/time` and the usual Linux C development tools must already exist.
 No Python packages are required. Tool installation/downloads are outside timing.
 
 ```sh
@@ -35,7 +35,7 @@ The runner never changes CPU governors, security software, ASLR or host settings
 | CPU time | `wait4` user + system seconds; all runtime threads and waited-for child processes |
 | Sustained throughput | Completed `काम` calls divided by host monotonic measured-phase elapsed time |
 | Measured CPU/task | `/proc/PID/stat` CPU differences at batch boundaries divided by calls; OS clock-tick resolution applies |
-| Peak process RSS | Linux `wait4.ru_maxrss`; includes heap, runtime, JIT, stacks and resident mapped pages |
+| Peak process RSS | GNU time's Linux `wait4.ru_maxrss` for the application; includes heap, runtime, JIT, stacks and resident mapped pages |
 | Measured-phase memory | Median of 10 ms `/proc` RSS observations within each measured batch, then median across batches/trials |
 | Compile cost | Fresh compiler JVM, semantic analysis, lowering, backend tools, link/package, normal validation; dependencies already installed |
 | Compiler peak RSS | Largest process high-water RSS including waited-for children; **not simultaneous summed tree memory** |
@@ -69,10 +69,21 @@ Raw logs preserve exit status, stdout/checksums, stderr, elapsed/CPU time and ti
 RSS samples. `results.json` includes medians, min/max, sample counts and coefficient of
 variation. The report does not present p95/p99 from seven observations. CPU utilization
 percent is not used as an efficiency score. Missing sampled data is `null`, never zero.
+Kernel-reported zero peak RSS for a very short process is also `null`; it does not
+mean the application used no memory. Measured CPU/task uses batches with both CPU
+snapshots available and records their coverage; a process may exit before the last
+snapshot can be read.
 The host's monotonic clock measures elapsed phases; Bhash's wall clock only selects
 the batch stopping point. A clock discontinuity, unexpected output, failed checksum,
 nonzero exit, missing target/toolchain or timeout fails the run, so no success report
 can silently omit a target. Existing output directories are refused to preserve data.
+
+Each invocation uses a lightweight GNU time wrapper for peak RSS accounting, avoiding
+the Python observer's pre-exec RSS becoming a false floor for small applications.
+The sampler observes the actual application's PID, not the wrapper. Elapsed and CPU
+time include the wrapper's small overhead; seven `/bin/true` launches record the
+observer floor in `environment.json`. Do not subtract that noisy floor from results
+or interpret sub-millisecond differences in short startup measurements.
 
 Initial scope omits comparable allocation bytes/GC pause distributions, energy,
 hardware counters, PSS/USS, frontend-only stage timings, self-contained managed runtime

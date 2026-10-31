@@ -49,14 +49,26 @@ def proc_sample(pid):
 def measure(command, cwd, env, timeout, log):
     """wait4 accounts for reaped compiler children; no competing Popen.poll()."""
     lines, samples, errors = [], [], []
+    # A small GNU time launcher avoids counting the Python observer's inherited
+    # pre-exec high-water RSS against a tiny native application. Its own startup
+    # overhead remains in elapsed/CPU time and is disclosed/calibrated separately.
+    rss_log = log.with_suffix(".rss")
+    observed_command = ["/usr/bin/time", "-o", str(rss_log), "-f", "%M", "--", *command]
     start = time.perf_counter()
-    process = subprocess.Popen(command, cwd=cwd, env=env, stdout=subprocess.PIPE,
+    process = subprocess.Popen(observed_command, cwd=cwd, env=env, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, start_new_session=True)
+
+    def application_sample():
+        try:
+            children = Path(f"/proc/{process.pid}/task/{process.pid}/children").read_text().split()
+            return proc_sample(int(children[0])) if len(children) == 1 else None
+        except (FileNotFoundError, ProcessLookupError):
+            return None
 
     def read_stdout():
         for line in process.stdout:
             lines.append({"at_s": time.perf_counter() - start, "text": line.decode("utf-8", "strict").strip(),
-                          "process": proc_sample(process.pid)})
+                          "process": application_sample()})
 
     def read_stderr():
         errors.append(process.stderr.read())
@@ -74,7 +86,7 @@ def measure(command, cwd, env, timeout, log):
     waiter.start()
     timed_out = False
     while not finished.is_set():
-        sample = proc_sample(process.pid)
+        sample = application_sample()
         if sample: samples.append({"at_s": time.perf_counter() - start, **sample})
         if time.perf_counter() - start > timeout:
             timed_out = True
@@ -87,12 +99,15 @@ def measure(command, cwd, env, timeout, log):
     process.returncode = os.waitstatus_to_exitcode(status)
     for thread in threads: thread.join(timeout=10)
     process.stdout.close(); process.stderr.close()
-    record = {"command": command, "cwd": str(cwd), "wall_s": elapsed,
-              "cpu_s": usage.ru_utime + usage.ru_stime, "peak_rss_bytes": usage.ru_maxrss * 1024,
+    peak = rss_log.read_text().strip() if rss_log.exists() else ""
+    valid_rss = peak.isdecimal()
+    peak = (int(peak) * 1024 or None) if valid_rss else None
+    record = {"command": command, "measurement_command": observed_command, "cwd": str(cwd), "wall_s": elapsed,
+              "cpu_s": usage.ru_utime + usage.ru_stime, "peak_rss_bytes": peak,
               "exit_code": process.returncode, "timed_out": timed_out,
               "stdout": lines, "stderr": b"".join(errors).decode("utf-8", "replace"), "samples": samples}
     log.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-    if timed_out or process.returncode:
+    if timed_out or process.returncode or not valid_rss:
         raise RuntimeError(f"Command failed/timeout; see {log}")
     return record
 
@@ -131,10 +146,11 @@ def validate(case, record, batches):
                        "rss_median_bytes": statistics.median(memory) if memory else None})
     total_calls = sum(p["calls"] for p in phases)
     total_time = sum(p["wall_s"] for p in phases)
-    cpus = [p["cpu_s"] for p in phases]
+    cpu_phases = [p for p in phases if p["cpu_s"] is not None]
     rss = [p["rss_median_bytes"] for p in phases if p["rss_median_bytes"] is not None]
     return {"ready_s": lines[0]["at_s"], "calls_per_s": total_calls / total_time,
-            "measured_cpu_s_per_call": sum(cpus) / total_calls if all(c is not None for c in cpus) else None,
+            "measured_cpu_s_per_call": sum(p["cpu_s"] for p in cpu_phases) / sum(p["calls"] for p in cpu_phases) if cpu_phases else None,
+            "cpu_phase_coverage": len(cpu_phases) / len(phases),
             "measured_rss_median_bytes": statistics.median(rss) if rss else None, "phases": phases}
 
 
@@ -202,6 +218,7 @@ def main():
     java = str(Path(os.environ["JAVA_HOME"]) / "bin/java") if os.environ.get("JAVA_HOME") else "java"
     dotnet = env.get("BHASH_DOTNET", "dotnet")
     logs = out / "logs"; logs.mkdir()
+    observer = [measure(["/bin/true"], out, env, 10, logs / f"observer-{i}.json") for i in range(7)]
 
     def version(command):
         p = subprocess.run(command, env=env, capture_output=True, text=True, timeout=60)
@@ -211,7 +228,8 @@ def main():
     environment = {"platform": platform.platform(), "cpu": next((s.split(":", 1)[1].strip() for s in Path('/proc/cpuinfo').read_text().splitlines() if s.startswith('model name')), "unknown"),
         "logical_cpus": os.cpu_count(), "memory": Path('/proc/meminfo').read_text(), "java": version([java, "-version"]),
         "dotnet": version([dotnet, "--info"]), "native_doctor": version([java, "-jar", str(compiler), "native", "doctor", "--json"]),
-        "python": sys.version, "clock": str(time.get_clock_info("perf_counter")),
+        "python": sys.version, "gnu_time": version(["/usr/bin/time", "--version"]),
+        "observer_launch_wall_s": [r["wall_s"] for r in observer], "clock": str(time.get_clock_info("perf_counter")),
         "relevant_env": {k: v for k, v in env.items() if k.startswith(("BHASH_", "DOTNET_", "MSBUILD"))},
         "runner": {k: os.environ.get(k) for k in ("GITHUB_SHA", "GITHUB_RUN_ID", "RUNNER_OS", "RUNNER_ARCH")},
         "removed_env_names": sorted(set(os.environ) - set(env)), "runtime_dependencies": "JVM: installed Java; CLR: installed .NET 10; native: system libc/libm, LLVM is build-only"}
