@@ -67,6 +67,8 @@ def fixed_sources(out):
             calls=max(2, 100000//(n*n) if kind=='array-sort' else 1000000//n)
             if kind=='array-sort':calls=max(2,1000000//(n*n))
             cases.append((f'{kind}-{n}',kind,n,calls,(ROOT/'benchmarks/workloads'/f'{kind}.bhash').read_text(encoding='utf-8'),'', 'काम(न)',expected(kind,n),expected(kind,n+1)))
+    for kind,n,count in (('integer',10000,100),('decimal',10000,100),('text',32,100),('json',16,100),('list-map',128,1000)):
+        cases.append((kind+'-medium',kind,n,count,(ROOT/'benchmarks/workloads'/f'{kind}.bhash').read_text(encoding='utf-8'),'','काम(न)',expected(kind,n),expected(kind,n+1)))
     n=256
     for operation in ('read','write'):
         body=('कार्य काम(अ: पूर्णांक[], न: पूर्णांक) -> पूर्णांक { मान इ: पूर्णांक=०; मान योग: पूर्णांक=०; जबतक (इ<न) { '
@@ -150,11 +152,11 @@ def main():
         print('PROFILED',case['key'],counts['instructions'],flush=True)
     # Original duration-based mixed workloads, unchanged operations, longer batches
     # for sampling. Profiled elapsed/throughput is never treated as baseline timing.
-    duration=generate(out/'sample-sources',['medium'],1500,1000,5,['array-sort','objects'])
+    duration=generate(out/'sample-sources',['medium'],1500,1000,5,['array-sort','objects','decimal'])
     sampling=[]
     (out/'results.json').write_text(json.dumps({'environment':metadata,'fixed':results,'sampling':sampling},ensure_ascii=False,indent=2),encoding='utf-8')
     for case in duration:
-        if case['name'] not in ('array-sort','objects'):continue
+        if case['name'] not in ('array-sort','objects','decimal'):continue
         key=case['name']+'-samples';directory,executable=build(out/'sample-sources'/case['source'],key)
         native=execute([str(executable)],directory,env,directory/'native.json');validate_duration(case,native['stdout'])
         perf=shutil.which('perf')
