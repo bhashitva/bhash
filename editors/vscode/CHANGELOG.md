@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.3
+
+- Replace affected minimatch versions with 11.0.1 for the language client and extension packaging tools (GHSA-g3hv-75wg-m249).
+- Update the packaging tool and compatible security patches in its dependencies; retain VS Code 1.95 and Windows/Linux/macOS support.
+
 ## 0.9.2
 
 - Launch Windows native debug sessions in a dedicated integrated terminal using Microsoft’s Windows debugger launcher directly, independent of WSL/Git Bash/default or automation profiles.

@@ -257,6 +257,12 @@ npm run test:integration --prefix editors/vscode
 npm run package --prefix editors/vscode
 ```
 
+The extension pins minimatch 11.0.1 for GHSA-g3hv-75wg-m249. `npm ci` applies
+`patches/vscode-languageclient+9.0.1.patch`: the client's three validity checks use
+Minimatch's `comment`/`empty` flags instead of the removed `makeRe()` API; matching
+still uses the patched library. Keep this patch until the client supports
+minimatch 11 upstream. A failed patch stops installation.
+
 Linux integration tests need an X display (CI uses `xvfb-run -a`). The tests launch
 VS Code 1.95.3 by default, exercise the actual extension host and compiler task,
 and can target another version with `VSCODE_VERSION`. The Java stdio protocol tests
