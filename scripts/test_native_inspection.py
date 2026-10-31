@@ -78,13 +78,18 @@ for repetition in range(20):
         assert int(watch(expression)) == expected, expression
     assert bool(watch('वस्तु.अगली == वस्तु'))
     assert bool(watch('रिक्तमान == रिक्त'))
+    assert bool(watch('नान != नान'))
+    assert bool(watch('नानडिब्बा == नानदूसरा'))
+    assert not bool(watch('डिब्बा == छोटाडिब्बा'))
+    assert 'भारत' in str(watch('"भारत"'))
     assert bool(watch('पाठ्य == "भारत😀\\u0000भाष"'))
     assert float(watch('भिन्न * २.०')) == 7.0
     assert int(watch('वस्तु.अगली')) == int(local('वस्तु'))
     assert 'भारत😀' in lookup(watch('वस्तु.नाम')).to_string()
     for invalid in ('वस्तु.अंक = 99', 'दुगुना(२)', 'अंक[-१]', 'अंक[२०]',
                     'शब्द["अनुपलब्ध"]', 'रिक्तमान.अंक', '१ / ०',
-                    '१.० + १', '-exec set variable allocations=0'):
+                    '१.० + १', '-exec set variable allocations=0',
+                    'अभिलेखमान == अभिलेखप्रतिलिपि'):
         try:
             watch(invalid)
         except gdb.error:
