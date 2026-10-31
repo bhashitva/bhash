@@ -36,12 +36,14 @@ export function dapFrame(message: Message): Buffer {
 
 // Launch Microsoft's WindowsDebugLauncher directly in a dedicated integrated terminal.
 // No user shell, command-string construction, or terminal profile changes are involved.
-export function windowsDebugTerminal(arguments_: any, launcher: string): vscode.TerminalOptions {
+export function windowsDebugTerminal(arguments_: any, launcher: string, defaultCwd: string): vscode.TerminalOptions {
+    // MIEngine deliberately sends an empty cwd for its Windows launcher.
+    const cwd = arguments_?.cwd === '' ? defaultCwd : arguments_?.cwd;
     const args = arguments_?.args;
     if (arguments_?.kind !== 'integrated' || !Array.isArray(args) || args.length < 2
         || !args.every(value=>typeof value === 'string' && !/[\0\r\n]/.test(value))
         || path.win32.normalize(args[0]).toLowerCase() !== path.win32.normalize(launcher).toLowerCase()
-        || typeof arguments_.cwd !== 'string' || (!path.win32.isAbsolute(arguments_.cwd) || path.win32.parse(arguments_.cwd).root.length < 2))
+        || typeof cwd !== 'string' || /[\0\r\n]/.test(cwd) || (!path.win32.isAbsolute(cwd) || path.win32.parse(cwd).root.length < 2))
         throw Error('Unsupported Windows debugger terminal request. Update the Bhash and Microsoft C/C++ extensions.');
     if (!path.win32.isAbsolute(launcher) || /[\0\r\n]/.test(launcher)) throw Error('Windows debugger launcher is unavailable');
     const env = arguments_.env;
@@ -49,11 +51,12 @@ export function windowsDebugTerminal(arguments_: any, launcher: string): vscode.
         || Object.entries(env).some(([key,value])=>/[=\0]/.test(key) || value !== null && (typeof value !== 'string' || value.includes('\0')))))
         throw Error('Invalid debugger terminal environment');
     return {name:'Bhash: Native Debug',shellPath:launcher,
-        shellArgs:args.slice(1),cwd:arguments_.cwd,env,isTransient:true};
+        shellArgs:args.slice(1),cwd,env,isTransient:true};
 }
 
 interface Terminal {processId: Thenable<number | undefined>; show(preserveFocus?: boolean): void; dispose(): void;}
 interface Services {
+    cwd: string;
     terminal(options: vscode.TerminalOptions): Terminal;
     closed(listener: (terminal: Terminal)=>void): vscode.Disposable;
     log(text: string): void;
@@ -124,7 +127,7 @@ export class WindowsDebugAdapter implements vscode.DebugAdapter {
     private async runTerminal(message: Message) {
         let terminal: Terminal | undefined;
         try {
-            terminal = this.services.terminal(windowsDebugTerminal(message.arguments,this.launcher));
+            terminal = this.services.terminal(windowsDebugTerminal(message.arguments,this.launcher,this.services.cwd));
             this.terminals.add(terminal); terminal.show(true);
             const pid = await terminal.processId;
             if (this.disposed) {terminal.dispose(); return;}

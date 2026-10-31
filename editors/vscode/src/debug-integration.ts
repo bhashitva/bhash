@@ -91,6 +91,7 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
             const adapter = path.join(cpp.extensionPath,'debugAdapters','bin','OpenDebugAD7.exe');
             await access(adapter); await access(path.join(path.dirname(adapter),'WindowsDebugLauncher.exe'));
             return new vscode.DebugAdapterInlineImplementation(new WindowsDebugAdapter(adapter, {
+                cwd: session.configuration.cwd,
                 terminal: options=>vscode.window.createTerminal(options),
                 closed: listener=>vscode.window.onDidCloseTerminal(listener),
                 log: text=>services.log(text)
