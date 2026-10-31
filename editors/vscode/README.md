@@ -325,7 +325,7 @@ Reference results remain expandable. Values refresh in the selected stopped fram
 Evaluation reads the paused process and computes in the debugger. Calls, assignments,
 construction, casts, text concatenation, text indexing, static member access and
 structural comparisons of distinct records are rejected. There are limits of 4,096
-UTF-8 expression bytes, 256 syntax nodes, 48 nesting levels, 1 MiB of memory reads and
+UTF-8 expression bytes, 256 syntax nodes, 48 nesting levels, 1 MiB of heap reads and
 1,000 map entries per lookup. Missing variables/keys and invalid indices report errors.
 The explicit **Debug Console** continues to accept advanced GDB/C syntax; it does not
 use the Bhash Watch grammar. Inferior calls remain disabled. Conditional breakpoints
