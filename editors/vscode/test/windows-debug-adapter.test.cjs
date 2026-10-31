@@ -9,12 +9,14 @@ const args={kind:'integrated',cwd:'C:\\Projects हिन्दी',env:{DEBUGIN
     args:[launcher,'--stdin=pipe','--dbgExe=C:\\GDB हिन्दी\\gdb.exe','--interpreter=mi "--data-directory=C:/GDB हिन्दी/share/gdb"']};
 
 test('Windows terminal directly runs the vendor launcher, preserving argv, cwd and environment',()=>{
-    const result=windowsDebugTerminal(args,launcher);
+    const result=windowsDebugTerminal(args,launcher,args.cwd);
     assert.equal(result.shellPath,launcher);assert.deepEqual(result.shellArgs,args.args.slice(1));
+    assert.equal(windowsDebugTerminal({...args,cwd:''},launcher,'C:\\Fallback हिन्दी').cwd,'C:\\Fallback हिन्दी');
+    assert.throws(()=>windowsDebugTerminal({...args,cwd:''},launcher,'/mnt/c/test'));
     assert.equal(result.cwd,args.cwd);assert.deepEqual(result.env,args.env);assert.equal(result.isTransient,true);
     for(const changed of [{kind:'external'},{args:['wsl.exe','anything']},{args:['cmd','/c','echo wrong']},
         {args:[launcher,'bad\nline']},{cwd:'/mnt/c/test'},{env:{bad:42}},{env:{bad:'a\0b'}}])
-        assert.throws(()=>windowsDebugTerminal({...args,...changed},launcher));
+        assert.throws(()=>windowsDebugTerminal({...args,...changed},launcher,args.cwd));
 });
 
 test('DAP reader handles byte-split Hindi and combined messages, rejecting malformed/oversized input',()=>{
@@ -35,6 +37,7 @@ function fixture(pid=123){
     const writes=[],events=[],terminals=[],logs=[];let onClose;
     const reader=new DapReader();child.stdin.on('data',bytes=>reader.accept(bytes,message=>writes.push(message)));
     const adapter=new WindowsDebugAdapter('C:\\Extensions\\OpenDebugAD7.exe',{
+        cwd:args.cwd,
         terminal(options){const terminal={processId:Promise.resolve(pid),options,show(){},dispose(){this.disposed=true;}};terminals.push(terminal);return terminal;},
         closed(listener){onClose=listener;return {dispose(){}};},log:text=>logs.push(text)
     },launcher,()=>child);
@@ -49,7 +52,7 @@ test('bridge correlates requests and reverse responses while handling terminal c
         assert.equal(f.writes[0].arguments.adapterID,'cppdbg');
         f.receive({seq:1,type:'response',command:'initialize',request_seq:f.writes[0].seq,success:true});
         assert.equal(f.events[0].request_seq,11);
-        f.receive({seq:2,type:'request',command:'runInTerminal',arguments:args});
+        f.receive({seq:2,type:'request',command:'runInTerminal',arguments:{...args,cwd:''}});
         await new Promise(resolve=>setImmediate(resolve));
         assert.equal(f.terminals.length,1);assert.equal(f.events.length,1);
         const response=f.writes.at(-1);assert.equal(response.request_seq,2);assert.equal(response.success,true);assert.equal(response.body.shellProcessId,123);
