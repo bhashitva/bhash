@@ -284,12 +284,15 @@ class WatchReader:
     def same(self, left, right, collection=False):
         # Records have structural equality. Reject it explicitly until its full
         # recursive contract is implemented rather than substitute pointer equality.
+        boxed = left.kind == 'ANY' or right.kind == 'ANY'
         left, right = self.unbox(left), self.unbox(right)
         refs = ('OBJECT', 'TEXT', 'ANY', 'NULL')
         if left.kind in refs and not left.data or right.kind in refs and not right.data:
             return left.kind in refs and right.kind in refs and not left.data and not right.data
         if left.kind in ('TEXT', 'LITERAL_TEXT') and right.kind in ('TEXT', 'LITERAL_TEXT'):
             return self.text(left) == self.text(right)
+        if boxed and left.kind != right.kind:
+            return False
         if left.kind == right.kind == 'OBJECT':
             if left.data == right.data:
                 return True
@@ -300,7 +303,7 @@ class WatchReader:
                     raise WatchError('अभिलेख की structural equality Watch में अभी समर्थित नहीं है।')
             return False
         if left.kind in WatchEvaluator.INTEGRAL and right.kind in WatchEvaluator.INTEGRAL or left.kind == right.kind and left.kind in ('BOOL', 'REAL'):
-            return left.data == right.data or collection and left.kind == 'REAL' and math.isnan(left.data) and math.isnan(right.data)
+            return left.data == right.data or (boxed or collection) and left.kind == 'REAL' and math.isnan(left.data) and math.isnan(right.data)
         raise WatchError('इन प्रकारों की तुलना Watch में समर्थित नहीं है।')
 
 
