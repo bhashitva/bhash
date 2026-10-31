@@ -90,12 +90,9 @@ for repetition in range(20):
                     'शब्द["अनुपलब्ध"]', 'रिक्तमान.अंक', '१ / ०',
                     '१.० + १', '-exec set variable allocations=0',
                     'अभिलेखमान == अभिलेखप्रतिलिपि'):
-        try:
-            watch(invalid)
-        except gdb.error:
-            pass
-        else:
-            raise AssertionError('unsafe/invalid Watch accepted: ' + invalid)
+        failure = watch(invalid)
+        assert failure.type.code == gdb.TYPE_CODE_ARRAY and failure.type.range()[0] == -1, invalid
+        assert lookup(failure).to_string().startswith('Bhash Watch: '), invalid
 assert before_counts == tuple(int(gdb.parse_and_eval(n)) for n in ('allocations', 'collections', 'live_objects')), 'inspection allocated or collected'
 assert before_roots == roots_snapshot(), 'inspection changed precise roots'
 if 'previous_collections' in globals():
