@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1
+
+- Allow a configurable five-minute GDB startup wait during setup and preflight, with cancellation and progress messages for first-run security scans.
+- Explain startup timeouts separately from missing debugger/Python failures. Preserve checksum verification and security-software decisions.
+
+
 ## 0.9.0
 
 - Add native Windows x64 debugging with automatic, separate verified GDB/Python setup.
