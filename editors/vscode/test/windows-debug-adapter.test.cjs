@@ -101,11 +101,13 @@ test('Linux forwards terminal reverse requests to VS Code and preserves correlat
 test('MI host-only Watch failures become DAP errors without confusing user text with errors',()=>{
     const f=fixture();
     try {
-        for(const [type,success] of [['char [-1..63]',false],['char [64]',true],['पाठ',true]]) {
+        for(const [type,result,success] of [['char [-1..63]','Bhash Watch: user text',false],
+            ['char [148]','Bhash Watch: यह Watch expression समर्थित नहीं है।',false],
+            ['char [64]','"Bhash Watch: user text"',true],['पाठ','Bhash Watch: user text',true]]) {
             f.adapter.handleMessage({seq:71,type:'request',command:'evaluate',arguments:{expression:'"Bhash Watch: user text"',context:'watch'}});
-            f.receive({seq:22,type:'response',command:'evaluate',request_seq:f.writes.at(-1).seq,success:true,body:{result:'Bhash Watch: user text',type,variablesReference:0}});
+            f.receive({seq:22,type:'response',command:'evaluate',request_seq:f.writes.at(-1).seq,success:true,body:{result,type,variablesReference:0}});
             assert.equal(f.events.at(-1).success,success);assert.equal(f.events.at(-1).request_seq,71);
-            if(!success)assert.equal(f.events.at(-1).message,'Bhash Watch: user text');
+            if(!success)assert.equal(f.events.at(-1).message,result);
         }
     } finally {f.adapter.dispose();}
 });
