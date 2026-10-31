@@ -2,7 +2,7 @@
   "name": "bhash",
   "displayName": "Bhash (भाष)",
   "description": "Devanagari programming: compiler-backed diagnostics, completion, navigation, and project tasks.",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "publisher": "bhashitva",
   "license": "Apache-2.0",
   "repository": {
@@ -36,7 +36,8 @@
     "onLanguage:bhash-project",
     "workspaceContains:**/bhash.project",
     "onTaskType:bhash",
-    "onDebugResolve:cppdbg"
+    "onDebugResolve:cppdbg",
+    "onDebugResolve:bhash-native-windows"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -325,6 +326,56 @@
             }
           }
         ]
+      },
+      {
+        "type": "bhash-native-windows",
+        "label": "Bhash: Native (Windows)",
+        "languages": [
+          "bhash"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "bhashInput": {
+                "type": "string",
+                "description": "Bhash file or project to build and debug."
+              },
+              "cwd": {
+                "type": "string",
+                "default": "${workspaceFolder}"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
+              },
+              "stopAtEntry": {
+                "type": "boolean",
+                "default": false
+              },
+              "environment": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "bhashNative": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        }
       }
     ],
     "breakpoints": [
@@ -337,7 +388,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.cjs",
     "test:integration": "node test/run.cjs",
-    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.9.1.vsix"
+    "package": "npm run build && vsce package --no-dependencies --baseContentUrl https://github.com/bhashitva/bhash/blob/main/editors/vscode --baseImagesUrl https://github.com/bhashitva/bhash/raw/main/editors/vscode -o ../../target/bhash-vscode-0.9.2.vsix"
   },
   "dependencies": {
     "vscode-languageclient": "9.0.1"

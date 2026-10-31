@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.2
+
+- Launch Windows native debug sessions in a dedicated integrated terminal using Microsoft’s Windows debugger launcher directly, independent of WSL/Git Bash/default or automation profiles.
+- Preserve terminal settings, interactive input, source stepping, and existing Bhash launch configurations. Linux/WSL debugging continues through cppdbg.
+
 ## 0.9.1
 
 - Allow a configurable five-minute GDB startup wait during setup and preflight, with cancellation and progress messages for first-run security scans.
