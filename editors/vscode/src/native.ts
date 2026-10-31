@@ -21,7 +21,7 @@ export const macosSdk = Object.freeze({
 export function sdkForHost(platform = process.platform) {return platform === 'darwin' ? macosSdk : platform === 'win32' ? windowsSdk : linuxSdk;}
 export const sdk = sdkForHost();
 export interface NativeOptions {java: string; jar: string; mode: 'managed' | 'system'; home?: string;}
-export type Runner = (command: string, args: string[], env: NodeJS.ProcessEnv, signal?: AbortSignal, cwd?: string) => Promise<string>;
+export type Runner = (command: string, args: string[], env: NodeJS.ProcessEnv, signal?: AbortSignal, cwd?: string, timeoutMs?: number) => Promise<string>;
 export function compilerInvocation(jar: string, args: string[], platform = process.platform, callerDirectory = process.cwd()): {args:string[]; cwd?:string} {
     if (platform === 'win32') return {args:['-Dfile.encoding=UTF-8','-Dstdout.encoding=UTF-8','-Dstderr.encoding=UTF-8','-jar',path.basename(jar),'--utf8-args',Buffer.from(JSON.stringify({args,cwd:callerDirectory}),'utf8').toString('base64')],cwd:path.dirname(path.resolve(jar))};
     return {args:['-Dfile.encoding=UTF-8','-jar',jar,...args]};
@@ -49,7 +49,7 @@ export function terminateTree(child: ChildProcess, signal: NodeJS.Signals = 'SIG
         } else child.kill(signal);
     } catch {}
 }
-export const capture: Runner = (command, args, env, signal, cwd) => new Promise((resolve, reject) => {
+export const capture: Runner = (command, args, env, signal, cwd, timeoutMs = 10 * 60 * 1000) => new Promise((resolve, reject) => {
     signal?.throwIfAborted();
     const child = spawn(command, args, {env, cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32'});
     let stdout = '', stderr = '', overflow = false, timedOut = false;
@@ -58,7 +58,7 @@ export const capture: Runner = (command, args, env, signal, cwd) => new Promise(
         const kill = (signal: NodeJS.Signals) => terminateTree(child, signal);
         kill('SIGTERM'); escalation ??= setTimeout(() => kill('SIGKILL'), 2000);
     };
-    const timer = setTimeout(() => {timedOut = true; terminate();}, 10 * 60 * 1000);
+    const timer = setTimeout(() => {timedOut = true; terminate();}, timeoutMs);
     signal?.addEventListener('abort', terminate, {once: true});
     const append = (text: string, error: boolean) => {
         if (stdout.length + stderr.length + text.length > 65536) {overflow = true; terminate(); return;}
