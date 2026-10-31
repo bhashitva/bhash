@@ -81,7 +81,9 @@ for repetition in range(20):
     assert bool(watch('नान != नान'))
     assert bool(watch('नानडिब्बा == नानदूसरा'))
     assert not bool(watch('डिब्बा == छोटाडिब्बा'))
-    assert 'भारत' in str(watch('"भारत"'))
+    assert lookup(watch('"भारत"')).to_string() == '"भारत"'
+    assert lookup(watch('""')).to_string() == '""'
+    assert lookup(watch('"भारत😀\\u0000भाष"')).to_string() == '"भारत😀\\u0000भाष"'
     assert bool(watch('पाठ्य == "भारत😀\\u0000भाष"'))
     assert float(watch('भिन्न * २.०')) == 7.0
     assert int(watch('वस्तु.अगली')) == int(local('वस्तु'))
