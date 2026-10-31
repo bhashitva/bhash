@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: ['perf/**']
+    paths: ['benchmarks/run.py', 'benchmarks/workloads.py', 'benchmarks/test_benchmarks.py', 'benchmarks/workloads/**']
   pull_request:
     paths: ['benchmarks/**', '.github/workflows/performance.yml']
 permissions:
@@ -31,7 +32,12 @@ jobs:
       - name: Test benchmark accounting and reference validation
         run: python3 -m unittest discover -s benchmarks -p 'test_*.py'
       - name: Collect baseline on the same machine for all targets
-        run: python3 benchmarks/run.py
+        run: |
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            python3 benchmarks/run.py --trials 1 --compile-trials 1 --sizes small --warmup-ms 100 --batch-ms 50 --batches 1
+          else
+            python3 benchmarks/run.py
+          fi
       - name: Publish comparison in job summary
         if: success()
         run: cat target/benchmarks/report.md >> "$GITHUB_STEP_SUMMARY"
