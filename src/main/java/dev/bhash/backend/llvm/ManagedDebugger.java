@@ -47,7 +47,18 @@ public final class ManagedDebugger {
         verify(root); // Detect damaged or modified caches before any execution, including offline reuse.
         return new Status(true,hash,root.toString(),root.resolve("bin/gdb.exe").toString());
     }
+    static int startupTimeoutSeconds(String configured){
+        try {
+            int seconds=configured==null?300:Integer.parseInt(configured);
+            if(seconds<15 || seconds>600)throw new NumberFormatException();
+            return seconds;
+        }catch(NumberFormatException error){throw new IllegalArgumentException("BHASH_DEBUGGER_STARTUP_TIMEOUT_SECONDS must be an integer from 15 to 600");}
+    }
+    @FunctionalInterface interface ProbeLauncher {Process start(ProcessBuilder builder)throws IOException;}
     private static void probe(Path root)throws IOException{
+        probe(root,startupTimeoutSeconds(System.getenv("BHASH_DEBUGGER_STARTUP_TIMEOUT_SECONDS")),ProcessBuilder::start);
+    }
+    static void probe(Path root,int timeoutSeconds,ProbeLauncher launcher)throws IOException{
         String prefix=NativeBuildInfo.JSON.toJson(root.toString());
         String python="import gdb, json, struct, sys, ctypes, os; assert os.path.normcase(os.path.realpath(sys.prefix)) == os.path.normcase(os.path.realpath("+prefix+")), 'Bundled Python prefix required'; assert ctypes.windll.kernel32.GetACP() == 65001, 'Windows 10 1903+ UTF-8 process support required'; from gdb.FrameDecorator import FrameDecorator; assert sys.version_info.major == 3; print('BHASH_GDB_READY')";
         // Avoid nested double quotes in Windows Java 17/MinGW argv parsing.
@@ -57,12 +68,16 @@ public final class ManagedDebugger {
         builder.environment().keySet().removeIf(key->Set.of("PYTHONHOME","PYTHONPATH","PYTHONSTARTUP").contains(key.toUpperCase(Locale.ROOT)));
         Path output=Files.createTempFile(root,".probe-",".log");
         try{
-            builder.redirectOutput(output.toFile());var process=builder.start();
+            builder.redirectOutput(output.toFile());var process=launcher.start(builder);
             try{
-                if(!process.waitFor(20,TimeUnit.SECONDS)){process.destroyForcibly();process.waitFor();throw new IOException("Debugger probe timed out");}
+                if(!process.waitFor(timeoutSeconds,TimeUnit.SECONDS)){stopProbe(process);throw new IOException("GDB startup timed out after "+timeoutSeconds+" seconds. Security software may still be reviewing it; let that review finish and retry, or increase BHASH_DEBUGGER_STARTUP_TIMEOUT_SECONDS.");}
                 if(Files.size(output)>65536 || process.exitValue()!=0 || !Files.readString(output).contains("BHASH_GDB_READY"))throw new IOException("GDB/Python cannot run from the installed debugger: "+Files.readString(output));
-            }catch(InterruptedException e){process.destroyForcibly();Thread.currentThread().interrupt();throw new IOException("Debugger setup cancelled",e);}
+            }catch(InterruptedException e){stopProbe(process);Thread.currentThread().interrupt();throw new IOException("Debugger setup cancelled",e);}
         }finally{Files.deleteIfExists(output);}
+    }
+    private static void stopProbe(Process process){
+        process.destroyForcibly();
+        try{process.waitFor(5,TimeUnit.SECONDS);}catch(InterruptedException error){Thread.currentThread().interrupt();}
     }
     public static Status install(Path archive,URI url,String hash)throws IOException{
         if(!NativePlatform.windows() || !System.getProperty("os.arch").matches("amd64|x86_64"))throw new IOException("Managed debugger requires Windows x64");
