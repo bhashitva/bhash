@@ -33,7 +33,7 @@ def execute(cmd, cwd, env, log, timeout=240, required=True):
 
 def parse_callgrind(path):
     names={}; current=None; callee=None; edge=False; positions=1
-    costs=Counter(); calls=Counter(); total=None
+    costs=Counter(); calls=Counter(); inclusive=Counter(); total=None
     def name(value):
         m=re.match(r'\((\d+)\)(?: (.*))?$',value)
         if not m:return value
@@ -51,11 +51,12 @@ def parse_callgrind(path):
         elif line and (line[0].isdigit() or line[0] in '+-*'):
             parts=line.split()
             if len(parts)<=positions:continue
-            if not edge and current:costs[current]+=int(parts[positions])
+            if edge:inclusive[callee]+=int(parts[positions])
+            elif current:costs[current]+=int(parts[positions])
             edge=False
     if total is None:raise RuntimeError('No Callgrind totals')
     if sum(costs.values())!=total:raise RuntimeError(f'Unbalanced instruction accounting: {sum(costs.values())}/{total}')
-    return {'instructions':total,'self_instructions':dict(costs.most_common()),'calls':dict(calls.most_common())}
+    return {'instructions':total,'self_instructions':dict(costs.most_common()),'inclusive_call_instructions':dict(inclusive.most_common()),'calls':dict(calls.most_common())}
 
 
 def fixed_sources(out):
@@ -151,6 +152,7 @@ def main():
     # for sampling. Profiled elapsed/throughput is never treated as baseline timing.
     duration=generate(out/'sample-sources',['medium'],1500,1000,5,['array-sort','objects'])
     sampling=[]
+    (out/'results.json').write_text(json.dumps({'environment':metadata,'fixed':results,'sampling':sampling},ensure_ascii=False,indent=2),encoding='utf-8')
     for case in duration:
         if case['name'] not in ('array-sort','objects'):continue
         key=case['name']+'-samples';directory,executable=build(out/'sample-sources'/case['source'],key)
@@ -169,6 +171,7 @@ def main():
         gdb=sample(executable,directory,env,directory);validate_duration(case,gdb['stdout'])
         status['gdb_samples']=len(gdb['samples']);status['gdb_flat']=gdb['flat']
         sampling.append(status)
+        (out/'results.json').write_text(json.dumps({'environment':metadata,'fixed':results,'sampling':sampling},ensure_ascii=False,indent=2),encoding='utf-8')
         print('SAMPLED',key,status['gdb_samples'],flush=True)
     (out/'results.json').write_text(json.dumps({'environment':metadata,'fixed':results,'sampling':sampling},ensure_ascii=False,indent=2),encoding='utf-8')
     print('All profile checksums passed; compiler and runtime sources unchanged.',flush=True)

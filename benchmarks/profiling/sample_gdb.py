@@ -64,7 +64,8 @@ def sample(executable, cwd, env, output):
         for cmd in ('-gdb-set pagination off', '-gdb-set confirm off', '-gdb-set mi-async on',
                     '-gdb-set disable-randomization off', '-inferior-tty-set ' + json.dumps(os.ttyname(slave))):
             if '^error' in command(cmd): raise RuntimeError('GDB setup failed: ' + cmd)
-        os.close(slave); slave = None
+        # Keep one slave descriptor open until exit: otherwise a fast PTY reader
+        # sees EIO before GDB has opened the inferior's terminal and stops early.
         c = threading.Thread(target=console); c.start()
         command('-exec-run')
         start = time.monotonic(); time.sleep(1.6)
@@ -90,7 +91,9 @@ def sample(executable, cwd, env, output):
                 line = q.get(timeout=20)
                 if line.startswith('*stopped') and 'exited' in line: exited=True
         command('-gdb-exit')
-        p.wait(timeout=10); t.join(timeout=5); c.join(timeout=5)
+        p.wait(timeout=10); t.join(timeout=5)
+        os.close(slave); slave = None
+        c.join(timeout=5)
     finally:
         if p.poll() is None: p.kill(); p.wait()
         if slave is not None: os.close(slave)
