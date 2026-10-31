@@ -63,7 +63,8 @@ interface Services {
 }
 
 // A separate debug type avoids replacing C/C++'s registered adapter factory. All debugging
-// still uses its installed OpenDebugAD7/GDB implementation; only runInTerminal is handled here.
+// still uses its installed OpenDebugAD7/GDB implementation. This bridge encodes automatic
+// Bhash evaluations and handles Windows terminal requests; Linux terminals go to VS Code.
 export class NativeDebugAdapter implements vscode.DebugAdapter {
     private child: ChildProcessWithoutNullStreams;
     private listeners = new Set<(message: Message)=>void>();
