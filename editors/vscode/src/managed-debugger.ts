@@ -5,7 +5,14 @@ import * as os from 'node:os';
 // Release catalog is bundled, never read from workspace configuration.
 import catalog from './windows-debugger.json';
 export const windowsDebugger = Object.freeze(catalog);
-export async function ensureDebugger(options: NativeOptions, configured: string, log: (text:string)=>void,
+export interface DebuggerOptions extends NativeOptions {debuggerStartupTimeoutSeconds?: number;}
+export function debuggerStartupTimeout(seconds = 300): number {
+    if (!Number.isInteger(seconds) || seconds < 15 || seconds > 600)
+        throw Error('bhash.native.debuggerStartupTimeoutSeconds must be an integer from 15 to 600.');
+    return seconds;
+}
+
+export async function ensureDebugger(options: DebuggerOptions, configured: string, log: (text:string)=>void,
     signal?: AbortSignal, run: Runner = capture, platform = process.platform): Promise<string> {
     signal?.throwIfAborted();
     if (platform !== 'win32') return configured || 'gdb';
@@ -14,9 +21,12 @@ export async function ensureDebugger(options: NativeOptions, configured: string,
         if (!path.win32.isAbsolute(configured)) throw Error('bhash.native.gdbPath must be an absolute Windows executable path, or empty for automatic setup.');
         return configured;
     }
+    const startupSeconds = debuggerStartupTimeout(options.debuggerStartupTimeoutSeconds);
     const invoke = async (args: string[]) => {
         const invocation = compilerInvocation(options.jar, ['native','debugger',...args,'--json'], platform);
-        return JSON.parse(await run(options.java, invocation.args, nativeEnvironment(options), signal, invocation.cwd));
+        const env = {...nativeEnvironment(options), BHASH_DEBUGGER_STARTUP_TIMEOUT_SECONDS: String(startupSeconds)};
+        // Keep the parent alive for the startup wait plus download/extraction time.
+        return JSON.parse(await run(options.java, invocation.args, env, signal, invocation.cwd, (startupSeconds + 300) * 1000));
     };
     // Full per-file verification is performed by status; damaged caches are repaired.
     let status: {installed?:boolean; archiveSha256?:string; gdb?:string} | undefined;
@@ -24,7 +34,8 @@ export async function ensureDebugger(options: NativeOptions, configured: string,
     const ready = () => status?.installed === true && status.archiveSha256 === catalog.sha256 && typeof status.gdb === 'string' && path.win32.isAbsolute(status.gdb);
     if (ready()) return status!.gdb!;
     log('Setting up the Bhash Windows debugger (GDB and Python), verified by SHA-256. No administrator access is required.');
-    const deadline = Date.now() + 6 * 60 * 1000;
+    log('First startup may take several minutes while security software reviews GDB. You can cancel.');
+    const deadline = Date.now() + (startupSeconds + 300) * 1000;
     for (;;) {
         signal?.throwIfAborted();
         try {status = await invoke(['install','--url',catalog.url,'--sha256',catalog.sha256]); break;}

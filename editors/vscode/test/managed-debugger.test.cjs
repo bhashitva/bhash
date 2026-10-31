@@ -29,3 +29,14 @@ test('configured debugger bypasses managed download; cancelled setup performs no
  await assert.rejects(ensureDebugger(options,'gdb',()=>{},undefined,fail,'win32'),/absolute Windows/);
  const abort=new AbortController();abort.abort();await assert.rejects(ensureDebugger(options,'',()=>{},abort.signal,fail,'win32'));
 });
+
+
+test('slow-start setting reaches the installer and its parent deadline allows setup overhead',async()=>{
+ const custom={...options,debuggerStartupTimeoutSeconds:600};const requests=[];
+ const run=async(command,args,env,signal,cwd,timeout)=>{
+  const request=decode(args);requests.push(request);
+  assert.equal(env.BHASH_DEBUGGER_STARTUP_TIMEOUT_SECONDS,'600');assert.ok(timeout>=900000);
+  return request[2]==='status'?'{"installed":false}':JSON.stringify(ready);
+ };
+ assert.equal(await ensureDebugger(custom,'',()=>{},undefined,run,'win32'),ready.gdb);assert.equal(requests.length,2);
+});

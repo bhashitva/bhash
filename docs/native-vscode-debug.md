@@ -173,3 +173,17 @@ Bhash-expression और protected-body stepping सीमाएँ Windows प�
 Hindi paths के लिए GDB process manifest में UTF-8 सक्षम है; Windows 10 version
 1903+ आवश्यक है। Manifest patch script corresponding-source archive में है।
 Debugger instructions तथा दूसरे upstream binaries में बदलाव नहीं है।
+
+
+## सुरक्षा जाँच के दौरान प्रतीक्षा (Security Scan Startup Wait)
+
+0.9.1 में GDB startup के लिए सामान्य सीमा पाँच मिनट है। Norton या दूसरी सुरक्षा
+व्यवस्था पहली बार `gdb.exe` की जाँच करते समय इसे रोक सकती है। इस दौरान progress
+notification से launch cancel कर सकते हैं। अधिक समय चाहिए तो Settings में
+`bhash.native.debuggerStartupTimeoutSeconds` को 600 तक बढ़ाएँ। यह installer और
+preflight दोनों पर लागू है; antivirus की स्वीकृति या file checksum जाँच नहीं बदलती।
+
+सुरक्षा जाँच पूरी होने के बाद launch फिर चलाएँ। यदि file को वास्तव में block या
+quarantine किया गया है, तो timeout बढ़ाने से वह निर्णय नहीं बदलता। Norton को false
+positive की समीक्षा भेजने का आधिकारिक मार्ग:
+[Submit a file or URL for review](https://support.norton.com/sp/en/us/home/current/solutions/kb20090410134005EN)।

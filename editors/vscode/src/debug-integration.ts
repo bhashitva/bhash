@@ -50,11 +50,12 @@ export function registerNativeDebug(context: vscode.ExtensionContext, services: 
                 let result;
                 try {
                     result = await vscode.window.withProgress({location: vscode.ProgressLocation.Notification,
-                        title: 'Bhash: prepare native debugging', cancellable: true}, async (_, progressToken) => {
+                        title: 'Bhash: prepare native debugging', cancellable: true}, async (progress, progressToken) => {
                         const listener = progressToken.onCancellationRequested(() => abort.abort());
                         try {
-                            const options: DebugOptions = {...services.tools(folder), gdb, input, cwd, extensionRoot: context.extensionPath};
-                            return await prepareNativeDebug(options, services.log, abort.signal);
+                            const options: DebugOptions = {...services.tools(folder), gdb, input, cwd, extensionRoot: context.extensionPath,
+                                debuggerStartupTimeoutSeconds: config.get<number>('native.debuggerStartupTimeoutSeconds',300)};
+                            return await prepareNativeDebug(options, text=>{services.log(text);progress.report({message:text});}, abort.signal);
                         } finally {listener.dispose();}
                     });
                 } finally {cancellation?.dispose();}

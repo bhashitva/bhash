@@ -4,11 +4,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {ensureDebugger} from './managed-debugger';
+import {ensureDebugger, DebuggerOptions, debuggerStartupTimeout} from './managed-debugger';
 export {ensureDebugger, windowsDebugger} from './managed-debugger';
 import {NativeOptions, Runner, capture, compilerInvocation, ensureNative, nativeEnvironment} from './native';
 
-export interface DebugOptions extends NativeOptions {gdb: string; input: string; cwd: string; extensionRoot: string;}
+export interface DebugOptions extends DebuggerOptions {gdb: string; input: string; cwd: string; extensionRoot: string;}
 export function requireDebugHost(platform = process.platform, arch = process.arch): void {
     if (!(['linux','win32'].includes(platform) && arch === 'x64')) throw Error('Bhash native debugging requires Windows x64 or Linux/WSL x86-64. macOS debugger integration is not yet available.');
 }
@@ -40,18 +40,24 @@ export async function debuggerArguments(command: string): Promise<string[]> {
     }
     return result;
 }
-export async function probeGdb(command: string, signal?: AbortSignal): Promise<void> {
+type ProbeExecutor = (command: string, args: string[], options: {encoding: 'utf8'; timeout: number; maxBuffer: number; signal?: AbortSignal; windowsHide: boolean}) => Promise<{stdout: string}>;
+export async function probeGdb(command: string, signal?: AbortSignal, timeoutSeconds?: number, log: (message:string)=>void = ()=>{},
+    execute: ProbeExecutor = (command,args,options)=>promisify(execFile)(command,args,options)): Promise<void> {
+    signal?.throwIfAborted();
+    const seconds = debuggerStartupTimeout(timeoutSeconds);
+    const waiting = setTimeout(()=>log('Waiting for GDB to start. Security software may be reviewing it; you can cancel this launch.'),5000);
     try {
         const python = 'import gdb, sys; from gdb.FrameDecorator import FrameDecorator; print("BHASH_GDB_READY:" + gdb.VERSION + ":" + str(sys.version_info[0]))';
         const probe = "python import base64; exec(base64.b64decode('" + Buffer.from(python,'utf8').toString('base64') + "'))";
-        const {stdout} = await promisify(execFile)(command, [...await debuggerArguments(command), '--batch', '-ex', probe],
-            {encoding: 'utf8', timeout: 15000, maxBuffer: 65536, signal, windowsHide: true});
+        const {stdout} = await execute(command, [...await debuggerArguments(command), '--batch', '-ex', probe],
+            {encoding: 'utf8', timeout: seconds * 1000, maxBuffer: 65536, signal, windowsHide: true});
         const match = /BHASH_GDB_READY:(\d+)[^\r\n]*:3(?:\r?\n|$)/.exec(stdout);
         if (!match || Number(match[1]) < 12) throw Error('GDB 12+ with Python 3 support is required.');
     } catch (error) {
         if (signal?.aborted) throw Error('Native debugging cancelled.');
+        if ((error as {killed?:boolean;code?:unknown})?.killed && typeof (error as {code?:unknown}).code !== 'string') throw Error(`GDB did not become ready within ${seconds} seconds. Security software may still be reviewing it. Let that review finish, then retry, or increase bhash.native.debuggerStartupTimeoutSeconds. ${String(error)}`);
         throw Error('Install GDB 12+ with Python 3 support on the extension host (Ubuntu: sudo apt install gdb), or set bhash.native.gdbPath. Windows automatic debugger setup may need repair. ' + String(error));
-    }
+    } finally {clearTimeout(waiting);}
 }
 export async function removeDebugBuild(directory: string): Promise<void> {
     // Delete only directories created by this module, never a user launch path.
@@ -65,7 +71,7 @@ export async function prepareNativeDebug(options: DebugOptions, log: (text: stri
     requireDebugHost();
     if (!path.isAbsolute(options.input) || !path.isAbsolute(options.cwd)) throw Error('Debug input and working directory must be absolute paths on the extension host.');
     const gdb = await (dependencies.debugger || ensureDebugger)(options, options.gdb, log, signal);
-    await dependencies.probe(gdb, signal);
+    await dependencies.probe(gdb, signal, options.debuggerStartupTimeoutSeconds, log);
     signal?.throwIfAborted();
     await dependencies.ensure(options, log, signal);
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bhash-debug-'));
