@@ -1,0 +1,29 @@
+{
+  "run": "https://github.com/bhashitva/bhash/actions/runs/41253980225",
+  "compiler_sha256": "bfcda6940c8c8dac0d336e199f0ee8fca8b589346aa7f5231941dba0cd4d10a0",
+  "fixed_checks_passed": [
+    "array-sort-64",
+    "array-sort-256",
+    "array-sort-1024",
+    "objects-64",
+    "objects-512",
+    "objects-4096",
+    "integer-medium",
+    "decimal-medium",
+    "text-medium",
+    "json-medium",
+    "list-map-medium",
+    "array-read",
+    "array-write",
+    "object-alloc",
+    "object-traverse",
+    "object-reference-store"
+  ],
+  "stack_samples": {
+    "array-sort-samples": 309,
+    "objects-samples": 306,
+    "decimal-samples": 309
+  },
+  "total_samples": 924,
+  "optimization_changes": false
+}
