@@ -150,7 +150,21 @@ class BhashLeaf:
         return self.printer.to_string()
 
 
+class BhashWatchFailure:
+    def __init__(self, original):
+        self.original = original
+
+    def to_string(self):
+        low, high = self.original.type.range()
+        return bytes(int(self.original[i]) & 255 for i in range(low, high)).decode('utf-8', 'replace')
+
+
 def lookup(original):
+    # A host-only char array with a reserved lower bound carries an evaluation
+    # failure through MI var-create, which can otherwise swallow Python errors.
+    # Bhash managed arrays are OBJECT pointers; ordinary literal strings start at 0.
+    if original.type.code == gdb.TYPE_CODE_ARRAY and str(original.type.target()) == 'char' and original.type.range()[0] == -1:
+        return BhashWatchFailure(original)
     kind = {'पाठ': 'TEXT', 'वस्तु': 'OBJECT', 'सर्ववस्तु': 'ANY'}.get(str(original.type))
     if not kind:
         return None
@@ -331,7 +345,8 @@ class BhashWatchFunction(gdb.Function):
                         'REAL': 'double', 'BOOL': 'bool'}[result.kind]
             return gdb.Value(result.data).cast(gdb.lookup_type(typename))
         except (WatchError, gdb.error, ValueError, KeyError, OverflowError, struct.error) as error:
-            raise gdb.GdbError('Bhash Watch: ' + str(error))
+            message = ('Bhash Watch: ' + str(error)).encode('utf-8')[:1024] + b'\0'
+            return gdb.Value(message, gdb.lookup_type('char').array(-1, len(message) - 2))
 
 
 if 'WatchEvaluator' in globals():
