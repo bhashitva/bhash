@@ -38,9 +38,10 @@ jobs:
           else
             python3 benchmarks/run.py
           fi
+          python3 benchmarks/compare.py target/benchmarks/results.json --output target/benchmarks/comparison.md
       - name: Publish comparison in job summary
         if: success()
-        run: cat target/benchmarks/report.md >> "$GITHUB_STEP_SUMMARY"
+        run: cat target/benchmarks/comparison.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
