@@ -258,7 +258,7 @@ final class BhashStandard {
         try{if(stream.input!=null)stream.input.close();else stream.output.close();}
         catch(java.io.IOException e){throw failure("प्रवाह बंद नहीं किया जा सका।");}
     }
-    static boolean appDirectoryExists(String name){return Files.isDirectory(path(name));}
+    static boolean appDirectoryExists(String name){var p=path(name);try{return Files.isDirectory(p);}catch(SecurityException error){return false;}}
     static void appMakeDirectory(String name){
         try{Files.createDirectory(path(name));}catch(java.io.IOException|SecurityException e){throw failure("निर्देशिका बनाई नहीं जा सकी।");}
     }
