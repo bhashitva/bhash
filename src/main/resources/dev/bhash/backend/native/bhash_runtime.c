@@ -1873,7 +1873,7 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
         bh_cleanup cleanup={cleanups,dir,app_dir_close};cleanups=&cleanup;
         slots[0]=bh_collection_new(info,0,location);
         do {
-            char name[4*MAX_PATH];int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,entry.cFileName,-1,name,sizeof name,NULL,NULL);
+            char name[4*MAX_PATH];int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,entry.cFileName,-1,name,(int)sizeof name,NULL,NULL);
             if(bytes<=0)runtime_error(location,"अमान्य यूनिकोड पाठ।");
             if(strcmp(name,".")&&strcmp(name,".."))app_entry(slots,name,location);
         }while(FindNextFileW(dir,&entry));
