@@ -9,6 +9,18 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EditorIntelligenceTest {
+    @Test void resourceBindingsAreVisibleOnlyInTheBodyAndFoundationMembersNavigate()throws Exception {
+        var index=source("resource-editor.bhash","वर्ग क { कार्य बंदकरो() -> शून्य {} } कार्य मुख्य() -> शून्य { संसाधन (फ: क = नया क()) { लिखो(१); } लिखो(२); }");
+        assertTrue(index.visibleLexical(after(index,"लिखो(१)")).stream().anyMatch(s->s.name().equals("फ")));
+        assertFalse(index.visibleLexical(after(index,"नया क()")).stream().anyMatch(s->s.name().equals("फ")));
+        assertFalse(index.visibleLexical(after(index,"लिखो(२)")).stream().anyMatch(s->s.name().equals("फ")));
+        Path cache=java.nio.file.Files.createTempDirectory("bhash-foundation-editor-");
+        try {
+            var library=new SourceIndex(dev.bhash.stdlib.StandardLibrary.editorSource(cache));
+            assertTrue(library.symbols.stream().anyMatch(s->s.qualified().equals("मानक.प्रवाह")));
+            assertTrue(library.symbols.stream().anyMatch(s->s.name().equals("पाठलिखो")));
+        }finally {cache.resolve(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME).toFile().setWritable(true);dev.bhash.backend.clr.ClrCompiler.deleteTree(cache);}
+    }
     private SourceIndex source(String name,String text) {return new SourceIndex(new SourceFile(Path.of(name).toAbsolutePath().toString(),text));}
     private Position after(SourceIndex index,String needle) {return index.coordinates.position(index.text.lastIndexOf(needle)+needle.length());}
     private List<String> labels(List<CompletionItem> items) {return items.stream().map(CompletionItem::getLabel).toList();}
