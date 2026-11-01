@@ -232,7 +232,11 @@ internal static class BhashStandard {
         if(!appStreams.Remove(id,out var stream))return;
         try{stream.Dispose();}catch(Exception e) when(fileError(e)){throw failure("प्रवाह बंद नहीं किया जा सका।");}
     }
-    internal static bool appDirectoryExists(string name){fileGuard();return Directory.Exists(path(name));}
+    internal static bool appDirectoryExists(string name){
+        fileGuard();string p=path(name);
+        try{var info=new DirectoryInfo(p);if(info.LinkTarget!=null)return info.ResolveLinkTarget(true) is DirectoryInfo target&&target.Exists;return Directory.Exists(p);}
+        catch(Exception e) when(fileError(e)){return false;}
+    }
     internal static void appMakeDirectory(string name){
         fileGuard();try{string p=path(name);if(File.Exists(p)||Directory.Exists(p))throw failure("निर्देशिका बनाई नहीं जा सकी।");
             string parent=Path.GetDirectoryName(p);if(!Directory.Exists(parent))throw failure("निर्देशिका बनाई नहीं जा सकी।");Directory.CreateDirectory(p);
