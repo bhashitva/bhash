@@ -1756,7 +1756,7 @@ static void app_entry(void **slots,const char *name,const void *location){
     if(!valid_utf8((const unsigned char *)name,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
     if(((bh_collection *)slots[0])->size>=65536)runtime_error(location,"निर्देशिका में बहुत अधिक नाम हैं।");
     slots[1]=new_text(n,location);memcpy(text_data(slots[1]),name,(size_t)n);
-    (void)bh_collection_call(slots[0],5,(uint64_t)(uintptr_t)slots[1],0,NULL,location);
+    (void)bh_collection_call(slots[0],BH_ADD,(uint64_t)(uintptr_t)slots[1],0,NULL,location);
     slots[1]=NULL;
 }
 uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_info *info,const void *location){
