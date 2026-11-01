@@ -13,6 +13,10 @@ INFO(array_text, 12, BH_ARRAY, BH_INT, BH_TEXT);
 INFO(list_text, 13, BH_LIST, BH_INT, BH_TEXT);
 INFO(map_int, 14, BH_MAP, BH_INT, BH_INT);
 INFO(map_text, 15, BH_MAP, BH_TEXT, BH_REFERENCE);
+INFO(array_bool, 16, BH_ARRAY, BH_INT, BH_BOOL);
+INFO(array_real, 17, BH_ARRAY, BH_INT, BH_REAL);
+INFO(array_byte, 18, BH_ARRAY, BH_INT, BH_BYTE);
+INFO(array_int32, 19, BH_ARRAY, BH_INT, BH_INT32);
 static uint64_t bits(const void *p) { return (uint64_t)(uintptr_t)p; }
 static uint64_t call(void *p, uint32_t op, uint64_t a, uint64_t b, const void *location) {
     return bh_collection_call(p, op, a, b, NULL, location);
@@ -35,6 +39,25 @@ int main(int argc, char **argv) {
             call(slots[0],BH_SET,bits(&key),0,&location); call(slots[0],BH_ITER_CHECK,version,0,&location);
         }
         return 9;
+    }
+    /* Full scalar carriers survive the short path bit-for-bit. In particular,
+       floating-point NaNs/signed zero and pointer-shaped integer bits are data.
+       GET_OR and other operations must retain their generic behavior. */
+    const bh_collection_info *scalars[] = {&array_int, &array_bool, &array_real, &array_byte, &array_int32};
+    const uint64_t values[] = {UINT64_MAX, 1, UINT64_C(0x8000000000000000),
+                              UINT64_C(0x7ff8000000000042), 255, UINT64_C(0xffffffff80000000)};
+    for (size_t k=0; k<sizeof(scalars)/sizeof(*scalars); ++k) {
+        slots[0]=bh_collection_new(scalars[k],2,&location);
+        uint64_t version=call(slots[0],BH_VERSION,0,0,&location);
+        for (size_t v=0; v<sizeof(values)/sizeof(*values); ++v) {
+            assert(call(slots[0],BH_SET,1,values[v],&location)==0);
+            bh_collect();
+            assert(call(slots[0],BH_GET,1,0,&location)==values[v]);
+            assert(call(slots[0],BH_GET_OR,1,0,&location)==values[v]);
+            assert(call(slots[0],BH_VERSION,0,0,&location)==version);
+            assert(call(slots[0],BH_GET,0,0,&location)==0);
+        }
+        slots[0]=NULL; bh_collect(); assert(bh_heap_objects()==0);
     }
     slots[0]=bh_collection_new(&array_text,100,&location);
     assert(call(slots[0],BH_SIZE,0,0,&location)==100);
