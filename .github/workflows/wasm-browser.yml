@@ -27,6 +27,11 @@ jobs:
       - run: npm run build --prefix playground
       - name: Profile full publishing before preparing the reusable browser host
         run: python3 scripts/profile_browser_publish.py
+      - name: Compare Run to first output on the same host
+        timeout-minutes: 6
+        run: node scripts/playground_performance.cjs
+      - name: Produce the before and after comparison report
+        run: python3 scripts/analyze_playground_performance.py
       - name: Validate all existing browser semantics through the prebuilt host
         run: node scripts/browser_smoke_test.cjs
         env:
@@ -36,8 +41,6 @@ jobs:
       - run: node scripts/playground_smoke_test.cjs
         env:
           BHASH_BROWSER_HOST: ${{ github.workspace }}/target/browser-publish-profile/host
-      - name: Compare Run to first output on the same host
-        run: node scripts/playground_performance.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
