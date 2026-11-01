@@ -5,6 +5,29 @@ exports.run=async()=>{
     const workspace=process.env.BHASH_TEST_WORKSPACE;let uri=vscode.Uri.file(path.join(workspace,'src','main.bhash'));
     const document=await vscode.workspace.openTextDocument(uri);uri=document.uri;await vscode.window.showTextDocument(document);
     assert.equal(document.languageId,'bhash');const extension=vscode.extensions.getExtension('bhashitva.bhash');assert.ok(extension);await extension.activate();
+    // Resolve the shipped task type, then exercise VS Code's real CustomExecution
+    // dispatch. A provider-less task fails here on Windows before open() runs.
+    // The terminal is synthetic: this regression needs no LLVM, SDK or compiler run.
+    const nativeTools=(await vscode.tasks.fetchTasks({type:'bhash-native-tools'})).find(t=>t.definition.operation==='check');
+    assert.ok(nativeTools,'configured native tools task resolves');
+    assert.ok(nativeTools.execution instanceof (process.platform==='win32'?vscode.CustomExecution:vscode.ProcessExecution));
+    let taskOpened=false;const taskWritten=new vscode.EventEmitter();const taskClosed=new vscode.EventEmitter();
+    const probeTask=new vscode.Task(nativeTools.definition,vscode.workspace.workspaceFolders[0],
+        'Native tools dispatch probe','Bhash',new vscode.CustomExecution(async()=>({
+            onDidWrite:taskWritten.event,onDidClose:taskClosed.event,
+            open(){taskOpened=true;taskWritten.fire('Bhash task provider dispatch passed.\r\n');setImmediate(()=>taskClosed.fire(0));},
+            close(){}
+        })));
+    await new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>{listener.dispose();reject(Error('Native tools custom task did not finish'));},15000);
+        const listener=vscode.tasks.onDidEndTask(event=>{
+            if(event.execution.task.name!==probeTask.name)return;
+            clearTimeout(timer);listener.dispose();resolve();
+        });
+        vscode.tasks.executeTask(probeTask).catch(error=>{clearTimeout(timer);listener.dispose();reject(error);});
+    });
+    taskWritten.dispose();taskClosed.dispose();assert.ok(taskOpened,'native tools CustomExecution callback was opened');
+    console.log('PASS native tools configured task resolution and real CustomExecution dispatch (no native tools required).');
     // Use the editor command (F9), which checks the language contribution.
     // debug.addBreakpoints bypasses this gate and missed the 0.8.0 regression.
     assert.equal(vscode.workspace.getConfiguration('debug',uri).get('allowBreakpointsEverywhere'),false);
