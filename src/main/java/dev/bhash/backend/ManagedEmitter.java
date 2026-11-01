@@ -258,14 +258,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (target == Target.JVM) {
             output.append("public final class BhashProgram {\n");
             if (main != null)
-            output.append("public static void main(String[] args) { try { ").append(main.java)
+            output.append("public static void main(String[] args) { try { BhashStandard.appSetArguments(args); ").append(main.java)
                     .append("(); } catch (RuntimeException | ExceptionInInitializerError e) { Throwable f=bhashFailure(e);")
                     .append(" if (!(f instanceof BhashRuntime.BException || f instanceof ArithmeticException)) throw e;")
                     .append(" BhashRuntime.report(f.getMessage()); System.exit(1); } }\n");
             output.append("private static Throwable bhashFailure(Throwable e) { while(e instanceof ExceptionInInitializerError && e.getCause()!=null) e=e.getCause(); return e; }\n");
         } else {
             output.append("using System;\ninternal static class BhashProgram {\n");
-            output.append("public static int Main(string[] args) { try { ").append(main.java)
+            output.append("public static int Main(string[] args) { try { BhashStandard.appSetArguments(args); ").append(main.java)
                     .append("(); return 0; } catch (Exception e) when (bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException) {")
                     .append(" BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n");
             output.append("private static Exception bhashFailure(Exception e) { while(e is TypeInitializationException && e.InnerException!=null) e=e.InnerException; return e; }\n");
@@ -739,6 +739,19 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             require(assignment, destination.type, value.type);
             if (destination.location.setter!=null) output.append(destination.location.setter).append(value.java).append(");\n");
             else output.append(destination.java).append('=').append(value.java).append(";\n");
+        } else if (statement.resourceStatement()!=null) {
+            var resource=statement.resourceStatement();
+            var value=visit(resource.expression());var parameter=resource.parameter();var declared=type(parameter.valueType());
+            require(resource,declared,value.type);
+            if(declared.object==null)throw error(resource,"संसाधन requires an object with बंदकरो() -> शून्य.");
+            scopes.push(new HashMap<>());
+            var binding=declare(parameter,parameter.IDENTIFIER().getText(),declared,false);
+            var close=callMethod(resource,new Expr(declared,binding.java),"बंदकरो",List.of());
+            require(resource,Type.VOID,close.type);
+            output.append("{ ").append(typeName(declared)).append(' ').append(binding.java).append("=BhashRuntime.instance((").append(typeName(declared)).append(")(").append(value.java).append(")); try ");
+            var flow=block(resource.block());
+            output.append(" finally { ").append(close.java).append("; } }\n");
+            scopes.pop();return flow;
         } else if (statement.tryStatement()!=null) {
             return tryStatement(statement.tryStatement());
         } else if (statement.THROW()!=null) {

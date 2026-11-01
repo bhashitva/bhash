@@ -14,5 +14,6 @@
   "Package": {"prefix": ["package", "संकुल"], "body": "संकुल ${1:उदाहरण};", "description": "Compilation unit package"},
   "Import": {"prefix": ["import", "आयात"], "body": "आयात ${1:उदाहरण.वर्ग};", "description": "Import a public declaration"},
   "Static method": {"prefix": ["static", "साझा"], "body": ["सार्वजनिक साझा कार्य ${1:नाम}() -> ${2:शून्य} {", "    $0", "}"], "description": "Static class member"},
+  "Resource scope": {"prefix": ["using", "संसाधन"], "body": ["संसाधन (${1:फ}: ${2:प्रवाह} = ${3:प्रवाह.पठन(\"फ़ाइल.txt\")}) {", "    $0", "}"], "description": "Close a resource on every scope exit"},
   "Print": {"prefix": ["print", "लिखो"], "body": "लिखो($0);", "description": "Print a line"}
 }

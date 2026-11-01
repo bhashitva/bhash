@@ -198,4 +198,69 @@ internal static class BhashStandard {
             }finally{active.Remove(x);}
         }
     }
+    private static string[] appArgs=Array.Empty<string>();
+    internal static void appSetArguments(string[] args){appArgs=(string[])args.Clone();}
+    internal static BhashRuntime.BList<string> appArguments(){var result=new BhashRuntime.BList<string>();foreach(string arg in appArgs){unicode(arg);result.add(arg);}return result;}
+    private static readonly Dictionary<long,Stream> appStreams=new Dictionary<long,Stream>();
+    private static long appNextStream;
+    private static long appOpen(string name,bool write){
+        fileGuard();if(appStreams.Count>=1024)throw failure("बहुत अधिक खुले प्रवाह।");
+        try{Stream stream=new BufferedStream(new FileStream(path(name),write?FileMode.Create:FileMode.Open,write?FileAccess.Write:FileAccess.Read,FileShare.Read));
+            long id=++appNextStream;appStreams.Add(id,stream);return id;
+        }catch(Exception e) when(fileError(e)){throw failure("प्रवाह खोला नहीं जा सका।");}
+    }
+    internal static long appOpenRead(string name)=>appOpen(name,false);
+    internal static long appOpenWrite(string name)=>appOpen(name,true);
+    private static Stream appStream(long id){fileGuard();if(!appStreams.TryGetValue(id,out var stream))throw failure("प्रवाह बंद है।");return stream;}
+    internal static BhashRuntime.BBuffer appRead(long id,long count){
+        fileGuard();if(count<0||count>1048576)throw failure("पठन आकार ० से १०४८५७६ होना चाहिए।");
+        var stream=appStream(id);if(!stream.CanRead)throw failure("प्रवाह पठन के लिए नहीं है।");
+        try{byte[] bytes=new byte[(int)count];int used=0,n;while(used<bytes.Length&&(n=stream.Read(bytes,used,bytes.Length-used))>0)used+=n;
+            if(used!=bytes.Length)Array.Resize(ref bytes,used);return new BhashRuntime.BBuffer(bytes);
+        }catch(Exception e) when(fileError(e)){throw failure("प्रवाह पढ़ा नहीं जा सका।");}
+    }
+    internal static void appWrite(long id,BhashRuntime.BBuffer value){
+        var stream=appStream(id);if(!stream.CanWrite)throw failure("प्रवाह लेखन के लिए नहीं है।");
+        BhashRuntime.instance(value);if(value.size()>1048576)throw failure("लेखन आकार १०४८५७६ से अधिक है।");
+        byte[] bytes=new byte[(int)value.size()];for(int i=0;i<bytes.Length;i++)bytes[i]=value.get(i);
+        try{stream.Write(bytes,0,bytes.Length);}catch(Exception e) when(fileError(e)){throw failure("प्रवाह लिखा नहीं जा सका।");}
+    }
+    internal static void appFlush(long id){var stream=appStream(id);if(!stream.CanWrite)throw failure("प्रवाह लेखन के लिए नहीं है।");
+        try{stream.Flush();}catch(Exception e) when(fileError(e)){throw failure("प्रवाह लिखा नहीं जा सका।");}}
+    internal static void appClose(long id){
+        fileGuard();if(id<=0||id>appNextStream)throw failure("अमान्य प्रवाह पहचान।");
+        if(!appStreams.Remove(id,out var stream))return;
+        try{stream.Dispose();}catch(Exception e) when(fileError(e)){throw failure("प्रवाह बंद नहीं किया जा सका।");}
+    }
+    internal static bool appDirectoryExists(string name){
+        fileGuard();string p=path(name);
+        try{var info=new DirectoryInfo(p);if(info.LinkTarget!=null)return info.ResolveLinkTarget(true) is DirectoryInfo target&&target.Exists;return Directory.Exists(p);}
+        catch(Exception e) when(fileError(e)){return false;}
+    }
+    internal static void appMakeDirectory(string name){
+        fileGuard();try{string p=path(name);if(File.Exists(p)||Directory.Exists(p))throw failure("निर्देशिका बनाई नहीं जा सकी।");
+            string parent=Path.GetDirectoryName(p);if(!Directory.Exists(parent))throw failure("निर्देशिका बनाई नहीं जा सकी।");Directory.CreateDirectory(p);
+        }catch(Exception e) when(fileError(e)){throw failure("निर्देशिका बनाई नहीं जा सकी।");}
+    }
+    internal static BhashRuntime.BList<string> appEntries(string name){
+        fileGuard();try{var result=new BhashRuntime.BList<string>();foreach(string entry in Directory.EnumerateFileSystemEntries(path(name))){
+            if(result.size()>=65536)throw failure("निर्देशिका में बहुत अधिक नाम हैं।");string item=Path.GetFileName(entry);unicode(item);result.add(item);}return result;
+        }catch(Exception e) when(fileError(e)){throw failure("निर्देशिका पढ़ी नहीं जा सकी।");}
+    }
+    internal static void appDeleteFile(string name){fileGuard();try{string p=path(name);
+        var attributes=File.GetAttributes(p);if((attributes&(FileAttributes.Directory|FileAttributes.ReparsePoint))!=0)throw failure("फ़ाइल हटाई नहीं जा सकी।");File.Delete(p);
+        }catch(Exception e) when(fileError(e)){throw failure("फ़ाइल हटाई नहीं जा सकी।");}}
+    internal static void appDeleteDirectory(string name){fileGuard();try{string p=path(name);
+        var attributes=File.GetAttributes(p);if((attributes&FileAttributes.Directory)==0||(attributes&FileAttributes.ReparsePoint)!=0)throw failure("निर्देशिका हटाई नहीं जा सकी।");Directory.Delete(p,false);
+        }catch(Exception e) when(fileError(e)){throw failure("निर्देशिका हटाई नहीं जा सकी।");}}
+    internal static string appEnvironment(string name,string fallback){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर परिवेश उपलब्ध नहीं है।");
+#else
+        unicode(name);if(name.Length==0||name.IndexOf((char)0)>=0||name.IndexOf('=')>=0)throw failure("अमान्य परिवेश नाम।");
+        try{return Environment.GetEnvironmentVariable(name)??fallback;}catch(System.Security.SecurityException){throw failure("परिवेश उपलब्ध नहीं है।");}
+#endif
+    }
+    internal static void appLog(string message){unicode(message);try{BhashRuntime.logRecord(message);}catch(IOException){throw failure("लेखा लिखा नहीं जा सका।");}}
+
 }

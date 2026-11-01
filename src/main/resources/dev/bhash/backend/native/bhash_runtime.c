@@ -2,6 +2,9 @@
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
 #endif
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#endif
 #include "bhash_runtime.h"
 #include <limits.h>
 #include <float.h>
@@ -19,6 +22,8 @@ _Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
 #include <fcntl.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <shellapi.h>
+#include <wchar.h>
 #else
 #include <unistd.h>
 #endif
@@ -1717,4 +1722,190 @@ int64_t bh_console_integer(const void *location){
     if(overflow)runtime_error(location,"पूर्णांक 64-बिट सीमा से बाहर है।");
     int64_t result=negative?(value==UINT64_C(9223372036854775808)?INT64_MIN:-(int64_t)value):(int64_t)value;
     bh_roots_pop(&frame);return result;
+}
+
+/* Application foundations. Only integer handles live in this registry: it is
+   not a GC root and never retains managed payload pointers. */
+#ifndef _WIN32
+#include <dirent.h>
+#endif
+typedef struct {FILE *file;uint64_t id;int writing;} app_stream;
+static app_stream app_streams[1024];
+static uint64_t app_next_stream;
+static int app_argc;static char **app_argv;
+void bh_application_arguments(int argc,char **argv){app_argc=argc;app_argv=argv;}
+static app_stream *app_lookup(uint64_t id,const void *location) {
+    for(size_t i=0;i<1024;i++)if(app_streams[i].file&&app_streams[i].id==id)return &app_streams[i];
+    runtime_error(location,"प्रवाह बंद है।");return NULL;
+}
+#ifndef _WIN32
+static void app_dir_close(void *value){(void)closedir((DIR *)value);}
+#else
+static void app_dir_close(void *value){(void)FindClose((HANDLE)value);}
+static void app_local_free(void *value){(void)LocalFree((HLOCAL)value);}
+static int app_directory_exists_wide(const wchar_t *path){
+    HANDLE file=CreateFileW(path,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
+    if(file==INVALID_HANDLE_VALUE)return 0;
+    BY_HANDLE_FILE_INFORMATION attributes;
+    int found=GetFileInformationByHandle(file,&attributes)&&(attributes.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)!=0;
+    (void)CloseHandle(file);return found;
+}
+#endif
+static void app_entry(void **slots,const char *name,const void *location){
+    uint64_t n=strlen(name);
+    if(!valid_utf8((const unsigned char *)name,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
+    if(((bh_collection *)slots[0])->size>=65536)runtime_error(location,"निर्देशिका में बहुत अधिक नाम हैं।");
+    slots[1]=new_text(n,location);memcpy(text_data(slots[1]),name,(size_t)n);
+    (void)bh_collection_call(slots[0],BH_ADD,(uint64_t)(uintptr_t)slots[1],0,NULL,location);
+    slots[1]=NULL;
+}
+uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_info *info,const void *location){
+    if(op==13){
+        void *slots[3]={NULL,NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,3);
+        slots[0]=bh_collection_new(info,0,location);
+#ifdef _WIN32
+        int count=0;wchar_t **args=CommandLineToArgvW(GetCommandLineW(),&count);
+        if(!args)runtime_error(location,"तर्क उपलब्ध नहीं हैं।");
+        bh_cleanup cleanup={cleanups,args,app_local_free};cleanups=&cleanup;
+        for(int i=1;i<count;i++){
+            int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,args[i],-1,NULL,0,NULL,NULL);
+            if(n<=0)runtime_error(location,"अमान्य यूनिकोड पाठ।");
+            slots[2]=new_text((uint64_t)n,location);
+            WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,args[i],-1,(char *)text_data(slots[2]),n,NULL,NULL);
+            app_entry(slots,(const char *)text_data(slots[2]),location);slots[2]=NULL;
+        }
+        cleanups=cleanup.previous;LocalFree(args);
+#else
+        for(int i=1;i<app_argc;i++)app_entry(slots,app_argv[i],location);
+#endif
+        uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
+    }
+    if(op<=1){
+        size_t slot=0;while(slot<1024&&app_streams[slot].file)slot++;
+        if(slot==1024)runtime_error(location,"बहुत अधिक खुले प्रवाह।");
+        void *name=file_path((void *)(uintptr_t)a,location);FILE *file=file_open(name,op==1);
+        if(!file)runtime_error(location,"प्रवाह खोला नहीं जा सका।");
+        app_streams[slot]=(app_stream){file,++app_next_stream,op==1};return app_next_stream;
+    }
+    if(op>=2&&op<=5){
+        if(op==5){
+            if(!a||a>app_next_stream)runtime_error(location,"अमान्य प्रवाह पहचान।");
+            for(size_t i=0;i<1024;i++) {
+                if(app_streams[i].file&&app_streams[i].id==a){
+                    FILE *file=app_streams[i].file;app_streams[i].file=NULL;
+                    if(fclose(file))runtime_error(location,"प्रवाह बंद नहीं किया जा सका।");
+                    break;
+                }
+            }
+            return 0;
+        }
+        if(op==2&&(int64_t)b<0)runtime_error(location,"पठन आकार ० से १०४८५७६ होना चाहिए।");
+        if(op==2&&b>1048576)runtime_error(location,"पठन आकार ० से १०४८५७६ होना चाहिए।");
+        app_stream *stream=app_lookup(a,location);
+        if(op==2){
+            if(stream->writing)runtime_error(location,"प्रवाह पठन के लिए नहीं है।");
+            bh_collection *buffer=bh_collection_new(info,(int64_t)b,location);
+            size_t used=b?fread(buffer->data,1,(size_t)b,stream->file):0;
+            if(ferror(stream->file))runtime_error(location,"प्रवाह पढ़ा नहीं जा सका।");
+            buffer->size=used;return (uint64_t)(uintptr_t)buffer;
+        }
+        if(!stream->writing)runtime_error(location,"प्रवाह लेखन के लिए नहीं है।");
+        if(op==4){if(fflush(stream->file))runtime_error(location,"प्रवाह लिखा नहीं जा सका।");return 0;}
+        bh_collection *buffer=bh_instance((void *)(uintptr_t)b,location);
+        if(buffer->size>1048576)runtime_error(location,"लेखन आकार १०४८५७६ से अधिक है।");
+        if(buffer->size&&fwrite(buffer->data,1,(size_t)buffer->size,stream->file)!=buffer->size)runtime_error(location,"प्रवाह लिखा नहीं जा सका।");
+        return 0;
+    }
+    if(op==12){
+        const void *message=(void *)(uintptr_t)a;uint64_t n=text_length(message);
+        if(!valid_utf8(text_data(message),n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
+        if((n&&fwrite(text_data(message),1,(size_t)n,stderr)!=n)||fputc('\n',stderr)==EOF||fflush(stderr))runtime_error(location,"लेखा लिखा नहीं जा सका।");
+        return 0;
+    }
+    void *slots[3]={NULL,NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,3);
+    if(op==11){
+        const void *name=(const void *)(uintptr_t)a;
+        if(!text_length(name)||memchr(text_data(name),0,(size_t)text_length(name))||memchr(text_data(name),'=',(size_t)text_length(name)))runtime_error(location,"अमान्य परिवेश नाम।");
+    }
+    slots[2]=file_path((void *)(uintptr_t)a,location);
+    if(op==11){
+        const char *name=(const char *)text_data(slots[2]);
+        if(strchr(name,'='))runtime_error(location,"अमान्य परिवेश नाम।");
+#ifdef _WIN32
+        wchar_t *wide=file_wide(slots[2]);if(!wide)runtime_error(location,"परिवेश उपलब्ध नहीं है।");
+        SetLastError(ERROR_SUCCESS);DWORD n=GetEnvironmentVariableW(wide,NULL,0);
+        if(!n){
+            DWORD error=GetLastError();free(wide);
+            if(error==ERROR_ENVVAR_NOT_FOUND){bh_roots_pop(&frame);return b;}
+            if(error!=ERROR_SUCCESS)runtime_error(location,"परिवेश उपलब्ध नहीं है।");
+            slots[0]=new_text(0,location);uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
+        }
+        wchar_t *value=malloc((size_t)n*sizeof *value);if(!value){free(wide);runtime_error(location,"परिवेश उपलब्ध नहीं है।");}
+        SetLastError(ERROR_SUCCESS);DWORD got=GetEnvironmentVariableW(wide,value,n);DWORD error=GetLastError();free(wide);
+        if(got>=n||(!got&&error!=ERROR_SUCCESS)){free(value);runtime_error(location,"परिवेश उपलब्ध नहीं है।");}
+        if(!got){free(value);slots[0]=new_text(0,location);uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;}
+        int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,value,(int)got,NULL,0,NULL,NULL);
+        if(bytes<=0){free(value);runtime_error(location,"अमान्य यूनिकोड पाठ।");}
+        bh_cleanup cleanup={cleanups,value,free};cleanups=&cleanup;
+        slots[0]=new_text((uint64_t)bytes,location);WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,value,(int)got,(char *)text_data(slots[0]),bytes,NULL,NULL);
+        cleanups=cleanup.previous;free(value);
+#else
+        const char *value=getenv(name);if(!value){bh_roots_pop(&frame);return b;}
+        uint64_t n=strlen(value);if(!valid_utf8((const unsigned char *)value,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
+        slots[0]=new_text(n,location);memcpy(text_data(slots[0]),value,(size_t)n);
+#endif
+        uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
+    }
+    int status=0;
+#ifdef _WIN32
+    wchar_t *wide=file_wide(slots[2]);if(!wide)runtime_error(location,"अमान्य फ़ाइल पथ।");
+    if(op==6){int found=app_directory_exists_wide(wide);free(wide);bh_roots_pop(&frame);return (uint64_t)found;}
+    if(op==7)status=CreateDirectoryW(wide,NULL)?0:-1;
+    if(op==9||op==10){DWORD attr=GetFileAttributesW(wide);
+        if(attr==INVALID_FILE_ATTRIBUTES||(attr&FILE_ATTRIBUTE_REPARSE_POINT))status=-1;
+        else if(op==9)status=(attr&FILE_ATTRIBUTE_DIRECTORY)?-1:(DeleteFileW(wide)?0:-1);
+        else status=(attr&FILE_ATTRIBUTE_DIRECTORY)?(RemoveDirectoryW(wide)?0:-1):-1;
+    }
+    if(op==8){
+        if(!app_directory_exists_wide(wide)){free(wide);runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");}
+        size_t length=wcslen(wide);wchar_t *pattern=malloc((length+3)*sizeof *pattern);
+        if(!pattern){free(wide);runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");}
+        memcpy(pattern,wide,length*sizeof *pattern);pattern[length]=L'/';pattern[length+1]=L'*';pattern[length+2]=0;free(wide);
+        WIN32_FIND_DATAW entry;HANDLE dir=FindFirstFileW(pattern,&entry);DWORD open_error=GetLastError();free(pattern);
+        if(dir==INVALID_HANDLE_VALUE){
+            if(open_error!=ERROR_FILE_NOT_FOUND)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
+            slots[0]=bh_collection_new(info,0,location);uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
+        }
+        bh_cleanup cleanup={cleanups,dir,app_dir_close};cleanups=&cleanup;
+        slots[0]=bh_collection_new(info,0,location);
+        do {
+            char name[4*MAX_PATH];int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,entry.cFileName,-1,name,(int)sizeof name,NULL,NULL);
+            if(bytes<=0)runtime_error(location,"अमान्य यूनिकोड पाठ।");
+            if(strcmp(name,".")&&strcmp(name,".."))app_entry(slots,name,location);
+        }while(FindNextFileW(dir,&entry));
+        DWORD error=GetLastError();cleanups=cleanup.previous;FindClose(dir);
+        if(error!=ERROR_NO_MORE_FILES)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
+        uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
+    }
+    free(wide);
+#else
+    const char *name=(const char *)text_data(slots[2]);struct stat statbuf;
+    if(op==6){int found=!stat(name,&statbuf)&&S_ISDIR(statbuf.st_mode);bh_roots_pop(&frame);return (uint64_t)found;}
+    if(op==7)status=mkdir(name,0777);
+    if(op==9||op==10){
+        status=lstat(name,&statbuf);
+        if(!status){if(op==9)status=S_ISREG(statbuf.st_mode)?unlink(name):-1;else status=S_ISDIR(statbuf.st_mode)?rmdir(name):-1;}
+    }
+    if(op==8){
+        DIR *dir=opendir(name);if(!dir)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
+        bh_cleanup cleanup={cleanups,dir,app_dir_close};cleanups=&cleanup;slots[0]=bh_collection_new(info,0,location);
+        struct dirent *entry;int error=0;
+        for(;;){errno=0;entry=readdir(dir);if(!entry){error=errno;break;}if(strcmp(entry->d_name,".")&&strcmp(entry->d_name,".."))app_entry(slots,entry->d_name,location);}
+        cleanups=cleanup.previous;if(closedir(dir)||error)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
+        uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
+    }
+#endif
+    bh_roots_pop(&frame);
+    if(status)runtime_error(location,op==7?"निर्देशिका बनाई नहीं जा सकी।":op==9?"फ़ाइल हटाई नहीं जा सकी।":"निर्देशिका हटाई नहीं जा सकी।");
+    return 0;
 }

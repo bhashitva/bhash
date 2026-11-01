@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Compiler bindings used by foundations.bhash; use its public resource classes.
+तंत्र|पठनखोलो|appOpenRead|पूर्णांक|पथ: पाठ
+तंत्र|लेखनखोलो|appOpenWrite|पूर्णांक|पथ: पाठ
+तंत्र|पढ़ो|appRead|बाइटबफ़र|धारा: पूर्णांक, गिनती: पूर्णांक
+तंत्र|बाइटलिखो|appWrite|शून्य|धारा: पूर्णांक, सामग्री: बाइटबफ़र
+तंत्र|भेजो|appFlush|शून्य|धारा: पूर्णांक
+तंत्र|बंदकरो|appClose|शून्य|धारा: पूर्णांक
+तंत्र|निर्देशिकाहै|appDirectoryExists|तार्किक|पथ: पाठ
+तंत्र|निर्देशिकाबनाओ|appMakeDirectory|शून्य|पथ: पाठ
+तंत्र|नाम|appEntries|सूची<पाठ>|पथ: पाठ
+तंत्र|फ़ाइलहटाओ|appDeleteFile|शून्य|पथ: पाठ
+तंत्र|निर्देशिकाहटाओ|appDeleteDirectory|शून्य|पथ: पाठ
+तंत्र|परिवेश|appEnvironment|पाठ|नाम: पाठ, वैकल्पिक: पाठ
+तंत्र|अभिलेखलिखो|appLog|शून्य|संदेश: पाठ
+तंत्र|तर्क|appArguments|सूची<पाठ>|

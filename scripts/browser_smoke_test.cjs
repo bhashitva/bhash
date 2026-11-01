@@ -24,6 +24,21 @@ build('types', path.resolve('examples/types'));
 compile('standard-library', fs.readFileSync('examples/standard-library/portable.bhash', 'utf8'));
 compile('standard-library-browser', fs.readFileSync('src/test/resources/stdlib/browser.bhash', 'utf8'));
 compile('type-semantics', fs.readFileSync('src/test/resources/types/browser.bhash', 'utf8'));
+for (const name of ['collections', 'configuration', 'resources'])
+    compile(`foundations-${name}`, fs.readFileSync(`examples/foundations/${name}.test.bhash`, 'utf8'));
+compile('foundations-browser', `
+आयात मानक.प्रवाह; आयात मानक.निर्देशिका; आयात मानक.विन्यास; आयात मानक.परीक्षण; आयात मानक.लेखा;
+कार्य मुख्य() -> शून्य {
+    मान गिनती: पूर्णांक = ०;
+    प्रयास { प्रवाह.पठन("अनुपलब्ध"); } पकड़ो (ग: अपवाद) { गिनती = गिनती + १; }
+    प्रयास { निर्देशिका.नाम("."); } पकड़ो (ग: अपवाद) { गिनती = गिनती + १; }
+    प्रयास { विन्यास.परिवेश("HOME", ""); } पकड़ो (ग: अपवाद) { गिनती = गिनती + १; }
+    परीक्षण.बराबर(३, गिनती);
+    लेखा.स्तर(४); लेखा.सूचना("दिखना नहीं चाहिए");
+    लेखा.स्तर(१); लेखा.सूचना("भारत😀");
+}
+`);
+
 build('multi-file', path.resolve('examples/multi-file'));
 build('source-packages', path.resolve('examples/packages/app'));
 compile('exceptions', fs.readFileSync('examples/exceptions.bhash', 'utf8'));
@@ -183,6 +198,9 @@ const server = http.createServer((request, response) => {
             for (const input of ['', '1२', 'abc', '9223372036854775808'])
                 await run(name, input, prompt, 1, 'भाष:');
         }
+        for (const name of ['collections', 'configuration', 'resources'])
+            await run(`foundations-${name}`, '', '');
+        await run('foundations-browser', '', '', 0, '{"level":1,"message":"भारत😀","fields":{}}');
         await run('types', '', fs.readFileSync('examples/types/expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('standard-library', '', '३ नमस्ते | भारत | \n२ भाष सरल है\n2.62\nसत्य ४२\n१\nभारत ३ {"नाम":"भारत","अंक":[1,2,3]}\n1970-01-01T00:00:00.000Z ०\nब्राउज़र में फ़ाइल तंत्र उपलब्ध नहीं है।\n');
         await run('standard-library-browser', '', '0.12 -0.00\n६७ ५० ३९\nसत्य सत्य सत्य 😀\n2000-02-29T12:34:56.789Z\nसत्य\n' + 'असमर्थित\n'.repeat(5) + 'अमान्य\nचक्रीय\n');

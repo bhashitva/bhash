@@ -1,5 +1,8 @@
 # Bhash standard library — first edition
 
+For collection algorithms, buffered streams, scoped cleanup, paths/directories,
+configuration, logging and testing, see [application foundations](application-foundations.md).
+
 For Hindi explanations and runnable examples of every function and overload, see the
 [standard-library tutorials](../tutorial/standard-library/README.md).
 

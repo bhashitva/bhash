@@ -27,11 +27,13 @@ def main():
             command = [args.cc, '/nologo', '/std:c17', '/utf-8', '/W4', '/WX',
                        '/O2' if optimized else '/Od', '/I' + str(RUNTIME),
                        str(ROOT / 'tests/native/runtime_test.c'), str(RUNTIME / 'bhash_runtime.c'),
-                       '/Fe:' + str(exe), '/Fo:' + str(BUILD) + os.sep]
+                       '/Fe:' + str(exe), '/Fo:' + str(BUILD) + os.sep, '/link', 'Shell32.lib']
         else:
             command = [args.cc, '-std=c17', '-Wall', '-Wextra', '-Werror', '-pedantic',
                        '-O2' if optimized else '-O0', '-I', str(RUNTIME),
                        str(ROOT / 'tests/native/runtime_test.c'), str(RUNTIME / 'bhash_runtime.c'), '-o', str(exe)]
+            if os.name == 'nt':
+                command += ['-lshell32']
             if os.name != 'nt':
                 command += ['-lm']
             if args.sanitize:

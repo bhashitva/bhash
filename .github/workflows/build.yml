@@ -24,6 +24,8 @@ jobs:
       - run: mvn --batch-mode --no-transfer-progress verify
       - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar check examples/hello.bhash
       - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar check examples/factorial.bhash
+      - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar test examples/foundations --target jvm
+      - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar test examples/foundations --target clr
       - run: python -m unittest discover -s scripts -p "test_build_examples.py"
       - run: python scripts/smoke_test.py
       - run: python scripts/check_lessons.py --target jvm

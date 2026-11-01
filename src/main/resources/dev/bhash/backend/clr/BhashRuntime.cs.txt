@@ -192,6 +192,7 @@ internal static class BhashRuntime {
     internal static bool same(object left, object right) => collectionSame(left, right);
     internal static void discard(object value) {}
     internal static void report(string message) => Errors.WriteLine("भाष: " + message);
+    internal static void logRecord(string message) { Errors.WriteLine(message); Errors.Flush(); }
     private static int collectionIndex(long index,int size,bool end) {
         if (index<0 || (end?index>size:index>=size)) throw new Failure("संग्रह सूचकांक सीमा से बाहर है।");
         return (int)index;

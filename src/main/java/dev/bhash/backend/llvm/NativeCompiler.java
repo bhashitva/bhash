@@ -76,6 +76,7 @@ public final class NativeCompiler {
                 for(String object:List.of("program.o","runtime.o"))Files.setLastModifiedTime(work.resolve(object),java.nio.file.attribute.FileTime.fromMillis(0));
             }
             var link=new ArrayList<>(List.of(clang,"program.o","runtime.o","-lm"));
+            if(NativePlatform.windows())link.add("-lshell32");
             // Darwin's content-derived UUID is required by current dyld, including release builds.
             if(NativePlatform.macos()){
                 if(debug)link.add("-Wl,-no_deduplicate,-oso_prefix,"+work+"/");

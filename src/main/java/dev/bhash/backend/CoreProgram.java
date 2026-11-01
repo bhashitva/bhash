@@ -57,6 +57,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record InputCall(Type type, Source source) implements Expression {}
     public enum TimeOperation { NOW, READ, WRITE, YEAR, MONTH, DAY }
     public record TimeCall(Type type, TimeOperation operation, List<Expression> arguments, Source source) implements Expression {}
+    public record FoundationCall(Type type,int operation,List<Expression> arguments,int descriptor,Source source) implements Expression {}
     public enum FileOperation { SUPPORTED, EXISTS, READ_TEXT, WRITE_TEXT }
     public record FileCall(Type type, FileOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public enum StructuredOperation { SPLIT, JOIN, JSON_READ, JSON_WRITE }
@@ -98,7 +99,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         public Function(int id, Type result, List<Binding> parameters, Block body, Source source, int initialization){this(id,result,parameters,body,source,initialization,"");}
         public Function(int id, Type result, List<Binding> parameters, Block body, Source source){this(id,result,parameters,body,source,-1);}
     }
-    public sealed interface Expression permits StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits FoundationCall, StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -116,7 +117,8 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record TextCall(Type type, TextOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public record Allocate(int objectType, Source source) implements Expression { public Type type(){return Type.OBJECT;} }
     public record FieldRead(Expression receiver, ObjectField field, Source source) implements Expression { public Type type(){return field.type();} }
-    public sealed interface Statement permits Fail, Initialize, StaticWrite, Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach, Try, Throw, Selection {}
+    public sealed interface Statement permits ResourceCheck, Fail, Initialize, StaticWrite, Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach, Try, Throw, Selection {}
+    public record ResourceCheck(Binding binding,Source source) implements Statement {}
     public record FieldWrite(FieldRead destination, Expression value) implements Statement {}
     public record Block(List<Statement> statements, List<Binding> locals) implements Statement {}
     public record Assign(Binding binding, Expression value) implements Statement {}
@@ -467,6 +469,12 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 throw unsupported(d);
             }
             if(s.THROW()!=null)return new Throw(s.expression()==null?new Read(caught.peek(),source(s)):expression(s.expression()),source(s));
+            if(s.resourceStatement()!=null){
+                var r=s.resourceStatement();var local=binding(a.bindings.get(r.parameter()),r.parameter());
+                var assign=new Assign(local,coerce(expression(r.expression()),local.type()));
+                var cleanup=new Block(List.of(new Evaluate(methodCall(a.calls.get(r),List.of(new Read(local,source(r))),r))),List.of());
+                return new Block(List.of(assign,new ResourceCheck(local,source(r)),new Try(block(r.block()),List.of(),cleanup,new Binding(nextBinding++,Type.OBJECT),source(r))),List.of(local));
+            }
             if(s.tryStatement()!=null){
                 var t=s.tryStatement();var body=block(t.block(0));var handlers=new ArrayList<Catch>();
                 for(var clause:t.catchClause()){
@@ -527,6 +535,12 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 case "stdFileReadBytes"->BufferOperation.READ_FILE;case "stdFileWriteBytes"->BufferOperation.WRITE_FILE;default->null;};
             if(buffer!=null)return new BufferCall(type(f.result,at),buffer,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             TextOperation operation=null;
+            if(f.intrinsic!=null && f.intrinsic.startsWith("app")) {
+                var names=List.of("appOpenRead","appOpenWrite","appRead","appWrite","appFlush","appClose","appDirectoryExists","appMakeDirectory","appEntries","appDeleteFile","appDeleteDirectory","appEnvironment","appLog","appArguments");
+                int op=names.indexOf(f.intrinsic);if(op<0)throw unsupported(at);
+                ensureStructuredTypes(at);
+                return new FoundationCall(type(f.result,at),op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
+            }
             if(f.intrinsic!=null) {
                 TimeOperation time=switch(f.intrinsic){case "stdNow"->TimeOperation.NOW;case "stdTimeRead"->TimeOperation.READ;
                     case "stdTimeWrite"->TimeOperation.WRITE;case "stdYear"->TimeOperation.YEAR;case "stdMonth"->TimeOperation.MONTH;case "stdDay"->TimeOperation.DAY;default->null;};

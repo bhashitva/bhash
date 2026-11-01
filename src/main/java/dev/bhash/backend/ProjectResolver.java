@@ -35,7 +35,7 @@ public final class ProjectResolver {
         var trees = new ArrayList<ProgramContext>();
         var errors = new ArrayList<String>();
         for (var source : sources) {
-            if(source.name().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME))throw new CompilationException("Reserved standard library source name.");
+            if(dev.bhash.stdlib.StandardLibrary.reserved(source.name()))throw new CompilationException("Reserved standard library source name.");
             var parsed = source.parse();
             if (parsed.valid()) trees.add(parsed.tree());
             else parsed.diagnostics().forEach(d -> errors.add(d.toString()));
@@ -51,17 +51,26 @@ public final class ProjectResolver {
     }
     static Resolution resolveTrees(List<ProgramContext> trees) throws CompilationException {
         if(trees.isEmpty())throw new CompilationException("Project contains no .bhash source files.");
-        for(var input:trees)if(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME.equals(LocatedToken.source(input.start,"")))throw new CompilationException("Reserved standard library source name.");
+        for(var input:trees)if(dev.bhash.stdlib.StandardLibrary.reserved(LocatedToken.source(input.start,"")))throw new CompilationException("Reserved standard library source name.");
         var resolver = new ProjectResolver();
         var all=new ArrayList<>(trees);
         var library=dev.bhash.stdlib.StandardLibrary.source().parse();
         if(!library.valid())throw new IllegalStateException("Invalid bundled standard library: "+library.diagnostics());
         all.add(library.tree());
+        var referenced=new HashSet<String>();
+        for(var input:trees)collectIdentifiers(input,referenced);
+        var foundations=dev.bhash.stdlib.StandardLibrary.foundations(referenced).parse();
+        if(!foundations.valid())throw new IllegalStateException("Invalid application foundations: "+foundations.diagnostics());
+        all.add(foundations.tree());
         var tree = resolver.resolveProgram(all);
         var names = new HashMap<String,String>();
         for (var table : List.of(resolver.types,resolver.functions))
             for (var symbol : table.values()) names.put(symbol.lowered,symbol.full);
         return new Resolution(tree,Map.copyOf(names));
+    }
+    private static void collectIdentifiers(ParseTree tree,Set<String> names) {
+        if(tree instanceof TerminalNode t&&t.getSymbol().getType()==BhashParser.IDENTIFIER)names.add(key(t.getText()));
+        for(int i=0;i<tree.getChildCount();i++)collectIdentifiers(tree.getChild(i),names);
     }
     private static String key(String text) { return Identifiers.key(text); }
     private static String full(Unit unit, String name) { return unit.pkg.isEmpty() ? key(name) : unit.pkg + "." + key(name); }
@@ -106,7 +115,7 @@ public final class ProjectResolver {
     }
     private void register(Unit unit, ParserRuleContext declaration, Token name, Kind kind, boolean exported) throws CompilationException {
         String shortName = key(name.getText()), full = full(unit, shortName);
-        if(dev.bhash.stdlib.StandardLibrary.owns(full)&&!dev.bhash.stdlib.StandardLibrary.SOURCE_NAME.equals(LocatedToken.source(name,"")))
+        if(dev.bhash.stdlib.StandardLibrary.owns(full)&&!dev.bhash.stdlib.StandardLibrary.reserved(LocatedToken.source(name,"")))
             throw error(name,"Reserved standard library declaration: "+full);
         if (kind == Kind.TYPE && (CollectionTypes.builtin(shortName) || shortName.equals(key("अपवाद")))) throw error(name,"Reserved built-in type: " + shortName);
         if (kind == Kind.FUNCTION && BUILTINS.contains(shortName)) {

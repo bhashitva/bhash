@@ -17,6 +17,37 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void nativeFoundationArgumentsAndLogsUseUnicode()throws Exception {
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.विन्यास; आयात मानक.लेखा;
+            कार्य मुख्य() -> शून्य {
+                लिखो(विन्यास.तर्क().पढ़ो("नाम","")); लेखा.सूचना("नमस्ते😀");
+            }
+            """, "--नाम=भारत😀");
+        assertEquals(0,result.exit(),result.err());assertEquals("भारत😀\n",result.out());
+        assertEquals("{\"level\":1,\"message\":\"नमस्ते😀\",\"fields\":{}}\n",result.err());
+    }
+    @Test void nativeFoundationEnvironmentPreservesEmptyValues()throws Exception {
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.विन्यास; आयात मानक.परीक्षण;
+            कार्य मुख्य() -> शून्य {
+                परीक्षण.बराबर("", विन्यास.परिवेश("BHASH_FOUNDATIONS_EMPTY", "missing"));
+                परीक्षण.बराबर("भारत😀", विन्यास.परिवेश("BHASH_FOUNDATIONS_UNICODE", "missing"));
+            }
+            """,Map.of("BHASH_FOUNDATIONS_EMPTY","","BHASH_FOUNDATIONS_UNICODE","भारत😀"));
+        assertEquals(0,result.exit(),result.err());assertEquals("",result.out());
+    }
+    @Test void applicationFoundationsRunWithForcedCollectionAndCleanRoots()throws Exception {
+        requireTools();
+        var sources=new ArrayList<>(FoundationFixtures.portable());sources.add(FoundationFixtures.files(temporary));
+        for(String source:sources){
+            var result=nativeRun(source,GC_STRESS);
+            assertEquals(0,result.exit(),result.err());assertEquals("",result.out());
+            assertEquals(0L,stats(result).get("live"));
+        }
+    }
     @TempDir Path temporary;
     @BeforeEach void reportNativeCase(TestInfo info){
         if(Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE")))
@@ -1956,8 +1987,9 @@ class NativeBackendTest {
             Path jar=temporary.resolve("reference.jar");
             new JvmCompiler().compile(sources,jar);
             Path referenceOut=temporary.resolve("reference.out"),referenceErr=temporary.resolve("reference.err");
-            var reference=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString())
-                .redirectOutput(referenceOut.toFile()).redirectError(referenceErr.toFile()).start();
+            var referenceBuilder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString())
+                .redirectOutput(referenceOut.toFile()).redirectError(referenceErr.toFile());
+            referenceBuilder.environment().putAll(environment);var reference=referenceBuilder.start();
             assertTrue(reference.waitFor(15,TimeUnit.SECONDS));
             assertEquals(reference.exitValue(),result.exit(),"Native/JVM exit mismatch");
             assertEquals(Files.readString(referenceOut).replace("\r\n","\n"),result.out(),"Native/JVM output mismatch");
