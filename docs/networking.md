@@ -94,8 +94,9 @@ Relative, absolute-path, query-only and network-path Location references resolve
 against the preceding URI.
 
 HTTPS never downgrades to HTTP. Cross-origin redirects are followed only after
-the method becomes GET/HEAD, with all caller-supplied headers dropped. Non-GET/HEAD
-body replay to another origin is rejected. An origin includes scheme, normalized
+the method becomes GET/HEAD with an empty body, with all caller-supplied headers
+dropped. Requests carrying a body, including GET bodies, are never replayed to
+another origin. An origin includes scheme, normalized
 host and effective port. Reaching the hop limit throws; setting the limit to zero
 returns the original redirect response.
 
