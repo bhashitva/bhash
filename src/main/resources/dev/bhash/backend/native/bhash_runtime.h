@@ -171,5 +171,3 @@ int64_t bh_console_integer(const void *location);
 void bh_application_arguments(int, char **);
 uint64_t bh_foundation_call(uint32_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
 #endif
-
-

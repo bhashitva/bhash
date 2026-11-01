@@ -1743,6 +1743,13 @@ static void app_dir_close(void *value){(void)closedir((DIR *)value);}
 #else
 static void app_dir_close(void *value){(void)FindClose((HANDLE)value);}
 static void app_local_free(void *value){(void)LocalFree((HLOCAL)value);}
+static int app_directory_exists_wide(const wchar_t *path){
+    HANDLE file=CreateFileW(path,FILE_READ_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS,NULL);
+    if(file==INVALID_HANDLE_VALUE)return 0;
+    BY_HANDLE_FILE_INFORMATION attributes;
+    int found=GetFileInformationByHandle(file,&attributes)&&(attributes.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)!=0;
+    (void)CloseHandle(file);return found;
+}
 #endif
 static void app_entry(void **slots,const char *name,const void *location){
     uint64_t n=strlen(name);
@@ -1843,7 +1850,7 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
     int status=0;
 #ifdef _WIN32
     wchar_t *wide=file_wide(slots[2]);if(!wide)runtime_error(location,"अमान्य फ़ाइल पथ।");
-    if(op==6){DWORD attr=GetFileAttributesW(wide);free(wide);bh_roots_pop(&frame);return attr!=INVALID_FILE_ATTRIBUTES&&(attr&FILE_ATTRIBUTE_DIRECTORY)!=0;}
+    if(op==6){int found=app_directory_exists_wide(wide);free(wide);bh_roots_pop(&frame);return (uint64_t)found;}
     if(op==7)status=CreateDirectoryW(wide,NULL)?0:-1;
     if(op==9||op==10){DWORD attr=GetFileAttributesW(wide);
         if(attr==INVALID_FILE_ATTRIBUTES||(attr&FILE_ATTRIBUTE_REPARSE_POINT))status=-1;
@@ -1851,11 +1858,15 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
         else status=(attr&FILE_ATTRIBUTE_DIRECTORY)?(RemoveDirectoryW(wide)?0:-1):-1;
     }
     if(op==8){
+        if(!app_directory_exists_wide(wide)){free(wide);runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");}
         size_t length=wcslen(wide);wchar_t *pattern=malloc((length+3)*sizeof *pattern);
         if(!pattern){free(wide);runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");}
         memcpy(pattern,wide,length*sizeof *pattern);pattern[length]=L'/';pattern[length+1]=L'*';pattern[length+2]=0;free(wide);
-        WIN32_FIND_DATAW entry;HANDLE dir=FindFirstFileW(pattern,&entry);free(pattern);
-        if(dir==INVALID_HANDLE_VALUE)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
+        WIN32_FIND_DATAW entry;HANDLE dir=FindFirstFileW(pattern,&entry);DWORD open_error=GetLastError();free(pattern);
+        if(dir==INVALID_HANDLE_VALUE){
+            if(open_error!=ERROR_FILE_NOT_FOUND)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
+            slots[0]=bh_collection_new(info,0,location);uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
+        }
         bh_cleanup cleanup={cleanups,dir,app_dir_close};cleanups=&cleanup;
         slots[0]=bh_collection_new(info,0,location);
         do {
