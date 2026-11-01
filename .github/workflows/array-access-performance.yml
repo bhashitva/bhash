@@ -1,0 +1,58 @@
+name: Primitive array access before-after experiment
+on:
+  push:
+    branches: ['perf/primitive-array-access']
+    paths: ['.github/workflows/array-access-performance.yml', 'benchmarks/array_access.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      BHASH_NATIVE_TOOLCHAIN: system
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          ref: af7753b3ecd8108c1ae3cb9992164741f6d72357
+          path: target/before-source
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify or install release toolchain
+        timeout-minutes: 8
+        run: |
+          if command -v clang-18 && command -v opt-18 && command -v cc && command -v objdump && test -x /usr/bin/time; then
+            clang-18 --version
+            opt-18 --version
+          else
+            sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+            sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y clang-18 llvm-18 build-essential binutils time
+          fi
+      - name: Build reference and candidate compilers
+        run: |
+          mvn --batch-mode --no-transfer-progress -f target/before-source/pom.xml -DskipTests package
+          mvn --batch-mode --no-transfer-progress -DskipTests package
+          sha256sum target/before-source/target/bhash-compiler-0.1.0-SNAPSHOT.jar target/bhash-compiler-0.1.0-SNAPSHOT.jar
+          echo 'bfcda6940c8c8dac0d336e199f0ee8fca8b589346aa7f5231941dba0cd4d10a0  target/before-source/target/bhash-compiler-0.1.0-SNAPSHOT.jar' | sha256sum -c
+      - name: Verify benchmark observer and reference checksums
+        run: python3 -m unittest discover -s benchmarks -p 'test_*.py'
+      - name: Compare compiler-selected primitive array access
+        run: python3 benchmarks/array_access.py --before target/before-source/target/bhash-compiler-0.1.0-SNAPSHOT.jar --after target/bhash-compiler-0.1.0-SNAPSHOT.jar
+      - name: Publish measured comparison
+        run: cat target/array-access-benchmarks/comparison.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: array-access-comparison-${{ github.run_id }}
+          path: target/array-access-benchmarks/
+          retention-days: 30
+          if-no-files-found: error

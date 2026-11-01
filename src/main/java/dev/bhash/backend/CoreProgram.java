@@ -31,11 +31,17 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public enum CollectionOperation { SIZE, EMPTY, GET, GET_OR, SET, CONTAINS, ADD, INSERT,
         REMOVE, CLEAR, KEYS, VALUES, VERSION, ITER_CHECK, ITER_KEY, ITER_VALUE }
     public record CollectionCall(Type type, CollectionOperation operation, Expression receiver,
-                                 List<Expression> arguments, int snapshot, Source source) implements Expression {}
+                                 List<Expression> arguments, int snapshot, Source source, boolean primitiveArray) implements Expression {
+        public CollectionCall(Type type,CollectionOperation operation,Expression receiver,List<Expression> arguments,int snapshot,Source source){
+            this(type,operation,receiver,arguments,snapshot,source,false);
+        }
+    }
     public record NewCollection(int collection, boolean literal, List<Expression> arguments, Source source) implements Expression {
         public Type type(){return Type.OBJECT;}
     }
-    public record IndexRead(Type type, Expression receiver, Expression index, Type keyType, Source source) implements Expression {}
+    public record IndexRead(Type type, Expression receiver, Expression index, Type keyType, Source source, boolean primitiveArray) implements Expression {
+        public IndexRead(Type type,Expression receiver,Expression index,Type keyType,Source source){this(type,receiver,index,keyType,source,false);}
+    }
     public record IndexWrite(IndexRead destination, Expression value) implements Statement {}
     public record Foreach(Expression collection, Binding owner, Binding index, Binding version,
                           List<Assign> items, Block body, Source source) implements Statement {}
@@ -653,7 +659,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                         var result=a.expressions.get(part).type();
                         boolean map=previous.collection==ManagedEmitter.CollectionKind.MAP;
                         var element=previous.arguments.get(map?1:0);var key=map?previous.arguments.get(0):ManagedEmitter.Type.INT;
-                        if(part.LBRACK()!=null)value=new IndexRead(type(result,part),value,coerce(expression(part.expression()),type(key,part)),type(key,part),source(part));
+                        if(part.LBRACK()!=null)value=new IndexRead(type(result,part),value,coerce(expression(part.expression()),type(key,part)),type(key,part),source(part),previous.collection==ManagedEmitter.CollectionKind.ARRAY && !type(element,part).reference());
                         else {
                             String name=part.IDENTIFIER().getText();var args=new ArrayList<>(arguments(part.arguments()));
                             BufferOperation bufferOp=previous.collection!=ManagedEmitter.CollectionKind.BUFFER?null:switch(Identifiers.key(name)){
@@ -674,7 +680,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                                 args.set(i,coerce(args.get(i),type(expected,part)));
                             }
                             int snapshot=result.collection!=null?collectionId(result,part):-1;
-                            value=new CollectionCall(type(result,part),operation,value,List.copyOf(args),snapshot,source(part));
+                            value=new CollectionCall(type(result,part),operation,value,List.copyOf(args),snapshot,source(part),previous.collection==ManagedEmitter.CollectionKind.ARRAY && !type(element,part).reference());
                         }
                         previous=result;continue;
                     }

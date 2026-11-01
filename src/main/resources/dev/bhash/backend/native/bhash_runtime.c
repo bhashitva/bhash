@@ -1138,6 +1138,20 @@ uint64_t bh_collection_call(void *receiver, uint32_t operation, uint64_t a, uint
     }
     bh_roots_pop(&frame); return result;
 }
+/* Compiler-only entry points for statically checked primitive arrays. Success
+   cannot allocate or collect, so no temporary roots or interior pointers escape.
+   Failure delegates to the unchanged rooted dispatcher: identical errors,
+   source locations and exception unwinding. Do not mark these globally no-GC. */
+uint64_t bh_primitive_array_get(void *receiver, uint64_t index, const void *location) {
+    bh_collection *c = bh_instance(receiver, location);
+    if (index < c->size) return c->data[index];
+    return bh_collection_call(receiver, BH_GET, index, 0, NULL, location);
+}
+void bh_primitive_array_set(void *receiver, uint64_t index, uint64_t value, const void *location) {
+    bh_collection *c = bh_instance(receiver, location);
+    if (index < c->size) c->data[index] = value;
+    else (void)bh_collection_call(receiver, BH_SET, index, value, NULL, location);
+}
 void *bh_collection_literal(const bh_collection_info *info, uint64_t count, const uint64_t *values, const void *location) {
     uint64_t width = info->kind == BH_MAP ? 2 : 1;
     if (count > INT32_MAX || count > (SIZE_MAX / sizeof(void *) - 1) / width) runtime_error(location, "सरणी की लंबाई सीमा से बाहर है।");
