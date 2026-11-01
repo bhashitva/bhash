@@ -1790,11 +1790,14 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
     if(op>=2&&op<=5){
         if(op==5){
             if(!a||a>app_next_stream)runtime_error(location,"अमान्य प्रवाह पहचान।");
-            for(size_t i=0;i<1024;i++)if(app_streams[i].file&&app_streams[i].id==a){
-                FILE *file=app_streams[i].file;app_streams[i].file=NULL;
-                if(fclose(file))runtime_error(location,"प्रवाह बंद नहीं किया जा सका।");
-                break;
-            }return 0;
+            for(size_t i=0;i<1024;i++) {
+                if(app_streams[i].file&&app_streams[i].id==a){
+                    FILE *file=app_streams[i].file;app_streams[i].file=NULL;
+                    if(fclose(file))runtime_error(location,"प्रवाह बंद नहीं किया जा सका।");
+                    break;
+                }
+            }
+            return 0;
         }
         if(op==2&&(int64_t)b<0)runtime_error(location,"पठन आकार ० से १०४८५७६ होना चाहिए।");
         if(op==2&&b>1048576)runtime_error(location,"पठन आकार ० से १०४८५७६ होना चाहिए।");
