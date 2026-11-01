@@ -215,4 +215,76 @@ final class BhashStandard {
             }finally{active.remove(x);}
         }
     }
+    private static String[] appArgs=new String[0];
+    static void appSetArguments(String[] args){appArgs=args.clone();}
+    static BhashRuntime.BList<String> appArguments(){var result=new BhashRuntime.BList<String>();for(String arg:appArgs){unicode(arg);result.add(arg);}return result;}
+    private record AppStream(java.io.InputStream input, java.io.OutputStream output) {}
+    private static final Map<Long,AppStream> appStreams=new HashMap<>();
+    private static long appNextStream;
+    private static long appOpen(String name,boolean write) {
+        if(appStreams.size()>=1024)throw failure("बहुत अधिक खुले प्रवाह।");
+        try {
+            var stream=write?new AppStream(null,new java.io.BufferedOutputStream(Files.newOutputStream(path(name)))):
+                new AppStream(new java.io.BufferedInputStream(Files.newInputStream(path(name))),null);
+            long id=++appNextStream;appStreams.put(id,stream);return id;
+        }catch(java.io.IOException|SecurityException e){throw failure("प्रवाह खोला नहीं जा सका।");}
+    }
+    static long appOpenRead(String name){return appOpen(name,false);}
+    static long appOpenWrite(String name){return appOpen(name,true);}
+    private static AppStream appStream(long id) {
+        var stream=appStreams.get(id);if(stream==null)throw failure("प्रवाह बंद है।");return stream;
+    }
+    static BhashRuntime.BBuffer appRead(long id,long count) {
+        if(count<0||count>1048576)throw failure("पठन आकार ० से १०४८५७६ होना चाहिए।");
+        var stream=appStream(id);if(stream.input==null)throw failure("प्रवाह पठन के लिए नहीं है।");
+        try {
+            byte[] bytes=stream.input.readNBytes((int)count);var result=new BhashRuntime.BBuffer(bytes.length);
+            for(int i=0;i<bytes.length;i++)result.set(i,(short)(bytes[i]&255));return result;
+        }catch(java.io.IOException e){throw failure("प्रवाह पढ़ा नहीं जा सका।");}
+    }
+    static void appWrite(long id,BhashRuntime.BBuffer value) {
+        var stream=appStream(id);if(stream.output==null)throw failure("प्रवाह लेखन के लिए नहीं है।");
+        BhashRuntime.instance(value);if(value.size()>1048576)throw failure("लेखन आकार १०४८५७६ से अधिक है।");
+        byte[] bytes=new byte[(int)value.size()];for(int i=0;i<bytes.length;i++)bytes[i]=(byte)(short)value.get(i);
+        try{stream.output.write(bytes);}catch(java.io.IOException e){throw failure("प्रवाह लिखा नहीं जा सका।");}
+    }
+    static void appFlush(long id) {
+        var stream=appStream(id);if(stream.output==null)throw failure("प्रवाह लेखन के लिए नहीं है।");
+        try{stream.output.flush();}catch(java.io.IOException e){throw failure("प्रवाह लिखा नहीं जा सका।");}
+    }
+    static void appClose(long id) {
+        if(id<=0||id>appNextStream)throw failure("अमान्य प्रवाह पहचान।");
+        var stream=appStreams.remove(id);if(stream==null)return;
+        try{if(stream.input!=null)stream.input.close();else stream.output.close();}
+        catch(java.io.IOException e){throw failure("प्रवाह बंद नहीं किया जा सका।");}
+    }
+    static boolean appDirectoryExists(String name){return Files.isDirectory(path(name));}
+    static void appMakeDirectory(String name){
+        try{Files.createDirectory(path(name));}catch(java.io.IOException|SecurityException e){throw failure("निर्देशिका बनाई नहीं जा सकी।");}
+    }
+    static BhashRuntime.BList<String> appEntries(String name){
+        try(var entries=Files.newDirectoryStream(path(name))){
+            var result=new BhashRuntime.BList<String>();
+            for(var entry:entries){if(result.size()>=65536)throw failure("निर्देशिका में बहुत अधिक नाम हैं।");String item=entry.getFileName().toString();unicode(item);result.add(item);}
+            return result;
+        }catch(java.io.IOException|java.nio.file.DirectoryIteratorException|SecurityException e){throw failure("निर्देशिका पढ़ी नहीं जा सकी।");}
+    }
+    static void appDeleteFile(String name){
+        try{var p=path(name);if(!Files.isRegularFile(p,LinkOption.NOFOLLOW_LINKS))throw failure("फ़ाइल हटाई नहीं जा सकी।");Files.delete(p);}
+        catch(java.io.IOException|SecurityException e){throw failure("फ़ाइल हटाई नहीं जा सकी।");}
+    }
+    static void appDeleteDirectory(String name){
+        try{var p=path(name);if(!Files.isDirectory(p,LinkOption.NOFOLLOW_LINKS))throw failure("निर्देशिका हटाई नहीं जा सकी।");Files.delete(p);}
+        catch(java.io.IOException|SecurityException e){throw failure("निर्देशिका हटाई नहीं जा सकी।");}
+    }
+    static String appEnvironment(String name,String fallback){
+        unicode(name);if(name.isEmpty()||name.indexOf(0)>=0||name.indexOf('=')>=0)throw failure("अमान्य परिवेश नाम।");
+        try{String value=System.getenv(name);return value==null?fallback:value;}
+        catch(SecurityException e){throw failure("परिवेश उपलब्ध नहीं है।");}
+    }
+    static void appLog(String message){
+        unicode(message);System.err.writeBytes((message+"\n").getBytes(StandardCharsets.UTF_8));System.err.flush();
+        if(System.err.checkError())throw failure("लेखा लिखा नहीं जा सका।");
+    }
+
 }
