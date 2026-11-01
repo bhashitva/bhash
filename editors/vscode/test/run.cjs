@@ -10,7 +10,7 @@ const {execFile}=require('node:child_process');const {promisify}=require('node:u
         await fs.writeFile(path.join(workspace,'bhash.project'),'name=host-test\nsources=src\n');
         await fs.writeFile(path.join(workspace,'src','math.bhash'),'संकुल गणित;\nसार्वजनिक कार्य दोहरा(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }\n');
         await fs.writeFile(path.join(workspace,'src','main.bhash'),'आयात गणित.दोहरा;\nकार्य मुख्य() -> शून्य {\n    स्थिर क: पूर्णांक = दोहरा(३);\n    लिखो(क);\n}\n');
-        await fs.writeFile(path.join(workspace,'.vscode','tasks.json'),JSON.stringify({version:'2.0.0',tasks:[{type:'bhash',label:'Integration build',command:'build',project:'bhash.project',target:'jvm'},...(['linux','darwin'].includes(process.platform)&&process.env.BHASH_TEST_NATIVE==='1'?[{type:'bhash',label:'Native integration build',command:'build',project:'bhash.project',target:'native'}]:[])]}));
+        await fs.writeFile(path.join(workspace,'.vscode','tasks.json'),JSON.stringify({version:'2.0.0',tasks:[{type:'bhash',label:'Integration build',command:'build',project:'bhash.project',target:'jvm'},{type:'bhash-native-tools',label:'Native tools check',operation:'check'},...(['linux','darwin'].includes(process.platform)&&process.env.BHASH_TEST_NATIVE==='1'?[{type:'bhash',label:'Native integration build',command:'build',project:'bhash.project',target:'native'}]:[])]}));
         const version=process.env.VSCODE_VERSION||'1.95.3';let vscodeExecutablePath;
         if(process.platform==='darwin'){
             // Resolve the vendor bundle's executable instead of assuming a legacy Electron filename.
