@@ -17,6 +17,30 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    private void networkFixture(String source,boolean trusted)throws Exception {
+        var executable=executable("http-client");new NativeCompiler(nativeSanitizers()).compile(List.of(new SourceFile("http-test.bhash",source)),executable);
+        Path output=temporary.resolve("http.out"),errors=temporary.resolve("http.err");
+        var builder=new ProcessBuilder(executable.toString()).redirectOutput(output.toFile()).redirectError(errors.toFile());
+        builder.environment().putAll(GC_STRESS);builder.environment().put("http_proxy","http://127.0.0.1:1");builder.environment().put("HTTP_PROXY","http://127.0.0.1:1");
+        if(trusted)builder.environment().put("SSL_CERT_FILE",NetworkFixture.certificate("ca.pem").toString());
+        var child=builder.start();
+        try {
+            assertTrue(child.waitFor(90,TimeUnit.SECONDS),"Native HTTP fixture exceeded its process budget");
+            String stderr=Files.readString(errors);assertEquals(0,child.exitValue(),stderr);assertEquals("",Files.readString(output));
+            assertEquals(0L,stats(new Result(0,"",stderr)).get("live"));
+        }finally{child.destroyForcibly();}
+    }
+    @Test void nativeHttpRequestsRedirectsAndBuffersSurviveForcedGc()throws Exception {
+        requireTools();try(var fixture=new NetworkFixture()){networkFixture(fixture.functional(),false);assertEquals(0,fixture.replayedBodies.get());}
+    }
+    @Test void nativeHttpTimeoutsAndLimitsCleanTransportAndGcRoots()throws Exception {
+        requireTools();try(var fixture=new NetworkFixture()){networkFixture(fixture.failures(),false);networkFixture(fixture.untrustedTls(),false);assertEquals(0,fixture.replayedBodies.get());}
+    }
+    @Test void nativeHttpTrustedTlsVerifiesNameExpiryAndDowngrade()throws Exception {
+        requireTools();
+        if(NativePlatform.windows())assertEquals("true",System.getenv("BHASH_HTTP_WINDOWS_TRUSTED"),"Run the HTTP test batch through its disposable-container CA setup");
+        try(var fixture=new NetworkFixture()){networkFixture(fixture.trustedTls(),true);}
+    }
     @Test void nativeFoundationArgumentsAndLogsUseUnicode()throws Exception {
         requireTools();
         var result=nativeRun("""
