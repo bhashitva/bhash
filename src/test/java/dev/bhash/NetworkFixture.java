@@ -56,7 +56,7 @@ final class NetworkFixture implements AutoCloseable {
             }else if(path.equals("/cross")){
                 exchange.getResponseHeaders().add("Location",otherBase()+"/credentials");reply(exchange,307,new byte[0]);
             }else if(path.equals("/credentials")){
-                if(!exchange.getRequestMethod().equals("GET"))replayedBodies.incrementAndGet();
+                if(!exchange.getRequestMethod().equals("GET")||input.length!=0)replayedBodies.incrementAndGet();
                 reply(exchange,200,(field(exchange,"Authorization")+"|"+field(exchange,"X-Secret")+"|"+field(exchange,"Cookie")).getBytes(StandardCharsets.UTF_8));
             }else if(path.equals("/cookie")){
                 exchange.getResponseHeaders().add("Set-Cookie","session=must-not-persist; Path=/");reply(exchange,200,new byte[0]);
@@ -137,9 +137,11 @@ final class NetworkFixture implements AutoCloseable {
             मान पकड़ा: तार्किक = असत्य;
             प्रयास { एचटीटीपी.पाओ(BASE+"/invalid-utf8").पाठ्यांश(); } पकड़ो (ग: अपवाद) { पकड़ा = सत्य; }
             परीक्षण.सत्यहै(पकड़ा,"अमान्य UTF-8 अस्वीकार हो।");
-            स्थिर अ: एचटीटीपीअनुरोध = नया एचटीटीपीअनुरोध("POST",BASE+"/cross"); अ.पाठरखो("गोपनीय"); पकड़ा = असत्य;
-            प्रयास { एचटीटीपी.भेजो(अ); } पकड़ो (ग: अपवाद) { पकड़ा = सत्य; परीक्षण.बराबर("अन्य उद्गम पर HTTP सामग्री पुनः नहीं भेज सकते।",ग.संदेश); }
-            परीक्षण.सत्यहै(पकड़ा,"दूसरे उद्गम पर सामग्री न भेजें।");
+            प्रत्येक (विधि: पाठ में नया सूची<पाठ>{"POST","GET"}) {
+                स्थिर अ: एचटीटीपीअनुरोध = नया एचटीटीपीअनुरोध(विधि,BASE+"/cross"); अ.पाठरखो("गोपनीय"); पकड़ा = असत्य;
+                प्रयास { एचटीटीपी.भेजो(अ); } पकड़ो (ग: अपवाद) { पकड़ा = सत्य; परीक्षण.बराबर("अन्य उद्गम पर HTTP सामग्री पुनः नहीं भेज सकते।",ग.संदेश); }
+                परीक्षण.सत्यहै(पकड़ा,"दूसरे उद्गम पर सामग्री न भेजें।");
+            }
             मान क: पूर्णांक = ०;
             जबतक (क < ४०) { असफल("/loop",१००००,"HTTP पुनर्निर्देशन सीमा पार हो गई।"); क = क+१; }
             परीक्षण.बराबर(२००,एचटीटीपी.पाओ(BASE+"/").स्थिति());
