@@ -155,3 +155,21 @@ The image now prepares an immutable browser host once. Public submissions compil
 only the changing program and reuse versioned runtime URLs on the execution
 origin. See [browser host operation, isolation and profiling](../../docs/browser-host.md).
 
+Before replacing an existing deployment, inspect the effective Compose
+configuration with every active override file. An override can pin an older
+image, replace the build context, or mount an older frontend over the image's
+files. Back up the base configuration, overrides and actual mounted gateway
+configuration together, and retain the previous image and persistent volumes.
+
+After activation, verify the running container's image, source-revision label
+and `BHASH_BROWSER_HOST` value in addition to health. Check the public frontend,
+including its existing community links, rather than only files inside the
+image. Check the configuration actually mounted into the gateway: a versioned
+`/browser-host/` asset must succeed on the execution origin with immutable cache
+headers and remain blocked on the editor origin. Preserve existing analytics
+and other gateway rules. A successful health check alone does not prove that
+the new image, frontend or routing rules are active.
+
+The [live before/after comparison](../../benchmarks/playground-profiling/after-prebuilt/report.md)
+records both the changed-source improvement and the cached-run/startup tradeoff.
+
