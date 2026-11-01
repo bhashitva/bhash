@@ -17,21 +17,38 @@ abstract class StandardLibraryTest {
     final boolean clr;
     @TempDir Path directory;
     int next;
+    @Test void applicationFoundationsSharePortableContracts()throws Exception {
+        for(String source:FoundationFixtures.portable())assertEquals("",execute(source));
+        assertEquals("",execute(FoundationFixtures.files(directory)));
+    }
     StandardLibraryTest(boolean clr){this.clr=clr;}
     String execute(String source) throws Exception { return execute(source,new byte[0]); }
-    String execute(String source,byte[] input) throws Exception {
+    String execute(String source,byte[] input) throws Exception {return execute(source,input,List.of());}
+    String execute(String source,byte[] input,List<String> arguments) throws Exception {
         Path output=directory.resolve("app"+next+++(clr?"-clr":".jar"));
         var sources=List.of(new SourceFile("standard-test.bhash",source));
         if(clr)new ClrCompiler().compile(sources,output);else new JvmCompiler().compile(sources,output);
         String java=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
         Path log=directory.resolve("result"+next+".txt"),stdin=directory.resolve("input"+next);
         Files.write(stdin,input);
-        var process=(clr?new ProcessBuilder(ClrCompiler.executable(),output.resolve("BhashProgram.dll").toString()):new ProcessBuilder(java,"-jar",output.toString())).redirectInput(stdin.toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        var command=new ArrayList<>(clr?List.of(ClrCompiler.executable(),output.resolve("BhashProgram.dll").toString()):List.of(java,"-jar",output.toString()));command.addAll(arguments);
+        var process=new ProcessBuilder(command).redirectInput(stdin.toFile()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try{process.getOutputStream().close();assertTrue(process.waitFor(30,TimeUnit.SECONDS));String result=Files.readString(log).replace("\r\n","\n");assertEquals(0,process.exitValue(),result);return result;}
         finally{process.destroyForcibly();}
     }
     @Test void consoleInputMatchesPortableFixtures()throws Exception{
         for(var fixture:ConsoleFixtures.cases())assertEquals(fixture.expected(),execute(fixture.source(),fixture.input()),fixture.name());
+    }
+    @Test void foundationArgumentsAndStructuredLogsArePortable()throws Exception {
+        assertEquals("portable\n{\"level\":1,\"message\":\"नमस्ते😀\",\"fields\":{\"job\":7}}\n",execute("""
+            आयात मानक.विन्यास; आयात मानक.लेखा;
+            कार्य मुख्य() -> शून्य {
+                स्थिर व: विन्यास = विन्यास.तर्क(); लिखो(व.पढ़ो("name", "missing"));
+                स्थिर क्षेत्र: मानचित्र<पाठ,सर्ववस्तु> = नया मानचित्र<पाठ,सर्ववस्तु>{"job":७};
+                लेखा.स्तर(१); लेखा.घटनालिखो(०,"छिपा",क्षेत्र); लेखा.घटनालिखो(१,"नमस्ते😀",क्षेत्र);
+                लेखा.स्तर(४); लेखा.सूचना("छिपा");
+            }
+            """,new byte[0],List.of("--name=portable")));
     }
     @Test void portableExampleAndTypedJsonCollectionsRunWithoutCompilerRuntimeDependencies() throws Exception {
         String result=execute(Files.readString(Path.of("examples/standard-library/portable.bhash")));

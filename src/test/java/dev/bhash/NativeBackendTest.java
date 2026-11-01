@@ -17,6 +17,26 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void nativeFoundationArgumentsAndLogsUseUnicode()throws Exception {
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.विन्यास; आयात मानक.लेखा;
+            कार्य मुख्य() -> शून्य {
+                लिखो(विन्यास.तर्क().पढ़ो("नाम","")); लेखा.सूचना("नमस्ते😀");
+            }
+            """, "--नाम=भारत😀");
+        assertEquals(0,result.exit(),result.err());assertEquals("भारत😀\n",result.out());
+        assertEquals("{\"level\":1,\"message\":\"नमस्ते😀\",\"fields\":{}}\n",result.err());
+    }
+    @Test void applicationFoundationsRunWithForcedCollectionAndCleanRoots()throws Exception {
+        requireTools();
+        var sources=new ArrayList<>(FoundationFixtures.portable());sources.add(FoundationFixtures.files(temporary));
+        for(String source:sources){
+            var result=nativeRun(source,GC_STRESS);
+            assertEquals(0,result.exit(),result.err());assertEquals("",result.out());
+            assertEquals(0L,stats(result).get("live"));
+        }
+    }
     @TempDir Path temporary;
     @BeforeEach void reportNativeCase(TestInfo info){
         if(Boolean.parseBoolean(System.getenv("BHASH_REQUIRE_NATIVE")))
