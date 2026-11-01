@@ -1042,6 +1042,16 @@ static uint64_t map_find(bh_collection *c, uint64_t key, uint64_t hash) {
 uint64_t bh_collection_call(void *receiver, uint32_t operation, uint64_t a, uint64_t b,
                             const bh_collection_info *snapshot, const void *location) {
     bh_collection *c = bh_instance(receiver, location);
+    /* Primitive array accesses cannot allocate on success. Keep the receiver and
+       storage private to this non-safepoint path; no interior pointer escapes.
+       Invalid indices fall through to the rooted, allocating exception path,
+       preserving checked_index's message, location and unwind behavior. Negative
+       signed indices arrive as large uint64_t values and fail the same test.
+       Reference lanes (including nested arrays) still use the checked store. */
+    if (c->info->kind == BH_ARRAY && !reference_kind(c->info->value_kind)) {
+        if (operation == BH_GET && a < c->size) return c->data[a];
+        if (operation == BH_SET && a < c->size) { c->data[a] = b; return 0; }
+    }
     int map = c->info->kind == BH_MAP;
     uint64_t value_kind = c->info->value_kind, key_kind = c->info->key_kind;
     uint64_t ak = 0, bk = 0;
