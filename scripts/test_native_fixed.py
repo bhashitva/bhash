@@ -27,7 +27,7 @@ def main():
             expected.append(format(Decimal.from_float(value).quantize(Decimal(1).scaleb(-places),rounding=ROUND_HALF_EVEN),'f'))
     for optimization in ('-O0','-O2'):
         executable=build/('oracle'+optimization+( '.exe' if os.name=='nt' else ''))
-        subprocess.run([args.cc,'-std=c17',optimization,'-Wall','-Wextra','-Werror','-I',str(runtime),str(ROOT/'tests/native/fixed_oracle.c'),str(runtime/'bhash_runtime.c'),'-o',str(executable)]+([] if os.name=='nt' else ['-lm']),check=True)
+        subprocess.run([args.cc,'-std=c17',optimization,'-Wall','-Wextra','-Werror','-I',str(runtime),str(ROOT/'tests/native/fixed_oracle.c'),str(runtime/'bhash_runtime.c'),'-o',str(executable)]+(['-lshell32'] if os.name=='nt' else ['-lm']),check=True)
         actual=subprocess.run([str(executable)],input=''.join(lines),capture_output=True,text=True,encoding='utf-8',check=True,timeout=120).stdout.splitlines()
         assert len(actual)==len(expected),(len(actual),len(expected))
         for vector,got,want in zip(vectors,actual,expected):assert got==want,(vector,got,want)
