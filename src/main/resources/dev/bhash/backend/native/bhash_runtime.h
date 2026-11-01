@@ -92,6 +92,9 @@ void *bh_collection_new(const bh_collection_info *, int64_t, const void *);
 void *bh_array_dimensions(const bh_collection_info *, uint64_t, const int64_t *, const void *);
 void *bh_collection_literal(const bh_collection_info *, uint64_t, const uint64_t *, const void *);
 uint64_t bh_collection_call(void *, uint32_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
+/* Only compiler-proven BH_ARRAY with non-reference elements; errors can collect. */
+uint64_t bh_primitive_array_get(void *, uint64_t, const void *);
+void bh_primitive_array_set(void *, uint64_t, uint64_t, const void *);
 /* Text payload: uint64 byte length, then UTF-8 bytes (including embedded NUL). */
 int bh_print_licenses_if_requested(int argc, char **argv, const void *notices);
 void bh_print_text(const void *);
