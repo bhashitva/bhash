@@ -93,7 +93,8 @@ final class SourceIndex {
             Range selection = range(id.getSymbol().getStartIndex(),id.getSymbol().getStopIndex()+1);
             Range full = range(start(context),Math.max(end(context),id.getSymbol().getStopIndex()+1));
             String qualified = pkg.isEmpty()?key(name):pkg+"."+key(name);
-            int visible = context instanceof VariableDeclContext ? end(context) : scopeStart;
+            int visible = context instanceof VariableDeclContext ? end(context) :
+                context instanceof ParameterContext p&&p.getParent() instanceof ResourceStatementContext r?start(r.block()):scopeStart;
             var symbol = new Symbol(name,qualified,uri,kind,detail,full,selection,exported,global,scopeStart,scopeEnd,visible);
             symbols.add(symbol); declarations.put(symbol,context);
             if (!(context instanceof ParameterContext) && !(context instanceof VariableDeclContext)) {
@@ -103,7 +104,7 @@ final class SourceIndex {
         }
         boolean scope = context instanceof BlockContext || context instanceof ClassDeclContext || context instanceof InterfaceDeclContext
                 || context instanceof EnumDeclContext || context instanceof FunctionDeclContext || context instanceof ConstructorDeclContext
-                || context instanceof CatchClauseContext || context instanceof ForeachStatementContext;
+                || context instanceof CatchClauseContext || context instanceof ForeachStatementContext || context instanceof ResourceStatementContext;
         int childStart = scope?start(context):scopeStart, childEnd=scope?end(context):scopeEnd;
         for (int i=0;i<context.getChildCount();i++) if (context.getChild(i) instanceof ParserRuleContext child)
             collect(child,children,false,false,childStart,childEnd);
