@@ -152,3 +152,9 @@ JVM tests use a private fixture truststore. The Windows native batch trusts the
 fixture CA only in its disposable, offline Server Core container. No test changes
 a developer's certificate store. Native programs force collection, verify zero
 live heap objects and repeat requests beyond the opaque-handle registry size.
+
+Run the shared managed transport fixtures with
+`mvn -Dtest=JvmNetworkTest,ClrNetworkTest test`; native coverage is included in
+`NativeBackendTest`. These tests require permission to bind loopback sockets.
+The offline `NetworkCoreTest` suite also checks policy and native IR lowering
+without opening a socket.
