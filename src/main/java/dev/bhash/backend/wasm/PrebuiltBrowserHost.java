@@ -33,6 +33,7 @@ public final class PrebuiltBrowserHost {
               <Target Name="RecordCompilerInputs" AfterTargets="ResolveReferences">
                 <WriteLinesToFile File="compiler-references.txt" Lines="@(ReferencePath)" Overwrite="true" />
                 <WriteLinesToFile File="compiler-path.txt" Lines="$(MSBuildToolsPath)/Roslyn/bincore/csc.dll" Overwrite="true" />
+                <WriteLinesToFile File="runtime-packs.txt" Lines="@(ResolvedRuntimePack->'%(PackageDirectory)')" Overwrite="true" />
               </Target>
             </Project>
             """;
@@ -87,6 +88,16 @@ public final class PrebuiltBrowserHost {
             if(!Files.isRegularFile(assembly))assembly=work.resolve("bin/Release/net10.0/browser-wasm/BhashBrowserHost.dll");
             Files.copy(assembly,references.resolve("BhashBrowserHost.dll"));
             Path csc=Path.of(Files.readString(work.resolve("compiler-path.txt")).strip()).toAbsolutePath();
+            boolean notices=false;
+            for(String line:Files.readAllLines(work.resolve("runtime-packs.txt"))) {
+                if(line.isBlank())continue;
+                Path pack=Path.of(line.strip());
+                if(pack.getParent()==null||!pack.getParent().getFileName().toString().equalsIgnoreCase("Microsoft.NETCore.App.Runtime.Mono.browser-wasm"))continue;
+                Path licenses=stage.resolve("web/licenses/dotnet-runtime");Files.createDirectories(licenses);
+                for(String name:List.of("LICENSE.TXT","THIRD-PARTY-NOTICES.TXT"))Files.copy(pack.resolve(name),licenses.resolve(name),StandardCopyOption.REPLACE_EXISTING);
+                notices=true;
+            }
+            if(!notices)throw new IOException("The browser runtime pack is missing its redistribution notices.");
             Properties properties=new Properties();properties.setProperty("runtime",runtimeFingerprint());
             properties.setProperty("csc",csc.toString());properties.setProperty("cscSha256",hash(Files.readAllBytes(csc)));
             var text=new StringWriter();properties.store(text,null);
