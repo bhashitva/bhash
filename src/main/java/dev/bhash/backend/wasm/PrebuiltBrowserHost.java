@@ -27,7 +27,7 @@ public final class PrebuiltBrowserHost {
                 <ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable>
                 <WasmBuildNative>false</WasmBuildNative><WasmEnableHotReload>false</WasmEnableHotReload>
                 <!-- Changing programs are loaded after publishing. Trimming cannot see their BCL uses. -->
-                <PublishTrimmed>false</PublishTrimmed><RunAOTCompilation>false</RunAOTCompilation>
+                <PublishTrimmed>false</PublishTrimmed>
               </PropertyGroup>
               <Target Name="RecordCompilerInputs" AfterTargets="ResolveReferences">
                 <WriteLinesToFile File="compiler-references.txt" Lines="@(ReferencePath)" Overwrite="true" />
@@ -81,7 +81,9 @@ public final class PrebuiltBrowserHost {
                 if(!reference.getFileName().toString().endsWith(".dll"))throw new IOException("Invalid SDK reference.");
                 Files.copy(reference,references.resolve(reference.getFileName()));
             }
-            Files.copy(work.resolve("bin/Release/net10.0/browser-wasm/BhashBrowserHost.dll"),references.resolve("BhashBrowserHost.dll"));
+            Path assembly=work.resolve("bin/Release/net10.0/BhashBrowserHost.dll");
+            if(!Files.isRegularFile(assembly))assembly=work.resolve("bin/Release/net10.0/browser-wasm/BhashBrowserHost.dll");
+            Files.copy(assembly,references.resolve("BhashBrowserHost.dll"));
             Path csc=Path.of(Files.readString(work.resolve("compiler-path.txt")).strip()).toAbsolutePath();
             Properties properties=new Properties();properties.setProperty("runtime",fingerprint());
             properties.setProperty("csc",csc.toString());properties.setProperty("cscSha256",hash(Files.readAllBytes(csc)));
