@@ -11,17 +11,22 @@ using System.Runtime.Versioning;
 public static partial class BhashBrowser {
     public static void Main() { }
     private static bool started;
+    private static Func<string[], int> entryPoint;
     [JSExport]
-    public static int Run(string assembly, string input) {
-        // A worker is single-use. Even an accidental second message cannot reuse static state.
-        if (started) throw new InvalidOperationException("Start a fresh worker for each program.");
-        started = true;
-        BhashRuntime.reset(input);
+    public static void Load(string assembly) {
+        if (started || entryPoint != null) throw new InvalidOperationException("Start a fresh worker for each program.");
         var program = Assembly.Load(Convert.FromBase64String(assembly));
         if (program.GetName().Name != "BhashProgram") throw new InvalidOperationException("Invalid program assembly.");
         var entry = program.GetType("BhashProgram", true).GetMethod("Main", BindingFlags.Public | BindingFlags.Static);
-        var run = (Func<string[], int>)entry.CreateDelegate(typeof(Func<string[], int>));
-        return run(Array.Empty<string>());
+        entryPoint = (Func<string[], int>)entry.CreateDelegate(typeof(Func<string[], int>));
+    }
+    [JSExport]
+    public static int Run(string input) {
+        // A worker is single-use. Even an accidental second message cannot reuse static state.
+        if (started || entryPoint == null) throw new InvalidOperationException("Start a fresh worker for each program.");
+        started = true;
+        BhashRuntime.reset(input);
+        return entryPoint(Array.Empty<string>());
     }
     [JSExport] public static string Output() => BhashRuntime.output();
     [JSExport] public static string Errors() => BhashRuntime.errors();

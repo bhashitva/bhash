@@ -12,8 +12,9 @@ self.onmessage = async ({data}) => {
     const {dotnet} = await import(new URL('_framework/dotnet.js', new URL(runtimeBase, import.meta.url)).href);
     const {getAssemblyExports, getConfig} = await dotnet.create();
     const api = (await getAssemblyExports(getConfig().mainAssemblyName)).BhashBrowser;
+    api.Load(btoa(binary));
     if (reportRunning) self.postMessage({type:'running'});
-    const exitCode = api.Run(btoa(binary), data.input);
+    const exitCode = api.Run(data.input);
     self.postMessage({output:api.Output(), errors:api.Errors(), exitCode});
   } catch (error) { self.postMessage({output:'', errors:String(error), exitCode:1}); }
 };
