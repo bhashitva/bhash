@@ -2397,6 +2397,19 @@ class NativeBackendTest {
     }
 
 
+    @Test void llvmRoutesOnlyStaticallyPrimitiveArraysToSpecializedAccess()throws Exception{
+        String ir=LlvmEmitter.emit(core("""
+            कार्य मुख्य() -> शून्य {
+                स्थिर अ: पूर्णांक[]=नया पूर्णांक[१]; अ[०]=७; लिखो(अ[०]); अ.रखो(०,८); लिखो(अ.लो(०));
+                स्थिर प: पाठ[]=नया पाठ[१]; प[०]="अ"; लिखो(प[०]);
+                स्थिर स: सूची<पूर्णांक> =नया सूची<पूर्णांक>{१}; स[०]=२; लिखो(स[०]);
+                स्थिर म: मानचित्र<पूर्णांक,पूर्णांक> =नया मानचित्र<पूर्णांक,पूर्णांक>{१:२}; म[१]=३; लिखो(म[१]);
+            }
+            """));
+        assertEquals(2,ir.lines().filter(x->x.contains("call i64 @bh_primitive_array_get(")).count());
+        assertEquals(2,ir.lines().filter(x->x.contains("call void @bh_primitive_array_set(")).count());
+        assertTrue(ir.lines().filter(x->x.contains("call i64 @bh_collection_call(")).count()>=6);
+    }
     @Test void primitiveArrayFastPathPreservesCarriersAndReferenceFallback()throws Exception{
         requireNumericTargets();var result=numericExact("""
             परिगणना रंग { लाल, नीला = ७ }
