@@ -2396,4 +2396,55 @@ class NativeBackendTest {
             """)),GC_STRESS);assertEquals(0,result.exit(),result.err());assertEquals("सत्य ७\nसत्य ८\n",result.out());assertEquals(0L,stats(result).get("live"));
     }
 
+
+    @Test void primitiveArrayFastPathPreservesCarriersAndReferenceFallback()throws Exception{
+        requireNumericTargets();var result=numericExact("""
+            परिगणना रंग { लाल, नीला = ७ }
+            कार्य मुख्य() -> शून्य {
+                स्थिर अ: पूर्णांक[] = नया पूर्णांक[]{-९२२३३७२०३६८५४७७५८०८,९२२३३७२०३६८५४७७५८०७};
+                अ.रखो(०,अ[१]); लिखो(अ[०],अ.लो(१),लंबाई(अ));
+                स्थिर ब: बाइट[] = नया बाइट[]{परिवर्तित<बाइट>(२५५)}; ब[०]=परिवर्तित<बाइट>(०); लिखो(ब[०]);
+                स्थिर ल: लघुपूर्णांक[] = नया लघुपूर्णांक[]{परिवर्तित<लघुपूर्णांक>(-२१४७४८३६४८)}; लिखो(ल[०]);
+                स्थिर स: तार्किक[] = नया तार्किक[]{सत्य,असत्य}; स[१]=स[०]; लिखो(स.लो(१));
+                स्थिर द: दशमलव[] = नया दशमलव[]{-०.०,०.०/०.०,१.०/०.०}; द[०]=द.लो(०); लिखो(द[०],द[१]!=द[१],द[२]);
+                स्थिर र: रंग[] = नया रंग[]{रंग.लाल}; र[०]=रंग.नीला; लिखो(र[०]==रंग.नीला);
+                स्थिर ज: पूर्णांक[][] = नया पूर्णांक[१][१]; ज[०][०]=७; लिखो(ज[०][०]);
+                स्थिर प: पाठ[] = नया पाठ[]{"अ"}; प[०]="भारत"+"😀"; लिखो(प[०]);
+                स्थिर व: सर्ववस्तु[] = नया सर्ववस्तु[१]; व[०]=अ; लिखो(परिवर्तित<पूर्णांक[]>(व[०])[०]);
+            }
+            """);assertEquals(0,result.exit(),result.err());
+    }
+    @Test void primitiveArrayFastPathPreservesAllocatingOperandsAndUnwinding()throws Exception{
+        requireNumericTargets();var result=numericExact("""
+            कार्य स्रोत() -> पूर्णांक[] { लिखो("सरणी"); लौटाओ नया पूर्णांक[१]; }
+            कार्य अंक(न:पूर्णांक) -> पूर्णांक { स्थिर प:पाठ="भा"+"रत😀"; लिखो(न); लौटाओ न; }
+            कार्य मुख्य() -> शून्य {
+                मान इ:पूर्णांक=०; मान योग:पूर्णांक=०;
+                जबतक(इ<१००) {
+                    स्थिर अ:पूर्णांक[]=नया पूर्णांक[]{इ};
+                    प्रयास { अ[अंक(१)]=अंक(७); } पकड़ो(ग:अपवाद) { योग=योग+अ[०]; }
+                    अंततः { स्थिर प:पाठ="साफ"+"😀"; }
+                    अ[अंक(०)]=अ[अंक(०)]+१; योग=योग+अ[०]; इ=इ+१;
+                }
+                स्रोत()[अंक(०)]=अंक(९); लिखो(योग);
+                स्थिर अ:पूर्णांक[]=रिक्त;
+                प्रयास { अ[अंक(०)]=अंक(५); } पकड़ो(ग:अपवाद) { लिखो("रिक्त"); }
+            }
+            """);assertEquals(0,result.exit(),result.err());
+        assertFalse(result.out().endsWith("५\nरिक्त\n"));assertTrue(stats(result).get("collections")>100,result.err());
+    }
+    @Test void primitiveArrayFastPathBoundsErrorsMatchBothManagedTargets()throws Exception{
+        requireNumericTargets();
+        for(String access:List.of("लिखो(अ[न]);","अ[न]=७;","लिखो(अ.लो(न));","अ.रखो(न,७);")){
+            String source="कार्य मुख्य() -> शून्य { स्थिर अ:पूर्णांक[]=नया पूर्णांक[]{३}; ";
+            for(String index:List.of("-१","१","९२२३३७२०३६८५४७७५८०७","-९२२३३७२०३६८५४७७५८०८"))
+                source+="{ स्थिर न:पूर्णांक="+index+"; प्रयास { "+access+" } पकड़ो(ग:अपवाद) { लिखो(ग.संदेश); } अंततः { स्थिर प:पाठ=\"जीवित\"+\"😀\"; } }";
+            source+="स्थिर खाली:पूर्णांक[]=नया पूर्णांक[०]; प्रयास { लिखो(खाली[०]); } पकड़ो(ग:अपवाद) { लिखो(ग.संदेश); } लिखो(अ[०]); }";
+            var result=numericExact(source);assertEquals(0,result.exit(),result.err());assertTrue(result.out().endsWith("३\n"));
+            assertEquals(5,result.out().lines().filter(x->x.equals("संग्रह सूचकांक सीमा से बाहर है।")).count());
+        }
+        var result=numericExact("कार्य मुख्य() -> शून्य { स्थिर अ:पूर्णांक[]=नया पूर्णांक[०]; लिखो(अ[०]); }");
+        assertEquals(1,result.exit());assertTrue(result.err().contains("native.bhash:1:"),result.err());
+    }
+
 }
