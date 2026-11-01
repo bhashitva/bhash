@@ -14,6 +14,7 @@ let serverWatcher: vscode.FileSystemWatcher | undefined;
 const schemes = [{scheme: 'file', language: 'bhash'}, {scheme: 'file', language: 'bhash-project'}];
 const targets = ['jvm', 'clr', 'wasm-browser', 'native'] as const;
 type Target = typeof targets[number];
+interface NativeToolsTask extends vscode.TaskDefinition {type: 'bhash-native-tools'; operation: 'setup' | 'check' | 'repair';}
 interface BhashTask extends vscode.TaskDefinition {type: 'bhash'; command: 'build' | 'run'; project?: string; target?: Target;}
 
 function trusted(): boolean {
@@ -95,13 +96,17 @@ function compilerExecution(operation: 'build' | 'run' | 'setup' | 'check' | 'rep
     return new vscode.ProcessExecution(process.execPath, [context.asAbsolutePath('dist/native-task.js'), JSON.stringify({...options, operation, input, target})],
         {cwd, env: {ELECTRON_RUN_AS_NODE:'1'}});
 }
-async function nativeTools(operation: 'setup' | 'check' | 'repair') {
+function nativeToolsTask(definition: NativeToolsTask, folder?: vscode.WorkspaceFolder): vscode.Task {
+    if (!['setup','check','repair'].includes(definition.operation)) throw new Error('Bhash native tools operation must be setup, check or repair.');
+    const task = new vscode.Task(definition, folder || vscode.TaskScope.Global,
+        `${definition.operation} native tools`, 'Bhash', compilerExecution(definition.operation, undefined, folder));
+    task.presentationOptions = {echo: false, reveal:vscode.TaskRevealKind.Always, panel:vscode.TaskPanelKind.Dedicated, clear:true};
+    return task;
+}
+async function nativeTools(operation: NativeToolsTask['operation']) {
     if (!trusted()) return;
     const folder = vscode.workspace.workspaceFolders?.find(f => f.uri.scheme === 'file');
-    const task = new vscode.Task({type:'bhash-native-tools', operation}, folder || vscode.TaskScope.Global,
-        `${operation} native tools`, 'Bhash', compilerExecution(operation, undefined, folder));
-    task.presentationOptions = {echo: false, reveal:vscode.TaskRevealKind.Always, panel:vscode.TaskPanelKind.Dedicated, clear:true};
-    await vscode.tasks.executeTask(task);
+    await vscode.tasks.executeTask(nativeToolsTask({type:'bhash-native-tools', operation},folder));
 }
 async function execute(command: 'build' | 'run') {
     if (!trusted()) return;
@@ -182,6 +187,20 @@ export function activate(extensionContext: vscode.ExtensionContext) {
             const definition = task.definition as BhashTask;
             const input = path.resolve(task.scope.uri.fsPath, definition.project || '.');
             return taskFor(definition,task.scope,input);
+        }
+    }));
+    // CustomExecution tasks need their own registered provider on Windows,
+    // even when the command supplies the execution callback programmatically.
+    context.subscriptions.push(vscode.tasks.registerTaskProvider('bhash-native-tools', {
+        provideTasks: () => [],
+        resolveTask: task => {
+            if (!vscode.workspace.isTrusted) return undefined;
+            const folder = typeof task.scope === 'object' ? task.scope : undefined;
+            if (folder ? folder.uri.scheme !== 'file' : task.scope !== vscode.TaskScope.Global) return undefined;
+            const definition = task.definition as NativeToolsTask;
+            if (!['setup','check','repair'].includes(definition.operation)) return undefined;
+            // Task identity must use the original definition object.
+            return nativeToolsTask(definition,folder);
         }
     }));
     void startServer();
