@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-01",
+  "collection": "Transcribed from the authenticated VPS console; original logs and nanosecond CSV remain under the named measurements directory.",
+  "measurementsDirectory": "/opt/bhash/prebuilt-preview-20261101/measurements",
+  "image": "bhash-playground:prebuilt-preview-20261101",
+  "compilerSHA256": "f2bcfbd15f7329a0e8713cebe986cb4fa8056fdb6eb44097aa1a2a56cdba0f32",
+  "sdk": "10.0.403",
+  "cpuLimit": 1.5,
+  "memoryLimit": "5g",
+  "network": "none",
+  "rootFilesystem": "read-only",
+  "user": 10001,
+  "workload": "कार्य मुख्य() -> शून्य { लिखो(१); }",
+  "baselineNanoseconds": [
+    29060938806,
+    29088652873,
+    28002830953
+  ],
+  "prebuiltNanoseconds": [
+    1495233485,
+    1553289252,
+    1548381354
+  ],
+  "baseline2TaskMs": {
+    "RestoreTask": 467,
+    "Csc": 2663,
+    "ILLink": 4520,
+    "BrotliCompress": 16939,
+    "GZipCompress": 394,
+    "ConvertDllsToWebCil": 134
+  },
+  "baseline2PhasesMs": {
+    "frontend": 286.770158,
+    "publish": 28458.14623
+  },
+  "prebuilt2ProgramCompileAndBundleMs": 699.947312,
+  "notes": [
+    "CLI compilation only; generated programs were not executed on the server.",
+    "Warm SDK/package caches, separate private workspaces, sequential baseline then prebuilt runs.",
+    "This preview predates the final Load/Run timing separation and host-output marker hardening; the final CI comparison measures the final implementation.",
+    "SDK task durations are overlapping nested accounting categories, not additive independent wall-clock phases."
+  ]
+}

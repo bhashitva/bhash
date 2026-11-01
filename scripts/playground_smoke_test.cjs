@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
 const server = spawn('java', ['-cp', 'target/bhash-compiler-0.1.0-SNAPSHOT.jar', 'dev.bhash.playground.PlaygroundServer'], {
   env: {...process.env, PORT:'0', BHASH_ORIGIN:'http://localhost:0', BHASH_RUN_ORIGIN:'http://127.0.0.1:0',
-    BHASH_DATA: path.resolve('target/playground-e2e'), BHASH_WASM_OFFLINE:'true'}, stdio:['ignore','pipe','pipe']
+    BHASH_DATA: path.resolve('target/playground-e2e'), BHASH_WASM_OFFLINE:'true', BHASH_REQUESTS_PER_MINUTE:'120'}, stdio:['ignore','pipe','pipe']
 });
 let logs=''; server.stderr.on('data', data => {logs+=data;});
 (async () => {
@@ -34,6 +34,33 @@ let logs=''; server.stderr.on('data', data => {logs+=data;});
     await execute('नमस्ते, दुनिया!\n');console.log('PASS playground cached rerun');
     await page.selectOption('#example','factorial');await execute('गुणनफल: १२०\n');console.log('PASS playground input factorial');
     await page.selectOption('#example','types');await execute('तैयार २ ३\nसत्य सत्य\n');console.log('PASS playground records enums');
+    await page.selectOption('#mode','program');
+    await page.locator('.cm-content').fill('वर्ग गिनती { साझा मान अंक: पूर्णांक = ०; साझा कार्य अगला() -> पूर्णांक { अंक = अंक + १; लौटाओ अंक; } } कार्य मुख्य() -> शून्य { लिखो(गिनती.अगला()); }');
+    await execute('१\n');await execute('१\n');console.log('PASS cached program gets fresh static state');
+    if(process.env.BHASH_BROWSER_HOST) {
+      const responses=await page.request.get(origin+'/api/config');assert.equal(responses.status(),200);
+      // Worker resources are not necessarily exposed in parent performance entries;
+      // inspect the immutable configuration and validate origins through HTTP instead.
+      const artifacts=fs.readdirSync('target/playground-e2e/artifacts');
+      const directory=artifacts.find(id=>fs.existsSync(path.join('target/playground-e2e/artifacts',id,'browser-host-config.js')));
+      const config=fs.readFileSync(path.join('target/playground-e2e/artifacts',directory,'browser-host-config.js'),'utf8');
+      const runtimePath=config.match(/"(\/browser-host\/[a-f0-9]{64}\/)/)[1]+'_framework/dotnet.js';
+      assert.equal((await page.request.get(origin+runtimePath)).status(),404);
+      const runtime=await page.request.get(origin.replace('localhost','127.0.0.1')+runtimePath);
+      assert.equal(runtime.status(),200);assert.ok(runtime.headers()['cache-control'].includes('immutable'));
+      for(const name of ['host.properties','references/BhashBrowserHost.dll'])
+        assert.equal((await page.request.get(origin.replace('localhost','127.0.0.1')+runtimePath.replace('_framework/dotnet.js',name))).status(),404);
+      console.log('PASS immutable runtime URLs and execution-origin isolation');
+      let releaseDownload,downloadStarted;
+      const pending=new Promise(resolve=>{downloadStarted=resolve;});
+      const release=new Promise(resolve=>{releaseDownload=resolve;});
+      await context.route('**/BhashProgram.dll',async route=>{downloadStarted();await release;await route.abort().catch(()=>{});});
+      await page.click('#run');await Promise.race([pending,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('Program download did not start')),30000);timer.unref();})]);await page.click('#stop');
+      releaseDownload();await context.unroute('**/BhashProgram.dll');
+      assert.ok((await page.locator('#status').textContent()).startsWith('Stopped'));
+      assert.equal(await page.locator('iframe').count(),0);assert.equal(await page.locator('#output').textContent(),'');
+      await execute('१\n');console.log('PASS stop during program download and clean recovery');
+    }
     await page.screenshot({path:'target/playground-desktop.png',fullPage:true});
     await page.selectOption('#mode','scratch');await page.locator('.cm-content').fill('लिखो(अज्ञात);');await page.click('#run');
     await page.waitForFunction(()=>document.querySelector('#status').textContent.startsWith('Could not run'),null,{timeout:30000});

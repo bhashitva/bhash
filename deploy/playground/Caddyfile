@@ -9,7 +9,7 @@
         X-Content-Type-Options "nosniff"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
     }
-    @artifacts path /artifacts/*
+    @artifacts path /artifacts/* /browser-host/*
     respond @artifacts 404
     reverse_proxy service:8080 {
         header_up X-Playground-Client {remote_host}
@@ -22,7 +22,8 @@
         X-Content-Type-Options "nosniff"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
     }
-    handle /artifacts/* {
+    @runtime path /artifacts/* /browser-host/*
+    handle @runtime {
         reverse_proxy service:8080
     }
     handle {

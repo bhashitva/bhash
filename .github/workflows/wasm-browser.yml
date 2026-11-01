@@ -25,8 +25,22 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm ci --prefix playground --no-audit --no-fund
       - run: npm run build --prefix playground
-      - run: node scripts/browser_smoke_test.cjs
+      - name: Profile full publishing before preparing the reusable browser host
+        run: python3 scripts/profile_browser_publish.py
+      - name: Compare Run to first output on the same host
+        timeout-minutes: 6
+        run: node scripts/playground_performance.cjs
+      - name: Produce the before and after comparison report
+        run: python3 scripts/analyze_playground_performance.py
+      - name: Validate all existing browser semantics through the prebuilt host
+        run: node scripts/browser_smoke_test.cjs
+        env:
+          BHASH_BROWSER_HOST: ${{ github.workspace }}/target/browser-publish-profile/host
+      - name: Validate original standalone browser publishing
+        run: node scripts/browser_smoke_test.cjs
       - run: node scripts/playground_smoke_test.cjs
+        env:
+          BHASH_BROWSER_HOST: ${{ github.workspace }}/target/browser-publish-profile/host
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -42,5 +56,9 @@ jobs:
             target/browser-factorial.png
             target/playground-desktop.png
             target/playground-mobile.png
+            target/browser-publish-profile/results.json
+            target/browser-publish-profile/*/*.log
+            target/browser-publish-profile/*/*phases.json
+            target/playground-performance/
           include-hidden-files: true
           if-no-files-found: error

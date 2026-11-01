@@ -45,7 +45,14 @@ public final class WasmCompiler {
     }
 
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
+        long started = System.nanoTime();
         String code = ManagedEmitter.emit(sources, Target.CLR);
+        long emitted = System.nanoTime();
+        String host = System.getenv("BHASH_BROWSER_HOST");
+        if (host != null && !host.isBlank()) {
+            PrebuiltBrowserHost.open(Path.of(host)).compile(code, output);
+            return;
+        }
         Path destination = output.toAbsolutePath().normalize();
         validateDestination(destination);
         Files.createDirectories(destination.getParent());
@@ -64,16 +71,20 @@ public final class WasmCompiler {
             resource("/dev/bhash/backend/clr/BhashRuntime.cs.txt", work.resolve("BhashRuntime.cs"));
             resource("/dev/bhash/backend/clr/BhashStandard.cs.txt", work.resolve("BhashStandard.cs"));
             resource("/dev/bhash/backend/wasm/BrowserHost.cs.txt", work.resolve("BrowserHost.cs"));
-            var builder = new ProcessBuilder(ClrCompiler.executable(), "publish", "BhashProgram.csproj",
+            var command = new ArrayList<>(List.of(ClrCompiler.executable(), "publish", "BhashProgram.csproj",
                     "-c", "Release", "-o", work.resolve("publish").toString(), "--nologo", "--verbosity", "quiet",
                     "--disable-build-servers", "-p:UseSharedCompilation=false",
-                    "-p:ImportDirectoryBuildProps=false", "-p:ImportDirectoryBuildTargets=false")
+                    "-p:ImportDirectoryBuildProps=false", "-p:ImportDirectoryBuildTargets=false"));
+            String profile = System.getenv("BHASH_WASM_PROFILE");
+            if (profile != null && !profile.isBlank()) command.add("-clp:PerformanceSummary");
+            var builder = new ProcessBuilder(command)
                     .directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("build.log").toFile());
             builder.environment().put("DOTNET_CLI_TELEMETRY_OPTOUT", "1");
             builder.environment().put("DOTNET_NOLOGO", "1");
             builder.environment().put("DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE", "true");
             builder.environment().put("DOTNET_CLI_UI_LANGUAGE", "en-US");
             Process process;
+            long publishStarted = System.nanoTime();
             try { process = builder.start(); }
             catch (IOException missing) { throw new CompilationException(requirements()); }
             try {
@@ -83,7 +94,15 @@ public final class WasmCompiler {
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 throw new IOException("Browser WASM compilation interrupted.", interrupted);
-            } finally { if (process.isAlive()) process.destroyForcibly(); }
+            } finally {
+                if (process.isAlive()) process.destroyForcibly();
+                if (profile != null && !profile.isBlank()) {
+                    Path logs = Path.of(profile); Files.createDirectories(logs);
+                    Files.copy(work.resolve("build.log"), logs.resolve("publish.log"), StandardCopyOption.REPLACE_EXISTING);
+                    Files.writeString(logs.resolve("phases.json"), "{\"frontendMs\":" + (emitted-started)/1_000_000.0
+                            + ",\"publishMs\":" + (System.nanoTime()-publishStarted)/1_000_000.0 + "}\n");
+                }
+            }
             Path published = work.resolve("publish");
             // SDK releases can wrap browser assets in wwwroot.
             if (Files.isDirectory(published.resolve("wwwroot/_framework"))) published = published.resolve("wwwroot");
@@ -113,7 +132,7 @@ public final class WasmCompiler {
                 + "Initial builds may require access to NuGet to restore browser runtime packs.";
     }
 
-    private static void resource(String name, Path output) throws IOException, CompilationException {
+    static void resource(String name, Path output) throws IOException, CompilationException {
         try (var input = WasmCompiler.class.getResourceAsStream(name)) {
             if (input == null) throw new CompilationException("Compiler installation is missing " + name);
             Files.copy(input, output, StandardCopyOption.REPLACE_EXISTING);
@@ -121,7 +140,7 @@ public final class WasmCompiler {
     }
 
     // Hash every generated asset, including nested paths. Refuse to remove user-added or modified files.
-    private static String manifest(Path directory) throws IOException {
+    static String manifest(Path directory) throws IOException {
         var result = new StringBuilder(STAMP).append('\n');
         try (var paths = Files.walk(directory)) {
             for (Path path : paths.sorted().toList()) {
@@ -139,9 +158,19 @@ public final class WasmCompiler {
         return result.toString();
     }
 
-    private static void validateDestination(Path destination) throws IOException {
+    static void validateDestination(Path destination) throws IOException {
+        validateDestination(destination, false);
+    }
+
+    static void validateHostDestination(Path destination) throws IOException {
+        validateDestination(destination, true);
+    }
+
+    private static void validateDestination(Path destination, boolean host) throws IOException {
         if (destination.getParent() == null || Files.isSymbolicLink(destination)) throw new IOException("Browser output must be a new or Bhash-managed directory.");
         if (!Files.exists(destination)) return;
+        boolean preparedHost=Files.isRegularFile(destination.resolve(PrebuiltBrowserHost.HOST_MARKER),LinkOption.NOFOLLOW_LINKS);
+        if(host!=preparedHost)throw new IOException("Program output and prebuilt browser host directories must be separate: "+destination);
         Path marker = destination.resolve(MARKER);
         if (!Files.isDirectory(destination) || !Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS)
                 || !Files.readString(marker, StandardCharsets.UTF_8).equals(manifest(destination)))
@@ -149,7 +178,15 @@ public final class WasmCompiler {
     }
 
     static void install(Path stage, Path destination) throws IOException {
-        validateDestination(destination);
+        install(stage,destination,false);
+    }
+
+    static void installHost(Path stage, Path destination) throws IOException {
+        install(stage,destination,true);
+    }
+
+    private static void install(Path stage, Path destination, boolean host) throws IOException {
+        validateDestination(destination,host);
         // Temp directories default to 0700 on Linux. Publish static assets with
         // read/traverse access for the HTTP server, including under a strict umask.
         // Windows retains its inherited ACLs; never change the private build workspace.

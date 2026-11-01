@@ -148,3 +148,10 @@ API requests are form encoded with `source` and `mode` (`scratch` or `program`),
 require the configured editor `Origin` and `X-Bhash-Playground: 1`, and return
 an asynchronous job. The UI polls `/api/jobs/<opaque-id>`. The service accepts
 no arbitrary output path, project file, command line or compiler flags.
+
+## Prepared browser runtime
+
+The image now prepares an immutable browser host once. Public submissions compile
+only the changing program and reuse versioned runtime URLs on the execution
+origin. See [browser host operation, isolation and profiling](../../docs/browser-host.md).
+
