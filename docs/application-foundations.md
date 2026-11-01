@@ -26,6 +26,8 @@ Unused foundation declarations are omitted, including their static initializatio
 
 No host filesystem/environment capability is added to browser programs. This
 milestone does not deploy a new playground or publish a VS Code extension.
+Windows native argument decoding uses Windows-supplied Shell32, alongside the
+existing Kernel32/UCRT dependencies; no Java/.NET/LLVM runtime is introduced.
 
 ## Collections
 

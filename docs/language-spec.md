@@ -264,9 +264,25 @@ structural equality and hashing. `बाइटबफ़र` provides packed byte
 access/iteration, binary64/signed-64 binary reads/writes with explicit endianness,
 copying and strict UTF-8 encoding/decoding. See [complete type rules](types-conversions.md).
 
-## 13. Deferred design questions
+## 13. Resource scopes
+
+`संसाधन (name: Type = expression) { ... }` introduces an immutable local resource
+binding. `संसाधन` is reserved. Evaluate the initializer once, check assignment
+compatibility and reject null before entering the body. Type must expose an
+accessible instance `बंदकरो() -> शून्य`; `मानक.बंदनीय` supplies the common interface.
+The binding is visible only in the body, not its initializer or subsequent code.
+
+Invoke close when the body exits normally, returns, breaks, continues or throws.
+An initializer that fails has acquired no resource to close. Nested scopes close
+in reverse order. Cleanup follows the existing `अंततः` exception-precedence rule:
+a close failure replaces a pending exception or return; there is no suppressed
+exception list in this edition. Fatal process/host failures are outside the
+cleanup guarantee. See [application foundations](application-foundations.md) for
+stream ownership, GC-root handling and target restrictions.
+
+## 14. Deferred design questions
 
 Confirm vocabulary; choose exact real formatting; extend dependency package distribution;
-extend records and generic member methods; extend exception metadata and resource management; settle WASI vs browser environments and native OS/ABI support; define
+extend records and generic member methods; extend exception metadata; settle WASI vs browser environments and native OS/ABI support; define
 foreign-function interfaces separately for each platform. Do not grow the grammar
 to cover these until their semantics and tests are agreed.
