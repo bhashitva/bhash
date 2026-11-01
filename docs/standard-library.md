@@ -271,3 +271,8 @@ calendar range and error messages; see [native time](native-time.md).
 Native Linux supports the existing console globals `पाठपढ़ो()` and `पढ़ो()`; see
 [native console input](native-console.md) for UTF-8 lines, integer syntax, errors,
 and line-local malformed-input recovery shared with JVM/CLR.
+
+## Networking
+
+See [HTTP and HTTPS client](networking.md) for requests, responses, redirects, TLS,
+limits and target requirements, and [the Hindi tutorial](../tutorial/networking/README.md).
