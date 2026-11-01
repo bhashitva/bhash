@@ -1987,8 +1987,9 @@ class NativeBackendTest {
             Path jar=temporary.resolve("reference.jar");
             new JvmCompiler().compile(sources,jar);
             Path referenceOut=temporary.resolve("reference.out"),referenceErr=temporary.resolve("reference.err");
-            var reference=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString())
-                .redirectOutput(referenceOut.toFile()).redirectError(referenceErr.toFile()).start();
+            var referenceBuilder=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-Dfile.encoding=UTF-8","-jar",jar.toString())
+                .redirectOutput(referenceOut.toFile()).redirectError(referenceErr.toFile());
+            referenceBuilder.environment().putAll(environment);var reference=referenceBuilder.start();
             assertTrue(reference.waitFor(15,TimeUnit.SECONDS));
             assertEquals(reference.exitValue(),result.exit(),"Native/JVM exit mismatch");
             assertEquals(Files.readString(referenceOut).replace("\r\n","\n"),result.out(),"Native/JVM output mismatch");
