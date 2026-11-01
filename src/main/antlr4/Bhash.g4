@@ -65,6 +65,7 @@ statement
     | whileStatement
     | foreachStatement
     | switchStatement
+    | resourceStatement
     | tryStatement
     | THROW expression? SEMI
     | RETURN expression? SEMI
@@ -74,6 +75,7 @@ statement
     | expression SEMI
     | block
     ;
+resourceStatement : RESOURCE LPAREN parameter ASSIGN expression RPAREN block ;
 tryStatement : TRY block (catchClause+ (FINALLY block)? | FINALLY block) ;
 catchClause : CATCH LPAREN parameter RPAREN block ;
 variableDecl : (LET | CONST) IDENTIFIER COLON valueType ASSIGN expression SEMI ;
@@ -155,6 +157,7 @@ IN : 'में' ;
 SWITCH : 'चयन' ;
 CASE : 'विकल्प' ;
 DEFAULT : 'शेष' ;
+RESOURCE : 'संसाधन' ;
 TRY : 'प्रयास' ;
 CATCH : 'पकड़ो' ;
 FINALLY : 'अंततः' ;
