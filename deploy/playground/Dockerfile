@@ -31,12 +31,14 @@ COPY --from=editor /src/playground/dist /opt/bhash/web
 RUN mkdir -p /data /opt/nuget /tmp/warm \
     && printf 'कार्य मुख्य() -> शून्य { लिखो("तैयार"); }' > /tmp/warm/hello.bhash \
     && BHASH_WASM_OFFLINE=false NUGET_PACKAGES=/opt/nuget java -jar /opt/bhash/compiler.jar compile /tmp/warm/hello.bhash --target wasm-browser -o /tmp/warm/web \
+    && BHASH_WASM_OFFLINE=false NUGET_PACKAGES=/opt/nuget java -cp /opt/bhash/compiler.jar dev.bhash.backend.wasm.PrebuiltBrowserHost /opt/bhash/browser-host \
     && (dotnet --version; sha256sum /opt/bhash/compiler.jar) > /opt/bhash/warm-version \
     && rm -rf /tmp/warm \
     && useradd --uid 10001 --create-home --home-dir /home/bhash bhash \
     && chown -R 10001:10001 /data
 COPY --chmod=755 deploy/playground/entrypoint.sh /opt/bhash/entrypoint.sh
-ENV XDG_RUNTIME_DIR=/tmp/bhash-runtime XDG_DATA_HOME=/data/user-data \
+ENV BHASH_BROWSER_HOST=/opt/bhash/browser-host \
+    XDG_RUNTIME_DIR=/tmp/bhash-runtime XDG_DATA_HOME=/data/user-data \
     LANG=C.UTF-8 LC_ALL=C.UTF-8
 USER 10001:10001
 EXPOSE 8080
