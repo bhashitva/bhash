@@ -1,0 +1,826 @@
+{
+  "baseline_browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0",
+  "after_browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0",
+  "groups": {
+    "hello_source_miss": {
+      "samples_per_path": 3,
+      "baseline_median_ms": 31849.5,
+      "prebuilt_median_ms": 4069.600000023842,
+      "percent_change": -87.22240537520575
+    },
+    "hello_cached": {
+      "samples_per_path": 3,
+      "baseline_median_ms": 1007.2999999523163,
+      "prebuilt_median_ms": 1557.2000000476837,
+      "percent_change": 54.59148219213728
+    },
+    "loop_source_miss": {
+      "samples_per_path": 1,
+      "baseline_median_ms": 31754.0,
+      "prebuilt_median_ms": 4060.0999999046326,
+      "percent_change": -87.21389431282789
+    },
+    "loop_cached": {
+      "samples_per_path": 3,
+      "baseline_median_ms": 1194.4000000357628,
+      "prebuilt_median_ms": 1765.7999999523163,
+      "percent_change": 47.83991961649736
+    }
+  },
+  "baseline": [
+    {
+      "label": "hello-cold-1",
+      "mode": "scratch",
+      "initial_status": "queued",
+      "server_cache_hit": false,
+      "click_to_output_ms": 46030.30000001192,
+      "click_to_ready_response_ms": 44160.5,
+      "iframe_bootstrap_ms": 822.1999999880791,
+      "worker_load_and_runtime_startup_ms": 1014.1000000238419,
+      "running_to_output_ms": 33.5,
+      "running_to_result_message_ms": null,
+      "result_observed": false,
+      "exit_code": null,
+      "api_observations": 42,
+      "compile_ms_interval": [
+        41528.30000001192,
+        44137.89999997616
+      ],
+      "queue_ms_interval": [
+        0,
+        1499.7999999523163
+      ],
+      "poll_and_ready_detection_ms_interval": [
+        0,
+        1109.800000011921
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 1651.575927734375,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 2376737,
+      "asset_decoded_content_bytes": 5096482,
+      "asset_cache_entries": 0,
+      "wire_request_envelope_ms": 1651.575927734375,
+      "ready_response_to_first_asset_request_ms": 20.300048828125,
+      "asset_receive_time_sum_ms_nonadditive": 1481.6599994665012,
+      "runtime_after_last_asset_response_ms": 164.424072265625,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-warm-1",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 1007.2999999523163,
+      "click_to_ready_response_ms": 110.69999998807907,
+      "iframe_bootstrap_ms": 295.89999997615814,
+      "worker_load_and_runtime_startup_ms": 559.1999999880791,
+      "running_to_output_ms": 41.5,
+      "running_to_result_message_ms": 41.5,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 640.93408203125,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 5096482,
+      "asset_cache_entries": 12,
+      "wire_request_envelope_ms": 0,
+      "ready_response_to_first_asset_request_ms": 19.0,
+      "asset_receive_time_sum_ms_nonadditive": 182.79300001449883,
+      "runtime_after_last_asset_response_ms": 195.165771484375,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-warm-2",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 1102.8999999761581,
+      "click_to_ready_response_ms": 524.8999999761581,
+      "iframe_bootstrap_ms": 162.9000000357628,
+      "worker_load_and_runtime_startup_ms": 387.5999999642372,
+      "running_to_output_ms": 27.5,
+      "running_to_result_message_ms": 27.600000023841858,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 396.381103515625,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 5096482,
+      "asset_cache_entries": 12,
+      "wire_request_envelope_ms": 0,
+      "ready_response_to_first_asset_request_ms": 3.10009765625,
+      "asset_receive_time_sum_ms_nonadditive": 91.76799992565066,
+      "runtime_after_last_asset_response_ms": 151.018798828125,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-warm-3",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 646.1999999880791,
+      "click_to_ready_response_ms": 67.30000001192093,
+      "iframe_bootstrap_ms": 183.19999998807907,
+      "worker_load_and_runtime_startup_ms": 370.0999999642372,
+      "running_to_output_ms": 25.600000023841858,
+      "running_to_result_message_ms": 25.600000023841858,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 394.4951171875,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 5096482,
+      "asset_cache_entries": 12,
+      "wire_request_envelope_ms": 0,
+      "ready_response_to_first_asset_request_ms": 13.7001953125,
+      "asset_receive_time_sum_ms_nonadditive": 84.05699965078384,
+      "runtime_after_last_asset_response_ms": 145.104736328125,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-cold-2",
+      "mode": "scratch",
+      "initial_status": "queued",
+      "server_cache_hit": false,
+      "click_to_output_ms": 31849.5,
+      "click_to_ready_response_ms": 30341.399999976158,
+      "iframe_bootstrap_ms": 385.5,
+      "worker_load_and_runtime_startup_ms": 1098.4000000357628,
+      "running_to_output_ms": 24.19999998807907,
+      "running_to_result_message_ms": 24.399999976158142,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 28,
+      "compile_ms_interval": [
+        28100.200000047684,
+        30323.30000001192
+      ],
+      "queue_ms_interval": [
+        0,
+        1130.0
+      ],
+      "poll_and_ready_detection_ms_interval": [
+        0,
+        1093.0999999642372
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 1344.39697265625,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 2376324,
+      "asset_decoded_content_bytes": 5096482,
+      "asset_cache_entries": 0,
+      "wire_request_envelope_ms": 1344.39697265625,
+      "ready_response_to_first_asset_request_ms": 4.10009765625,
+      "asset_receive_time_sum_ms_nonadditive": 867.7429999224842,
+      "runtime_after_last_asset_response_ms": 135.40283203125,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-cold-3",
+      "mode": "scratch",
+      "initial_status": "queued",
+      "server_cache_hit": false,
+      "click_to_output_ms": 31753.899999976158,
+      "click_to_ready_response_ms": 30222.0,
+      "iframe_bootstrap_ms": 382.0999999642372,
+      "worker_load_and_runtime_startup_ms": 1120.4000000357628,
+      "running_to_output_ms": 29.399999976158142,
+      "running_to_result_message_ms": 29.69999998807907,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 29,
+      "compile_ms_interval": [
+        27973.69999998808,
+        30202.80000001192
+      ],
+      "queue_ms_interval": [
+        0,
+        1124.800000011921
+      ],
+      "poll_and_ready_detection_ms_interval": [
+        0,
+        1104.300000011921
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 1305.06005859375,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 2376333,
+      "asset_decoded_content_bytes": 5096482,
+      "asset_cache_entries": 0,
+      "wire_request_envelope_ms": 1305.06005859375,
+      "ready_response_to_first_asset_request_ms": 4.0,
+      "asset_receive_time_sum_ms_nonadditive": 928.1070000724867,
+      "runtime_after_last_asset_response_ms": 193.43994140625,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "cpu-cold",
+      "mode": "scratch",
+      "initial_status": "queued",
+      "server_cache_hit": false,
+      "click_to_output_ms": 31754.0,
+      "click_to_ready_response_ms": 30331.900000035763,
+      "iframe_bootstrap_ms": 352.5,
+      "worker_load_and_runtime_startup_ms": 750.0,
+      "running_to_output_ms": 319.5999999642372,
+      "running_to_result_message_ms": 319.69999998807907,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 28,
+      "compile_ms_interval": [
+        27978.30000001192,
+        30318.900000035763
+      ],
+      "queue_ms_interval": [
+        0,
+        1212.6000000238419
+      ],
+      "poll_and_ready_detection_ms_interval": [
+        0,
+        1128.0
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 990.987060546875,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 2376493,
+      "asset_decoded_content_bytes": 5096994,
+      "asset_cache_entries": 0,
+      "wire_request_envelope_ms": 990.987060546875,
+      "ready_response_to_first_asset_request_ms": 3.5,
+      "asset_receive_time_sum_ms_nonadditive": 423.0320000788197,
+      "runtime_after_last_asset_response_ms": 108.012939453125,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "cpu-warm-1",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 1194.4000000357628,
+      "click_to_ready_response_ms": 81.19999998807907,
+      "iframe_bootstrap_ms": 275.80000001192093,
+      "worker_load_and_runtime_startup_ms": 462.9000000357628,
+      "running_to_output_ms": 374.5,
+      "running_to_result_message_ms": 374.5999999642372,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 528.037109375,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 5096994,
+      "asset_cache_entries": 12,
+      "wire_request_envelope_ms": 0,
+      "ready_response_to_first_asset_request_ms": 10.900146484375,
+      "asset_receive_time_sum_ms_nonadditive": 97.69700025208294,
+      "runtime_after_last_asset_response_ms": 199.7626953125,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "cpu-warm-2",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 885.6000000238419,
+      "click_to_ready_response_ms": 68.10000002384186,
+      "iframe_bootstrap_ms": 171.69999998807907,
+      "worker_load_and_runtime_startup_ms": 372.30000001192093,
+      "running_to_output_ms": 273.5,
+      "running_to_result_message_ms": 273.5,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 397.047119140625,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 5096994,
+      "asset_cache_entries": 12,
+      "wire_request_envelope_ms": 0,
+      "ready_response_to_first_asset_request_ms": 2.5,
+      "asset_receive_time_sum_ms_nonadditive": 76.32599992211908,
+      "runtime_after_last_asset_response_ms": 144.452880859375,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "cpu-warm-3",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 1281.6000000238419,
+      "click_to_ready_response_ms": 449.60000002384186,
+      "iframe_bootstrap_ms": 179.5,
+      "worker_load_and_runtime_startup_ms": 379.39999997615814,
+      "running_to_output_ms": 273.10000002384186,
+      "running_to_result_message_ms": 273.19999998807907,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "asset_request_count": 12,
+      "asset_network_envelope_ms": 408.032958984375,
+      "asset_encoded_body_bytes": null,
+      "asset_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 5096994,
+      "asset_cache_entries": 12,
+      "wire_request_envelope_ms": 0,
+      "ready_response_to_first_asset_request_ms": 4.0,
+      "asset_receive_time_sum_ms_nonadditive": 73.72500014025718,
+      "runtime_after_last_asset_response_ms": 146.866943359375,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    }
+  ],
+  "prebuilt": [
+    {
+      "label": "hello-cold-1",
+      "mode": "scratch",
+      "initial_status": "queued",
+      "server_cache_hit": false,
+      "click_to_output_ms": 6175.799999952316,
+      "click_to_ready_response_ms": 2347.600000023842,
+      "iframe_bootstrap_ms": 406.59999990463257,
+      "worker_load_and_runtime_startup_ms": 3398.5,
+      "running_to_output_ms": 23.100000023841858,
+      "running_to_result_message_ms": 23.300000071525574,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 3,
+      "compile_ms_interval": [
+        0,
+        2335.8000000715256
+      ],
+      "queue_ms_interval": [
+        0,
+        1258.3999999761581
+      ],
+      "poll_and_ready_detection_ms_interval": [
+        0,
+        1116.5
+      ],
+      "reported_bundle_build_ms": 1668.913624,
+      "this_run_queue_ms": 0.899044,
+      "this_run_build_ms": 1668.913624,
+      "request_poll_and_ready_overhead_ms": 677.787332023842,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 3671.47705078125,
+      "asset_transfer_bytes": 9840065,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 9832240,
+      "program_artifact_transfer_bytes": 7825,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 0,
+      "wire_request_envelope_ms": 3671.47705078125,
+      "runtime_after_last_asset_response_ms": 111.52294921875,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-warm-1",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 2055.9000000953674,
+      "click_to_ready_response_ms": 176.40000009536743,
+      "iframe_bootstrap_ms": 238.19999992847443,
+      "worker_load_and_runtime_startup_ms": 1613.7000000476837,
+      "running_to_output_ms": 27.600000023841858,
+      "running_to_result_message_ms": 27.600000023841858,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "reported_bundle_build_ms": 1668.913624,
+      "this_run_queue_ms": 0,
+      "this_run_build_ms": 0,
+      "request_poll_and_ready_overhead_ms": 176.40000009536743,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1596.537109375,
+      "asset_transfer_bytes": 0,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 184,
+      "wire_request_envelope_ms": 0,
+      "runtime_after_last_asset_response_ms": 246.2626953125,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-warm-2",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 1557.2000000476837,
+      "click_to_ready_response_ms": 177.60000002384186,
+      "iframe_bootstrap_ms": 183.10000002384186,
+      "worker_load_and_runtime_startup_ms": 1173.1999999284744,
+      "running_to_output_ms": 23.300000071525574,
+      "running_to_result_message_ms": 23.300000071525574,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "reported_bundle_build_ms": 1668.913624,
+      "this_run_queue_ms": 0,
+      "this_run_build_ms": 0,
+      "request_poll_and_ready_overhead_ms": 177.60000002384186,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1197.85693359375,
+      "asset_transfer_bytes": 0,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 184,
+      "wire_request_envelope_ms": 0,
+      "runtime_after_last_asset_response_ms": 145.14306640625,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-warm-3",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 1516.1000000238419,
+      "click_to_ready_response_ms": 152.5,
+      "iframe_bootstrap_ms": 201.0,
+      "worker_load_and_runtime_startup_ms": 1142.3999999761581,
+      "running_to_output_ms": 20.200000047683716,
+      "running_to_result_message_ms": 20.300000071525574,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "reported_bundle_build_ms": 1668.913624,
+      "this_run_queue_ms": 0,
+      "this_run_build_ms": 0,
+      "request_poll_and_ready_overhead_ms": 152.5,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1197.116943359375,
+      "asset_transfer_bytes": 0,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 184,
+      "wire_request_envelope_ms": 0,
+      "runtime_after_last_asset_response_ms": 128.383056640625,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-cold-2",
+      "mode": "scratch",
+      "initial_status": "queued",
+      "server_cache_hit": false,
+      "click_to_output_ms": 3988.100000023842,
+      "click_to_ready_response_ms": 2188.8000000715256,
+      "iframe_bootstrap_ms": 385.60000002384186,
+      "worker_load_and_runtime_startup_ms": 1383.5999999046326,
+      "running_to_output_ms": 30.100000023841858,
+      "running_to_result_message_ms": 30.200000047683716,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 3,
+      "compile_ms_interval": [
+        0,
+        2176.899999976158
+      ],
+      "queue_ms_interval": [
+        0,
+        1125.0999999046326
+      ],
+      "poll_and_ready_detection_ms_interval": [
+        0,
+        1092.6000000238419
+      ],
+      "reported_bundle_build_ms": 1511.476742,
+      "this_run_queue_ms": 0.862512,
+      "this_run_build_ms": 1511.476742,
+      "request_poll_and_ready_overhead_ms": 676.4607460715254,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1579.470947265625,
+      "asset_transfer_bytes": 7502,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 7502,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 178,
+      "wire_request_envelope_ms": 639.4619140625,
+      "runtime_after_last_asset_response_ms": 187.029052734375,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "hello-cold-3",
+      "mode": "scratch",
+      "initial_status": "queued",
+      "server_cache_hit": false,
+      "click_to_output_ms": 4069.600000023842,
+      "click_to_ready_response_ms": 2189.0,
+      "iframe_bootstrap_ms": 303.3000000715256,
+      "worker_load_and_runtime_startup_ms": 1557.1999999284744,
+      "running_to_output_ms": 20.100000023841858,
+      "running_to_result_message_ms": 20.200000047683716,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 3,
+      "compile_ms_interval": [
+        0,
+        2174.0999999046326
+      ],
+      "queue_ms_interval": [
+        0,
+        1112.5
+      ],
+      "poll_and_ready_detection_ms_interval": [
+        0,
+        1100.1999999284744
+      ],
+      "reported_bundle_build_ms": 1576.221994,
+      "this_run_queue_ms": 0.05865,
+      "this_run_build_ms": 1576.221994,
+      "request_poll_and_ready_overhead_ms": 612.7193560000001,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1639.1259765625,
+      "asset_transfer_bytes": 7400,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 7400,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 178,
+      "wire_request_envelope_ms": 697.93603515625,
+      "runtime_after_last_asset_response_ms": 216.3740234375,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "cpu-cold",
+      "mode": "scratch",
+      "initial_status": "queued",
+      "server_cache_hit": false,
+      "click_to_output_ms": 4060.0999999046326,
+      "click_to_ready_response_ms": 2161.0999999046326,
+      "iframe_bootstrap_ms": 316.8000000715256,
+      "worker_load_and_runtime_startup_ms": 1323.0,
+      "running_to_output_ms": 259.1999999284744,
+      "running_to_result_message_ms": 259.1999999284744,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 3,
+      "compile_ms_interval": [
+        0,
+        2153.6999999284744
+      ],
+      "queue_ms_interval": [
+        0,
+        1101.6999999284744
+      ],
+      "poll_and_ready_detection_ms_interval": [
+        0,
+        1088.1999999284744
+      ],
+      "reported_bundle_build_ms": 1603.321536,
+      "this_run_queue_ms": 0.07777,
+      "this_run_build_ms": 1603.321536,
+      "request_poll_and_ready_overhead_ms": 557.7006939046328,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1524.97607421875,
+      "asset_transfer_bytes": 7423,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 7423,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 178,
+      "wire_request_envelope_ms": 608.97998046875,
+      "runtime_after_last_asset_response_ms": 113.32373046875,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "cpu-warm-1",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 2019.8999999761581,
+      "click_to_ready_response_ms": 87.70000004768372,
+      "iframe_bootstrap_ms": 300.1999999284744,
+      "worker_load_and_runtime_startup_ms": 1370.7000000476837,
+      "running_to_output_ms": 261.2999999523163,
+      "running_to_result_message_ms": 261.39999997615814,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "reported_bundle_build_ms": 1603.321536,
+      "this_run_queue_ms": 0,
+      "this_run_build_ms": 0,
+      "request_poll_and_ready_overhead_ms": 87.70000004768372,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1478.0859375,
+      "asset_transfer_bytes": 0,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 184,
+      "wire_request_envelope_ms": 0,
+      "runtime_after_last_asset_response_ms": 182.114013671875,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "cpu-warm-2",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 1765.7999999523163,
+      "click_to_ready_response_ms": 53.5,
+      "iframe_bootstrap_ms": 188.39999997615814,
+      "worker_load_and_runtime_startup_ms": 1265.3999999761581,
+      "running_to_output_ms": 258.5,
+      "running_to_result_message_ms": 258.60000002384186,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "reported_bundle_build_ms": 1603.321536,
+      "this_run_queue_ms": 0,
+      "this_run_build_ms": 0,
+      "request_poll_and_ready_overhead_ms": 53.5,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1337.77587890625,
+      "asset_transfer_bytes": 0,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 184,
+      "wire_request_envelope_ms": 0,
+      "runtime_after_last_asset_response_ms": 112.72412109375,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    },
+    {
+      "label": "cpu-warm-3",
+      "mode": "scratch",
+      "initial_status": "ready",
+      "server_cache_hit": true,
+      "click_to_output_ms": 1691.0,
+      "click_to_ready_response_ms": 49.89999997615814,
+      "iframe_bootstrap_ms": 170.20000004768372,
+      "worker_load_and_runtime_startup_ms": 1172.2999999523163,
+      "running_to_output_ms": 298.60000002384186,
+      "running_to_result_message_ms": 298.60000002384186,
+      "result_observed": true,
+      "exit_code": 0,
+      "api_observations": 1,
+      "queue_ms_interval": [
+        0,
+        0
+      ],
+      "compile_ms_interval": [
+        0,
+        0
+      ],
+      "reported_bundle_build_ms": 1603.321536,
+      "this_run_queue_ms": 0,
+      "this_run_build_ms": 0,
+      "request_poll_and_ready_overhead_ms": 49.89999997615814,
+      "asset_request_count": 184,
+      "asset_network_envelope_ms": 1200.322998046875,
+      "asset_transfer_bytes": 0,
+      "shared_runtime_request_count": 178,
+      "shared_runtime_transfer_bytes": 0,
+      "program_artifact_transfer_bytes": 0,
+      "asset_decoded_content_bytes": 24285984,
+      "asset_cache_entries": 184,
+      "wire_request_envelope_ms": 0,
+      "runtime_after_last_asset_response_ms": 137.77685546875,
+      "asset_content_encodings": [
+        "zstd"
+      ]
+    }
+  ]
+}
