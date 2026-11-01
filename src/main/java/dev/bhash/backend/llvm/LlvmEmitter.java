@@ -134,6 +134,7 @@ public final class LlvmEmitter {
             "declare i64 @bh_remainder(i64, i64, ptr)\n"+
             "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\n"+
             "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
+            "declare i64 @bh_primitive_array_get(ptr, i64, ptr)\ndeclare void @bh_primitive_array_set(ptr, i64, i64, ptr)\n"+
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
             textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_to_int32(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
@@ -236,9 +237,23 @@ public final class LlvmEmitter {
             ", ptr "+collectionInfo(snapshot)+", ptr "+text(source.toString())+")");
         return collectionResult(result,bits);
     }
+    private Value arrayAccess(Type result,CollectionOperation operation,Value receiver,List<Value> arguments,Source source,boolean primitive){
+        if(!primitive || (operation!=CollectionOperation.GET && operation!=CollectionOperation.SET))
+            return collectionCall(result,operation,receiver,arguments,-1,source);
+        String location=text(source.toString());
+        if(operation==CollectionOperation.SET){
+            Value value=bits(arguments.get(1));
+            line("call void @bh_primitive_array_set(ptr "+receiver.ir()+", i64 "+arguments.get(0).ir()+", i64 "+value.ir()+", ptr "+location+")");
+            return new Value(Type.VOID,"");
+        }
+        return collectionResult(result,instruction(Type.INT,"call i64 @bh_primitive_array_get(ptr "+receiver.ir()+", i64 "+arguments.get(0).ir()+", ptr "+location+")"));
+    }
     private Value collectionCall(CollectionCall c){
         instance(expression(c.receiver()),c.source());for(var arg:c.arguments())expression(arg);
-        return collectionCall(c.type(),c.operation(),reload(c.receiver()),c.arguments().stream().map(this::reload).toList(),c.snapshot(),c.source());
+        var arguments=c.arguments().stream().map(this::reload).toList();
+        if(c.primitiveArray() && (c.operation()==CollectionOperation.GET || c.operation()==CollectionOperation.SET))
+            return arrayAccess(c.type(),c.operation(),reload(c.receiver()),arguments,c.source(),true);
+        return collectionCall(c.type(),c.operation(),reload(c.receiver()),arguments,c.snapshot(),c.source());
     }
     private Value newCollection(NewCollection c){
         for(var arg:c.arguments())expression(arg);
@@ -556,7 +571,7 @@ public final class LlvmEmitter {
         else if(e instanceof CollectionCall c)result=collectionCall(c);
         else if(e instanceof IndexRead r){
             instance(expression(r.receiver()),r.source());expression(r.index());
-            result=collectionCall(r.type(),CollectionOperation.GET,reload(r.receiver()),List.of(reload(r.index())),-1,r.source());
+            result=arrayAccess(r.type(),CollectionOperation.GET,reload(r.receiver()),List.of(reload(r.index())),r.source(),r.primitiveArray());
         }
         else if(e instanceof FieldRead f){
             Value receiver=expression(f.receiver());
@@ -788,7 +803,7 @@ public final class LlvmEmitter {
         }
         else if(s instanceof IndexWrite w){
             var target=w.destination();instance(expression(target.receiver()),target.source());expression(target.index());expression(w.value());
-            collectionCall(Type.VOID,CollectionOperation.SET,reload(target.receiver()),List.of(reload(target.index()),reload(w.value())),-1,target.source());
+            arrayAccess(Type.VOID,CollectionOperation.SET,reload(target.receiver()),List.of(reload(target.index()),reload(w.value())),target.source(),target.primitiveArray());
             release(target.receiver());release(target.index());release(w.value());
         }
         else if(s instanceof Initialize i)initialize(i.owner());
