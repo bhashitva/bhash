@@ -3,7 +3,7 @@
 The service prepares `BhashBrowserHost` once when building its container image.
 New submissions still pass through the Bhash frontend in a private Java child
 process, but Roslyn compiles only the generated `Program.cs`. There is no
-per-submission project evaluation, package restore, runtime compilation,
+per-submission project evaluation, package restore, runtime bundling,
 trimming, WebCIL conversion or complete browser publishing.
 
 The administrator-only preparation command is:
@@ -31,6 +31,8 @@ bundles fail explicitly; requests never rebuild or repair a shared host.
 Host and program output directories have distinct markers; program output may
 not replace or overlap the prepared host, including through directory aliases.
 Rebuild the bundle with the compiler and SDK image when either changes.
+The prepared web assets include the license and third-party notices from the
+selected .NET browser runtime pack under `licenses/dotnet-runtime/`.
 This manifest detects accidental modifications; the immutable deployment image
 is the trust boundary, not a signature supplied by an untrusted client.
 
