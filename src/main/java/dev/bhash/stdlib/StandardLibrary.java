@@ -17,9 +17,13 @@ public final class StandardLibrary {
     private StandardLibrary() {}
     private static Catalog load() {
         var owners=new LinkedHashMap<String,List<String[]>>();
-        try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/api.txt")) {
-            if(input==null)throw new IOException("Missing standard library signature catalog");
-            for(String line:new String(input.readAllBytes(),StandardCharsets.UTF_8).lines().toList()) {
+        try {
+            var catalog=new StringBuilder();
+            for(String name:List.of("api.txt","foundation-api.txt"))try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+name)) {
+                if(input==null)throw new IOException("Missing standard library signature catalog: "+name);
+                catalog.append(new String(input.readAllBytes(),StandardCharsets.UTF_8)).append('\n');
+            }
+            for(String line:catalog.toString().lines().toList()) {
                 if(line.isBlank()||line.startsWith("#"))continue;
                 String[] fields=line.split("\\|",-1);
                 if(fields.length!=5||!fields[2].matches("[A-Za-z][A-Za-z0-9]*"))throw new IOException("Invalid standard library signature");
@@ -39,7 +43,47 @@ public final class StandardLibrary {
         }
         return new Catalog(String.join("\n",lines)+"\n",Map.copyOf(natives));
     }
-    public static boolean owns(String full) {return CATALOG.source.lines().anyMatch(line->line.startsWith("सार्वजनिक वर्ग ")&&full.equals("मानक."+Identifiers.key(line.substring("सार्वजनिक वर्ग ".length(),line.length()-2))));}
+    public static boolean owns(String full) {
+        return (CATALOG.source+foundations().text()).lines().anyMatch(line->{
+            for(String prefix:List.of("सार्वजनिक वर्ग ","सार्वजनिक अनुबंध "))
+                if(line.startsWith(prefix)&&full.equals("मानक."+Identifiers.key(line.substring(prefix.length()).split("[ <{]",2)[0])))return true;
+            return false;
+        });
+    }
+    public static final String FOUNDATIONS_NAME="__bhash_foundations__.bhash";
+    public static boolean reserved(String name) {return name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME);}
+    private static final SourceFile FOUNDATIONS=loadFoundations();
+    public static SourceFile foundations() {return FOUNDATIONS;}
+    private static SourceFile loadFoundations() {
+        try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/foundations.bhash")) {
+            if(input==null)throw new IOException("Missing application foundations");
+            return new SourceFile(FOUNDATIONS_NAME,new String(input.readAllBytes(),StandardCharsets.UTF_8));
+        }catch(IOException error){throw new IllegalStateException(error);}
+    }
+    /** Include the transitive referenced declarations, preserving original line numbers.
+     * Unused foundation classes must not add initialization, layouts or functions. */
+    public static SourceFile foundations(Set<String> referenced) {
+        var parsed=FOUNDATIONS.parse();
+        if(!parsed.valid())throw new IllegalStateException("Invalid foundations: "+parsed.diagnostics());
+        var declarations=new LinkedHashMap<String,org.antlr.v4.runtime.ParserRuleContext>();
+        for(var c:parsed.tree().classDecl())declarations.put(Identifiers.key(c.IDENTIFIER().getText()),c);
+        for(var c:parsed.tree().interfaceDecl())declarations.put(Identifiers.key(c.IDENTIFIER().getText()),c);
+        var needed=new HashSet<>(referenced);boolean changed;
+        do {
+            int size=needed.size();
+            for(var entry:declarations.entrySet())if(needed.contains(entry.getKey())) {
+                var declaration=entry.getValue();
+                String original=declaration.start.getInputStream().getText(org.antlr.v4.runtime.misc.Interval.of(declaration.start.getStartIndex(),declaration.stop.getStopIndex()));
+                var lexer=new dev.bhash.parser.BhashLexer(org.antlr.v4.runtime.CharStreams.fromString(original));
+                for(var token:lexer.getAllTokens())if(token.getType()==dev.bhash.parser.BhashLexer.IDENTIFIER)needed.add(Identifiers.key(token.getText()));
+            }
+            changed=needed.size()!=size;
+        }while(changed);
+        var lines=FOUNDATIONS.text().lines().toList();var keep=new BitSet();keep.set(0,2);
+        for(var entry:declarations.entrySet())if(needed.contains(entry.getKey()))keep.set(entry.getValue().start.getLine()-1,entry.getValue().stop.getLine());
+        var text=new StringBuilder();for(int i=0;i<lines.size();i++)text.append(keep.get(i)?lines.get(i):"").append('\n');
+        return new SourceFile(FOUNDATIONS_NAME,text.toString());
+    }
     public static SourceFile source() {return new SourceFile(SOURCE_NAME,CATALOG.source);}
     public static String intrinsic(FunctionDeclContext declaration) {
         return declaration!=null&&SOURCE_NAME.equals(LocatedToken.source(declaration.start,""))?CATALOG.natives.get(declaration.start.getLine()):null;
@@ -47,7 +91,8 @@ public final class StandardLibrary {
     /** LSP materializes readable declarations so F12 opens a real document. */
     public static SourceFile editorSource(Path directory) throws IOException {
         Files.createDirectories(directory);Path path=directory.resolve(SOURCE_NAME);
-        Files.writeString(path,CATALOG.source,StandardCharsets.UTF_8);path.toFile().setReadOnly();
-        return new SourceFile(path.toAbsolutePath().toString(),CATALOG.source);
+        String text=CATALOG.source+FOUNDATIONS.text().replace("संकुल मानक;","");
+        Files.writeString(path,text,StandardCharsets.UTF_8);path.toFile().setReadOnly();
+        return new SourceFile(path.toAbsolutePath().toString(),text);
     }
 }
