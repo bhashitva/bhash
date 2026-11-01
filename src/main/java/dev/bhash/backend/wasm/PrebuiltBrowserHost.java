@@ -175,19 +175,29 @@ public final class PrebuiltBrowserHost {
         } catch(InterruptedException error) {Thread.currentThread().interrupt();throw new IOException("Browser compilation interrupted.",error);}
         finally {
             var children=process.descendants().toList();
+            // Register exit waits while handles still identify live processes.
+            // On Windows isAlive() can become false before inherited log handles
+            // have finished closing; never skip the exit wait after termination.
+            var exits=new ArrayList<java.util.concurrent.CompletableFuture<ProcessHandle>>();
+            for(var child:children)exits.add(child.onExit());
+            exits.add(process.toHandle().onExit());
+            var stopped=java.util.concurrent.CompletableFuture.allOf(exits.toArray(java.util.concurrent.CompletableFuture<?>[]::new));
             for(var child:children)if(child.isAlive())child.destroyForcibly();
             if(process.isAlive())process.destroyForcibly();
             boolean interrupted=Thread.interrupted();
             try {
                 long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
-                var handles=new ArrayList<ProcessHandle>(children);handles.add(process.toHandle());
-                for(var handle:handles)while(handle.isAlive()) {
+                for(;;) {
                     long left=deadline-System.nanoTime();if(left<=0)throw new IOException("Browser compiler cleanup timed out.");
-                    try{handle.onExit().get(left,TimeUnit.NANOSECONDS);}
+                    try{stopped.get(left,TimeUnit.NANOSECONDS);break;}
                     catch(InterruptedException error){interrupted=true;}
                     catch(java.util.concurrent.ExecutionException|java.util.concurrent.TimeoutException error){throw new IOException("Browser compiler cleanup failed.",error);}
                 }
-            } finally {if(interrupted)Thread.currentThread().interrupt();}
+            } finally {
+                try(var output=process.getOutputStream();var input=process.getInputStream();var error=process.getErrorStream()) {
+                    // Release all parent-side pipe handles before deleting the workspace.
+                } finally {if(interrupted)Thread.currentThread().interrupt();}
+            }
         }
     }
     static String runtimeFingerprint() throws IOException {
