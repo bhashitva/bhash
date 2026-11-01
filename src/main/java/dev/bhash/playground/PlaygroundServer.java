@@ -36,6 +36,8 @@ public final class PlaygroundServer implements AutoCloseable {
         final String id=UUID.randomUUID().toString().replace("-",""),key;
         final boolean scratch;
         volatile String status="queued",error="";
+        final long queuedAt=System.nanoTime();
+        volatile long startedAt,finishedAt;
         volatile long touched=System.currentTimeMillis();
         Job(String key,boolean scratch) { this.key=key;this.scratch=scratch; }
         boolean active() { return status.equals("queued") || status.equals("compiling"); }
@@ -162,7 +164,7 @@ public final class PlaygroundServer implements AutoCloseable {
         }
     }
     private void build(Job job,String source) {
-        job.status="compiling"; Path directory=work.resolve(job.id),destination=artifacts.resolve(job.id);
+        job.startedAt=System.nanoTime();job.status="compiling"; Path directory=work.resolve(job.id),destination=artifacts.resolve(job.id);
         try {
             Files.createDirectories(directory);
             Path file=directory.resolve("playground.bhash");Files.writeString(file,source);
@@ -180,14 +182,14 @@ public final class PlaygroundServer implements AutoCloseable {
             }
             if(browserHost!=null) Files.copy(destination.resolve("worker.js"),destination.resolve("playground-worker.js"),StandardCopyOption.REPLACE_EXISTING);
             Files.writeString(destination.resolve("runner-config.js"),"export const parentOrigin="+quote(origin.toString())+";\n");
-            job.status="ready";
+            job.finishedAt=System.nanoTime();job.status="ready";
         } catch(Exception error) {
             String message=String.valueOf(error.getMessage()).replace(directory.toString()+File.separator,"");
             if(job.scratch) {
                 Matcher matcher=Pattern.compile("playground\\.bhash:(\\d+):").matcher(message);
                 message=matcher.replaceAll(m->"playground.bhash:"+Math.max(1,Integer.parseInt(m.group(1))-1)+":");
             }
-            job.error=message.substring(0,Math.min(message.length(),MAX_ERROR));job.status="failed";
+            job.error=message.substring(0,Math.min(message.length(),MAX_ERROR));job.finishedAt=System.nanoTime();job.status="failed";
             remove(destination);
         } finally {job.touched=System.currentTimeMillis();remove(directory);synchronized(jobs){trim();}}
     }
@@ -229,7 +231,9 @@ public final class PlaygroundServer implements AutoCloseable {
             finally {if(interrupted)Thread.currentThread().interrupt();}
         }
     }
-    private String jobJson(Job job) {return "{\"id\":"+quote(job.id)+",\"status\":"+quote(job.status)+",\"error\":"+quote(job.error)+",\"url\":"+quote(runOrigin+"/artifacts/"+job.id+"/runner.html")+"}";}
+    private String jobJson(Job job) {return "{\"id\":"+quote(job.id)+",\"status\":"+quote(job.status)+",\"error\":"+quote(job.error)+",\"url\":"+quote(runOrigin+"/artifacts/"+job.id+"/runner.html")
+            +",\"timings\":{\"queueMs\":"+(job.startedAt==0?"null":(job.startedAt-job.queuedAt)/1_000_000.0)
+            +",\"compileMs\":"+(job.finishedAt==0?"null":(job.finishedAt-job.startedAt)/1_000_000.0)+"}}";}
     private void expire() {try{synchronized(jobs){expireLocked();}}catch(Exception error){System.err.println("Playground cache cleanup failed");}}
     private void expireLocked() {
         long now=System.currentTimeMillis();
@@ -286,7 +290,7 @@ public final class PlaygroundServer implements AutoCloseable {
     }
     private static String env(String key,String fallback){return System.getenv().getOrDefault(key,fallback);}
     public static void main(String[] args) throws Exception {
-        var config=new Settings(Path.of(env("BHASH_COMPILER_JAR","target/bhash-compiler-0.1.0-SNAPSHOT.jar")),Path.of(env("BHASH_DATA","target/playground-data")),Path.of(env("BHASH_WEB","playground/dist")),env("BHASH_BIND","127.0.0.1"),Integer.parseInt(env("PORT","8080")),URI.create(env("BHASH_ORIGIN","http://localhost:8080")),URI.create(env("BHASH_RUN_ORIGIN","http://127.0.0.1:8080")),Integer.parseInt(env("BHASH_BUILD_TIMEOUT","180")),8,10,Boolean.parseBoolean(env("BHASH_TRUST_PROXY","false")));
+        var config=new Settings(Path.of(env("BHASH_COMPILER_JAR","target/bhash-compiler-0.1.0-SNAPSHOT.jar")),Path.of(env("BHASH_DATA","target/playground-data")),Path.of(env("BHASH_WEB","playground/dist")),env("BHASH_BIND","127.0.0.1"),Integer.parseInt(env("PORT","8080")),URI.create(env("BHASH_ORIGIN","http://localhost:8080")),URI.create(env("BHASH_RUN_ORIGIN","http://127.0.0.1:8080")),Integer.parseInt(env("BHASH_BUILD_TIMEOUT","180")),8,Integer.parseInt(env("BHASH_REQUESTS_PER_MINUTE","10")),Boolean.parseBoolean(env("BHASH_TRUST_PROXY","false")));
         var app=new PlaygroundServer(config);Runtime.getRuntime().addShutdownHook(new Thread(app::close));app.start();System.out.println("Bhash playground listening at "+app.origin());
     }
 }
