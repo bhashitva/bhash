@@ -47,7 +47,7 @@ public final class PrebuiltBrowserHost {
             throw new IOException("Prebuilt browser host is modified or incomplete; prepare it again.");
         Properties properties=new Properties();
         try(var reader=Files.newBufferedReader(root.resolve("host.properties"))) {properties.load(reader);}
-        if (!fingerprint().equals(properties.getProperty("runtime")))
+        if (!runtimeFingerprint().equals(properties.getProperty("runtime")))
             throw new IOException("Prebuilt browser host does not match this compiler runtime; prepare it again.");
         Path compiler=Path.of(properties.getProperty("csc", ""));
         if (!Files.isRegularFile(compiler) || !hash(Files.readAllBytes(compiler)).equals(properties.getProperty("cscSha256")))
@@ -85,7 +85,7 @@ public final class PrebuiltBrowserHost {
             if(!Files.isRegularFile(assembly))assembly=work.resolve("bin/Release/net10.0/browser-wasm/BhashBrowserHost.dll");
             Files.copy(assembly,references.resolve("BhashBrowserHost.dll"));
             Path csc=Path.of(Files.readString(work.resolve("compiler-path.txt")).strip()).toAbsolutePath();
-            Properties properties=new Properties();properties.setProperty("runtime",fingerprint());
+            Properties properties=new Properties();properties.setProperty("runtime",runtimeFingerprint());
             properties.setProperty("csc",csc.toString());properties.setProperty("cscSha256",hash(Files.readAllBytes(csc)));
             var text=new StringWriter();properties.store(text,null);
             Files.write(stage.resolve("host.properties"),text.toString().lines().filter(line->!line.startsWith("#")).toList());
@@ -142,7 +142,7 @@ public final class PrebuiltBrowserHost {
         if(value.indexOf('"')>=0||value.indexOf('\n')>=0||value.indexOf('\r')>=0)throw new IOException("Unsupported toolchain path.");
         return "\""+value+"\"";
     }
-    private static void run(List<String> command,Path work) throws IOException,CompilationException {
+    static void run(List<String> command,Path work) throws IOException,CompilationException {
         var builder=new ProcessBuilder(command).directory(work.toFile()).redirectErrorStream(true).redirectOutput(work.resolve("build.log").toFile());
         builder.environment().put("DOTNET_CLI_TELEMETRY_OPTOUT","1");builder.environment().put("DOTNET_NOLOGO","1");
         builder.environment().put("DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE","true");builder.environment().put("DOTNET_CLI_UI_LANGUAGE","en-US");
@@ -168,8 +168,9 @@ public final class PrebuiltBrowserHost {
             } finally {if(interrupted)Thread.currentThread().interrupt();}
         }
     }
-    private static String fingerprint() throws IOException {
+    static String runtimeFingerprint() throws IOException {
         var bytes=new ByteArrayOutputStream();
+        bytes.write(PROJECT.getBytes(StandardCharsets.UTF_8));
         for(String name:SOURCES)try(var input=PrebuiltBrowserHost.class.getResourceAsStream(name)) {
             if(input==null)throw new IOException("Missing browser host resource.");input.transferTo(bytes);
         }
