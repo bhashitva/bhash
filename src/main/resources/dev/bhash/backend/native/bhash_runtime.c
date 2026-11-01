@@ -1833,8 +1833,13 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
         if(strchr(name,'='))runtime_error(location,"अमान्य परिवेश नाम।");
 #ifdef _WIN32
         wchar_t *wide=file_wide(slots[2]);if(!wide)runtime_error(location,"परिवेश उपलब्ध नहीं है।");
-        DWORD n=GetEnvironmentVariableW(wide,NULL,0);
-        if(!n){free(wide);bh_roots_pop(&frame);return b;}
+        SetLastError(ERROR_SUCCESS);DWORD n=GetEnvironmentVariableW(wide,NULL,0);
+        if(!n){
+            DWORD error=GetLastError();free(wide);
+            if(error==ERROR_ENVVAR_NOT_FOUND){bh_roots_pop(&frame);return b;}
+            if(error!=ERROR_SUCCESS)runtime_error(location,"परिवेश उपलब्ध नहीं है।");
+            slots[0]=new_text(0,location);uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
+        }
         wchar_t *value=malloc((size_t)n*sizeof *value);if(!value){free(wide);runtime_error(location,"परिवेश उपलब्ध नहीं है।");}
         DWORD got=GetEnvironmentVariableW(wide,value,n);free(wide);
         if(!got||got>=n){free(value);runtime_error(location,"परिवेश उपलब्ध नहीं है।");}
