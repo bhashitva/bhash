@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[1],"invalid-repeat")) {
             const bh_type bad = {"bad-repeat",0,0,NULL,0,3,1}; bh_alloc(&bad,6);
         }
-        if (!strcmp(argv[1],"array-bounds")) { slots[0]=bh_collection_new(&array_int,0,&location); call(slots[0],BH_GET,0,0,&location); }
+        if (!strcmp(argv[1],"array-bounds")) { slots[0]=bh_collection_new(&array_int,0,&location); bh_primitive_array_get(slots[0],0,&location); }
         slots[0]=bh_collection_new(&map_text,0,&location);
         if (!strcmp(argv[1],"null-key")) call(slots[0],BH_SET,0,0,&location);
         if (!strcmp(argv[1],"missing-key")) call(slots[0],BH_GET,bits(&key),0,&location);
@@ -50,8 +50,9 @@ int main(int argc, char **argv) {
         slots[0]=bh_collection_new(scalars[k],2,&location);
         uint64_t version=call(slots[0],BH_VERSION,0,0,&location);
         for (size_t v=0; v<sizeof(values)/sizeof(*values); ++v) {
-            assert(call(slots[0],BH_SET,1,values[v],&location)==0);
+            bh_primitive_array_set(slots[0],1,values[v],&location);
             bh_collect();
+            assert(bh_primitive_array_get(slots[0],1,&location)==values[v]);
             assert(call(slots[0],BH_GET,1,0,&location)==values[v]);
             assert(call(slots[0],BH_GET_OR,1,0,&location)==values[v]);
             assert(call(slots[0],BH_VERSION,0,0,&location)==version);
