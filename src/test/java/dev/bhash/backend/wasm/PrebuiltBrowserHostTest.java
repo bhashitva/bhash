@@ -14,6 +14,7 @@ class PrebuiltBrowserHostTest {
     Path fixture() throws Exception {
         Path root=directory.resolve("host");Files.createDirectories(root.resolve("web/_framework"));
         Files.writeString(root.resolve("web/_framework/dotnet.js"),"runtime");
+        Files.writeString(root.resolve(PrebuiltBrowserHost.HOST_MARKER),"Bhash prebuilt browser host v1\n");
         Path csc=directory.resolve("csc.dll");Files.writeString(csc,"compiler");
         var properties=new Properties();properties.setProperty("runtime",PrebuiltBrowserHost.runtimeFingerprint());
         properties.setProperty("csc",csc.toString());properties.setProperty("cscSha256",sha(Files.readAllBytes(csc)));
@@ -41,6 +42,13 @@ class PrebuiltBrowserHostTest {
         Files.writeString(directory.resolve("keep.txt"),"keep");
         assertThrows(IOException.class,()->PrebuiltBrowserHost.prepare(directory));
         assertEquals("keep",Files.readString(directory.resolve("keep.txt")));
+    }
+    @Test void programOutputCannotOverwriteOrModifyThePreparedHost() throws Exception {
+        Path root=fixture();var host=PrebuiltBrowserHost.open(root);String id=host.id();
+        for(Path output:List.of(root,root.resolve("program"),directory))
+            assertTrue(assertThrows(IOException.class,()->host.compile("unused",output)).getMessage().contains("overlap"));
+        assertThrows(IOException.class,()->new WasmCompiler().compile("hello.bhash","कार्य मुख्य() -> शून्य {}",root));
+        assertEquals(id,PrebuiltBrowserHost.open(root).id());
     }
     @Test void interruptStopsCompilerAndItsDescendantsBeforeReturning() throws Exception {
         Path processDirectory=directory.resolve("process");Files.createDirectories(processDirectory);
