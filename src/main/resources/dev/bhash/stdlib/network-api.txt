@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Private transport surface used by networking.bhash; applications use एचटीटीपी.
+जालतंत्र|भेजो|netSend|पूर्णांक|विधि: पाठ, पता: पाठ, शीर्ष: सूची<पाठ>, सामग्री: बाइटबफ़र, समय: पूर्णांक
+जालतंत्र|स्थिति|netStatus|पूर्णांक|पहचान: पूर्णांक
+जालतंत्र|शीर्ष|netHeaders|सूची<पाठ>|पहचान: पूर्णांक
+जालतंत्र|सामग्री|netBody|बाइटबफ़र|पहचान: पूर्णांक
+जालतंत्र|बंदकरो|netClose|शून्य|पहचान: पूर्णांक
+जालतंत्र|घड़ी|netClock|पूर्णांक|
