@@ -28,6 +28,17 @@ class NativeBackendTest {
         assertEquals(0,result.exit(),result.err());assertEquals("भारत😀\n",result.out());
         assertEquals("{\"level\":1,\"message\":\"नमस्ते😀\",\"fields\":{}}\n",result.err());
     }
+    @Test void nativeFoundationEnvironmentPreservesEmptyValues()throws Exception {
+        requireTools();
+        var result=nativeRun("""
+            आयात मानक.विन्यास; आयात मानक.परीक्षण;
+            कार्य मुख्य() -> शून्य {
+                परीक्षण.बराबर("", विन्यास.परिवेश("BHASH_FOUNDATIONS_EMPTY", "missing"));
+                परीक्षण.बराबर("भारत😀", विन्यास.परिवेश("BHASH_FOUNDATIONS_UNICODE", "missing"));
+            }
+            """,Map.of("BHASH_FOUNDATIONS_EMPTY","","BHASH_FOUNDATIONS_UNICODE","भारत😀"));
+        assertEquals(0,result.exit(),result.err());assertEquals("",result.out());
+    }
     @Test void applicationFoundationsRunWithForcedCollectionAndCleanRoots()throws Exception {
         requireTools();
         var sources=new ArrayList<>(FoundationFixtures.portable());sources.add(FoundationFixtures.files(temporary));
