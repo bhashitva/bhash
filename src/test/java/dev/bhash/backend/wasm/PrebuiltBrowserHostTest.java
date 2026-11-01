@@ -15,10 +15,7 @@ class PrebuiltBrowserHostTest {
         Path root=directory.resolve("host");Files.createDirectories(root.resolve("web/_framework"));
         Files.writeString(root.resolve("web/_framework/dotnet.js"),"runtime");
         Path csc=directory.resolve("csc.dll");Files.writeString(csc,"compiler");
-        var bytes=new ByteArrayOutputStream();
-        for(String resource:List.of("/dev/bhash/backend/clr/BhashRuntime.cs.txt","/dev/bhash/backend/clr/BhashStandard.cs.txt","/dev/bhash/backend/wasm/PrebuiltBrowserHost.cs.txt"))
-            try(var stream=PrebuiltBrowserHost.class.getResourceAsStream(resource)){stream.transferTo(bytes);}
-        var properties=new Properties();properties.setProperty("runtime",sha(bytes.toByteArray()));
+        var properties=new Properties();properties.setProperty("runtime",PrebuiltBrowserHost.runtimeFingerprint());
         properties.setProperty("csc",csc.toString());properties.setProperty("cscSha256",sha(Files.readAllBytes(csc)));
         try(var writer=Files.newBufferedWriter(root.resolve("host.properties"))){properties.store(writer,"");}
         seal(root);return root;
@@ -44,5 +41,33 @@ class PrebuiltBrowserHostTest {
         Files.writeString(directory.resolve("keep.txt"),"keep");
         assertThrows(IOException.class,()->PrebuiltBrowserHost.prepare(directory));
         assertEquals("keep",Files.readString(directory.resolve("keep.txt")));
+    }
+    @Test void interruptStopsCompilerAndItsDescendantsBeforeReturning() throws Exception {
+        Path processDirectory=directory.resolve("process");Files.createDirectories(processDirectory);
+        String javaExecutable=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
+        String classes=Path.of(BrowserCompilerProcessFixture.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString();
+        var failure=new java.util.concurrent.atomic.AtomicReference<Throwable>();
+        var preserved=new java.util.concurrent.atomic.AtomicBoolean();
+        Thread runner=new Thread(()->{
+            try{PrebuiltBrowserHost.run(List.of(javaExecutable,"-cp",classes,BrowserCompilerProcessFixture.class.getName(),processDirectory.toString(),"parent"),processDirectory);}
+            catch(Throwable error){failure.set(error);preserved.set(Thread.currentThread().isInterrupted());}
+        });
+        runner.start();
+        try {
+            long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+            while(!Files.exists(processDirectory.resolve("child.pid"))&&runner.isAlive()&&System.nanoTime()<deadline)Thread.sleep(20);
+            assertTrue(Files.exists(processDirectory.resolve("child.pid")),String.valueOf(failure.get()));
+            runner.interrupt();runner.join(10000);assertFalse(runner.isAlive());
+            assertInstanceOf(IOException.class,failure.get());assertTrue(preserved.get());
+            for(String file:List.of("parent.pid","child.pid")) {
+                long pid=Long.parseLong(Files.readString(processDirectory.resolve(file)));
+                assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false),file+" survived cancellation");
+            }
+        } finally {
+            runner.interrupt();
+            for(String file:List.of("parent.pid","child.pid"))if(Files.exists(processDirectory.resolve(file)))
+                ProcessHandle.of(Long.parseLong(Files.readString(processDirectory.resolve(file)))).ifPresent(ProcessHandle::destroyForcibly);
+            runner.join(10000);
+        }
     }
 }
