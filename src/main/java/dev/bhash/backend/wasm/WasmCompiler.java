@@ -159,8 +159,18 @@ public final class WasmCompiler {
     }
 
     static void validateDestination(Path destination) throws IOException {
+        validateDestination(destination, false);
+    }
+
+    static void validateHostDestination(Path destination) throws IOException {
+        validateDestination(destination, true);
+    }
+
+    private static void validateDestination(Path destination, boolean host) throws IOException {
         if (destination.getParent() == null || Files.isSymbolicLink(destination)) throw new IOException("Browser output must be a new or Bhash-managed directory.");
         if (!Files.exists(destination)) return;
+        boolean preparedHost=Files.isRegularFile(destination.resolve(PrebuiltBrowserHost.HOST_MARKER),LinkOption.NOFOLLOW_LINKS);
+        if(host!=preparedHost)throw new IOException("Program output and prebuilt browser host directories must be separate: "+destination);
         Path marker = destination.resolve(MARKER);
         if (!Files.isDirectory(destination) || !Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS)
                 || !Files.readString(marker, StandardCharsets.UTF_8).equals(manifest(destination)))
@@ -168,7 +178,15 @@ public final class WasmCompiler {
     }
 
     static void install(Path stage, Path destination) throws IOException {
-        validateDestination(destination);
+        install(stage,destination,false);
+    }
+
+    static void installHost(Path stage, Path destination) throws IOException {
+        install(stage,destination,true);
+    }
+
+    private static void install(Path stage, Path destination, boolean host) throws IOException {
+        validateDestination(destination,host);
         // Temp directories default to 0700 on Linux. Publish static assets with
         // read/traverse access for the HTTP server, including under a strict umask.
         // Windows retains its inherited ACLs; never change the private build workspace.

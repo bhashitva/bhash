@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 /** Immutable, administrator-prepared browser runtime. Never executes submitted code on the host. */
 public final class PrebuiltBrowserHost {
+    static final String HOST_MARKER=".bhash-browser-host";
     private final Path root;
     private final String id;
     private final Properties metadata;
@@ -42,6 +43,7 @@ public final class PrebuiltBrowserHost {
     public static PrebuiltBrowserHost open(Path path) throws IOException {
         Path root=path.toAbsolutePath().normalize();
         if (Files.isSymbolicLink(root)) throw new IOException("Browser host must not be a symbolic link.");
+        if(!Files.isRegularFile(root.resolve(HOST_MARKER),LinkOption.NOFOLLOW_LINKS))throw new IOException("Not a prepared Bhash browser host.");
         String manifest=WasmCompiler.manifest(root);
         if (!Files.readString(root.resolve(".bhash-wasm-output")).equals(manifest))
             throw new IOException("Prebuilt browser host is modified or incomplete; prepare it again.");
@@ -57,7 +59,7 @@ public final class PrebuiltBrowserHost {
 
     /** Explicit image-construction operation; never called by a public compilation request. */
     public static void prepare(Path output) throws Exception {
-        Path destination=output.toAbsolutePath().normalize(); WasmCompiler.validateDestination(destination);
+        Path destination=output.toAbsolutePath().normalize(); WasmCompiler.validateHostDestination(destination);
         Files.createDirectories(destination.getParent());
         Path work=Files.createTempDirectory("bhash-browser-host-");
         Path stage=Files.createTempDirectory(destination.getParent(),".bhash-host-stage-");
@@ -89,8 +91,9 @@ public final class PrebuiltBrowserHost {
             properties.setProperty("csc",csc.toString());properties.setProperty("cscSha256",hash(Files.readAllBytes(csc)));
             var text=new StringWriter();properties.store(text,null);
             Files.write(stage.resolve("host.properties"),text.toString().lines().filter(line->!line.startsWith("#")).toList());
+            Files.writeString(stage.resolve(HOST_MARKER),"Bhash prebuilt browser host v1\n");
             Files.writeString(stage.resolve(".bhash-wasm-output"),WasmCompiler.manifest(stage));
-            WasmCompiler.install(stage,destination);
+            WasmCompiler.installHost(stage,destination);
         } finally {
             String profile=System.getenv("BHASH_WASM_PROFILE");
             if(profile!=null&&!profile.isBlank()&&Files.exists(work.resolve("build.log"))) {
@@ -102,7 +105,15 @@ public final class PrebuiltBrowserHost {
     }
 
     void compile(String code, Path output) throws IOException, CompilationException {
-        Path destination=output.toAbsolutePath().normalize();WasmCompiler.validateDestination(destination);
+        Path destination=output.toAbsolutePath().normalize();
+        Path existing=destination;
+        while(!Files.exists(existing,LinkOption.NOFOLLOW_LINKS)) {
+            existing=existing.getParent();
+            if(existing==null)throw new IOException("Cannot resolve the browser output filesystem.");
+        }
+        Path physical=existing.toRealPath().resolve(existing.relativize(destination)),host=root.toRealPath();
+        if(physical.startsWith(host)||host.startsWith(physical))throw new IOException("Program output must not overlap the prebuilt browser host.");
+        WasmCompiler.validateDestination(destination);
         Files.createDirectories(destination.getParent());
         Path work=Files.createTempDirectory("bhash-browser-program-");
         Path stage=Files.createTempDirectory(destination.getParent(),".bhash-wasm-stage-");
