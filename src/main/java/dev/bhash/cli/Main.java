@@ -53,6 +53,7 @@ public final class Main {
                 try{return run(decoded,out,err);}finally{if(previous==null)launchDirectory.remove();else launchDirectory.set(previous);}
             }catch(java.nio.charset.CharacterCodingException | RuntimeException error){err.println("Invalid UTF-8 argument envelope: "+error.getMessage());return 2;}
         }
+        if (args.length > 0 && args[0].equals("test")) return TestCommands.run(args,out,err);
         if (args.length > 0 && args[0].equals("native")) return NativeCommands.run(args,out,err);
         if (args.length == 1 && args[0].equals("targets")) {
             for (var target : Target.values()) {
@@ -120,6 +121,7 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz|archive.zip> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");
         err.println("       Native compile/run also accept --source-root ROOT for reproducible source paths.");
         err.println("       java -jar bhash-compiler.jar targets");
+        err.println("       java -jar bhash-compiler.jar test <file.bhash|directory> [--target jvm|clr|native] [--timeout SECONDS]");
         err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");
         err.println("JVM output is a JAR; CLR output is a directory containing BhashProgram.dll and runtime metadata.");
         err.println("Native output is an experimental Linux/Windows x86-64 or macOS 14+ ARM64 executable; LLVM 18 is required for builds.");
