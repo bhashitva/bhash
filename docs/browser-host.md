@@ -23,11 +23,13 @@ folder without that service route.
 
 ## Compatibility and integrity
 
-Preparation records the runtime/standard-library source fingerprint, exact
+Preparation records the host project and runtime/standard-library source fingerprint, exact
 reference assemblies, SDK compiler location and compiler digest. A manifest
 hashes every prepared file. The service validates this bundle at startup, and
 compiler children validate it before use. Missing, changed or incompatible
 bundles fail explicitly; requests never rebuild or repair a shared host.
+Host and program output directories have distinct markers; program output may
+not replace or overlap the prepared host, including through directory aliases.
 Rebuild the bundle with the compiler and SDK image when either changes.
 This manifest detects accidental modifications; the immutable deployment image
 is the trust boundary, not a signature supplied by an untrusted client.
@@ -80,8 +82,11 @@ not add nested MSBuild timings as independent wall-clock phases.
 `node scripts/playground_performance.cjs` repeats the ten original Hello/loop
 cases for both paths through the real editor/API/iframe/worker pipeline. It
 checks output, records Run-to-output and ready/running events, captures server
-queue/build timings and saves local-only HAR files. CI uses headless Chromium
+queue/build timings and saves browser-reported resource timings and response
+sizes. CI uses headless Chromium
 and loopback HTTP with no compression or throttling, so its absolute numbers
 are not interchangeable with the public Edge/WAN baseline. Raw results are
-uploaded as CI artifacts. Production measurements require a tested preview or
+uploaded with a generated comparison report as CI artifacts. Run
+`python3 scripts/analyze_playground_performance.py` to reproduce that report.
+Production measurements require a tested preview or
 a separately approved deployment.
