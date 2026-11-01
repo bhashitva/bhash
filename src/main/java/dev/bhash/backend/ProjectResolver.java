@@ -59,9 +59,11 @@ public final class ProjectResolver {
         all.add(library.tree());
         var referenced=new HashSet<String>();
         for(var input:trees)collectIdentifiers(input,referenced);
-        var foundations=dev.bhash.stdlib.StandardLibrary.foundations(referenced).parse();
-        if(!foundations.valid())throw new IllegalStateException("Invalid application foundations: "+foundations.diagnostics());
-        all.add(foundations.tree());
+        for(var source:dev.bhash.stdlib.StandardLibrary.implementations(referenced)) {
+            var implementation=source.parse();
+            if(!implementation.valid())throw new IllegalStateException("Invalid bundled implementation: "+implementation.diagnostics());
+            all.add(implementation.tree());
+        }
         var tree = resolver.resolveProgram(all);
         var names = new HashMap<String,String>();
         for (var table : List.of(resolver.types,resolver.functions))
