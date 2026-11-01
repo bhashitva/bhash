@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.1
+
+- Register the native tools task provider and task schema so Windows custom-terminal setup/check/repair tasks can execute and configured tasks can resolve without changing VS Code settings.
+- Add extension-host coverage for configured native tools tasks and actual CustomExecution dispatch.
+
+
 ## 0.10.0
 
 - Evaluate read-only Bhash expressions in Watch and hover on Windows x64 and Linux/WSL: Hindi names, fields, collection indices, scalar arithmetic, comparisons and short-circuit logic.
