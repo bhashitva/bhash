@@ -1,0 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+// Statements mode workload. Expected numeric checksum: 1007993832.
+लिखो("आरंभ");
+मान इ: पूर्णांक = ०;
+मान योग: पूर्णांक = ०;
+जबतक (इ < २००००००) {
+    योग = योग + (इ * १७ + १३) % १००९;
+    इ = इ + १;
+}
+लिखो(योग);
