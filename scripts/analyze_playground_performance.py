@@ -44,6 +44,16 @@ text=['# Prebuilt browser host: controlled before/after comparison','',
       f"SDK: `{profile['sdk']}`; platform: `{profile['platform']}`; logical CPUs: {profile['logicalCPUs']}. ",
       f"Compiler SHA-256: `{profile['compilerSHA256']}`.",'',
       '| Operation | Elapsed seconds |','| --- | ---: |']
+summary=['## End-to-end summaries','',
+         '| Case | Samples per path | Baseline seconds | Prebuilt seconds |',
+         '| --- | ---: | ---: | ---: |']
+for label,prefix in [('First Hello in a fresh browser','hello-cold-1'),('Hello source misses','hello-cold'),('Hello cached reruns','hello-warm'),('Loop source miss','cpu-cold'),('Loop cached reruns','cpu-warm')]:
+    old=selected('baseline',prefix);new=selected('prebuilt',prefix)
+    summary.append(f"| {label} | {len(old)} | {median(row['seconds'] for row in old):.3f} | {median(row['seconds'] for row in new):.3f} |")
+summary+=['','Values are medians. A source miss requires compilation; it does not imply an empty HTTP cache. '
+          'The first case uses a fresh browser context. Later source misses can reuse shared runtime URLs in the '
+          'prebuilt path. Cached reruns reuse the compiled program while creating a fresh worker/runtime.','']
+at=text.index('## Publishing profile');text[at:at]=summary
 for item in profile['runs']:text.append(f"| {item['label']} | {item['seconds']:.3f} |")
 text+=['','Per-publish SDK task times (milliseconds); nested targets overlap and are not added to these task durations.','',
        '| Sample | Restore | C# compile | Trimming | Brotli | Gzip | WebCIL |','| --- | ---: | ---: | ---: | ---: | ---: | ---: |']
