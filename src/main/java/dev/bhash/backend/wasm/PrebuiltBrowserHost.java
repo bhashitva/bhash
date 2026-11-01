@@ -85,7 +85,8 @@ public final class PrebuiltBrowserHost {
             Path csc=Path.of(Files.readString(work.resolve("compiler-path.txt")).strip()).toAbsolutePath();
             Properties properties=new Properties();properties.setProperty("runtime",fingerprint());
             properties.setProperty("csc",csc.toString());properties.setProperty("cscSha256",hash(Files.readAllBytes(csc)));
-            try(var writer=Files.newBufferedWriter(stage.resolve("host.properties"))) {properties.store(writer,"Bhash browser host v1; rebuild with the SDK image");}
+            var text=new StringWriter();properties.store(text,null);
+            Files.write(stage.resolve("host.properties"),text.toString().lines().filter(line->!line.startsWith("#")).toList());
             Files.writeString(stage.resolve(".bhash-wasm-output"),WasmCompiler.manifest(stage));
             WasmCompiler.install(stage,destination);
         } finally {
@@ -106,13 +107,13 @@ public final class PrebuiltBrowserHost {
         long started=System.nanoTime();
         try {
             Files.writeString(work.resolve("Program.cs"),code);
-            var arguments=new ArrayList<>(List.of("-noconfig","-nostdlib+","-target:library","-optimize+","-deterministic+",
+            var arguments=new ArrayList<>(List.of("-nologo","-nostdlib+","-target:library","-optimize+","-deterministic+",
                     "-checked-","-define:BHASH_BROWSER","-out:"+quoted(work.resolve("BhashProgram.dll")),quoted(work.resolve("Program.cs"))));
             try(var files=Files.list(root.resolve("references"))) {
                 for(Path file:files.sorted().toList())arguments.add("-reference:"+quoted(file));
             }
             Files.write(work.resolve("compile.rsp"),arguments,StandardCharsets.UTF_8);
-            run(List.of(ClrCompiler.executable(),"exec",metadata.getProperty("csc"),"@compile.rsp"),work);
+            run(List.of(ClrCompiler.executable(),"exec",metadata.getProperty("csc"),"-noconfig","@compile.rsp"),work);
             Files.copy(work.resolve("BhashProgram.dll"),stage.resolve("BhashProgram.dll"));
             // The service uses shared immutable URLs. Standalone CLI output remains self-contained.
             boolean shared=Boolean.parseBoolean(System.getenv("BHASH_BROWSER_SHARED"));
@@ -152,6 +153,17 @@ public final class PrebuiltBrowserHost {
             var children=process.descendants().toList();
             for(var child:children)if(child.isAlive())child.destroyForcibly();
             if(process.isAlive())process.destroyForcibly();
+            boolean interrupted=Thread.interrupted();
+            try {
+                long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+                var handles=new ArrayList<ProcessHandle>(children);handles.add(process.toHandle());
+                for(var handle:handles)while(handle.isAlive()) {
+                    long left=deadline-System.nanoTime();if(left<=0)throw new IOException("Browser compiler cleanup timed out.");
+                    try{handle.onExit().get(left,TimeUnit.NANOSECONDS);}
+                    catch(InterruptedException error){interrupted=true;}
+                    catch(java.util.concurrent.ExecutionException|java.util.concurrent.TimeoutException error){throw new IOException("Browser compiler cleanup failed.",error);}
+                }
+            } finally {if(interrupted)Thread.currentThread().interrupt();}
         }
     }
     private static String fingerprint() throws IOException {
