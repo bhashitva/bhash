@@ -1841,8 +1841,9 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
             slots[0]=new_text(0,location);uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
         }
         wchar_t *value=malloc((size_t)n*sizeof *value);if(!value){free(wide);runtime_error(location,"परिवेश उपलब्ध नहीं है।");}
-        DWORD got=GetEnvironmentVariableW(wide,value,n);free(wide);
-        if(!got||got>=n){free(value);runtime_error(location,"परिवेश उपलब्ध नहीं है।");}
+        SetLastError(ERROR_SUCCESS);DWORD got=GetEnvironmentVariableW(wide,value,n);DWORD error=GetLastError();free(wide);
+        if(got>=n||(!got&&error!=ERROR_SUCCESS)){free(value);runtime_error(location,"परिवेश उपलब्ध नहीं है।");}
+        if(!got){free(value);slots[0]=new_text(0,location);uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;}
         int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,value,(int)got,NULL,0,NULL,NULL);
         if(bytes<=0){free(value);runtime_error(location,"अमान्य यूनिकोड पाठ।");}
         bh_cleanup cleanup={cleanups,value,free};cleanups=&cleanup;
