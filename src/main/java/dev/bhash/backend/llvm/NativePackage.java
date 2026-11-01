@@ -40,7 +40,13 @@ public final class NativePackage {
             files.put("run.sh",("#!/bin/sh\nset -eu\ncd -- \"$(dirname -- \"$0\")\"\n./check-host.sh\nexec ./bin/"+name+" \"$@\"\n").getBytes(StandardCharsets.UTF_8));
             files.put("README.txt",("Bhash native release: "+name+" "+version+"\nLinux x86-64; glibc >= "+compatibility.minimumGlibc()+".\nNo JVM, .NET or LLVM is needed to run this program.\nVerify: sha256sum -c SHA256SUMS\nRun: ./run.sh\nInspect provenance: ./bin/"+name+" --bhash-build-info\nDebug sources: gdb; set substitute-path /bhash/source /path/to/source-root\nChecksums detect corruption; they are not signatures or proof of authorship.\n").getBytes(StandardCharsets.UTF_8));
             }
-            var manifest=new LinkedHashMap<String,Object>();manifest.put("format",1);manifest.put("name",name);manifest.put("version",version);manifest.put("target",compatibility.target());manifest.put("build",compatibility.buildInfo());manifest.put("minimum_glibc",compatibility.minimumGlibc());manifest.put("interpreter",compatibility.interpreter());manifest.put("libraries",compatibility.libraries());manifest.put("source_date_epoch",epoch);
+            var dynamicLibraries=new ArrayList<String>();
+            if(compatibility.buildInfo().has("networking")&&compatibility.buildInfo().get("networking").getAsBoolean()) {
+                String http=windows?"HTTP uses Windows-supplied WinHTTP.\n":NativePlatform.macos()?"HTTP uses the macOS system libcurl with TLS and asynchronous DNS.\n":"HTTP requires the libcurl.so.4 runtime (libcurl 7.68+, TLS and asynchronous DNS); no C development package is needed.\n";
+                if(!windows)dynamicLibraries.add(NativePlatform.macos()?"/usr/lib/libcurl.4.dylib":"libcurl.so.4");
+                files.put("README.txt",(new String(files.get("README.txt"),StandardCharsets.UTF_8)+http).getBytes(StandardCharsets.UTF_8));
+            }
+            var manifest=new LinkedHashMap<String,Object>();manifest.put("dynamic_libraries",dynamicLibraries);manifest.put("format",1);manifest.put("name",name);manifest.put("version",version);manifest.put("target",compatibility.target());manifest.put("build",compatibility.buildInfo());manifest.put("minimum_glibc",compatibility.minimumGlibc());manifest.put("interpreter",compatibility.interpreter());manifest.put("libraries",compatibility.libraries());manifest.put("source_date_epoch",epoch);
             if(windows){manifest.put("minimum_windows","10.0");manifest.put("c_runtime","ucrt");}
             if(NativePlatform.macos()){manifest.put("minimum_macos",compatibility.minimumMacos());manifest.put("c_runtime","libSystem");}
             var hashes=new TreeMap<String,String>();for(var source:mapped)hashes.put(source.name(),NativeBuildInfo.hash(source.text().getBytes(StandardCharsets.UTF_8)));manifest.put("source_sha256",hashes);

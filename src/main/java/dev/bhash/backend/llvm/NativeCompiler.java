@@ -55,6 +55,10 @@ public final class NativeCompiler {
             var tools=NativeToolchain.require(work);String clang=tools.clang(),opt=tools.opt();
             Path sdk=tools.managed()?Path.of(clang).getParent().getParent():null;
             String buildInfo=NativeBuildInfo.describe(debug,sanitize,tools.version(),tools.linkerVersion(),tools.libcVersion());
+            var networkInfo=com.google.gson.JsonParser.parseString(buildInfo).getAsJsonObject();
+            networkInfo.addProperty("networking",core.networking());
+            if(core.networking())networkInfo.addProperty("network_runtime",NativePlatform.windows()?"winhttp":"system-libcurl");
+            buildInfo=NativeBuildInfo.JSON.toJson(networkInfo);
             if(tools.managed()){
                 var metadata=com.google.gson.JsonParser.parseString(buildInfo).getAsJsonObject();metadata.addProperty("toolchain_id",tools.toolchainId());metadata.addProperty("toolchain_sha256",tools.toolchainSha256());buildInfo=NativeBuildInfo.JSON.toJson(metadata);
             }
@@ -65,18 +69,21 @@ public final class NativeCompiler {
             }
             if(NativePlatform.windows())notices.append("\n--- MinGW-w64 runtime notices ---\n").append(new String(NativeBuildInfo.resource("/dev/bhash/backend/native/MINGW_RUNTIME_NOTICES.txt"),StandardCharsets.UTF_8));
             Files.writeString(work.resolve("program.ll"),LlvmEmitter.emit(core,notices.toString(),debug,buildInfo),StandardCharsets.UTF_8);
-            for(String name:List.of("bhash_runtime.c","bhash_runtime.h"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
+            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_http.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
                 if(in==null)throw new IOException("Missing native runtime: "+name);
                 Files.copy(in,work.resolve(name));
             }
             if(!NativePlatform.windows())NativeToolchain.run(work,List.of(opt,"-passes=verify","-disable-output","program.ll"));
             NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,debug?"-O0":"-O2","-Xclang","-llvm-verify-each","-c","program.ll","-o","program.o"))));
-            NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"))));
+            var runtimeCommand=new ArrayList<>(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"));
+            if(core.networking())runtimeCommand.add("-DBHASH_NETWORKING=1");
+            NativeToolchain.run(work,mapped(work,sdk,clangCommand(runtimeCommand)));
             if(NativePlatform.macos() && debug){
                 for(String object:List.of("program.o","runtime.o"))Files.setLastModifiedTime(work.resolve(object),java.nio.file.attribute.FileTime.fromMillis(0));
             }
             var link=new ArrayList<>(List.of(clang,"program.o","runtime.o","-lm"));
-            if(NativePlatform.windows())link.add("-lshell32");
+            if(NativePlatform.windows()){link.add("-lshell32");if(core.networking())link.add("-lwinhttp");}
+            else if(!NativePlatform.macos()&&core.networking())link.add("-ldl");
             // Darwin's content-derived UUID is required by current dyld, including release builds.
             if(NativePlatform.macos()){
                 if(debug)link.add("-Wl,-no_deduplicate,-oso_prefix,"+work+"/");
