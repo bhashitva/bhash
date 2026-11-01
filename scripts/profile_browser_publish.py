@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Same-host baseline publishing phases, one-time host preparation and edited-program builds."""
-import json, os, pathlib, platform, subprocess, time
+import hashlib, json, os, pathlib, platform, subprocess, time
 root = pathlib.Path(__file__).resolve().parents[1]
 out = root / 'target/browser-publish-profile'
 out.mkdir(parents=True, exist_ok=True)
@@ -9,7 +9,9 @@ host = out / 'host'
 env = dict(os.environ)
 env.pop('BHASH_BROWSER_HOST', None)
 env.pop('BHASH_BROWSER_SHARED', None)
-results = {'platform': platform.platform(), 'runs': []}
+results = {'platform': platform.platform(), 'logicalCPUs':os.cpu_count(),
+           'sdk':subprocess.check_output(['dotnet','--version'],text=True).strip(),
+           'compilerSHA256':hashlib.sha256(jar.read_bytes()).hexdigest(), 'runs': []}
 def run(label, command, extra):
     logs = out / label
     logs.mkdir(exist_ok=True)

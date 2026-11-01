@@ -27,7 +27,7 @@ async function measure(kind,browser) {
     const page=await context.newPage();await page.goto(origin);await page.waitForFunction(()=>!document.querySelector('#run').disabled);
     await page.evaluate(()=>{
       window.measurements=[];let active,frame;
-      document.querySelector('#run').addEventListener('click',()=>{active={click:performance.now(),messages:[],api:[]};window.measurements.push(active);frame=undefined;},true);
+      document.querySelector('#run').addEventListener('click',()=>{active={click:performance.now(),timeOrigin:performance.timeOrigin,messages:[],api:[]};window.measurements.push(active);frame=undefined;},true);
       const original=window.fetch;
       window.fetch=function(...args){const run=active;const promise=original.apply(this,args);if(run&&/\/api\/(compile|jobs\/)/.test(String(args[0])))promise.then(response=>response.clone().json()).then(job=>run.api.push({t:performance.now(),job}));return promise;};
       addEventListener('message',event=>{
