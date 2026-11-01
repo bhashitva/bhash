@@ -37,7 +37,7 @@ jobs:
           echo 'bfcda6940c8c8dac0d336e199f0ee8fca8b589346aa7f5231941dba0cd4d10a0  target/before-source/target/bhash-compiler-0.1.0-SNAPSHOT.jar' | sha256sum -c
       - name: Verify benchmark observer and reference checksums
         run: python3 -m unittest discover -s benchmarks -p 'test_*.py'
-      - name: Randomized same-host cross-target comparison
+      - name: Compare compiler-selected primitive array access
         run: python3 benchmarks/array_access.py --before target/before-source/target/bhash-compiler-0.1.0-SNAPSHOT.jar --after target/bhash-compiler-0.1.0-SNAPSHOT.jar
       - name: Publish measured comparison
         run: cat target/array-access-benchmarks/comparison.md >> "$GITHUB_STEP_SUMMARY"
