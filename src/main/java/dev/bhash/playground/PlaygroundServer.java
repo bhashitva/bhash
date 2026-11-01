@@ -29,6 +29,7 @@ public final class PlaygroundServer implements AutoCloseable {
     private final Map<String,long[]> clients=new HashMap<>();
     private final Builder builder;
     private final String compilerVersion;
+    private final dev.bhash.backend.wasm.PrebuiltBrowserHost browserHost;
     private final Path artifacts,work;
     private final URI origin,runOrigin;
     private static final class Job {
@@ -61,7 +62,9 @@ public final class PlaygroundServer implements AutoCloseable {
         Files.createDirectories(artifacts); Files.createDirectories(work);
         // Only transient data under the dedicated managed root is removed on restart.
         clearManaged(artifacts); clearManaged(work);
-        compilerVersion=hex(Files.readAllBytes(settings.compiler));
+        String hostPath=System.getenv("BHASH_BROWSER_HOST");
+        browserHost=hostPath==null||hostPath.isBlank()?null:dev.bhash.backend.wasm.PrebuiltBrowserHost.open(Path.of(hostPath));
+        compilerVersion=hex(Files.readAllBytes(settings.compiler))+(browserHost==null?"":browserHost.id());
         server=HttpServer.create(new InetSocketAddress(settings.bind,settings.port),16);
         origin=actualPort(settings.origin,server.getAddress().getPort());runOrigin=actualPort(settings.runOrigin,server.getAddress().getPort());
         this.builder=builder==null?this::compileProcess:builder;
@@ -84,6 +87,12 @@ public final class PlaygroundServer implements AutoCloseable {
             exchange.getResponseHeaders().set("X-Content-Type-Options","nosniff");
             exchange.getResponseHeaders().set("Cache-Control","no-store");
             if (path.equals("/api/health") && method.equals("GET")) { json(exchange,200,"{\"status\":\"ok\"}"); return; }
+            if (path.startsWith("/browser-host/")) {
+                String prefix=browserHost==null?"":"/browser-host/"+browserHost.id()+"/";
+                if(browserHost==null || !host(exchange,runOrigin) || !path.startsWith(prefix)) throw new Rejected(404,"Not found");
+                serve(exchange,browserHost.web(),path.substring(prefix.length()),true);
+                return;
+            }
             if (path.startsWith("/artifacts/")) {
                 if (!host(exchange,runOrigin)) throw new Rejected(404,"Not found");
                 String[] parts=path.substring(11).split("/",2);
@@ -169,6 +178,7 @@ public final class PlaygroundServer implements AutoCloseable {
             for(String asset:List.of("runner.html","runner.js","playground-worker.js")) try(var input=PlaygroundServer.class.getResourceAsStream("/dev/bhash/playground/"+asset)) {
                 if(input==null) throw new IOException("Missing runner asset"); Files.copy(input,destination.resolve(asset));
             }
+            if(browserHost!=null) Files.copy(destination.resolve("worker.js"),destination.resolve("playground-worker.js"),StandardCopyOption.REPLACE_EXISTING);
             Files.writeString(destination.resolve("runner-config.js"),"export const parentOrigin="+quote(origin.toString())+";\n");
             job.status="ready";
         } catch(Exception error) {
@@ -184,8 +194,10 @@ public final class PlaygroundServer implements AutoCloseable {
     private void compileProcess(Path source,Path destination) throws Exception {
         String java=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
         Path log=source.getParent().resolve("build.log");
-        Process process=new ProcessBuilder(java,"-Xmx512m","-jar",settings.compiler.toAbsolutePath().toString(),"compile",source.toString(),"--target","wasm-browser","-o",destination.toString())
-                .redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        ProcessBuilder command=new ProcessBuilder(java,"-Xmx512m","-jar",settings.compiler.toAbsolutePath().toString(),"compile",source.toString(),"--target","wasm-browser","-o",destination.toString())
+                .redirectErrorStream(true).redirectOutput(log.toFile());
+        if(browserHost!=null)command.environment().put("BHASH_BROWSER_SHARED","true");
+        Process process=command.start();
         try {
             if(!process.waitFor(settings.timeoutSeconds,TimeUnit.SECONDS)) throw new IOException("Compilation timed out; try a smaller program");
             if(process.exitValue()!=0) {try(var input=Files.newInputStream(log)){throw new IOException(new String(input.readNBytes(MAX_ERROR),StandardCharsets.UTF_8));}}
@@ -247,7 +259,7 @@ public final class PlaygroundServer implements AutoCloseable {
         String name=file.getFileName().toString(),type=(name.endsWith(".js") || name.endsWith(".mjs"))?"text/javascript":name.endsWith(".wasm")?"application/wasm":name.endsWith(".webmanifest")?"application/manifest+json":name.endsWith(".json")?"application/json":name.endsWith(".css")?"text/css":name.endsWith(".html")?"text/html":name.endsWith(".svg")?"image/svg+xml":"application/octet-stream";
         exchange.getResponseHeaders().set("Content-Type",type+(type.startsWith("text/")?"; charset=utf-8":""));
         if(artifact) {
-            exchange.getResponseHeaders().set("Cache-Control","public, max-age=300");
+            exchange.getResponseHeaders().set("Cache-Control",browserHost!=null&&root.equals(browserHost.web())?"public, max-age=31536000, immutable":"public, max-age=300");
             exchange.getResponseHeaders().set("Content-Security-Policy","default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; frame-ancestors "+origin+"; base-uri 'none'; object-src 'none'");
         }
         boolean head=exchange.getRequestMethod().equals("HEAD");exchange.sendResponseHeaders(200,head?-1:Files.size(file));
