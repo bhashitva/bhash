@@ -54,7 +54,7 @@ final class PeCompatibility {
             int at=table+i*20,name=u32(at+12);
             if(name==0){ended=true;break;}
             String dll=string(offset(name),256).toLowerCase(Locale.ROOT);
-            if(!dll.equals("kernel32.dll") && !dll.equals("ucrtbase.dll") && !dll.matches("api-ms-win-crt-[a-z0-9-]+\\.dll"))throw invalid("Unsupported Windows dependency: "+dll+". Distribution must not require LLVM, MinGW DLLs, JVM or .NET.");
+            if(!dll.equals("kernel32.dll") && !dll.equals("shell32.dll") && !dll.equals("ucrtbase.dll") && !dll.matches("api-ms-win-crt-[a-z0-9-]+\\.dll"))throw invalid("Unsupported Windows dependency: "+dll+". Distribution must not require LLVM, MinGW DLLs, JVM or .NET.");
             libraries.add(dll);
         }
         if(!ended || libraries.stream().noneMatch(x->x.equals("ucrtbase.dll") || x.startsWith("api-ms-win-crt-")))throw invalid("Expected bounded Windows UCRT imports");
