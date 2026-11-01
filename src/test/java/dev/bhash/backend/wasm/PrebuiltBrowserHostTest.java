@@ -50,7 +50,7 @@ class PrebuiltBrowserHostTest {
         assertThrows(IOException.class,()->new WasmCompiler().compile("hello.bhash","कार्य मुख्य() -> शून्य {}",root));
         assertEquals(id,PrebuiltBrowserHost.open(root).id());
     }
-    @Test void interruptStopsCompilerAndItsDescendantsBeforeReturning() throws Exception {
+    @org.junit.jupiter.api.RepeatedTest(5) void interruptStopsCompilerAndItsDescendantsBeforeReturning() throws Exception {
         Path processDirectory=directory.resolve("process");Files.createDirectories(processDirectory);
         String javaExecutable=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
         String classes=Path.of(BrowserCompilerProcessFixture.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString();
@@ -71,6 +71,7 @@ class PrebuiltBrowserHostTest {
                 long pid=Long.parseLong(Files.readString(processDirectory.resolve(file)));
                 assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false),file+" survived cancellation");
             }
+            Files.delete(processDirectory.resolve("build.log"));
         } finally {
             runner.interrupt();
             for(String file:List.of("parent.pid","child.pid"))if(Files.exists(processDirectory.resolve(file)))
