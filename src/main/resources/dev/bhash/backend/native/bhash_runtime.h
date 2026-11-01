@@ -167,4 +167,9 @@ int64_t bh_time_day(int64_t, const void *);
 /* Console reads consume one UTF-8 line; stdin remains owned by the host. */
 void *bh_console_text(const void *location);
 int64_t bh_console_integer(const void *location);
+/* Application bindings use opaque integer stream handles, never GC pointers. */
+void bh_application_arguments(int, char **);
+uint64_t bh_foundation_call(uint32_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
 #endif
+
+
