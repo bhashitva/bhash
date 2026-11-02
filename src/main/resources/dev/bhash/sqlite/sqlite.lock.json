@@ -1,0 +1,16 @@
+{
+  "sqlite_version": "3.54.1",
+  "source_url": "https://www.sqlite.org/2026/sqlite-amalgamation-3540100.zip",
+  "archive": "sqlite-amalgamation-3540100.zip",
+  "archive_sha3_256": "92281c86e2957f9b9305890f9ac04204caa7b677cc868dc326d942689df28e30",
+  "source_sha3_256": "e2b869d3003b33c942b7dd7063604fbc53553e1b66609570df39b9b7b558ee81",
+  "jdbc_version": "3.54.1.0",
+  "jdbc_sha256": "f8dce420a6016278497f4f0560f65602b9db858de141b541cf91a4644ebe4639",
+  "defines": [
+    "SQLITE_THREADSAFE=1",
+    "SQLITE_OMIT_LOAD_EXTENSION=1",
+    "SQLITE_ENABLE_FTS5=1",
+    "SQLITE_ENABLE_RTREE=1",
+    "SQLITE_ENABLE_COLUMN_METADATA=1"
+  ]
+}
