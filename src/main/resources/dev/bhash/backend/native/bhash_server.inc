@@ -24,17 +24,28 @@ static BOOL WINAPI srv_signal(DWORD code){if(code==CTRL_C_EVENT||code==CTRL_BREA
 #else
 #include <signal.h>
 static volatile sig_atomic_t srv_stopping;
+static struct sigaction srv_old_term,srv_old_int;
 static void srv_signal(int code){(void)code;srv_stopping=1;}
 #endif
 static int srv_hooked;
-static void srv_hooks(void){if(srv_hooked)return;
+static void srv_hooks(void){if(srv_hooked)return;srv_stopping=0;
 #ifdef _WIN32
     SetConsoleCtrlHandler(srv_signal,TRUE);
 #else
     struct sigaction action;memset(&action,0,sizeof action);action.sa_handler=srv_signal;sigemptyset(&action.sa_mask);
-    sigaction(SIGTERM,&action,NULL);sigaction(SIGINT,&action,NULL);
+    sigaction(SIGTERM,&action,&srv_old_term);sigaction(SIGINT,&action,&srv_old_int);
 #endif
     srv_hooked=1;
+}
+static void srv_unhook(void){
+    for(size_t i=0;i<32;i++)if(srv_states[i].id)return;
+    if(!srv_hooked)return;
+#ifdef _WIN32
+    SetConsoleCtrlHandler(srv_signal,FALSE);
+#else
+    sigaction(SIGTERM,&srv_old_term,NULL);sigaction(SIGINT,&srv_old_int,NULL);
+#endif
+    srv_hooked=0;
 }
 static uint64_t srv_clock(void){
 #ifdef _WIN32
@@ -44,14 +55,15 @@ static uint64_t srv_clock(void){
     return (uint64_t)now.tv_sec*1000+(uint64_t)now.tv_nsec/1000000;
 #endif
 }
-static void srv_nonblocking(srv_socket socket){
+static int srv_nonblocking(srv_socket socket){
 #ifdef _WIN32
-    u_long value=1;ioctlsocket(socket,FIONBIO,&value);
+    u_long value=1;return ioctlsocket(socket,FIONBIO,&value)==0;
 #else
-    fcntl(socket,F_SETFL,fcntl(socket,F_GETFL,0)|O_NONBLOCK);
+    int flags=fcntl(socket,F_GETFL,0);if(flags<0||fcntl(socket,F_SETFL,flags|O_NONBLOCK))return 0;
 #ifdef SO_NOSIGPIPE
-    int yes=1;setsockopt(socket,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof yes);
+    int yes=1;if(setsockopt(socket,SOL_SOCKET,SO_NOSIGPIPE,&yes,sizeof yes))return 0;
 #endif
+    return 1;
 #endif
 }
 static int srv_wait(srv_socket socket,int write,uint64_t deadline){
@@ -96,12 +108,12 @@ uint64_t bh_server_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_in
 #endif
         struct sockaddr_in addr;memset(&addr,0,sizeof addr);addr.sin_family=AF_INET;addr.sin_port=htons((uint16_t)b);addr.sin_addr.s_addr=htonl(local?INADDR_LOOPBACK:INADDR_ANY);
         if(bind(socket_value,(struct sockaddr *)&addr,sizeof addr)||listen(socket_value,16)){srv_close_socket(socket_value);runtime_error(location,"HTTP सर्वर खोला नहीं जा सका।");}
-        srv_hooks();srv_nonblocking(socket_value);*state=(srv_state){++srv_next,0,socket_value,1};return state->id;
+        if(!srv_nonblocking(socket_value)){srv_close_socket(socket_value);runtime_error(location,"HTTP सर्वर खोला नहीं जा सका।");}srv_hooks();*state=(srv_state){++srv_next,0,socket_value,1};return state->id;
     }
     if(op==4){
         if(!a||a>srv_next)runtime_error(location,"अमान्य HTTP संबंध पहचान।");
         for(size_t i=0;i<32;i++)if(srv_states[i].id==a){srv_close_socket(srv_states[i].socket);memset(&srv_states[i],0,sizeof srv_states[i]);}
-        return 0;
+        srv_unhook();return 0;
     }
     srv_state *state=srv_find(a,location);
     if(op==1){
@@ -113,7 +125,7 @@ uint64_t bh_server_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_in
 #ifndef _WIN32
         if(socket_value>=FD_SETSIZE){srv_close_socket(socket_value);runtime_error(location,"HTTP संबंध असफल।");}
 #endif
-        srv_nonblocking(socket_value);*child=(srv_state){++srv_next,srv_clock()+10000,socket_value,0};return child->id;
+        if(!srv_nonblocking(socket_value)){srv_close_socket(socket_value);runtime_error(location,"HTTP संबंध असफल।");}*child=(srv_state){++srv_next,srv_clock()+10000,socket_value,0};return child->id;
     }
     if(op==5){
         if(!state->listener)runtime_error(location,"अमान्य HTTP सर्वर।");
