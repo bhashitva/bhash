@@ -1,0 +1,14 @@
+{
+  "sqlite_version": "3.54.1",
+  "target": "linux-x86_64",
+  "source_sha3_256": "e2b869d3003b33c942b7dd7063604fbc53553e1b66609570df39b9b7b558ee81",
+  "defines": [
+    "SQLITE_THREADSAFE=1",
+    "SQLITE_OMIT_LOAD_EXTENSION=1",
+    "SQLITE_ENABLE_FTS5=1",
+    "SQLITE_ENABLE_RTREE=1",
+    "SQLITE_ENABLE_COLUMN_METADATA=1"
+  ],
+  "file": "libbhash_sqlite.so",
+  "sha256": "0c449910ec9dd9d6f7e438aecb876aa997d342d4f87c80358f2e9258396c323e"
+}
