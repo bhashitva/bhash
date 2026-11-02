@@ -10,7 +10,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
-public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes, List<StaticField> staticFields, List<ClassInitialization> initializations, boolean networking) {
+public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes, List<StaticField> staticFields, List<ClassInitialization> initializations, boolean networking, boolean database) {
     public enum Type { INT, BYTE, INT32, REAL, BOOL, TEXT, OBJECT, ANY, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT || this==ANY; }
     }
@@ -57,6 +57,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public record InputCall(Type type, Source source) implements Expression {}
     public enum TimeOperation { NOW, READ, WRITE, YEAR, MONTH, DAY }
     public record TimeCall(Type type, TimeOperation operation, List<Expression> arguments, Source source) implements Expression {}
+    public record DatabaseCall(Type type,int operation,List<Expression> arguments,int descriptor,Source source) implements Expression {}
     public record NetworkCall(Type type,int operation,List<Expression> arguments,int descriptor,Source source) implements Expression {}
     public record FoundationCall(Type type,int operation,List<Expression> arguments,int descriptor,Source source) implements Expression {}
     public enum FileOperation { SUPPORTED, EXISTS, READ_TEXT, WRITE_TEXT }
@@ -100,7 +101,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         public Function(int id, Type result, List<Binding> parameters, Block body, Source source, int initialization){this(id,result,parameters,body,source,initialization,"");}
         public Function(int id, Type result, List<Binding> parameters, Block body, Source source){this(id,result,parameters,body,source,-1);}
     }
-    public sealed interface Expression permits NetworkCall, FoundationCall, StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits DatabaseCall, NetworkCall, FoundationCall, StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -191,7 +192,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         final Map<ManagedEmitter.Type,Integer> collectionIds=new IdentityHashMap<>();
         final List<CollectionType> collections=new ArrayList<>();
         StructuredTypes structuredTypes;
-        boolean networking;
+        boolean networking, database;
         void ensureStructuredTypes(ParserRuleContext at)throws CompilationException{
             if(structuredTypes!=null)return;
             int texts=collectionId(listType(ManagedEmitter.Type.TEXT),at);
@@ -412,7 +413,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             result.replaceAll(f->new Function(f.id(),f.result(),f.parameters(),f.body(),f.source(),f.initialization(),functionNames.getOrDefault(f.id(),"")));
             return new CoreProgram(List.copyOf(result),entry,List.copyOf(objectTypes),types.stream()
                 .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections),new ObjectType(-5,"अपवाद",List.of(messageField,locationField),List.of(),
-                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().filter(c->!c.record()).map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList(),networking);
+                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().filter(c->!c.record()).map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList(),networking,database);
         }
         void collectTypes(ManagedEmitter.ClassInfo c, Set<ManagedEmitter.ClassInfo> result) throws CompilationException {
             if(c==null || !result.add(c))return;
@@ -537,6 +538,11 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 case "stdFileReadBytes"->BufferOperation.READ_FILE;case "stdFileWriteBytes"->BufferOperation.WRITE_FILE;default->null;};
             if(buffer!=null)return new BufferCall(type(f.result,at),buffer,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             TextOperation operation=null;
+            if(f.intrinsic!=null && f.intrinsic.startsWith("db")) {
+                int op=List.of("dbOpen","dbClose","dbPrepare","dbFinalize","dbBindInt","dbBindReal","dbBindBytes","dbBindNull","dbExecute","dbNext","dbReset","dbClear","dbColumns","dbName","dbType","dbInteger","dbReal","dbBytes","dbTransaction","dbVersion","dbParameterCount").indexOf(f.intrinsic);
+                if(op<0)throw unsupported(at);database=true;ensureStructuredTypes(at);
+                return new DatabaseCall(type(f.result,at),op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
+            }
             if(f.intrinsic!=null && f.intrinsic.startsWith("net")) {
                 int op=List.of("netSend","netStatus","netHeaders","netBody","netClose","netClock").indexOf(f.intrinsic);
                 if(op<0)throw unsupported(at);networking=true;ensureStructuredTypes(at);
