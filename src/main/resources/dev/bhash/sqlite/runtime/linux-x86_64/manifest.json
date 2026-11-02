@@ -10,5 +10,5 @@
     "SQLITE_ENABLE_COLUMN_METADATA=1"
   ],
   "file": "libbhash_sqlite.so",
-  "sha256": "0c449910ec9dd9d6f7e438aecb876aa997d342d4f87c80358f2e9258396c323e"
+  "sha256": "d188d66d9256b36fa63d4e6efc70896950f1b70766516c1496aca65df6b577f4"
 }
