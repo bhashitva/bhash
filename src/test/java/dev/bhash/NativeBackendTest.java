@@ -17,6 +17,20 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void nativeWebParserDispatchAndShutdownSurviveForcedGc()throws Exception {
+        requireTools();WebServerFixture.protocol(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
+    }
+    @Test void nativeWebTaskBoardPersistsAcrossRestartWithForcedGc()throws Exception {
+        requireTools();WebServerFixture.demo(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
+    }
+    @Test void nativeWebOsStopSignalReleasesRoots()throws Exception {
+        requireTools();WebServerFixture.signal(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
+    }
+    @Test void nativeWebPortableFrameworkSurvivesForcedGc()throws Exception {
+        requireTools();var result=nativeOnlyRun(List.of(new SourceFile("web-pure.bhash",WebCoreTest.PURE)),GC_STRESS);
+        assertEquals(0,result.exit(),result.err());assertEquals("",result.out());assertEquals(0L,stats(result).get("live"));
+    }
+
     @Test void nativeSqliteHttpExampleCachesAndRollsBackWithForcedGc()throws Exception {
         requireTools();HttpSqliteExampleFixture.verify(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
     }
