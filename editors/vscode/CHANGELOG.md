@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.0
+
+- Bundle the merged authentication and sessions compiler/library milestone for JVM, CLR and native Linux/Windows x64 and macOS ARM64.
+- Include provider-backed PBKDF2 password hashing, cryptographic tokens, secure cookies, bounded sessions, expiry/rotation/revocation, role authorization, CSRF protection and login attempt limits.
+- Make the authentication APIs available to completion, signature help, automatic imports and declaration navigation, with extension-host coverage.
+- Link the Hindi authentication reference and the HTTP/SQLite login and account-scoped notes demonstration.
+- Explain HTTPS deployment, process-local session storage, browser/WASM restrictions and the OpenSSL 3 runtime requirement for native Linux password operations.
+- Include the merged Windows debugger probe-log cleanup fix, preserving startup/timeout diagnostics during transient file locks.
+
 ## 0.12.0
 
 - Bundle the merged compiler with the Bhash HTTP server and small web application framework on JVM, CLR and native Linux/Windows x64 and macOS ARM64.
