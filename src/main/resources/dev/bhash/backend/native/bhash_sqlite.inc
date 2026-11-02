@@ -49,6 +49,7 @@ static int db_binding(db_statement *s,uint64_t index,const void *location){
 static void db_bound(db_statement *s,const void *location){for(int i=0;i<sqlite3_bind_parameter_count(s->query);i++)if(!s->bound[i])runtime_error(location,"सभी SQLite मापदंड बाँधें।");}
 static void db_boundary(db_connection *c){for(size_t i=0;i<128;i++)if(db_statements[i].id&&db_statements[i].owner==c&&db_statements[i].state){sqlite3_reset(db_statements[i].query);db_statements[i].state=3;}}
 static uint64_t db_text(const char *value,const void *location){
+    if(!value)runtime_error(location,"SQLite कथन असफल।");
     size_t n=strlen(value);if(!valid_utf8((const unsigned char *)value,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
     void *result=new_text(n,location);memcpy(text_data(result),value,n);return pointer_bits(result);
 }
@@ -136,7 +137,7 @@ uint64_t bh_database_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t 
     if(op==17){
         int at=db_cell(s,b,(int)c,location);int length=sqlite3_column_bytes(s->query,at);
         bh_collection *buffer=bh_collection_new(info,length,location);
-        const void *bytes=sqlite3_column_blob(s->query,at);if(length)memcpy(buffer->data,bytes,(size_t)length);return pointer_bits(buffer);
+        const void *bytes=sqlite3_column_blob(s->query,at);if(!bytes&&length)runtime_error(location,"SQLite कथन असफल।");if(length)memcpy(buffer->data,bytes,(size_t)length);return pointer_bits(buffer);
     }
     if(op==20)return (uint64_t)sqlite3_bind_parameter_count(s->query);
     runtime_error(location,"अमान्य SQLite क्रिया।");
