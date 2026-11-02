@@ -77,6 +77,11 @@ application की working directory के सापेक्ष है। क�
 और `--offline=true` **बने हुए application** के तर्क हैं; compiler के `run` आदेश
 को ये तर्क देने का दावा नहीं किया गया है।
 
+(Windows Java 17) सीधे Java launcher को दिए गैर-ASCII application arguments कुछ
+Windows installations पर बदल सकते हैं। इस अभ्यास में default `article-cache.db`
+जैसा ASCII filename उपयोग करें। HTTP/JSON और database के हिन्दी/emoji **data** पर
+यह सीमा लागू नहीं होती; तीनों targets पर वही data जाँचा जाता है।
+
 (VS Code) Python server चलता रहने दें, `main.bhash` खोलें और **Bhash: Run Project
 or File** से JVM, CLR या Native चुनें। Default URL के कारण अतिरिक्त launch arguments
 नहीं चाहिए। Offline/custom path वाले प्रयोग के लिए ऊपर के executable आदेश चलाएँ।
