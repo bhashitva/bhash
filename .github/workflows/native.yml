@@ -38,6 +38,8 @@ jobs:
         run: python3 scripts/test_native_debugger.py
       - name: Verify and execute LLVM backend
         run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest,NativeReleaseTest test
+      - name: Verify standalone SQLite distribution and reproducibility
+        run: python3 scripts/test_sqlite_distribution.py
       - name: Run Bhash foundation tests through the native CLI
         run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar test examples/foundations --target native
       - name: Build every applicable native example
@@ -62,6 +64,9 @@ jobs:
             for tool in java dotnet clang gcc; do
               if command -v "$tool"; then echo "Unexpected development/runtime tool: $tool"; exit 1; fi
             done
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/examples/native/sqlite/offline.test > /tmp/sqlite-actual 2> /tmp/sqlite-stats
+            test ! -s /tmp/sqlite-actual
+            grep "live=0" /tmp/sqlite-stats
             cd /tmp
             tar -xzf /artifacts/native-release/hello-1.0.0-linux-x86_64.tar.gz
             cd /tmp/hello-1.0.0-linux-x86_64

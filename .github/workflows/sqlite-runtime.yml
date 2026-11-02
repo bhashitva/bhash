@@ -40,6 +40,9 @@ jobs:
       - name: Verify deterministic binaries
         run: |
           python -c "from pathlib import Path; a=Path('target/sqlite-one'); b=Path('target/sqlite-two'); files=list(a.rglob('*')); assert files; assert all(p.is_dir() or p.read_bytes()==(b/p.relative_to(a)).read_bytes() for p in files)"
+      - name: Validate distributed library provenance
+        run: |
+          python -c "import json; from pathlib import Path; root=Path('src/main/resources/dev/bhash/sqlite'); lock=json.loads((root/'sqlite.lock.json').read_text()); manifests=list((root/'runtime').glob('*/manifest.json')); assert len(manifests)==3; assert all(json.loads(p.read_text())['source_sha3_256']==lock['source_sha3_256'] and json.loads(p.read_text())['defines']==lock['defines'] for p in manifests)"
       - uses: actions/upload-artifact@v4
         with:
           name: sqlite-runtime-${{ matrix.os }}
