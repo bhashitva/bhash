@@ -346,4 +346,249 @@ internal static class BhashStandard {
     }
     internal static long netClock()=>System.Diagnostics.Stopwatch.GetElapsedTime(0).Ticks/TimeSpan.TicksPerMillisecond;
 
+    private const int DB_LIMIT=8388608;
+#if !BHASH_BROWSER
+    private static class SqlNative {
+        private static bool attempted;private static string unavailable;
+        internal static void Ensure(){
+            if(attempted){if(unavailable!=null)throw failure(unavailable);return;}attempted=true;
+            try{
+                string filename,expected;var arch=System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
+                if(OperatingSystem.IsWindows()&&arch==System.Runtime.InteropServices.Architecture.X64){filename="bhash_sqlite.dll";expected="__SQLITE_HASH_WINDOWS__";}
+                else if(OperatingSystem.IsLinux()&&arch==System.Runtime.InteropServices.Architecture.X64){filename="libbhash_sqlite.so";expected="__SQLITE_HASH_LINUX__";}
+                else if(OperatingSystem.IsMacOS()&&arch==System.Runtime.InteropServices.Architecture.Arm64){filename="libbhash_sqlite.dylib";expected="__SQLITE_HASH_MACOS__";}
+                else throw failure("इस मंच पर SQLite रनटाइम उपलब्ध नहीं है।");
+                string path=Path.Combine(AppContext.BaseDirectory,filename);
+                string hash=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+                if(!string.Equals(hash,expected,StringComparison.OrdinalIgnoreCase))throw failure("SQLite रनटाइम का सत्यापन असफल।");
+                IntPtr library=System.Runtime.InteropServices.NativeLibrary.Load(path);
+                System.Runtime.InteropServices.NativeLibrary.SetDllImportResolver(typeof(BhashStandard).Assembly,(name,assembly,search)=>name=="bhash_sqlite"?library:IntPtr.Zero);
+                if(System.Runtime.InteropServices.Marshal.PtrToStringUTF8(sqlite3_libversion())!="3.54.1")throw failure("SQLite रनटाइम संस्करण मेल नहीं खाता।");
+            }catch(BhashRuntime.Failure error){unavailable=error.Message;throw;}
+            catch(Exception error) when(error is IOException||error is UnauthorizedAccessException||error is DllNotFoundException||error is BadImageFormatException||error is EntryPointNotFoundException){unavailable="SQLite रनटाइम उपलब्ध नहीं है।";throw failure(unavailable);}
+        }
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern IntPtr sqlite3_libversion();
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_open_v2(byte[] path,out IntPtr db,int flags,IntPtr vfs);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_close_v2(IntPtr db);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_busy_timeout(IntPtr db,int milliseconds);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_limit(IntPtr db,int id,int value);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_exec(IntPtr db,byte[] sql,IntPtr callback,IntPtr state,out IntPtr error);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern void sqlite3_free(IntPtr value);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_prepare_v3(IntPtr db,byte[] sql,int bytes,uint flags,out IntPtr statement,out IntPtr tail);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_finalize(IntPtr statement);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_reset(IntPtr statement);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_clear_bindings(IntPtr statement);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_bind_parameter_count(IntPtr statement);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_bind_int64(IntPtr statement,int index,long value);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_bind_double(IntPtr statement,int index,double value);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_bind_null(IntPtr statement,int index);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_bind_blob(IntPtr statement,int index,byte[] value,int count,IntPtr destructor);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_bind_text(IntPtr statement,int index,byte[] value,int count,IntPtr destructor);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_step(IntPtr statement);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_column_count(IntPtr statement);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern IntPtr sqlite3_column_name(IntPtr statement,int column);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_column_type(IntPtr statement,int column);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern long sqlite3_column_int64(IntPtr statement,int column);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern double sqlite3_column_double(IntPtr statement,int column);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern IntPtr sqlite3_column_blob(IntPtr statement,int column);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern int sqlite3_column_bytes(IntPtr statement,int column);
+        [System.Runtime.InteropServices.DllImport("bhash_sqlite",CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)]internal static extern long sqlite3_total_changes64(IntPtr db);
+    }
+    private sealed class SqlConnection {internal IntPtr Pointer;internal long Transaction;internal bool Failed;}
+    private sealed class SqlStatement {internal SqlConnection Owner;internal IntPtr Pointer;internal bool[] Bound;internal int State;internal int[] Types=new int[256];}
+    private static readonly Dictionary<long,SqlConnection> sqlConnections=new();
+    private static readonly Dictionary<long,SqlStatement> sqlStatements=new();
+    private static long sqlConnectionNext,sqlStatementNext,sqlTransactionNext;
+    private static BhashRuntime.Failure dbError(int code)=>failure((code&255) switch {
+        5 or 6=>"SQLite डेटाबेस व्यस्त है।",19=>"SQLite बाधा का उल्लंघन।",8=>"SQLite डेटाबेस केवल पढ़ने योग्य है।",
+        11 or 26=>"अमान्य SQLite डेटाबेस।",18=>"SQLite मान की सीमा ८३८८६०८ बाइट है।",10 or 14=>"SQLite फ़ाइल तक पहुँच असफल।",_=>"SQLite कथन असफल।"});
+    private static void dbCheck(int code){if(code!=0)throw dbError(code);}
+    private static byte[] dbSqlText(string value){BhashRuntime.instance(value);byte[] result=new UTF8Encoding(false,true).GetBytes(value+"\0");return result;}
+    private static int dbExecCode(SqlConnection c,string text){int code=SqlNative.sqlite3_exec(c.Pointer,dbSqlText(text),IntPtr.Zero,IntPtr.Zero,out IntPtr error);if(error!=IntPtr.Zero)SqlNative.sqlite3_free(error);return code;}
+    private static SqlConnection dbConnection(long id){if(!sqlConnections.TryGetValue(id,out var value))throw failure("SQLite डेटाबेस बंद है।");return value;}
+    private static SqlStatement dbStatement(long id){if(!sqlStatements.TryGetValue(id,out var value))throw failure("SQLite कथन बंद है।");return value;}
+    private static int dbColumn(SqlStatement s,long index){if(index<0||index>=SqlNative.sqlite3_column_count(s.Pointer))throw failure("SQLite स्तंभ सूचकांक सीमा से बाहर है।");return (int)index;}
+    private static int dbBinding(SqlStatement s,long index){if(index<1||index>s.Bound.Length)throw failure("SQLite बंधन सूचकांक सीमा से बाहर है।");if(s.State!=0)throw failure("SQLite कथन को रीसेट करें।");return (int)index;}
+    private static void dbBound(SqlStatement s){foreach(bool value in s.Bound)if(!value)throw failure("सभी SQLite मापदंड बाँधें।");}
+    private static int dbCell(SqlStatement s,long index,int expected){int i=dbColumn(s,index);if(s.State!=1)throw failure("SQLite परिणाम की वर्तमान पंक्ति नहीं है।");int kind=s.Types[i];if(kind==5)throw failure("SQLite स्तंभ रिक्त है।");if(kind!=expected&&(expected!=2||kind!=1))throw failure("SQLite स्तंभ का प्रकार मेल नहीं खाता।");return i;}
+    private static void dbResetValue(SqlStatement s,int state){SqlNative.sqlite3_reset(s.Pointer);s.State=state;Array.Clear(s.Types);}
+    private static void dbTransactionReady(SqlConnection c){if(c.Transaction!=0&&c.Failed)throw failure("SQLite लेनदेन असफल है; वापस लें।");}
+    private static void dbBoundary(SqlConnection c){foreach(var s in sqlStatements.Values)if(s.Owner==c&&s.State!=0)dbResetValue(s,3);}
+#endif
+    internal static long dbOpen(string path){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        SqlNative.Ensure();if(sqlConnections.Count>=32)throw failure("बहुत अधिक खुले SQLite डेटाबेस।");var c=new SqlConnection();
+        try{
+            int code=SqlNative.sqlite3_open_v2(dbSqlText(path),out c.Pointer,2|4|0x10000,IntPtr.Zero);if(code!=0)throw failure("SQLite डेटाबेस खोला नहीं जा सका।");
+            SqlNative.sqlite3_limit(c.Pointer,0,DB_LIMIT);SqlNative.sqlite3_limit(c.Pointer,1,65536);SqlNative.sqlite3_limit(c.Pointer,2,256);SqlNative.sqlite3_limit(c.Pointer,9,999);SqlNative.sqlite3_limit(c.Pointer,7,0);
+            if(SqlNative.sqlite3_busy_timeout(c.Pointer,5000)!=0||dbExecCode(c,"PRAGMA foreign_keys=ON; PRAGMA schema_version;")!=0)throw failure("SQLite डेटाबेस खोला नहीं जा सका।");
+            long id=++sqlConnectionNext;sqlConnections.Add(id,c);c=null;return id;
+        }finally{if(c!=null&&c.Pointer!=IntPtr.Zero)SqlNative.sqlite3_close_v2(c.Pointer);}
+#endif
+    }
+    internal static void dbClose(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        if(id<1||id>sqlConnectionNext)throw failure("SQLite डेटाबेस बंद है।");if(!sqlConnections.Remove(id,out var c))return;
+        foreach(var key in new List<long>(sqlStatements.Keys))if(sqlStatements[key].Owner==c){SqlNative.sqlite3_finalize(sqlStatements[key].Pointer);sqlStatements.Remove(key);}
+        int error=c.Transaction!=0?dbExecCode(c,"ROLLBACK"):0;int closed=SqlNative.sqlite3_close_v2(c.Pointer);c.Pointer=IntPtr.Zero;
+        if(error!=0&&(error&255)!=1)throw dbError(error);dbCheck(closed);
+#endif
+    }
+    internal static long dbPrepare(long id,string text){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var c=dbConnection(id);if(sqlStatements.Count>=128)throw failure("बहुत अधिक खुले SQLite कथन।");var s=new SqlStatement{Owner=c};byte[] sql=dbSqlText(text);
+        try{dbCheck(SqlNative.sqlite3_prepare_v3(c.Pointer,sql,sql.Length-1,0,out s.Pointer,out _));if(s.Pointer==IntPtr.Zero)throw failure("SQLite कथन असफल।");
+            s.Bound=new bool[SqlNative.sqlite3_bind_parameter_count(s.Pointer)];long result=++sqlStatementNext;sqlStatements.Add(result,s);s=null;return result;
+        }finally{if(s!=null&&s.Pointer!=IntPtr.Zero)SqlNative.sqlite3_finalize(s.Pointer);}
+#endif
+    }
+    internal static void dbFinalize(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        if(id<1||id>sqlStatementNext)throw failure("SQLite कथन बंद है।");if(sqlStatements.Remove(id,out var s)){int code=SqlNative.sqlite3_finalize(s.Pointer);if(s.State!=3)dbCheck(code);}
+#endif
+    }
+    internal static void dbBindInt(long id,long index,long value){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);int i=dbBinding(s,index);dbCheck(SqlNative.sqlite3_bind_int64(s.Pointer,i,value));s.Bound[i-1]=true;
+#endif
+    }
+    internal static void dbBindReal(long id,long index,double value){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);int i=dbBinding(s,index);if(!double.IsFinite(value))throw failure("SQLite में सीमित दशमलव मान दें।");dbCheck(SqlNative.sqlite3_bind_double(s.Pointer,i,value));s.Bound[i-1]=true;
+#endif
+    }
+    internal static void dbBindNull(long id,long index){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);int i=dbBinding(s,index);dbCheck(SqlNative.sqlite3_bind_null(s.Pointer,i));s.Bound[i-1]=true;
+#endif
+    }
+    internal static void dbBindBytes(long id,long index,long kind,BhashRuntime.BBuffer buffer){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);int i=dbBinding(s,index);BhashRuntime.instance(buffer);int size=buffer.items.Length;
+        if(size>DB_LIMIT)throw failure("SQLite मान की सीमा ८३८८६०८ बाइट है।");if(kind==3)decodeUtf8(buffer);else if(kind!=4)throw failure("SQLite स्तंभ का प्रकार मेल नहीं खाता।");
+        byte[] bytes=size==0?new byte[1]:buffer.items;int code=kind==3?SqlNative.sqlite3_bind_text(s.Pointer,i,bytes,size,new IntPtr(-1)):SqlNative.sqlite3_bind_blob(s.Pointer,i,bytes,size,new IntPtr(-1));dbCheck(code);s.Bound[i-1]=true;
+#endif
+    }
+    internal static long dbExecute(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);dbTransactionReady(s.Owner);if(s.State!=0)throw failure("SQLite कथन को रीसेट करें।");dbBound(s);
+        if(SqlNative.sqlite3_column_count(s.Pointer)!=0)throw failure("SQLite पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");long before=SqlNative.sqlite3_total_changes64(s.Owner.Pointer);
+        int code=SqlNative.sqlite3_step(s.Pointer);if(code!=101){if(s.Owner.Transaction!=0)s.Owner.Failed=true;dbResetValue(s,3);throw dbError(code);}s.State=2;return SqlNative.sqlite3_total_changes64(s.Owner.Pointer)-before;
+#endif
+    }
+    internal static bool dbNext(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);dbTransactionReady(s.Owner);if(s.State==2)return false;if(s.State==3)throw failure("SQLite कथन को रीसेट करें।");dbBound(s);
+        if(SqlNative.sqlite3_column_count(s.Pointer)==0)throw failure("SQLite बदलाव के लिए चलाओ उपयोग करें।");int code=SqlNative.sqlite3_step(s.Pointer);
+        if(code==101){s.State=2;Array.Clear(s.Types);return false;}if(code!=100){if(s.Owner.Transaction!=0)s.Owner.Failed=true;dbResetValue(s,3);throw dbError(code);}
+        int count=SqlNative.sqlite3_column_count(s.Pointer);for(int i=0;i<count;i++)s.Types[i]=SqlNative.sqlite3_column_type(s.Pointer,i);
+        long size=0;for(int i=0;i<count;i++)if(s.Types[i]==3||s.Types[i]==4)size+=SqlNative.sqlite3_column_bytes(s.Pointer,i);
+        if(size>DB_LIMIT){dbResetValue(s,3);throw failure("SQLite पंक्ति की सीमा ८३८८६०८ बाइट है।");}s.State=1;return true;
+#endif
+    }
+    internal static void dbReset(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        dbResetValue(dbStatement(id),0);
+#endif
+    }
+    internal static void dbClear(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);if(s.State!=0)throw failure("SQLite कथन को रीसेट करें।");dbCheck(SqlNative.sqlite3_clear_bindings(s.Pointer));Array.Clear(s.Bound);
+#endif
+    }
+    internal static long dbColumns(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        return SqlNative.sqlite3_column_count(dbStatement(id).Pointer);
+#endif
+    }
+    internal static string dbName(long id,long index){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);return System.Runtime.InteropServices.Marshal.PtrToStringUTF8(SqlNative.sqlite3_column_name(s.Pointer,dbColumn(s,index)));
+#endif
+    }
+    internal static long dbType(long id,long index){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);int i=dbColumn(s,index);if(s.State!=1)throw failure("SQLite परिणाम की वर्तमान पंक्ति नहीं है।");return s.Types[i];
+#endif
+    }
+    internal static long dbInteger(long id,long index){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);return SqlNative.sqlite3_column_int64(s.Pointer,dbCell(s,index,1));
+#endif
+    }
+    internal static double dbReal(long id,long index){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);double value=SqlNative.sqlite3_column_double(s.Pointer,dbCell(s,index,2));if(!double.IsFinite(value))throw failure("SQLite दशमलव सीमित नहीं है।");return value;
+#endif
+    }
+    internal static BhashRuntime.BBuffer dbBytes(long id,long index,long kind){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var s=dbStatement(id);if(kind!=3&&kind!=4)throw failure("SQLite स्तंभ का प्रकार मेल नहीं खाता।");int i=dbCell(s,index,(int)kind);IntPtr data=SqlNative.sqlite3_column_blob(s.Pointer,i);int size=SqlNative.sqlite3_column_bytes(s.Pointer,i);
+        if(size>DB_LIMIT)throw failure("SQLite मान की सीमा ८३८८६०८ बाइट है।");if(data==IntPtr.Zero&&size!=0)throw failure("SQLite कथन असफल।");byte[] bytes=new byte[size];if(size!=0)System.Runtime.InteropServices.Marshal.Copy(data,bytes,0,size);return new BhashRuntime.BBuffer(bytes);
+#endif
+    }
+    internal static long dbParameterCount(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        return dbStatement(id).Bound.Length;
+#endif
+    }
+    internal static long dbTransaction(long id,long token,long operation){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        var c=dbConnection(id);if(operation==3&&c.Transaction!=token)return 0;
+        if(operation==0&&c.Transaction!=0)throw failure("SQLite लेनदेन पहले से सक्रिय है।");
+        if(operation!=0&&(token==0||c.Transaction!=token))throw failure("SQLite लेनदेन सक्रिय नहीं है।");dbBoundary(c);
+        if(operation==1)dbTransactionReady(c);
+        string sql=operation==0?"BEGIN DEFERRED":operation==1?"COMMIT":operation==2||operation==3?"ROLLBACK":throw failure("SQLite लेनदेन सक्रिय नहीं है।");
+        int code=dbExecCode(c,sql);if(code!=0&&!((operation==3||operation==2&&c.Failed)&&(code&255)==1))throw dbError(code);
+        if(operation==0){c.Failed=false;c.Transaction=++sqlTransactionNext;return c.Transaction;}c.Transaction=0;return 0;
+#endif
+    }
+    internal static string dbVersion(){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।");
+#else
+        SqlNative.Ensure();return System.Runtime.InteropServices.Marshal.PtrToStringUTF8(SqlNative.sqlite3_libversion());
+#endif
+    }
+
 }
