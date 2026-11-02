@@ -193,3 +193,5 @@ limit भी लागू है। व्यस्त डेटाबेस प
 (Rollback Only) लेनदेन के भीतर SQL चलाने में engine त्रुटि आए तो scope केवल rollback योग्य हो जाता है। उसके बाद SQL या commit से पहले `वापसलो`/`बंदकरो` करें। SQLite अपने-आप rollback करे तब अगला SQL चुपचाप autocommit में नहीं चलेगा; केवल कथन रीसेट करना पर्याप्त नहीं है।
 
 (Portable SQL) साझा SQL व्यवहार में SQLite का मुख्य SQL, JSON, FTS5 और R*Tree हैं। JDBC के कुछ अतिरिक्त compile-time विकल्प सभी targets पर नहीं हैं। समान version से सभी वैकल्पिक SQL extensions समान नहीं हो जाते; आवश्यक हो तो `PRAGMA compile_options` देखें।
+
+(Combined example) HTTP से JSON लाकर SQLite में सहेजने, offline पढ़ने और rollback देखने के लिए [HTTP + SQLite उदाहरण](../http-sqlite/README.md) देखें।
