@@ -17,6 +17,24 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void nativeAuthenticationHindiTutorialsSurviveForcedGc()throws Exception {
+        requireTools();for(Path source:AuthenticationFixtures.tutorials()){
+            var result=nativeOnlyRun(List.of(new SourceFile(source.toString(),Files.readString(source))),GC_STRESS);
+            assertEquals(0,result.exit(),result.err());assertEquals(Files.readString(source.resolveSibling(source.getFileName().toString().replace(".bhash",".expected.txt"))).replace("\r\n","\n"),result.out());assertEquals(0L,stats(result).get("live"));
+        }
+    }
+    @Test void nativeAuthenticationCryptoSurvivesForcedGc()throws Exception {
+        requireTools();var result=nativeOnlyRun(AuthenticationFixtures.source("crypto"),GC_STRESS);
+        assertEquals(0,result.exit(),result.err());assertEquals("",result.out());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeAuthenticationSessionsCsrfAndRevocationSurviveForcedGc()throws Exception {
+        requireTools();var result=nativeOnlyRun(AuthenticationFixtures.source("sessions"),GC_STRESS);
+        assertEquals(0,result.exit(),result.err());assertEquals("",result.out());assertEquals(0L,stats(result).get("live"));assertTrue(stats(result).get("collections")>100);
+    }
+    @Test void nativeAuthenticationRealApplicationPreservesRootsAndOwnership()throws Exception {
+        requireTools();AuthenticationHttpFixture.verify(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
+    }
+
     @Test void nativeWebParserDispatchAndShutdownSurviveForcedGc()throws Exception {
         requireTools();WebServerFixture.protocol(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
     }
