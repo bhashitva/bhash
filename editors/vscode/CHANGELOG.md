@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0
+
+- Bundle the merged compiler with the Bhash HTTP server and small web application framework on JVM, CLR and native Linux/Windows x64 and macOS ARM64.
+- Include routing, path/query values, UTF-8 JSON, validation, bounded request handling, logging, resource cleanup and cooperative shutdown.
+- Make the new web APIs available to compiler-backed completion, signature help, imports and declaration navigation.
+- Link the Hindi web application walkthrough, SQLite task-board demo, combined HTTP/SQLite cache example and deployment templates.
+- Document the initial server limits: serialized handlers, fixed-length bodies up to 1 MiB, reverse-proxy TLS, and no browser/WASM listeners.
+
 ## 0.11.0
 
 - Bundle the latest compiler with collection algorithms, streams, paths/directories, scoped resource cleanup, configuration, logging and the Bhash test runner.

@@ -153,7 +153,8 @@ VS Code में WSL वाला फ़ोल्डर खोलें और 
 The bundled compiler includes text, math/random, JSON, dates/time, file I/O and
 UTF-8/binary data support. It also includes collection algorithms, streams,
 paths/directories, scoped resource cleanup (`संसाधन`), configuration, logging,
-a Bhash test runner, HTTP networking and SQLite database access.
+a Bhash test runner, HTTP client/server networking, a small web application framework
+and SQLite database access.
 
 Use imports such as `आयात मानक.पाठ्य;` or `आयात मानक.एसक्यूलाइट;`, or fully
 qualified names. Completion, signature help and automatic imports use the same
@@ -170,6 +171,30 @@ unavailable there, and browser networking follows browser security restrictions.
 See [the standard library guide](../../docs/standard-library.md) and the Hindi
 reference tutorials for [application foundations](../../tutorial/application-foundations/README.md),
 [networking](../../tutorial/networking/README.md) and [SQLite](../../tutorial/sqlite/README.md).
+
+## HTTP servers and web applications
+
+The bundled compiler supports `मानक.वेब`, `वेबअनुप्रयोग`, `वेबचालक` and
+`एचटीटीपीसर्वर` on JVM, CLR and native Linux/Windows x64 and macOS ARM64.
+Use the existing build/run target choices; the same Bhash source provides routing,
+path/query values, UTF-8 JSON, validation, logging, resource cleanup and cooperative
+shutdown. Completion, signature help, automatic imports and F12 include these APIs.
+
+Start with the [SQLite task-board example](../../examples/web-tasks/README.md)
+and its [step-by-step Hindi walkthrough](../../tutorial/web-applications/README.md).
+Open the example folder containing `bhash.project` and `index.html`, then build/run
+with the desired target. The example serves <http://127.0.0.1:8080/> and keeps data
+in a local SQLite file. Running the compiled application from another directory
+requires an explicit `--page` path as documented in the example.
+
+The initial server runs one handler at a time, accepts fixed-length bodies up to
+1 MiB, and closes each connection after its response. Use a reverse proxy for
+HTTPS; listening is unavailable in browser/WASM. The demo is a single-user
+teaching app; the supplied proxy template adds access control for deployment.
+See the [server contract and deployment limits](../../docs/web-applications.md).
+
+A separate [HTTP and SQLite cache example](../../examples/http-sqlite/README.md)
+shows importing remote JSON into a transactional offline cache.
 
 ## Reusable source packages
 
