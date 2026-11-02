@@ -36,6 +36,8 @@ jobs:
         run: python3 scripts/test_native_release.py
       - name: Verify source-level debugging with GDB
         run: python3 scripts/test_native_debugger.py
+      - name: Check SQLite literal and heap text boundaries under forced GC and sanitizers
+        run: mvn --batch-mode --no-transfer-progress '-Dtest=NativeBackendTest#nativeSqlite*' test
       - name: Verify and execute LLVM backend
         run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest,NativeReleaseTest test
       - name: Verify standalone SQLite distribution and reproducibility

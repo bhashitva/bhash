@@ -115,6 +115,9 @@ jobs:
       - name: Verify reproducible release packages, Mach-O inspection, symbols and standalone execution
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: python3 scripts/test_macos_native_release.py
+      - name: Check SQLite literal and heap text boundaries under forced GC and sanitizers
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: mvn --batch-mode --no-transfer-progress '-Dtest=NativeBackendTest#nativeSqlite*' test
       - name: Cross-validate native language behavior against JVM and CLR with forced GC
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: mvn --batch-mode --no-transfer-progress -Dtest=NativeBackendTest,NativeReleaseTest,ManagedToolchainTest,MacosCompatibilityTest,SqliteCoreTest,SqliteAssetsTest,JvmSqliteTest,ClrSqliteTest test
