@@ -131,6 +131,21 @@ final class WebServerFixture {
             if(target==Target.NATIVE){String errors=Files.readString(server.err);assertTrue(errors.contains("live=0"),errors);}
         }
     }
+    static void signalAfterClose(Target target,Path work,boolean sanitize,Map<String,String> env)throws Exception {
+        if(NativePlatform.windows())return;
+        String source="""
+            आयात मानक.एचटीटीपीसर्वर;
+            कार्य मुख्य() -> शून्य {
+                संसाधन (स: एचटीटीपीसर्वर = नया एचटीटीपीसर्वर("127.0.0.1",०)) {}
+                लिखो("READY 1"); पाठपढ़ो();
+            }
+            """;
+        Path artifact=compile(target,work,"closed-signal",List.of(new SourceFile("closed-server.bhash",source)),sanitize);
+        try(var server=new Running(target,artifact,work,env)){
+            server.child.destroy();assertTrue(server.child.waitFor(5,TimeUnit.SECONDS),"A closed server must not swallow SIGTERM");
+            assertEquals(143,server.child.exitValue(),Files.readString(server.err));
+        }
+    }
     static void demo(Target target,Path work,boolean sanitize,Map<String,String> env)throws Exception {
         Path artifact=compile(target,work,"tasks",WebCoreTest.demo(),sanitize);Files.copy(Path.of("examples/web-tasks/index.html"),work.resolve("index.html"),StandardCopyOption.REPLACE_EXISTING);
         try(var server=new Running(target,artifact,work,env,"--port=0","--requests=13")){

@@ -26,6 +26,9 @@ class NativeBackendTest {
     @Test void nativeWebOsStopSignalReleasesRoots()throws Exception {
         requireTools();WebServerFixture.signal(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
     }
+    @Test void nativeWebClosedServerRestoresOsStopSignal()throws Exception {
+        requireTools();WebServerFixture.signalAfterClose(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
+    }
     @Test void nativeWebPortableFrameworkSurvivesForcedGc()throws Exception {
         requireTools();var result=nativeOnlyRun(List.of(new SourceFile("web-pure.bhash",WebCoreTest.PURE)),GC_STRESS);
         assertEquals(0,result.exit(),result.err());assertEquals("",result.out());assertEquals(0L,stats(result).get("live"));

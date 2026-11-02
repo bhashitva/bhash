@@ -18,5 +18,6 @@ abstract class WebCompilerTest {
     }
     @Test void realHttpParserDispatchCleanupAndShutdown()throws Exception {WebServerFixture.protocol(target,directory,false,Map.of());}
     @Test void osStopSignalRunsResourceCleanup()throws Exception {WebServerFixture.signal(target,directory,false,Map.of());}
+    @Test void closedServerDoesNotSwallowOsStopSignal()throws Exception {WebServerFixture.signalAfterClose(target,directory,false,Map.of());}
     @Test void shippedTaskBoardUsesTransactionsAndSurvivesRestart()throws Exception {WebServerFixture.demo(target,directory,false,Map.of());}
 }
