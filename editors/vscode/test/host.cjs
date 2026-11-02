@@ -82,7 +82,7 @@ exports.run=async()=>{
     assert.ok(authDefinitions.length>0,'authentication F12');
     const authDoc=await vscode.workspace.openTextDocument(authDefinitions[0].uri);assert.ok(authDoc.getText().includes('हैशबनाओ'),'readable authentication declaration');
     const unimported=authentication.replace('आयात मानक.सत्रप्रबंधक; ','');const importEdit=new vscode.WorkspaceEdit();importEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),unimported);await vscode.workspace.applyEdit(importEdit);
-    await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(unimported.indexOf('सत्रप्रबंधक'))),list=>list?.items?.some(i=>label(i)==='सत्रप्रबंधक'&&i.additionalTextEdits?.some(e=>e.newText.includes('आयात मानक.सत्रप्रबंधक;'))),'session automatic import');
+    await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(unimported.indexOf('सत्रप्रबंधक')+'सत्रप्रबंधक'.length)),list=>list?.items?.some(i=>label(i)==='सत्रप्रबंधक'&&i.additionalTextEdits?.some(e=>e.newText.includes('आयात मानक.सत्रप्रबंधक;'))),'session automatic import');
     console.log('PASS bundled authentication: diagnostics, crypto/session completion, signature help, F12 and automatic imports without executing code.');
     const original=new vscode.WorkspaceEdit();original.replace(uri,new vscode.Range(0,0,document.lineCount,0),source);await vscode.workspace.applyEdit(original);await document.save();
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'diagnostic clearing after provider tests');
