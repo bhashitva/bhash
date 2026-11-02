@@ -4,6 +4,7 @@
 
 | ट्यूटोरियल | क्या मिलेगा |
 | --- | --- |
+| [SQLite डेटाबेस (SQLite Database)](sqlite/README.md) | मापदंड, प्रकार, पंक्तियाँ, लेनदेन, सफाई और वितरण |
 | [HTTP / HTTPS नेटवर्किंग (Networking)](networking/README.md) | अनुरोध, उत्तर, शीर्ष, UTF-8 और binary सामग्री, समयसीमा, redirects और TLS |
 | [अनुप्रयोग का आधार (Application Foundations)](application-foundations/README.md) | संग्रह, प्रवाह, पथ, संसाधन-सफाई, विन्यास, लेखा और परीक्षण |
 | [मानक पुस्तकालय (Standard Library)](standard-library/README.md) | सभी ४७ फ़ंक्शन, ओवरलोड सहित ५० हस्ताक्षर, चलाने योग्य उदाहरण और अपेक्षित आउटपुट |

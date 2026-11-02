@@ -24,6 +24,16 @@ build('types', path.resolve('examples/types'));
 compile('standard-library', fs.readFileSync('examples/standard-library/portable.bhash', 'utf8'));
 compile('standard-library-browser', fs.readFileSync('src/test/resources/stdlib/browser.bhash', 'utf8'));
 compile('type-semantics', fs.readFileSync('src/test/resources/types/browser.bhash', 'utf8'));
+compile('sqlite-browser', `
+आयात मानक.एसक्यूलाइट; आयात मानक.डेटानियम; आयात मानक.परीक्षण;
+कार्य मुख्य() -> शून्य {
+    डेटानियम.कथनजाँचो("SELECT ?");
+    मान पकड़ा: तार्किक = असत्य;
+    प्रयास { एसक्यूलाइट.खोलो(":memory:"); }
+    पकड़ो (ग: अपवाद) { पकड़ा = सत्य; परीक्षण.बराबर("ब्राउज़र लक्ष्य पर SQLite उपलब्ध नहीं है।",ग.संदेश); }
+    परीक्षण.सत्यहै(पकड़ा,"ब्राउज़र SQLite सीमा लागू हो।");
+}
+`);
 compile('networking-browser', `
 आयात मानक.एचटीटीपी; आयात मानक.परीक्षण;
 कार्य मुख्य() -> शून्य {
@@ -213,6 +223,7 @@ const server = http.createServer((request, response) => {
             await run(`foundations-${name}`, '', '');
         await run('foundations-browser', '', '', 0, '{"level":1,"message":"भारत😀","fields":{}}');
         await run('networking-browser', '', '');
+        await run('sqlite-browser', '', '');
         await run('types', '', fs.readFileSync('examples/types/expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('standard-library', '', '३ नमस्ते | भारत | \n२ भाष सरल है\n2.62\nसत्य ४२\n१\nभारत ३ {"नाम":"भारत","अंक":[1,2,3]}\n1970-01-01T00:00:00.000Z ०\nब्राउज़र में फ़ाइल तंत्र उपलब्ध नहीं है।\n');
         await run('standard-library-browser', '', '0.12 -0.00\n६७ ५० ३९\nसत्य सत्य सत्य 😀\n2000-02-29T12:34:56.789Z\nसत्य\n' + 'असमर्थित\n'.repeat(5) + 'अमान्य\nचक्रीय\n');

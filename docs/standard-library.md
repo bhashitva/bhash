@@ -276,3 +276,7 @@ and line-local malformed-input recovery shared with JVM/CLR.
 
 See [HTTP and HTTPS client](networking.md) for requests, responses, redirects, TLS,
 limits and target requirements, and [the Hindi tutorial](../tutorial/networking/README.md).
+
+## SQLite
+
+See [SQLite database access](sqlite.md) for parameterized SQL, transactions, strict type conversions, offline distribution and platform restrictions; [Hindi tutorial](../tutorial/sqlite/README.md) covers every public method.

@@ -49,3 +49,16 @@ Fundraising is voluntary and does not add conditions to the software license.
 ## Optional managed native toolchain
 
 Managed toolchain archives separately redistribute LLVM/Clang/LLD and selected Linux system development/runtime components under their respective licenses. Their per-package notices are retained in `licenses/`, versions in `packages.json`, and matching corresponding sources in the companion `-sources.zip` identified by `sources.json`. Redistributors must make that companion archive and notices available alongside the binary toolchain. See [managed toolchains](docs/managed-native-toolchain.md); the Bhash Apache license does not replace those component licenses.
+
+## SQLite applications
+
+SQLite 3.54.1 is public domain (https://www.sqlite.org/copyright.html). Native database
+applications statically include its amalgamation. CLR database output includes the
+verified Linux x64, Windows x64 and macOS ARM64 SQLite libraries; preserve the complete
+output folder, including SQLITE_RUNTIME.json and this guide. These libraries do not
+require installing SQLite separately. Windows libraries use the static Microsoft CRT.
+JVM database applications include Xerial sqlite-jdbc 3.54.1.0 under Apache-2.0 and
+its original Zentus BSD license; full terms remain under
+META-INF/maven/org.xerial/sqlite-jdbc/LICENSE and LICENSE.zentus in generated JARs.
+SQLite source, build inputs and checksums are in src/main/resources/dev/bhash/sqlite/.
+The compiler itself bundles the driver and the native assets; see THIRD_PARTY_NOTICES.md.

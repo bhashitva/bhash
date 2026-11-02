@@ -1,0 +1,5 @@
+src/main/resources/dev/bhash/sqlite/** linguist-vendored
+*.zip binary
+*.dll binary
+*.so binary
+*.dylib binary

@@ -17,6 +17,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    private void sqliteFixture(String source)throws Exception {
+        requireTools();source=source.replace("भारत😀.db",temporary.resolve("भारत😀.db").toString().replace('\\','/'));
+        var result=nativeOnlyRun(List.of(new SourceFile("sqlite.bhash",source)),GC_STRESS);assertEquals(0,result.exit(),result.err());assertEquals("",result.out());assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeSqliteTypesAndBindingsSurviveForcedGc()throws Exception {sqliteFixture(SqliteFixtures.BASIC);}
+    @Test void nativeSqliteTransactionsPersistenceAndCleanup()throws Exception {sqliteFixture(SqliteFixtures.TRANSACTIONS);}
+    @Test void nativeSqliteErrorsAndResetPreserveRoots()throws Exception {sqliteFixture(SqliteFixtures.ERRORS);}
+    @Test void nativeSqliteRepeatedResourcesAndDetachedBuffers()throws Exception {sqliteFixture(SqliteFixtures.STRESS);}
     private void networkFixture(String source,boolean trusted)throws Exception {
         var executable=executable("http-client");new NativeCompiler(nativeSanitizers()).compile(List.of(new SourceFile("http-test.bhash",source)),executable);
         Path output=temporary.resolve("http.out"),errors=temporary.resolve("http.err");

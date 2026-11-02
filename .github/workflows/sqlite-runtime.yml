@@ -1,0 +1,50 @@
+name: Pinned SQLite runtime builds
+on:
+  push:
+    paths:
+      - 'scripts/build_sqlite_runtime.py'
+      - 'src/main/resources/dev/bhash/sqlite/**'
+      - '.github/workflows/sqlite-runtime.yml'
+  pull_request:
+    paths:
+      - 'scripts/build_sqlite_runtime.py'
+      - 'src/main/resources/dev/bhash/sqlite/**'
+      - '.github/workflows/sqlite-runtime.yml'
+permissions:
+  contents: read
+jobs:
+  sqlite-runtime:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build twice on POSIX
+        if: runner.os != 'Windows'
+        run: |
+          python3 scripts/build_sqlite_runtime.py --output target/sqlite-one
+          python3 scripts/build_sqlite_runtime.py --output target/sqlite-two
+      - name: Build twice with static Windows CRT
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installation = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$installation) { throw 'Visual C++ build tools are required to reproduce the Windows SQLite library.' }
+          $setup = Join-Path $installation 'VC\Auxiliary\Build\vcvars64.bat'
+          cmd.exe /d /c "`"$setup`" && python scripts/build_sqlite_runtime.py --output target/sqlite-one && python scripts/build_sqlite_runtime.py --output target/sqlite-two"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Verify deterministic binaries
+        run: |
+          python -c "from pathlib import Path; a=Path('target/sqlite-one'); b=Path('target/sqlite-two'); files=list(a.rglob('*')); assert files; assert all(p.is_dir() or p.read_bytes()==(b/p.relative_to(a)).read_bytes() for p in files)"
+      - name: Validate distributed library provenance
+        run: |
+          python -c "import json; from pathlib import Path; root=Path('src/main/resources/dev/bhash/sqlite'); lock=json.loads((root/'sqlite.lock.json').read_text()); manifests=list((root/'runtime').glob('*/manifest.json')); assert len(manifests)==3; assert all(json.loads(p.read_text())['source_sha3_256']==lock['source_sha3_256'] and json.loads(p.read_text())['defines']==lock['defines'] for p in manifests)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sqlite-runtime-${{ matrix.os }}
+          path: target/sqlite-one/
+          if-no-files-found: error

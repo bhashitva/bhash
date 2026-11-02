@@ -1913,3 +1913,7 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
 #ifdef BHASH_NETWORKING
 #include "bhash_http.inc"
 #endif
+
+#ifdef BHASH_SQLITE
+#include "bhash_sqlite.inc"
+#endif

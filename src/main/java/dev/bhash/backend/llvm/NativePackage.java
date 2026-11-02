@@ -40,6 +40,8 @@ public final class NativePackage {
             files.put("run.sh",("#!/bin/sh\nset -eu\ncd -- \"$(dirname -- \"$0\")\"\n./check-host.sh\nexec ./bin/"+name+" \"$@\"\n").getBytes(StandardCharsets.UTF_8));
             files.put("README.txt",("Bhash native release: "+name+" "+version+"\nLinux x86-64; glibc >= "+compatibility.minimumGlibc()+".\nNo JVM, .NET or LLVM is needed to run this program.\nVerify: sha256sum -c SHA256SUMS\nRun: ./run.sh\nInspect provenance: ./bin/"+name+" --bhash-build-info\nDebug sources: gdb; set substitute-path /bhash/source /path/to/source-root\nChecksums detect corruption; they are not signatures or proof of authorship.\n").getBytes(StandardCharsets.UTF_8));
             }
+            if(compatibility.buildInfo().has("sqlite")&&compatibility.buildInfo().get("sqlite").getAsBoolean())
+                files.put("README.txt",(new String(files.get("README.txt"),StandardCharsets.UTF_8)+"SQLite "+dev.bhash.backend.SqliteAssets.VERSION+" is statically included (public domain); no SQLite installation is needed.\n").getBytes(StandardCharsets.UTF_8));
             var dynamicLibraries=new ArrayList<String>();
             if(compatibility.buildInfo().has("networking")&&compatibility.buildInfo().get("networking").getAsBoolean()) {
                 String http=windows?"HTTP uses Windows-supplied WinHTTP.\n":NativePlatform.macos()?"HTTP uses the macOS system libcurl with TLS and asynchronous DNS.\n":"HTTP requires the libcurl.so.4 runtime (libcurl 7.68+, TLS and asynchronous DNS); no C development package is needed.\n";

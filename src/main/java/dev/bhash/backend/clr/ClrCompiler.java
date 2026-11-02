@@ -5,6 +5,7 @@ import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.Target;
 import dev.bhash.backend.Licensing;
+import dev.bhash.backend.SqliteAssets;
 import dev.bhash.frontend.SourceFile;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 /** Bhash -> checked C# -> .NET 10 managed DLL and deployment metadata. */
 public final class ClrCompiler {
     private static final String MARKER = ".bhash-clr-output";
+    private static final String SQLITE_STAMP = "Bhash CLR output v3 SQLite\n";
     private static final String STAMP = "Bhash CLR output v2\n";
     private static final String LEGACY_STAMP = "Bhash CLR output v1\n";
     private static final Set<String> LEGACY_FILES = Set.of("BhashProgram.dll", "BhashProgram.deps.json", "BhashProgram.runtimeconfig.json", MARKER);
@@ -56,6 +58,7 @@ public final class ClrCompiler {
 
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
         String code = ManagedEmitter.emit(sources, Target.CLR);
+        boolean sqlite=code.contains("BhashStandard.db");
         Path destination = output.toAbsolutePath().normalize();
         validateDestination(destination);
         Files.createDirectories(destination.getParent());
@@ -72,7 +75,8 @@ public final class ClrCompiler {
             }
             try(var standard=ClrCompiler.class.getResourceAsStream("BhashStandard.cs.txt")) {
                 if(standard==null)throw new CompilationException("Missing CLR standard library runtime.");
-                Files.copy(standard,work.resolve("BhashStandard.cs"));
+                String text=new String(standard.readAllBytes(),StandardCharsets.UTF_8);
+                Files.writeString(work.resolve("BhashStandard.cs"),sqlite?SqliteAssets.clrSource(text):text,StandardCharsets.UTF_8);
             }
             var command = List.of(executable(), "publish", "BhashProgram.csproj", "--configuration", "Release",
                     "--output", stage.toString(), "--no-self-contained", "--nologo", "--verbosity", "quiet",
@@ -97,11 +101,12 @@ public final class ClrCompiler {
                 throw new IOException("CLR compilation interrupted.", interrupted);
             } finally { if (process.isAlive()) process.destroyForcibly(); }
             Licensing.copyTo(stage);
+            if(sqlite)SqliteAssets.copyLibraries(stage);
             for (String name : FILES) {
                 if (!name.equals(MARKER) && !Files.isRegularFile(stage.resolve(name)))
                     throw new CompilationException("CLR backend did not produce " + name);
             }
-            Files.writeString(stage.resolve(MARKER), STAMP, StandardCharsets.UTF_8);
+            Files.writeString(stage.resolve(MARKER), sqlite?SQLITE_STAMP:STAMP, StandardCharsets.UTF_8);
             install(stage, destination);
         } finally {
             deleteTree(stage);
@@ -116,9 +121,10 @@ public final class ClrCompiler {
         if (!Files.isDirectory(destination) || !Files.isRegularFile(destination.resolve(MARKER), LinkOption.NOFOLLOW_LINKS))
             throw new IOException("Refusing to replace a directory not created by the Bhash CLR compiler: " + destination);
         String stamp=Files.readString(destination.resolve(MARKER), StandardCharsets.UTF_8);
-        if (!stamp.equals(STAMP) && !stamp.equals(LEGACY_STAMP))
+        if (!stamp.equals(STAMP) && !stamp.equals(LEGACY_STAMP) && !stamp.equals(SQLITE_STAMP))
             throw new IOException("Refusing to replace a directory not created by the Bhash CLR compiler: " + destination);
-        Set<String> allowed=stamp.equals(LEGACY_STAMP)?LEGACY_FILES:FILES;
+        Set<String> allowed=new HashSet<>(stamp.equals(LEGACY_STAMP)?LEGACY_FILES:FILES);
+        if(stamp.equals(SQLITE_STAMP))allowed.addAll(SqliteAssets.APPLICATION_FILES);
         try (var entries = Files.list(destination)) {
             for (Path entry : entries.toList()) {
                 if (!allowed.contains(entry.getFileName().toString()) || !Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS))

@@ -246,6 +246,15 @@ No registry, Maven or NuGet dependency is needed by a compiled application.
 See [all APIs and portability rules](docs/standard-library.md) and
 [the runnable example](examples/standard-library/portable.bhash).
 
+### SQLite databases
+
+Use `मानक.एसक्यूलाइट`, `डेटाबेस`, `कथन` and `लेनदेन` for parameterized SQL,
+strict value conversions, row iteration and scoped transactions on JVM, CLR and
+native Linux/Windows x64 and macOS ARM64. SQLite is included in generated database
+applications; no database server or separate SQLite installation is required.
+See the [SQLite contract](docs/sqlite.md), [Hindi reference tutorial](tutorial/sqlite/README.md)
+and [runnable examples](examples/sqlite). Browser database access is explicitly unavailable.
+
 ## Types, conversions and binary data
 
 Bhash v0.9 adds checked numeric conversions, unsigned `बाइट`, signed 32-bit

@@ -151,6 +151,7 @@ enum { BH_ENCODE, BH_DECODE, BH_READ_FILE, BH_WRITE_FILE, BH_SLICE, BH_TO_ARRAY,
        BH_READ_INT, BH_WRITE_INT, BH_READ_REAL, BH_WRITE_REAL };
 int64_t bh_to_byte(int64_t, const void *);
 int64_t bh_to_int32(int64_t, const void *);
+uint64_t bh_database_call(uint32_t, uint64_t, uint64_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
 uint64_t bh_buffer_call(uint32_t, uint64_t, uint64_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
 /* Files: strict UTF-8, bounded whole-file text operations. */
 int bh_file_supported(const void *);
