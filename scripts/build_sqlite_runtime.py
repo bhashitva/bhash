@@ -53,7 +53,7 @@ def build(output, compiler=None):
                        *['-D' + d for d in defines], 'sqlite3.c', '-o', name]
             command += (['-dynamiclib', '-arch', 'arm64', '-mmacosx-version-min=11.0',
                          '-Wl,-install_name,@rpath/' + name] if system == 'Darwin'
-                        else ['-shared', '-pthread', '-Wl,--build-id=sha1'])
+                        else ['-shared', '-pthread', '-Wl,--build-id=sha1', '-Wl,-z,defs', '-lm'])
         subprocess.run(command, cwd=work, check=True)
         if system == 'Darwin':
             subprocess.run(['/usr/bin/codesign', '--force', '--sign', '-',
