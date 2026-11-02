@@ -5,3 +5,5 @@
 `offline.test.bhash` runs with `bhash test examples/sqlite --target jvm|clr|native`.
 The examples use independent in-memory databases and need no network or pre-existing data.
 See [Hindi tutorial](../../tutorial/sqlite/README.md) and [contract](../../docs/sqlite.md).
+
+(Combined example) HTTP से JSON लाकर SQLite में सहेजने, offline पढ़ने और rollback देखने के लिए [HTTP + SQLite उदाहरण](../http-sqlite/README.md) देखें।
