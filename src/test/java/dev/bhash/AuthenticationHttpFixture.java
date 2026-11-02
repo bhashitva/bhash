@@ -73,7 +73,10 @@ final class AuthenticationHttpFixture {
     }
     private static String login(String name,String password){var j=new JsonObject();j.addProperty("username",name);j.addProperty("password",password);return j.toString();}
     static void verify(Target target,Path work,boolean sanitize,Map<String,String> env)throws Exception {
-        Path artifact=WebServerFixture.compile(target,work,"auth-application",sources(),sanitize),db=work.resolve("accounts-भारत😀.db");
+        // Java 17's Windows launcher uses the system argument encoding. Keep
+        // CLI paths ASCII; Unicode password, JSON and database values remain
+        // covered below, and SQLite's Unicode paths have dedicated fixtures.
+        Path artifact=WebServerFixture.compile(target,work,"auth-application",sources(),sanitize),db=work.resolve("accounts.db");
         init(target,artifact,work,db,"alice","reader",env);init(target,artifact,work,db,"bob","admin",env);
         String oldCookie;
         try(var s=new Server(target,artifact,work,db,40,env)){
