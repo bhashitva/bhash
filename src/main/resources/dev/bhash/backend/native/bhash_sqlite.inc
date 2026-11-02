@@ -130,6 +130,7 @@ uint64_t bh_database_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t 
         db_bound(s,location);sqlite3_int64 before=sqlite3_total_changes64(s->owner->db);int result=sqlite3_step(s->query);
         if(result!=SQLITE_ROW&&result!=SQLITE_DONE){if(s->owner->token)s->owner->failed=1;sqlite3_reset(s->query);s->state=3;runtime_error(location,db_message(result));}
         if(result==SQLITE_DONE){sqlite3_reset(s->query);s->state=2;return op==8?(uint64_t)(sqlite3_total_changes64(s->owner->db)-before):0;}
+        columns=sqlite3_column_count(s->query); /* step may automatically reprepare after a schema change */
         for(int i=0;i<columns;i++)s->types[i]=(unsigned char)sqlite3_column_type(s->query,i);
         uint64_t bytes=0;for(int i=0;i<columns;i++)if(s->types[i]==SQLITE_TEXT||s->types[i]==SQLITE_BLOB)bytes+=(uint64_t)sqlite3_column_bytes(s->query,i);
         if(bytes>DB_LIMIT){sqlite3_reset(s->query);s->state=3;runtime_error(location,"SQLite पंक्ति की सीमा ८३८८६०८ बाइट है।");}
