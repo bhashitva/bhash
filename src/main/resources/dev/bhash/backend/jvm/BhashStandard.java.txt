@@ -506,8 +506,9 @@ final class BhashStandard {
         if(s.state==0)dbBound(s);
         try{
             if(s.state==0){s.statement.execute();s.result=s.statement.getResultSet();}
+            count=s.result.getMetaData().getColumnCount();s.names=new String[count];for(int i=0;i<count;i++)s.names[i]=s.result.getMetaData().getColumnName(i+1);
             if(!s.result.next()){dbResetValue(s,2);return false;}
-            count=s.result.getMetaData().getColumnCount();s.names=new String[count];for(int i=0;i<count;i++)s.names[i]=s.result.getMetaData().getColumnName(i+1);s.values=new Object[count];s.types=new int[count];long size=0;
+            s.values=new Object[count];s.types=new int[count];long size=0;
             for(int i=0;i<count;i++){
                 Object value=s.result.getObject(i+1);int kind;
                 if(value==null)kind=5;
