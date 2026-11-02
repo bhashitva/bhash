@@ -117,9 +117,18 @@ Source, lockfile and runtime manifests: `src/main/resources/dev/bhash/sqlite/`.
 `python scripts/build_sqlite_runtime.py --output target/sqlite-runtime` rebuilds
 on the matching host using an installed C compiler (MSVC x64 environment on Windows).
 The CI workflow builds twice on each supported OS and compares bytes. The checked-in
-libraries are the verified artifacts of run 41368892339; SHA-256 manifests record
+libraries are the verified artifacts of runs 41368892339 (Windows/macOS) and 41376837422 (Linux); SHA-256 manifests record
 identity. Updating SQLite requires updating source hash, JDBC version, all libraries,
 conversion/transaction tests and notices together. Compiler builds consume these
 assets offline after ordinary Maven dependency resolution.
 
 An execution error inside a transaction marks the scope rollback-only. Further execution and commit fail until rollback/close. This prevents silent autocommit after SQLite automatically aborts a transaction (for example INSERT OR ROLLBACK). Reset alone does not recover a failed transaction.
+
+## Portable SQL capabilities
+
+The portable SQL surface is SQLite core SQL, built-in JSON, FTS5 (including bm25)
+and R*Tree. Xerial enables additional optional features (for example SQL math,
+FTS3, dbstat, percentile aggregates and STAT4) that are not promised by the CLR/native
+build. SQLite version equality does not imply identical compile options. Use
+`PRAGMA compile_options` when intentionally writing platform-specific SQL; prefer
+Bhash's `मानक.गणित` for portable numeric computation before binding values.
