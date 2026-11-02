@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Platform crypto only; never use seeded यादृच्छिक for secrets.
+कूटशब्द|हैशबनाओ|appPasswordHash|पाठ|कूटशब्द: पाठ
+कूटशब्द|जाँचो|appPasswordVerify|तार्किक|कूटशब्द: पाठ, हैश: पाठ
+सुरक्षा|टोकन|appSecureToken|पाठ|
+सुरक्षा|समान|appSecureEqual|तार्किक|पहला: पाठ, दूसरा: पाठ
+सुरक्षाघड़ी|मिलीसेकंड|appMonotonic|पूर्णांक|
