@@ -6,6 +6,7 @@ import dev.bhash.backend.CompilationException;
 import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.Target;
 import dev.bhash.backend.Licensing;
+import dev.bhash.backend.SqliteAssets;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -22,6 +23,7 @@ public final class JvmCompiler {
 
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
         String java = ManagedEmitter.emit(sources, Target.JVM);
+        boolean sqlite=java.contains("BhashStandard.db");
         var compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) throw new CompilationException("JVM compilation requires a full JDK 17 or newer (not a JRE).");
         Path temporary = Files.createTempDirectory("bhash-jvm-");
@@ -60,9 +62,11 @@ public final class JvmCompiler {
             var manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
             manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, "BhashProgram");
+            if(sqlite)manifest.getMainAttributes().putValue("Enable-Native-Access","ALL-UNNAMED");
             try (var jar = new JarOutputStream(Files.newOutputStream(stagedJar), manifest);
                  var paths = Files.walk(classes)) {
                 Licensing.addToJar(jar);
+                if(sqlite)SqliteAssets.addJdbc(jar);
                 for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
                     var entry = new JarEntry(classes.relativize(file).toString().replace('\\', '/'));
                     entry.setTime(0);
