@@ -80,7 +80,7 @@ for launch configurations, limits, GC safety and troubleshooting.
 
 ## Native on Windows, Linux and WSL
 
-Native builds use the compiler bundled in version 0.7.0. Choose `native` from
+Native builds use the compiler bundled with the extension. Choose `native` from
 **Bhash: Build Project or File** or **Bhash: Run Project or File**. The first task
 downloads the [versioned SDK](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.1.0)
 (110 MiB), checks its bundled SHA-256, verifies the installation, and activates it
@@ -150,13 +150,26 @@ VS Code में WSL वाला फ़ोल्डर खोलें और 
 
 ## Standard library
 
-The bundled compiler includes `मानक.पाठ्य`, `मानक.गणित`, `मानक.यादृच्छिक`,
-`मानक.जेसन`, `मानक.समय` and `मानक.फ़ाइल`. Use `आयात मानक.पाठ्य;` or fully
+The bundled compiler includes text, math/random, JSON, dates/time, file I/O and
+UTF-8/binary data support. It also includes collection algorithms, streams,
+paths/directories, scoped resource cleanup (`संसाधन`), configuration, logging,
+a Bhash test runner, HTTP networking and SQLite database access.
+
+Use imports such as `आयात मानक.पाठ्य;` or `आयात मानक.एसक्यूलाइट;`, or fully
 qualified names. Completion, signature help and automatic imports use the same
 catalog as compiler checking; F12 opens a readable declaration document.
-No dependency download is needed. Browser builds expose file capability checks,
-but local file operations are unavailable in browser WASM.
-See [the standard library guide](../../docs/standard-library.md).
+
+SQLite supports parameterized SQL, typed values, transactions and deterministic
+cleanup on JVM, CLR and native. The compiler bundles the SQLite driver/source and
+verified runtime libraries needed for supported Windows x64, Linux x64 and macOS
+ARM64 targets; users do not install SQLite separately. Normal Java/.NET/native
+toolchain prerequisites still apply. Generated database applications can run
+offline. SQLite is unavailable in browser WASM; local file operations are also
+unavailable there, and browser networking follows browser security restrictions.
+
+See [the standard library guide](../../docs/standard-library.md) and the Hindi
+reference tutorials for [application foundations](../../tutorial/application-foundations/README.md),
+[networking](../../tutorial/networking/README.md) and [SQLite](../../tutorial/sqlite/README.md).
 
 ## Reusable source packages
 
@@ -198,7 +211,7 @@ For a repeatable team build, add a VS Code task:
 }
 ```
 
-`project` is relative to that workspace folder. `target` accepts `jvm`, `clr`, or
+`project` is relative to that workspace folder. `target` accepts `jvm`, `clr`, `native`, or
 `wasm-browser`; `command` accepts `build` or `run`. Browser programs must be built
 and served over HTTP. CLR/browser builds require .NET 10; browser builds also
 require the `wasm-tools` workload. A library-only project can be analyzed without

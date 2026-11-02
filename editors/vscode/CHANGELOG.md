@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0
+
+- Bundle the latest compiler with collection algorithms, streams, paths/directories, scoped resource cleanup, configuration, logging and the Bhash test runner.
+- Include HTTP networking with consistent target restrictions and errors.
+- Add SQLite access on JVM, CLR and native: parameterized SQL, typed values, transactions and automatic resource cleanup, including schema-change metadata fixes.
+- Bundle pinned SQLite runtime assets for supported desktop targets; no separate SQLite installation is required. Browser SQLite access reports an explicit unsupported error.
+- Link the Hindi application-foundations, networking and SQLite tutorials from the extension documentation.
+
 ## 0.10.1
 
 - Register the native tools task provider and task schema so Windows custom-terminal setup/check/repair tasks can execute and configured tasks can resolve without changing VS Code settings.
