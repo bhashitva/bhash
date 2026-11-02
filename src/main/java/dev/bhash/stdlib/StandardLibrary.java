@@ -19,7 +19,7 @@ public final class StandardLibrary {
         var owners=new LinkedHashMap<String,List<String[]>>();
         try {
             var catalog=new StringBuilder();
-            for(String name:List.of("api.txt","foundation-api.txt","network-api.txt"))try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+name)) {
+            for(String name:List.of("api.txt","foundation-api.txt","network-api.txt","sqlite-api.txt"))try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+name)) {
                 if(input==null)throw new IOException("Missing standard library signature catalog: "+name);
                 catalog.append(new String(input.readAllBytes(),StandardCharsets.UTF_8)).append('\n');
             }
@@ -44,7 +44,7 @@ public final class StandardLibrary {
         return new Catalog(String.join("\n",lines)+"\n",Map.copyOf(natives));
     }
     public static boolean owns(String full) {
-        return (CATALOG.source+FOUNDATIONS.text()+NETWORKING.text()).lines().anyMatch(line->{
+        return (CATALOG.source+FOUNDATIONS.text()+NETWORKING.text()+SQLITE.text()).lines().anyMatch(line->{
             for(String prefix:List.of("सार्वजनिक वर्ग ","सार्वजनिक अनुबंध "))
                 if(line.startsWith(prefix)&&full.equals("मानक."+Identifiers.key(line.substring(prefix.length()).split("[ <{]",2)[0])))return true;
             return false;
@@ -52,10 +52,12 @@ public final class StandardLibrary {
     }
     public static final String FOUNDATIONS_NAME="__bhash_foundations__.bhash";
     public static final String NETWORKING_NAME="__bhash_networking__.bhash";
-    public static boolean reserved(String name) {return name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME)||name.equals(NETWORKING_NAME);}
+    public static final String SQLITE_NAME="__bhash_sqlite__.bhash";
+    public static boolean reserved(String name) {return name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME)||name.equals(NETWORKING_NAME)||name.equals(SQLITE_NAME);}
     private static final SourceFile FOUNDATIONS=loadImplementation("foundations.bhash",FOUNDATIONS_NAME);
     private static final SourceFile NETWORKING=loadImplementation("networking.bhash",NETWORKING_NAME);
-    private static final List<SourceFile> IMPLEMENTATIONS=List.of(FOUNDATIONS,NETWORKING);
+    private static final SourceFile SQLITE=loadImplementation("sqlite.bhash",SQLITE_NAME);
+    private static final List<SourceFile> IMPLEMENTATIONS=List.of(FOUNDATIONS,NETWORKING,SQLITE);
     public static SourceFile foundations() {return FOUNDATIONS;}
     private static SourceFile loadImplementation(String resource,String name) {
         try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+resource)) {
