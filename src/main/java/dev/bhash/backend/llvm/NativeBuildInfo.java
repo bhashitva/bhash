@@ -30,10 +30,12 @@ public final class NativeBuildInfo {
         byte[] http=resource("/dev/bhash/backend/native/bhash_http.inc");
         byte[] sqlite=resource("/dev/bhash/backend/native/bhash_sqlite.inc");
         byte[] server=resource("/dev/bhash/backend/native/bhash_server.inc");
-        byte[] runtime=java.util.Arrays.copyOf(source,source.length+http.length+sqlite.length+server.length);
+        byte[] auth=resource("/dev/bhash/backend/native/bhash_auth.inc");
+        byte[] runtime=java.util.Arrays.copyOf(source,source.length+http.length+sqlite.length+server.length+auth.length);
         System.arraycopy(http,0,runtime,source.length,http.length);
         System.arraycopy(sqlite,0,runtime,source.length+http.length,sqlite.length);
         System.arraycopy(server,0,runtime,source.length+http.length+sqlite.length,server.length);
+        System.arraycopy(auth,0,runtime,source.length+http.length+sqlite.length+server.length,auth.length);
         info.put("runtime_sha256",hash(runtime));info.put("runtime_header_sha256",hash(header));
         String version="development",compiler="development";
         try(var in=NativeBuildInfo.class.getResourceAsStream("/META-INF/maven/dev.bhash/bhash-compiler/pom.properties")){if(in!=null){var p=new Properties();p.load(in);version=p.getProperty("version",version);}}

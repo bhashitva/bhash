@@ -48,6 +48,11 @@ public final class NativePackage {
                 if(!windows)dynamicLibraries.add(NativePlatform.macos()?"/usr/lib/libcurl.4.dylib":"libcurl.so.4");
                 files.put("README.txt",(new String(files.get("README.txt"),StandardCharsets.UTF_8)+http).getBytes(StandardCharsets.UTF_8));
             }
+            if(compatibility.buildInfo().has("authentication")&&compatibility.buildInfo().get("authentication").getAsBoolean()){
+                String crypto=windows?"Authentication uses Windows CNG.\n":NativePlatform.macos()?"Authentication uses system CommonCrypto.\n":"Authentication requires the OpenSSL 3 libcrypto.so.3 runtime; no development headers are needed.\n";
+                if(!windows&&!NativePlatform.macos())dynamicLibraries.add("libcrypto.so.3");
+                files.put("README.txt",(new String(files.get("README.txt"),StandardCharsets.UTF_8)+crypto).getBytes(StandardCharsets.UTF_8));
+            }
             var manifest=new LinkedHashMap<String,Object>();manifest.put("dynamic_libraries",dynamicLibraries);manifest.put("format",1);manifest.put("name",name);manifest.put("version",version);manifest.put("target",compatibility.target());manifest.put("build",compatibility.buildInfo());manifest.put("minimum_glibc",compatibility.minimumGlibc());manifest.put("interpreter",compatibility.interpreter());manifest.put("libraries",compatibility.libraries());manifest.put("source_date_epoch",epoch);
             if(windows){manifest.put("minimum_windows","10.0");manifest.put("c_runtime","ucrt");}
             if(NativePlatform.macos()){manifest.put("minimum_macos",compatibility.minimumMacos());manifest.put("c_runtime","libSystem");}
