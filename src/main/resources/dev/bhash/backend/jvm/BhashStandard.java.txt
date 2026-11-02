@@ -603,4 +603,38 @@ final class BhashStandard {
     }
     static void srvClose(long id){if(id<1||id>serverNext)throw failure("अमान्य HTTP संबंध पहचान।");var s=serverSockets.remove(id);if(s!=null)try{if(s.listener!=null){s.listener.close();serverActive.decrementAndGet();}else s.socket.close();}catch(java.io.IOException ignored){}}
     static long srvPort(long id){var s=serverState(id);if(s.listener==null)throw failure("अमान्य HTTP सर्वर।");try{return ((java.net.InetSocketAddress)s.listener.getLocalAddress()).getPort();}catch(java.io.IOException e){throw failure("HTTP संबंध असफल।");}}
+    private static final String AUTH_PREFIX="$bhash$pbkdf2-sha256$600000$";
+    private static final class AuthRandom { static final java.security.SecureRandom VALUE=new java.security.SecureRandom(); }
+    private static byte[] authBytes(String value){BhashRuntime.instance(value);unicode(value);return value.getBytes(StandardCharsets.UTF_8);}
+    private static void authPassword(String value){
+        byte[] bytes=authBytes(value);int n=bytes.length;Arrays.fill(bytes,(byte)0);
+        if(n<1||n>1024)throw failure("कूटशब्द १ से १०२४ UTF-8 बाइट होना चाहिए।");
+    }
+    private static byte[] authDerive(String password,byte[] salt){
+        char[] chars=password.toCharArray();var spec=new javax.crypto.spec.PBEKeySpec(chars,salt,600000,256);Arrays.fill(chars,'\0');
+        try{return javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();}
+        catch(java.security.GeneralSecurityException error){throw failure("सुरक्षा प्रदाता उपलब्ध नहीं है।");}
+        finally{spec.clearPassword();}
+    }
+    static String appPasswordHash(String password){
+        authPassword(password);byte[] salt=new byte[16],derived=null;
+        try{AuthRandom.VALUE.nextBytes(salt);derived=authDerive(password,salt);return AUTH_PREFIX+HexFormat.of().formatHex(salt)+"$"+HexFormat.of().formatHex(derived);}
+        catch(java.security.ProviderException error){throw failure("सुरक्षा प्रदाता उपलब्ध नहीं है।");}
+        finally{Arrays.fill(salt,(byte)0);if(derived!=null)Arrays.fill(derived,(byte)0);}
+    }
+    static boolean appPasswordVerify(String password,String encoded){
+        authPassword(password);BhashRuntime.instance(encoded);
+        if(encoded.length()!=AUTH_PREFIX.length()+97||!encoded.startsWith(AUTH_PREFIX)||encoded.charAt(AUTH_PREFIX.length()+32)!='$')return false;
+        String body=encoded.substring(AUTH_PREFIX.length());if(!body.matches("[0-9a-f]{32}\\$[0-9a-f]{64}"))return false;
+        byte[] salt=HexFormat.of().parseHex(body.substring(0,32)),expected=HexFormat.of().parseHex(body.substring(33)),derived=null;
+        try{derived=authDerive(password,salt);return java.security.MessageDigest.isEqual(derived,expected);}
+        finally{Arrays.fill(salt,(byte)0);Arrays.fill(expected,(byte)0);if(derived!=null)Arrays.fill(derived,(byte)0);}
+    }
+    static String appSecureToken(){byte[] bytes=new byte[32];try{AuthRandom.VALUE.nextBytes(bytes);return HexFormat.of().formatHex(bytes);}catch(java.security.ProviderException error){throw failure("सुरक्षा प्रदाता उपलब्ध नहीं है।");}finally{Arrays.fill(bytes,(byte)0);}}
+    static boolean appSecureEqual(String a,String b){
+        byte[] x=authBytes(a),y=authBytes(b);
+        try{if(x.length>8192||y.length>8192)throw failure("सुरक्षा तुलना की सीमा ८१९२ UTF-8 बाइट है।");return java.security.MessageDigest.isEqual(x,y);}
+        finally{Arrays.fill(x,(byte)0);Arrays.fill(y,(byte)0);}
+    }
+    static long appMonotonic(){return (System.nanoTime()&Long.MAX_VALUE)/1000000;}
 }

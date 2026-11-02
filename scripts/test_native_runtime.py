@@ -53,6 +53,23 @@ def main():
         assert result.returncode == 0
         assert result.stdout.decode('utf-8').replace('\r\n', '\n') == '-९२२३३७२०३६८५४७७५८०८ ९२२३३७२०३६८५४७७५८०७ सत्य असत्य\n'
         print(f'{name}: collector, cycles, precision, roots, stress, Unicode, arithmetic and failure checks passed')
+        auth_exe = BUILD / ('auth-' + name + ('.exe' if os.name == 'nt' else ''))
+        auth_command = [part.replace('runtime_test.c', 'auth_runtime_test.c').replace(str(exe), str(auth_exe)) for part in command]
+        auth_command.insert(1, '/DBHASH_AUTHENTICATION=1' if msvc else '-DBHASH_AUTHENTICATION=1')
+        if os.name == 'nt':
+            auth_command.append('Bcrypt.lib' if msvc else '-lbcrypt')
+        result = run(auth_command)
+        if result.returncode:
+            raise RuntimeError(result.stdout.decode('utf-8', errors='replace') + result.stderr.decode('utf-8', errors='replace'))
+        result = run([str(auth_exe)])
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.replace(b'\r\n', b'\n') == b'Native authentication checks passed.\n'
+        for scenario in ('empty-password', 'oversize-password'):
+            result = run([str(auth_exe), scenario])
+            assert result.returncode == 1 and not result.stdout, (scenario, result.stderr)
+            assert 'कूटशब्द १ से १०२४ UTF-8 बाइट होना चाहिए।'.encode('utf-8') in result.stderr
+        print(f'{name}: platform PBKDF2 vectors, Unicode/NUL, secure random, fixed-time comparison, failures and forced GC passed')
+
         text_exe = BUILD / ('text-' + name + ('.exe' if os.name == 'nt' else ''))
         text_command = [part.replace('runtime_test.c', 'text_runtime_test.c').replace(str(exe), str(text_exe)) for part in command]
         result = run(text_command)

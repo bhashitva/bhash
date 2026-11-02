@@ -126,7 +126,9 @@ final class WebServerFixture {
         Path artifact=compile(target,work,"signal",List.of(new SourceFile("server-signal.bhash",SERVER)),sanitize);
         try(var server=new Running(target,artifact,work,env)){
             assertEquals(200,request(server.port,"GET","/","").status());
-            server.child.destroy();assertTrue(server.child.waitFor(15,TimeUnit.SECONDS),"SIGTERM cleanup timed out");
+            // Process.destroy() also closes stdin, racing EOF against SIGTERM.
+            // Signal through ProcessHandle so the child's pipes remain open.
+            assertTrue(server.child.toHandle().destroy());assertTrue(server.child.waitFor(15,TimeUnit.SECONDS),"SIGTERM cleanup timed out");
             assertTrue(server.child.exitValue()==0||(target==Target.JVM&&server.child.exitValue()==143),Files.readString(server.err));
             if(target==Target.NATIVE){String errors=Files.readString(server.err);assertTrue(errors.contains("live=0"),errors);}
         }
@@ -142,7 +144,7 @@ final class WebServerFixture {
             """;
         Path artifact=compile(target,work,"closed-signal",List.of(new SourceFile("closed-server.bhash",source)),sanitize);
         try(var server=new Running(target,artifact,work,env)){
-            server.child.destroy();assertTrue(server.child.waitFor(5,TimeUnit.SECONDS),"A closed server must not swallow SIGTERM");
+            assertTrue(server.child.toHandle().destroy());assertTrue(server.child.waitFor(5,TimeUnit.SECONDS),"A closed server must not swallow SIGTERM");
             assertEquals(143,server.child.exitValue(),Files.readString(server.err));
         }
     }

@@ -1763,7 +1763,17 @@ static void app_entry(void **slots,const char *name,const void *location){
     (void)bh_collection_call(slots[0],BH_ADD,(uint64_t)(uintptr_t)slots[1],0,NULL,location);
     slots[1]=NULL;
 }
+#ifdef BHASH_AUTHENTICATION
+#include "bhash_auth.inc"
+#endif
 uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_info *info,const void *location){
+    if(op>=14){
+#ifdef BHASH_AUTHENTICATION
+        return auth_call(op,a,b,location);
+#else
+        runtime_error(location,"सुरक्षा प्रदाता उपलब्ध नहीं है।");
+#endif
+    }
     if(op==13){
         void *slots[3]={NULL,NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,3);
         slots[0]=bh_collection_new(info,0,location);

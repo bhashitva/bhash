@@ -484,6 +484,16 @@ automatically. Java 17+ and Microsoft's C/C++ extension are required on that hos
 WSL and preinstalled LLVM/C development tools are unnecessary. See the
 [Hindi native debugging guide](docs/native-vscode-debug.md).
 
+### Authentication and sessions
+
+Password hashing, opaque server-side sessions, secure cookies, authorization and
+CSRF protection are available on desktop JVM, CLR and native targets. See the
+[Hindi tutorial](tutorial/authentication/README.md),
+[authenticated SQLite notes application](examples/auth-sessions/README.md), and
+[security/runtime contract](docs/authentication.md). Sessions are process-local;
+public deployments require HTTPS. Native Linux password operations require the
+OpenSSL 3 `libcrypto.so.3` runtime, without development headers.
+
 ### HTTP server and web applications
 
 Build a small Bhash web application with the new server and router: [task-board example](examples/web-tasks/README.md), [Hindi walkthrough](tutorial/web-applications/README.md), and [protocol/deployment contract](docs/web-applications.md). Desktop JVM, CLR and native are supported; browser/WASM cannot listen for HTTP requests.
