@@ -383,12 +383,12 @@ final class BhashStandard {
     private static final java.util.Map<Long,SqlStatement> sqlStatements=new java.util.HashMap<>();
     private static long sqlConnectionNext,sqlStatementNext,sqlTransactionNext;
     private static final class SqlConnection {
-        final java.sql.Connection connection;long transaction;
+        final java.sql.Connection connection;long transaction;boolean failed;
         SqlConnection(java.sql.Connection value){connection=value;}
     }
     private static final class SqlStatement {
         final SqlConnection owner;final java.sql.PreparedStatement statement;
-        final boolean[] bound;final String[] names;int state;java.sql.ResultSet result;Object[] values;int[] types;
+        final boolean[] bound;String[] names;int state;java.sql.ResultSet result;Object[] values;int[] types;
         SqlStatement(SqlConnection c,java.sql.PreparedStatement s,int parameters)throws java.sql.SQLException {
             owner=c;statement=s;bound=new boolean[parameters];
             try{var field=Class.forName("org.sqlite.core.CorePreparedStatement").getDeclaredField("columnCount");field.setAccessible(true);names=new String[field.getInt(s)];}
@@ -494,20 +494,20 @@ final class BhashStandard {
     private static long dbTotal(SqlConnection c)throws java.sql.SQLException {
         try(var query=c.connection.createStatement();var result=query.executeQuery("SELECT total_changes()")){result.next();return result.getLong(1);}
     }
-    static long dbExecute(long id){var s=dbStatement(id);if(s.state!=0)throw failure("SQLite कथन को रीसेट करें।");dbBound(s);
+    static long dbExecute(long id){var s=dbStatement(id);dbTransactionReady(s.owner);if(s.state!=0)throw failure("SQLite कथन को रीसेट करें।");dbBound(s);
         try{
             if(s.names.length!=0)throw failure("SQLite पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");
             long before=dbTotal(s.owner);s.statement.execute();s.state=2;return dbTotal(s.owner)-before;
-        }catch(java.sql.SQLException e){s.state=3;throw dbFailure(e);}
+        }catch(java.sql.SQLException e){s.state=3;if(s.owner.transaction!=0)s.owner.failed=true;throw dbFailure(e);}
     }
-    static boolean dbNext(long id){var s=dbStatement(id);if(s.state==2)return false;if(s.state==3)throw failure("SQLite कथन को रीसेट करें।");
+    static boolean dbNext(long id){var s=dbStatement(id);dbTransactionReady(s.owner);if(s.state==2)return false;if(s.state==3)throw failure("SQLite कथन को रीसेट करें।");
         int count=s.names.length;
         if(count==0)throw failure("SQLite बदलाव के लिए चलाओ उपयोग करें।");
         if(s.state==0)dbBound(s);
         try{
             if(s.state==0){s.statement.execute();s.result=s.statement.getResultSet();}
             if(!s.result.next()){dbResetValue(s,2);return false;}
-            count=s.result.getMetaData().getColumnCount();s.values=new Object[count];s.types=new int[count];long size=0;
+            count=s.result.getMetaData().getColumnCount();s.names=new String[count];for(int i=0;i<count;i++)s.names[i]=s.result.getMetaData().getColumnName(i+1);s.values=new Object[count];s.types=new int[count];long size=0;
             for(int i=0;i<count;i++){
                 Object value=s.result.getObject(i+1);int kind;
                 if(value==null)kind=5;
@@ -519,7 +519,7 @@ final class BhashStandard {
                 if(size>DB_LIMIT)throw failure("SQLite पंक्ति की सीमा ८३८८६०८ बाइट है।");s.values[i]=value;s.types[i]=kind;
             }
             s.state=1;return true;
-        }catch(java.sql.SQLException e){try{dbResetValue(s,3);}catch(java.sql.SQLException ignored){}throw dbFailure(e);}
+        }catch(java.sql.SQLException e){if(s.owner.transaction!=0)s.owner.failed=true;try{dbResetValue(s,3);}catch(java.sql.SQLException ignored){}throw dbFailure(e);}
         catch(RuntimeException e){try{dbResetValue(s,3);}catch(java.sql.SQLException ignored){}throw e;}
     }
     static void dbReset(long id){var s=dbStatement(id);try{dbResetValue(s,0);}catch(java.sql.SQLException e){throw dbFailure(e);}}
@@ -533,17 +533,19 @@ final class BhashStandard {
     static BhashRuntime.BBuffer dbBytes(long id,long index,long kind){var s=dbStatement(id);if(kind!=3&&kind!=4)throw failure("SQLite स्तंभ का प्रकार मेल नहीं खाता।");
         try{return dbBuffer((byte[])s.values[dbCell(s,index,(int)kind)]);}catch(java.sql.SQLException e){throw dbFailure(e);}}
     static long dbParameterCount(long id){return dbStatement(id).bound.length;}
+    private static void dbTransactionReady(SqlConnection c){if(c.transaction!=0&&c.failed)throw failure("SQLite लेनदेन असफल है; वापस लें।");}
     static long dbTransaction(long id,long token,long operation){var c=dbConnection(id);
         if(operation==3&&c.transaction!=token)return 0;
         if(operation==0&&c.transaction!=0)throw failure("SQLite लेनदेन पहले से सक्रिय है।");
         if(operation!=0&&(token==0||c.transaction!=token))throw failure("SQLite लेनदेन सक्रिय नहीं है।");
+        if(operation==1)dbTransactionReady(c);
         try{
             dbBoundary(c);
-            if(operation==0){c.connection.setAutoCommit(false);c.transaction=++sqlTransactionNext;return c.transaction;}
+            if(operation==0){c.connection.setAutoCommit(false);c.failed=false;c.transaction=++sqlTransactionNext;return c.transaction;}
             if(operation==1)c.connection.commit();else if(operation==2||operation==3)c.connection.rollback();else throw failure("SQLite लेनदेन सक्रिय नहीं है।");
             c.connection.setAutoCommit(true);c.transaction=0;return 0;
         }catch(java.sql.SQLException e){
-            if(operation==3&&(e.getErrorCode()&255)==1){try{c.connection.setAutoCommit(true);}catch(java.sql.SQLException ignored){}c.transaction=0;return 0;}
+            if((operation==3||operation==2&&c.failed)&&(e.getErrorCode()&255)==1){try{c.connection.setAutoCommit(true);}catch(java.sql.SQLException ignored){}c.transaction=0;return 0;}
             throw dbFailure(e);
         }
     }
