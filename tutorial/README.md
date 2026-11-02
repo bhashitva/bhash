@@ -4,6 +4,7 @@
 
 | ट्यूटोरियल | क्या मिलेगा |
 | --- | --- |
+| [वेब अनुप्रयोग (Web Applications)](web-applications/README.md) | HTTP सर्वर, routing, JSON, SQLite कार्य-सूची, परीक्षण और deployment |
 | [HTTP और SQLite साथ में (HTTP + SQLite)](http-sqlite/README.md) | HTTP JSON से स्थानीय संग्रह, parameterized SQL, transactions, offline query और rollback |
 | [SQLite डेटाबेस (SQLite Database)](sqlite/README.md) | मापदंड, प्रकार, पंक्तियाँ, लेनदेन, सफाई और वितरण |
 | [HTTP / HTTPS नेटवर्किंग (Networking)](networking/README.md) | अनुरोध, उत्तर, शीर्ष, UTF-8 और binary सामग्री, समयसीमा, redirects और TLS |
