@@ -595,13 +595,13 @@ internal static class BhashStandard {
     private sealed class ServerSocketState { internal System.Net.Sockets.Socket Socket; internal bool Listener; internal long Deadline; }
     private static readonly Dictionary<long,ServerSocketState> serverSockets=new();
     private static long serverNext;
-    private static int serverStopping;
+    private static int serverStopping,serverActive;
     private static bool serverHook;
     private static System.Runtime.InteropServices.PosixSignalRegistration serverTerm;
     internal static long srvStopping()=>System.Threading.Volatile.Read(ref serverStopping);
     private static void serverHooks(){if(serverHook)return;
-        Console.CancelKeyPress+=(sender,args)=>{args.Cancel=true;System.Threading.Interlocked.Exchange(ref serverStopping,1);};
-        if(!OperatingSystem.IsWindows())serverTerm=System.Runtime.InteropServices.PosixSignalRegistration.Create(System.Runtime.InteropServices.PosixSignal.SIGTERM,context=>{context.Cancel=true;System.Threading.Interlocked.Exchange(ref serverStopping,1);});serverHook=true;
+        Console.CancelKeyPress+=(sender,args)=>{if(System.Threading.Volatile.Read(ref serverActive)>0){args.Cancel=true;System.Threading.Interlocked.Exchange(ref serverStopping,1);}};
+        if(!OperatingSystem.IsWindows())serverTerm=System.Runtime.InteropServices.PosixSignalRegistration.Create(System.Runtime.InteropServices.PosixSignal.SIGTERM,context=>{if(System.Threading.Volatile.Read(ref serverActive)>0){context.Cancel=true;System.Threading.Interlocked.Exchange(ref serverStopping,1);}});serverHook=true;
     }
     private static ServerSocketState serverState(long id){if(!serverSockets.TryGetValue(id,out var s))throw failure("HTTP संबंध बंद है।");return s;}
     private static long serverClock(){long ticks=System.Diagnostics.Stopwatch.GetTimestamp(),frequency=System.Diagnostics.Stopwatch.Frequency;return ticks/frequency*1000+ticks%frequency*1000/frequency;}
@@ -611,7 +611,7 @@ internal static class BhashStandard {
         if(serverSockets.Count>=32)throw failure("बहुत अधिक HTTP संबंध।");
         var socket=new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,System.Net.Sockets.SocketType.Stream,System.Net.Sockets.ProtocolType.Tcp);
         try{socket.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Parse(address),(int)port));socket.Listen(16);socket.Blocking=false;
-            serverHooks();long id=++serverNext;serverSockets.Add(id,new ServerSocketState{Socket=socket,Listener=true});return id;
+            if(serverSockets.Count==0)System.Threading.Interlocked.Exchange(ref serverStopping,0);serverHooks();System.Threading.Interlocked.Increment(ref serverActive);long id=++serverNext;serverSockets.Add(id,new ServerSocketState{Socket=socket,Listener=true});return id;
         }catch(System.Net.Sockets.SocketException){socket.Dispose();throw failure("HTTP सर्वर खोला नहीं जा सका।");}
     }
     internal static long srvAccept(long id){var p=serverState(id);if(!p.Listener)throw failure("अमान्य HTTP सर्वर।");if(serverSockets.Count>=32)throw failure("बहुत अधिक HTTP संबंध।");
@@ -628,6 +628,6 @@ internal static class BhashStandard {
         try{int at=0;while(at<bytes.Length){serverWait(s,true);int n=s.Socket.Send(bytes,at,bytes.Length-at,System.Net.Sockets.SocketFlags.None);if(n<=0)throw failure("HTTP संबंध असफल।");at+=n;}}
         catch(System.Net.Sockets.SocketException){throw failure("HTTP संबंध असफल।");}
     }
-    internal static void srvClose(long id){if(id<1||id>serverNext)throw failure("अमान्य HTTP संबंध पहचान।");if(serverSockets.Remove(id,out var s))s.Socket.Dispose();}
+    internal static void srvClose(long id){if(id<1||id>serverNext)throw failure("अमान्य HTTP संबंध पहचान।");if(serverSockets.Remove(id,out var s)){s.Socket.Dispose();if(s.Listener)System.Threading.Interlocked.Decrement(ref serverActive);}}
     internal static long srvPort(long id){var s=serverState(id);if(!s.Listener)throw failure("अमान्य HTTP सर्वर।");return ((System.Net.IPEndPoint)s.Socket.LocalEndPoint).Port;}
 }
