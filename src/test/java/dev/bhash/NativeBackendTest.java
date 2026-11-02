@@ -17,6 +17,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void nativeSqliteHttpExampleCachesAndRollsBackWithForcedGc()throws Exception {
+        requireTools();HttpSqliteExampleFixture.verify(Target.NATIVE,temporary,nativeSanitizers(),GC_STRESS);
+    }
     private void sqliteFixture(String source)throws Exception {
         requireTools();source=source.replace("भारत😀.db",temporary.resolve("भारत😀.db").toString().replace('\\','/'));
         var result=nativeOnlyRun(List.of(new SourceFile("sqlite.bhash",source)),GC_STRESS);assertEquals(0,result.exit(),result.err());assertEquals("",result.out());assertEquals(0L,stats(result).get("live"));

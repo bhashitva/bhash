@@ -13,6 +13,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JvmSqliteTest {
     @TempDir Path directory;
+    @Test void combinedHttpSqliteExampleCachesAndRollsBack()throws Exception {
+        HttpSqliteExampleFixture.verify(dev.bhash.backend.Target.JVM,directory,false,Map.of());
+    }
     private void execute(String source,boolean database)throws Exception {execute(source,database,"");}
     private void execute(String source,boolean database,String expected)throws Exception {
         Path jar=directory.resolve("program.jar"),log=directory.resolve("program.log");

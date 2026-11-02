@@ -16,6 +16,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class ClrSqliteTest {
     static boolean dotnetAvailable(){return ClrCompilerTest.dotnetAvailable();}
     @TempDir Path directory;
+    @Test void combinedHttpSqliteExampleCachesAndRollsBack()throws Exception {
+        HttpSqliteExampleFixture.verify(dev.bhash.backend.Target.CLR,directory,false,Map.of());
+    }
     private void execute(String source,boolean database)throws Exception {execute(source,database,"");}
     private void execute(String source,boolean database,String expected)throws Exception {
         Path output=directory.resolve("program"),log=directory.resolve("program.log");
