@@ -46,7 +46,10 @@ final class HttpSqliteExampleFixture {
         });
         server.start();boolean stopped=false;
         String url="http://127.0.0.1:"+server.getAddress().getPort()+"/posts.json";
-        Path database=work.resolve("लेख भारत😀.db");
+        // The Java 17 Windows launcher can replace non-ACP application arguments.
+        // Match the documented ASCII filename; Hindi/emoji HTTP and SQL values
+        // still exercise UTF-8 on every target. Unicode file APIs have separate tests.
+        Path database=work.resolve("article-cache.db");
         try {
             run(target,artifact,work,environment,url,database,false,0,"सहेजी गई पंक्तियाँ: २\n"+ROWS,null);
             assertTrue(Files.isRegularFile(database));
