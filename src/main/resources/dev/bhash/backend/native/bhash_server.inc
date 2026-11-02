@@ -106,7 +106,9 @@ uint64_t bh_server_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_in
 #ifndef _WIN32
         if(socket_value>=FD_SETSIZE){srv_close_socket(socket_value);runtime_error(location,"HTTP सर्वर खोला नहीं जा सका।");}
 #endif
-        struct sockaddr_in addr;memset(&addr,0,sizeof addr);addr.sin_family=AF_INET;addr.sin_port=htons((uint16_t)b);addr.sin_addr.s_addr=htonl(local?INADDR_LOOPBACK:INADDR_ANY);
+        /* INADDR_LOOPBACK is a BSD extension hidden by Darwin's POSIX headers.
+         * The public API accepts exactly 127.0.0.1 or 0.0.0.0, so use its IPv4 value. */
+        struct sockaddr_in addr;memset(&addr,0,sizeof addr);addr.sin_family=AF_INET;addr.sin_port=htons((uint16_t)b);addr.sin_addr.s_addr=htonl(local?UINT32_C(0x7f000001):INADDR_ANY);
         if(bind(socket_value,(struct sockaddr *)&addr,sizeof addr)||listen(socket_value,16)){srv_close_socket(socket_value);runtime_error(location,"HTTP सर्वर खोला नहीं जा सका।");}
         if(!srv_nonblocking(socket_value)){srv_close_socket(socket_value);runtime_error(location,"HTTP सर्वर खोला नहीं जा सका।");}srv_hooks();*state=(srv_state){++srv_next,0,socket_value,1};return state->id;
     }
