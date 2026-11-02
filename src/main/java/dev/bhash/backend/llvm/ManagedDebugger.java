@@ -67,13 +67,31 @@ public final class ManagedDebugger {
         builder.directory(root.toFile());builder.redirectErrorStream(true);
         builder.environment().keySet().removeIf(key->Set.of("PYTHONHOME","PYTHONPATH","PYTHONSTARTUP").contains(key.toUpperCase(Locale.ROOT)));
         Path output=Files.createTempFile(root,".probe-",".log");
+        Throwable failure=null;
         try{
             builder.redirectOutput(output.toFile());var process=launcher.start(builder);
             try{
                 if(!process.waitFor(timeoutSeconds,TimeUnit.SECONDS)){stopProbe(process);throw new IOException("GDB startup timed out after "+timeoutSeconds+" seconds. Security software may still be reviewing it; let that review finish and retry, or increase BHASH_DEBUGGER_STARTUP_TIMEOUT_SECONDS.");}
                 if(Files.size(output)>65536 || process.exitValue()!=0 || !Files.readString(output).contains("BHASH_GDB_READY"))throw new IOException("GDB/Python cannot run from the installed debugger: "+Files.readString(output));
             }catch(InterruptedException e){stopProbe(process);Thread.currentThread().interrupt();throw new IOException("Debugger setup cancelled",e);}
-        }finally{Files.deleteIfExists(output);}
+        }catch(IOException|RuntimeException|Error error){failure=error;throw error;}
+        finally{
+            try{deleteProbeLog(output);}
+            catch(IOException error){if(failure!=null)failure.addSuppressed(error);else throw error;}
+        }
+    }
+    private static void deleteProbeLog(Path output)throws IOException{
+        // Java 17/Windows can signal process termination before releasing its
+        // redirected-file handle. Keep cleanup bounded and retain the original
+        // startup/timeout diagnostic if cleanup ultimately fails.
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+        while(true){
+            try{Files.deleteIfExists(output);return;}
+            catch(java.nio.file.FileSystemException error){
+                if(!NativePlatform.windows()||System.nanoTime()>=deadline)throw error;
+                try{Thread.sleep(25);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IOException("Debugger log cleanup interrupted",interrupted);}
+            }
+        }
     }
     private static void stopProbe(Process process){
         process.destroyForcibly();
