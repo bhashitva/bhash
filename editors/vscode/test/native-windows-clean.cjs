@@ -60,6 +60,12 @@ try {
         const program=path.join(home,name+'.exe');cli(['compile',source,'--target','native','-o',program]);
         const run=invoke(program,[]);assert.match(run.stderr,/live=0/);assert.match(run.stderr,/allocations=[1-9]/);
     }
+    const sqlSource=path.join(repo,'examples/sqlite/values.bhash'),sqlExe=path.join(home,'sqlite.exe');
+    cli(['compile',sqlSource,'--target','native','-o',sqlExe]);
+    const sqlRun=invoke(sqlExe,[],undefined,{PATH:path.join(process.env.SystemRoot,'System32')});
+    assert.equal(sqlRun.stdout,'3.54.1\n६ ६ अंक\n४२ १.२५ सत्य भारत😀\nबाइटबफ़र ० सत्य\nरिक्त\n०\n');assert.match(sqlRun.stderr,/live=0/);
+    const sqlReport=JSON.parse(cli(['native','inspect',sqlExe,'--json','--require-runtime-match']).stdout);
+    assert.equal(sqlReport.buildInfo.sqlite_version,'3.54.1');assert.ok(!sqlReport.libraries.some(x=>/sqlite|jvm|clr/i.test(x)));
     console.log('PASS clean automatic setup, Unicode input/files, forced-GC programs and PE dependency audit.');
     const zip=path.join(home,'hello.zip');cli(['native','package',hello,'--name','hello','--version','1','--debug','-o',zip]);
     assert.ok(fs.statSync(zip).size>0);
