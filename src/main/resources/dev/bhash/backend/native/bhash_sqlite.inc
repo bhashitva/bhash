@@ -48,6 +48,14 @@ static int db_binding(db_statement *s,uint64_t index,const void *location){
 }
 static void db_bound(db_statement *s,const void *location){for(int i=0;i<sqlite3_bind_parameter_count(s->query);i++)if(!s->bound[i])runtime_error(location,"सभी SQLite मापदंड बाँधें।");}
 static void db_boundary(db_connection *c){for(size_t i=0;i<128;i++)if(db_statements[i].id&&db_statements[i].owner==c&&db_statements[i].state){sqlite3_reset(db_statements[i].query);db_statements[i].state=3;}}
+/* Literal Bhash text has an explicit length and need not end in NUL.
+   SQLite owns no Bhash pointers: make a bounded C copy before entering it. */
+static char *db_string(uint64_t value,const void *location){
+    const void *text=bits_pointer(value);bh_instance((void *)text,location);uint64_t n=text_length(text);
+    if(n>65536||memchr(text_data(text),0,(size_t)n))runtime_error(location,"अमान्य SQLite पाठ।");
+    char *copy=malloc((size_t)n+1);if(!copy)runtime_error(location,"SQLite कथन असफल।");
+    memcpy(copy,text_data(text),(size_t)n);copy[n]=0;return copy;
+}
 static uint64_t db_text(const char *value,const void *location){
     if(!value)runtime_error(location,"SQLite कथन असफल।");
     size_t n=strlen(value);if(!valid_utf8((const unsigned char *)value,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
@@ -59,8 +67,8 @@ uint64_t bh_database_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t 
     if(op==0){
         db_connection *slot=NULL;for(size_t i=0;i<32;i++)if(!db_connections[i].id){slot=&db_connections[i];break;}
         if(!slot)runtime_error(location,"बहुत अधिक खुले SQLite डेटाबेस।");
-        bh_instance(bits_pointer(a),location);sqlite3 *database=NULL;
-        int result=sqlite3_open_v2((const char *)text_data(bits_pointer(a)),&database,SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE|SQLITE_OPEN_FULLMUTEX,NULL);
+        char *path=db_string(a,location);sqlite3 *database=NULL;
+        int result=sqlite3_open_v2(path,&database,SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE|SQLITE_OPEN_FULLMUTEX,NULL);free(path);
         if(result!=SQLITE_OK){sqlite3_close_v2(database);runtime_error(location,"SQLite डेटाबेस खोला नहीं जा सका।");}
         sqlite3_limit(database,SQLITE_LIMIT_LENGTH,DB_LIMIT);sqlite3_limit(database,SQLITE_LIMIT_SQL_LENGTH,65536);
         sqlite3_limit(database,SQLITE_LIMIT_COLUMN,DB_COLUMNS);sqlite3_limit(database,SQLITE_LIMIT_VARIABLE_NUMBER,999);sqlite3_limit(database,SQLITE_LIMIT_ATTACHED,0);
@@ -77,8 +85,8 @@ uint64_t bh_database_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t 
         db_connection *owner=db_conn(a,location);db_statement *slot=NULL;
         for(size_t i=0;i<128;i++)if(!db_statements[i].id){slot=&db_statements[i];break;}
         if(!slot)runtime_error(location,"बहुत अधिक खुले SQLite कथन।");
-        bh_instance(bits_pointer(b),location);sqlite3_stmt *query=NULL;
-        int result=sqlite3_prepare_v3(owner->db,(const char *)text_data(bits_pointer(b)),(int)text_length(bits_pointer(b))+1,SQLITE_PREPARE_PERSISTENT,&query,NULL);
+        char *sql=db_string(b,location);sqlite3_stmt *query=NULL;
+        int result=sqlite3_prepare_v3(owner->db,sql,(int)text_length(bits_pointer(b))+1,SQLITE_PREPARE_PERSISTENT,&query,NULL);free(sql);
         if(result!=SQLITE_OK||!query){sqlite3_finalize(query);runtime_error(location,db_message(result));}
         slot->id=++db_statement_next;slot->owner=owner;slot->query=query;return slot->id;
     }
