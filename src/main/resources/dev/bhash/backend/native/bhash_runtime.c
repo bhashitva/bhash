@@ -1909,3 +1909,7 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
     if(status)runtime_error(location,op==7?"निर्देशिका बनाई नहीं जा सकी।":op==9?"फ़ाइल हटाई नहीं जा सकी।":"निर्देशिका हटाई नहीं जा सकी।");
     return 0;
 }
+
+#ifdef BHASH_NETWORKING
+#include "bhash_http.inc"
+#endif

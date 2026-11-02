@@ -110,3 +110,11 @@ See `docs/native-vscode-debug.md` and `scripts/build_windows_debugger.py`.
 The Windows GDB process manifest enables UTF-8 for Hindi paths (Windows 10 1903+).
 The manifest patch script is retained with the corresponding sources; debugger
 instructions and other upstream binaries are unchanged.
+
+## Optional system HTTP transports
+
+Network-using native applications use Windows-supplied WinHTTP, or dynamically
+load the operating system libcurl runtime on Linux/macOS. No libcurl implementation
+or TLS library is vendored or redistributed by the compiler. libcurl is licensed
+under the [curl license](https://curl.se/docs/copyright.html). The small native
+foreign-function declarations follow libcurl's documented stable ABI.

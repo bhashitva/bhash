@@ -27,7 +27,10 @@ public final class NativeBuildInfo {
         String text=new String(header,java.nio.charset.StandardCharsets.UTF_8);
         if(!text.contains("#define BHASH_NATIVE_ABI_VERSION "+ABI) || !text.contains(GUARD))throw new CompilationException("[BH9108] Bundled native runtime ABI does not match the compiler; rebuild/reinstall the compiler.");
         var info=new LinkedHashMap<String,Object>();info.put("format",FORMAT);info.put("target",TARGET);info.put("runtime_abi",ABI);
-        info.put("runtime_sha256",hash(source));info.put("runtime_header_sha256",hash(header));
+        byte[] http=resource("/dev/bhash/backend/native/bhash_http.inc");
+        byte[] runtime=java.util.Arrays.copyOf(source,source.length+http.length);
+        System.arraycopy(http,0,runtime,source.length,http.length);
+        info.put("runtime_sha256",hash(runtime));info.put("runtime_header_sha256",hash(header));
         String version="development",compiler="development";
         try(var in=NativeBuildInfo.class.getResourceAsStream("/META-INF/maven/dev.bhash/bhash-compiler/pom.properties")){if(in!=null){var p=new Properties();p.load(in);version=p.getProperty("version",version);}}
         try{Path jar=Path.of(NativeBuildInfo.class.getProtectionDomain().getCodeSource().getLocation().toURI());if(Files.isRegularFile(jar))compiler=fileHash(jar);}catch(java.net.URISyntaxException e){throw new IOException(e);}

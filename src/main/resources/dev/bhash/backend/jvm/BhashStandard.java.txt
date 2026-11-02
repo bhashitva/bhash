@@ -287,4 +287,94 @@ final class BhashStandard {
         if(System.err.checkError())throw failure("लेखा लिखा नहीं जा सका।");
     }
 
+    // The public policy lives in networking.bhash. This transport performs one hop.
+    private static final int NET_BODY=8388608, NET_HEADERS=65536;
+    private record NetResponse(long status,List<String> headers,byte[] body) {}
+    private static final Map<Long,NetResponse> netResponses=new HashMap<>();
+    private static long netNext;
+    private static javax.net.ssl.SSLParameters netTlsParameters(){
+        var value=new javax.net.ssl.SSLParameters();value.setProtocols(new String[]{"TLSv1.3","TLSv1.2"});value.setEndpointIdentificationAlgorithm("HTTPS");return value;
+    }
+    private static final class NetClient {
+        static final java.net.http.HttpClient CLIENT=java.net.http.HttpClient.newBuilder()
+            .version(java.net.http.HttpClient.Version.HTTP_1_1).sslParameters(netTlsParameters())
+            .followRedirects(java.net.http.HttpClient.Redirect.NEVER)
+            .proxy(new java.net.ProxySelector(){
+                public List<java.net.Proxy> select(java.net.URI uri){return List.of(java.net.Proxy.NO_PROXY);}
+                public void connectFailed(java.net.URI uri,java.net.SocketAddress address,java.io.IOException error){}
+            }).build();
+    }
+    private static final class NetSubscriber implements java.net.http.HttpResponse.BodySubscriber<byte[]> {
+        final java.util.concurrent.CompletableFuture<byte[]> result=new java.util.concurrent.CompletableFuture<>();
+        final java.io.ByteArrayOutputStream output=new java.io.ByteArrayOutputStream();
+        java.util.concurrent.Flow.Subscription subscription;
+        public java.util.concurrent.CompletionStage<byte[]> getBody(){return result;}
+        public void onSubscribe(java.util.concurrent.Flow.Subscription value){subscription=value;value.request(1);}
+        public void onNext(List<java.nio.ByteBuffer> buffers){
+            for(var buffer:buffers){
+                if(buffer.remaining()>NET_BODY-output.size()){
+                    subscription.cancel();result.completeExceptionally(failure("HTTP उत्तर की सीमा ८३८८६०८ बाइट है।"));return;
+                }
+                byte[] bytes=new byte[buffer.remaining()];buffer.get(bytes);output.writeBytes(bytes);
+            }
+            subscription.request(1);
+        }
+        public void onError(Throwable error){result.completeExceptionally(error);}
+        public void onComplete(){result.complete(output.toByteArray());}
+    }
+    private static String netFailure(Throwable error){
+        for(Throwable cause=error;cause!=null;cause=cause.getCause()){
+            if(cause instanceof BhashRuntime.Failure)return cause.getMessage();
+            if(cause instanceof java.net.http.HttpTimeoutException||cause instanceof java.util.concurrent.TimeoutException)return "HTTP अनुरोध का समय समाप्त।";
+            if(cause instanceof javax.net.ssl.SSLException)return "TLS संबंध स्थापित नहीं हो सका।";
+        }
+        return "HTTP अनुरोध असफल।";
+    }
+    private static void netArguments(String method,String url,BhashRuntime.BList<String> headers,BhashRuntime.BBuffer body,long timeout){
+        BhashRuntime.instance(method);BhashRuntime.instance(url);BhashRuntime.instance(headers);BhashRuntime.instance(body);
+        if(timeout<1||timeout>120000)throw failure("HTTP समयसीमा १ से १२०००० मिलीसेकंड होनी चाहिए।");
+        if(body.size()>NET_BODY)throw failure("अमान्य HTTP सामग्री।");
+        if(headers.size()%2!=0||headers.size()>132)throw failure("अमान्य HTTP शीर्ष।");
+    }
+    static long netSend(String method,String url,BhashRuntime.BList<String> headers,BhashRuntime.BBuffer body,long timeout){
+        netArguments(method,url,headers,body,timeout);
+        if(netResponses.size()>=32)throw failure("बहुत अधिक खुले HTTP उत्तर।");
+        java.util.concurrent.CompletableFuture<java.net.http.HttpResponse<byte[]>> pending=null;
+        long deadline=netClock()+timeout;
+        try {
+            var uri=java.net.URI.create(url);
+            if(!List.of("http","https").contains(uri.getScheme())||uri.getRawUserInfo()!=null)throw failure("अमान्य HTTP पता।");
+            byte[] bytes=new byte[(int)body.size()];for(int i=0;i<bytes.length;i++)bytes[i]=(byte)(short)body.get(i);
+            var request=java.net.http.HttpRequest.newBuilder(uri).version(java.net.http.HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(timeout)).method(method,bytes.length==0?java.net.http.HttpRequest.BodyPublishers.noBody():java.net.http.HttpRequest.BodyPublishers.ofByteArray(bytes));
+            for(int i=0;i<headers.size();i+=2)request.header(headers.get(i),headers.get(i+1));
+            pending=NetClient.CLIENT.sendAsync(request.build(),info->{
+                int count=0,size=0;
+                for(var entry:info.headers().map().entrySet())for(String value:entry.getValue()){
+                    size+=entry.getKey().length()+value.length()+4;
+                    if(++count>256||size>NET_HEADERS)throw failure("HTTP शीर्षों की सीमा पार हो गई।");
+                }
+                return new NetSubscriber();
+            });
+            long remaining=deadline-netClock();if(remaining<=0)throw new java.util.concurrent.TimeoutException();
+            var response=pending.get(remaining,java.util.concurrent.TimeUnit.MILLISECONDS);
+            var result=new ArrayList<String>();
+            for(var entry:response.headers().map().entrySet())for(String value:entry.getValue()){
+                result.add(entry.getKey().toLowerCase(Locale.ROOT));result.add(value);
+            }
+            long id=++netNext;netResponses.put(id,new NetResponse(response.statusCode(),List.copyOf(result),response.body()));return id;
+        }catch(java.util.concurrent.TimeoutException error){
+            if(pending!=null)pending.cancel(true);throw failure("HTTP अनुरोध का समय समाप्त।");
+        }catch(InterruptedException error){
+            if(pending!=null)pending.cancel(true);Thread.currentThread().interrupt();throw failure("HTTP अनुरोध असफल।");
+        }catch(java.util.concurrent.ExecutionException error){throw failure(netFailure(error));}
+        catch(IllegalArgumentException error){throw failure("अमान्य HTTP पता।");}
+    }
+    private static NetResponse netResponse(long id){var value=netResponses.get(id);if(value==null)throw failure("HTTP उत्तर बंद है।");return value;}
+    static long netStatus(long id){return netResponse(id).status();}
+    static BhashRuntime.BList<String> netHeaders(long id){var result=new BhashRuntime.BList<String>();for(String value:netResponse(id).headers())result.add(value);return result;}
+    static BhashRuntime.BBuffer netBody(long id){byte[] bytes=netResponse(id).body();var result=new BhashRuntime.BBuffer(bytes.length);for(int i=0;i<bytes.length;i++)result.set(i,(short)(bytes[i]&255));return result;}
+    static void netClose(long id){if(id<1||id>netNext)throw failure("अमान्य HTTP उत्तर पहचान।");netResponses.remove(id);}
+    static long netClock(){return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime());}
+
 }

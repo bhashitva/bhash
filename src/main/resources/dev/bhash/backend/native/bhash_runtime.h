@@ -170,4 +170,6 @@ int64_t bh_console_integer(const void *location);
 /* Application bindings use opaque integer stream handles, never GC pointers. */
 void bh_application_arguments(int, char **);
 uint64_t bh_foundation_call(uint32_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
+/* Optional one-hop HTTP transport: compiled only for network-using programs. */
+uint64_t bh_network_call(uint32_t,uint64_t,uint64_t,uint64_t,uint64_t,uint64_t,const bh_collection_info *,const void *);
 #endif

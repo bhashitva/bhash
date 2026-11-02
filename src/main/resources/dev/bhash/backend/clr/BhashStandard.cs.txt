@@ -263,4 +263,87 @@ internal static class BhashStandard {
     }
     internal static void appLog(string message){unicode(message);try{BhashRuntime.logRecord(message);}catch(IOException){throw failure("लेखा लिखा नहीं जा सका।");}}
 
+    private const int NET_BODY=8388608, NET_HEADERS=65536;
+#if !BHASH_BROWSER
+    private sealed record NetResponse(long Status,List<string> Headers,byte[] Body);
+    private static readonly Dictionary<long,NetResponse> netResponses=new();
+    private static long netNext;
+    private static class NetClient {
+        internal static readonly System.Net.Http.HttpClient Client=new(new System.Net.Http.SocketsHttpHandler {
+            AllowAutoRedirect=false,UseCookies=false,UseProxy=false,Credentials=null,
+            AutomaticDecompression=System.Net.DecompressionMethods.None,MaxResponseHeadersLength=64,
+            SslOptions=new System.Net.Security.SslClientAuthenticationOptions { EnabledSslProtocols=System.Security.Authentication.SslProtocols.Tls12|System.Security.Authentication.SslProtocols.Tls13 }
+        }) { Timeout=System.Threading.Timeout.InfiniteTimeSpan };
+    }
+    private static NetResponse netResponse(long id){if(!netResponses.TryGetValue(id,out var value))throw failure("HTTP उत्तर बंद है।");return value;}
+#endif
+    internal static long netSend(string method,string url,BhashRuntime.BList<string> headers,BhashRuntime.BBuffer body,long timeout){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर तुल्यकालिक HTTP उपलब्ध नहीं है।");
+#else
+        BhashRuntime.instance(method);BhashRuntime.instance(url);BhashRuntime.instance(headers);BhashRuntime.instance(body);
+        if(timeout<1||timeout>120000)throw failure("HTTP समयसीमा १ से १२०००० मिलीसेकंड होनी चाहिए।");
+        if(body.size()>NET_BODY)throw failure("अमान्य HTTP सामग्री।");
+        if(headers.size()%2!=0||headers.size()>132)throw failure("अमान्य HTTP शीर्ष।");
+        if(netResponses.Count>=32)throw failure("बहुत अधिक खुले HTTP उत्तर।");
+        try {
+            var uri=new Uri(url,UriKind.Absolute);
+            if((uri.Scheme!="http"&&uri.Scheme!="https")||uri.UserInfo.Length!=0)throw failure("अमान्य HTTP पता।");
+            using var cancel=new System.Threading.CancellationTokenSource((int)timeout);
+            using var request=new System.Net.Http.HttpRequestMessage(new System.Net.Http.HttpMethod(method),uri) {
+                Version=System.Net.HttpVersion.Version11,VersionPolicy=System.Net.Http.HttpVersionPolicy.RequestVersionExact,
+                Content=new System.Net.Http.ByteArrayContent(body.items)
+            };
+            for(int i=0;i<headers.size();i+=2)if(!request.Headers.TryAddWithoutValidation(headers.get(i),headers.get(i+1)))
+                if(!request.Content.Headers.TryAddWithoutValidation(headers.get(i),headers.get(i+1)))throw failure("अमान्य HTTP शीर्ष।");
+            using var response=NetClient.Client.SendAsync(request,System.Net.Http.HttpCompletionOption.ResponseHeadersRead,cancel.Token).GetAwaiter().GetResult();
+            var fields=new List<string>();int size=0;
+            foreach(var group in new[]{response.Headers,(System.Net.Http.Headers.HttpHeaders)response.Content.Headers})foreach(var entry in group)foreach(string value in entry.Value){
+                size+=entry.Key.Length+value.Length+4;if(fields.Count>=512||size>NET_HEADERS)throw failure("HTTP शीर्षों की सीमा पार हो गई।");
+                fields.Add(entry.Key.ToLowerInvariant());fields.Add(value);
+            }
+            using var input=response.Content.ReadAsStreamAsync(cancel.Token).GetAwaiter().GetResult();
+            using var output=new MemoryStream();byte[] buffer=new byte[16384];
+            for(;;){int used=input.ReadAsync(buffer.AsMemory(),cancel.Token).AsTask().GetAwaiter().GetResult();if(used==0)break;
+                if(used>NET_BODY-output.Length)throw failure("HTTP उत्तर की सीमा ८३८८६०८ बाइट है।");output.Write(buffer,0,used);}
+            long id=++netNext;netResponses.Add(id,new NetResponse((long)response.StatusCode,fields,output.ToArray()));return id;
+        }catch(OperationCanceledException){throw failure("HTTP अनुरोध का समय समाप्त।");}
+        catch(UriFormatException){throw failure("अमान्य HTTP पता।");}
+        catch(System.Net.Http.HttpRequestException error){
+            if(error.HttpRequestError==System.Net.Http.HttpRequestError.SecureConnectionError)throw failure("TLS संबंध स्थापित नहीं हो सका।");
+            if(error.HttpRequestError==System.Net.Http.HttpRequestError.ConfigurationLimitExceeded)throw failure("HTTP शीर्षों की सीमा पार हो गई।");
+            throw failure("HTTP अनुरोध असफल।");
+        }catch(IOException){throw failure("HTTP अनुरोध असफल।");}
+#endif
+    }
+    internal static long netStatus(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर तुल्यकालिक HTTP उपलब्ध नहीं है।");
+#else
+        return netResponse(id).Status;
+#endif
+    }
+    internal static BhashRuntime.BList<string> netHeaders(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर तुल्यकालिक HTTP उपलब्ध नहीं है।");
+#else
+        var result=new BhashRuntime.BList<string>();foreach(string value in netResponse(id).Headers)result.add(value);return result;
+#endif
+    }
+    internal static BhashRuntime.BBuffer netBody(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर तुल्यकालिक HTTP उपलब्ध नहीं है।");
+#else
+        return new BhashRuntime.BBuffer((byte[])netResponse(id).Body.Clone());
+#endif
+    }
+    internal static void netClose(long id){
+#if BHASH_BROWSER
+        throw failure("ब्राउज़र लक्ष्य पर तुल्यकालिक HTTP उपलब्ध नहीं है।");
+#else
+        if(id<1||id>netNext)throw failure("अमान्य HTTP उत्तर पहचान।");netResponses.Remove(id);
+#endif
+    }
+    internal static long netClock()=>System.Diagnostics.Stopwatch.GetElapsedTime(0).Ticks/TimeSpan.TicksPerMillisecond;
+
 }

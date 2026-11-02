@@ -136,7 +136,7 @@ public final class LlvmEmitter {
             "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
             "declare i64 @bh_primitive_array_get(ptr, i64, ptr)\ndeclare void @bh_primitive_array_set(ptr, i64, i64, ptr)\n"+
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
-            "declare void @bh_application_arguments(i32, ptr)\ndeclare i64 @bh_foundation_call(i32, i64, i64, ptr, ptr)\n"+textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_to_int32(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
+            "declare i64 @bh_network_call(i32, i64, i64, i64, i64, i64, ptr, ptr)\ndeclare void @bh_application_arguments(i32, ptr)\ndeclare i64 @bh_foundation_call(i32, i64, i64, ptr, ptr)\n"+textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_to_int32(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
             "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @"+NativeBuildInfo.GUARD+"()\n  call void @bh_runtime_init()\n  call void @bh_application_arguments(i32 %argc, ptr %argv)\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  call void @bh_static_roots_configure(ptr @static_roots, i64 "+staticRoots.size()+")\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %info = call i32 @bh_print_build_info_if_requested(i32 %argc, ptr %argv, ptr @bhash_build_info)\n  %handled = or i32 %shown, %info\n  %skip = icmp ne i32 %handled, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n"+(debug==null?"":debug.render());
     }
@@ -344,6 +344,7 @@ public final class LlvmEmitter {
         else if(e instanceof TextCall c)c.arguments().forEach(this::scan);
         else if(e instanceof NumericCall c)c.arguments().forEach(this::scan);
         else if(e instanceof StructuredCall c)c.arguments().forEach(this::scan);
+        else if(e instanceof NetworkCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FoundationCall c)c.arguments().forEach(this::scan);
         else if(e instanceof FileCall c)c.arguments().forEach(this::scan);
         else if(e instanceof TimeCall c)c.arguments().forEach(this::scan);
@@ -415,6 +416,7 @@ public final class LlvmEmitter {
         else if(e instanceof TextCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof NumericCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof StructuredCall c)c.arguments().forEach(a->expressionRoots(a,slots));
+        else if(e instanceof NetworkCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof FoundationCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof FileCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof TimeCall c)c.arguments().forEach(a->expressionRoots(a,slots));
@@ -613,6 +615,12 @@ public final class LlvmEmitter {
             String call="call "+llvm(c.type())+" "+target+"("+String.join(", ",args)+")";
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else result=instruction(c.type(),call);
+        } else if(e instanceof NetworkCall c) {
+            for(var a:c.arguments())expression(a);
+            var args=new ArrayList<String>();for(var a:c.arguments())args.add("i64 "+bits(reload(a)).ir());
+            while(args.size()<5)args.add("i64 0");traceAt(c.source());
+            Value raw=instruction(Type.INT,"call i64 @bh_network_call(i32 "+c.operation()+", "+String.join(", ",args)+", ptr "+collectionInfo(c.descriptor())+", ptr "+text(c.source().toString())+")");
+            result=c.type()==Type.VOID?new Value(Type.VOID,""):collectionResult(c.type(),raw);
         } else if(e instanceof FoundationCall c) {
             for(var a:c.arguments())expression(a);
             var args=new ArrayList<String>();for(var a:c.arguments())args.add("i64 "+bits(reload(a)).ir());
@@ -670,6 +678,7 @@ public final class LlvmEmitter {
         else if(e instanceof TextCall c)c.arguments().forEach(this::release);
         else if(e instanceof NumericCall c)c.arguments().forEach(this::release);
         else if(e instanceof StructuredCall c)c.arguments().forEach(this::release);
+        else if(e instanceof NetworkCall c)c.arguments().forEach(this::release);
         else if(e instanceof FoundationCall c)c.arguments().forEach(this::release);
         else if(e instanceof FileCall c)c.arguments().forEach(this::release);
         else if(e instanceof TimeCall c)c.arguments().forEach(this::release);

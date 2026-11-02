@@ -55,6 +55,7 @@ class NativeReleaseTest {
         Path file=temporary.resolve("fixture.exe");Files.write(file,windowsPe("KERNEL32.dll"));
         var report=NativeCompatibility.inspect(file,true);assertEquals(NativePlatform.WINDOWS_TARGET,report.target());assertNull(report.minimumGlibc());assertTrue(report.runtimeMatchesCompiler());
         Files.write(file,windowsPe("SHELL32.dll"));assertTrue(NativeCompatibility.inspect(file,true).libraries().contains("shell32.dll"));
+        Files.write(file,windowsPe("WINHTTP.dll"));assertTrue(NativeCompatibility.inspect(file,true).libraries().contains("winhttp.dll"));
         for(String dll:List.of("libjvm.dll","coreclr.dll","libLLVM-18.dll","libwinpthread-1.dll")){Files.write(file,windowsPe(dll));assertThrows(CompilationException.class,()->NativeCompatibility.inspect(file,false));}
         byte[] bytes=windowsPe("KERNEL32.dll");bytes[0x84]=0;Files.write(file,bytes);assertThrows(CompilationException.class,()->NativeCompatibility.inspect(file,false));
         Files.write(file,Arrays.copyOf(windowsPe("KERNEL32.dll"),100));assertThrows(CompilationException.class,()->NativeCompatibility.inspect(file,false));

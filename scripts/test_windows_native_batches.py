@@ -65,12 +65,19 @@ def container_command(command, environment):
         'PATH': r'C:\java\bin;C:\dotnet;C:\Windows\system32;C:\Windows',
         'BHASH_TOOLCHAIN_HOME': r'C:\toolchains', 'BHASH_NATIVE_TOOLCHAIN': 'managed',
         'BHASH_REQUIRE_NATIVE': 'true', 'BHASH_REQUIRE_CLR': 'true',
-        'DOTNET_CLI_TELEMETRY_OPTOUT': '1',
+        'DOTNET_CLI_TELEMETRY_OPTOUT': '1', 'BHASH_HTTP_CI_CONTAINER': 'true',
     }
     for key, value in settings.items():
         result.extend(['-e', f'{key}={value}'])
+    # Trust the fixture CA only in the ephemeral container running HTTP cases.
+    if any('nativeHttp' in value for value in command):
+        command = [value + ',ClrNetworkTest#trustedHttpsStillChecksNamesExpiryAndDowngrade'
+                   if value.startswith('-Dtest=') else value for value in command]
+    launcher = (r'C:\repo\scripts\windows_network_tests.cmd'
+                if any('nativeHttp' in value for value in command)
+                else r'C:\maven\bin\mvn.cmd')
     result.extend(['mcr.microsoft.com/windows/servercore:ltsc2022',
-                   'cmd.exe', '/d', '/c', r'C:\maven\bin\mvn.cmd',
+                   'cmd.exe', '/d', '/c', launcher,
                    '-o', r'-Dmaven.repo.local=C:\m2', *command[1:]])
     return result
 
