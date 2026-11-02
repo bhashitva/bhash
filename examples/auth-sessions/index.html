@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="hi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>भाष · सुरक्षित टिप्पणियाँ</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body><main>
+<p class="eyebrow">भाष · प्रमाणीकरण उदाहरण</p><h1>आपकी निजी टिप्पणियाँ</h1>
+<p>खाते से प्रवेश करें। प्रत्येक खाते की टिप्पणियाँ अलग रखी जाती हैं।</p>
+<p id="status" role="status" aria-live="polite">सत्र तैयार हो रहा है…</p>
+<form id="login"><label>उपयोगकर्ता नाम<input name="username" autocomplete="username" required maxlength="256"></label><label>कूटशब्द<input name="password" type="password" autocomplete="current-password" required maxlength="1024"></label><button disabled>प्रवेश करें</button></form>
+<section id="account" hidden><h2 id="welcome"></h2><button id="logout" type="button">सत्र समाप्त करें</button>
+<form id="note"><label>नई टिप्पणी<textarea name="text" required maxlength="1000"></textarea></label><button>सहेजें</button></form><ul id="notes"></ul>
+<button id="admin" type="button">व्यवस्थापक: खाते देखें</button><p id="users"></p></section>
+<footer>यह शिक्षण उदाहरण है। सार्वजनिक उपयोग में HTTPS वाला reverse proxy लगाएँ।</footer>
+</main></body></html>
