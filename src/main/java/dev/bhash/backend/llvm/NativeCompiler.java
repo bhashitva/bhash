@@ -58,6 +58,7 @@ public final class NativeCompiler {
             var networkInfo=com.google.gson.JsonParser.parseString(buildInfo).getAsJsonObject();
             networkInfo.addProperty("networking",core.networking());
             networkInfo.addProperty("sqlite",core.database());
+            networkInfo.addProperty("http_server",core.server());
             if(core.database()){networkInfo.addProperty("sqlite_version",SqliteAssets.VERSION);networkInfo.add("sqlite_source_sha3_256",SqliteAssets.lock().get("source_sha3_256"));}
             if(core.networking())networkInfo.addProperty("network_runtime",NativePlatform.windows()?"winhttp":"system-libcurl");
             buildInfo=NativeBuildInfo.JSON.toJson(networkInfo);
@@ -71,7 +72,7 @@ public final class NativeCompiler {
             }
             if(NativePlatform.windows())notices.append("\n--- MinGW-w64 runtime notices ---\n").append(new String(NativeBuildInfo.resource("/dev/bhash/backend/native/MINGW_RUNTIME_NOTICES.txt"),StandardCharsets.UTF_8));
             Files.writeString(work.resolve("program.ll"),LlvmEmitter.emit(core,notices.toString(),debug,buildInfo),StandardCharsets.UTF_8);
-            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_http.inc","bhash_sqlite.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
+            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_http.inc","bhash_sqlite.inc","bhash_server.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
                 if(in==null)throw new IOException("Missing native runtime: "+name);
                 Files.copy(in,work.resolve(name));
             }
@@ -81,6 +82,7 @@ public final class NativeCompiler {
             var runtimeCommand=new ArrayList<>(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"));
             if(core.database())runtimeCommand.add("-DBHASH_SQLITE=1");
             if(core.networking())runtimeCommand.add("-DBHASH_NETWORKING=1");
+            if(core.server())runtimeCommand.add("-DBHASH_SERVER=1");
             NativeToolchain.run(work,mapped(work,sdk,clangCommand(runtimeCommand)));
             if(core.database()){
                 var sqliteCommand=new ArrayList<>(List.of(clang,"-std=c17","-O2","-c","sqlite3.c","-o","sqlite3.o"));
@@ -93,7 +95,7 @@ public final class NativeCompiler {
             }
             var link=new ArrayList<>(List.of(clang,"program.o","runtime.o","-lm"));
             if(core.database()){link.add("sqlite3.o");if(!NativePlatform.windows())link.add("-pthread");}
-            if(NativePlatform.windows()){link.add("-lshell32");if(core.networking())link.add("-lwinhttp");}
+            if(NativePlatform.windows()){link.add("-lshell32");if(core.networking())link.add("-lwinhttp");if(core.server())link.add("-lws2_32");}
             else if(!NativePlatform.macos()&&core.networking())link.add("-ldl");
             // Darwin's content-derived UUID is required by current dyld, including release builds.
             if(NativePlatform.macos()){
