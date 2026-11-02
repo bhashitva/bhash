@@ -1,0 +1,8 @@
+# Replace the domain with your own. Keep Bhash bound to loopback.
+tasks.example.org {
+    basic_auth {
+        # Generate a password hash with: caddy hash-password
+        learner REPLACE_WITH_PASSWORD_HASH
+    }
+    reverse_proxy 127.0.0.1:8080
+}
