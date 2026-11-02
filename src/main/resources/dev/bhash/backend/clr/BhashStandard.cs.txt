@@ -630,4 +630,42 @@ internal static class BhashStandard {
     }
     internal static void srvClose(long id){if(id<1||id>serverNext)throw failure("अमान्य HTTP संबंध पहचान।");if(serverSockets.Remove(id,out var s)){s.Socket.Dispose();if(s.Listener)System.Threading.Interlocked.Decrement(ref serverActive);}}
     internal static long srvPort(long id){var s=serverState(id);if(!s.Listener)throw failure("अमान्य HTTP सर्वर।");return ((System.Net.IPEndPoint)s.Socket.LocalEndPoint).Port;}
+    private const string AUTH_PREFIX="$bhash$pbkdf2-sha256$600000$";
+    private static void authGuard(){if(OperatingSystem.IsBrowser())throw failure("ब्राउज़र लक्ष्य पर सर्वर प्रमाणीकरण उपलब्ध नहीं है।");}
+    private static byte[] authBytes(string value){BhashRuntime.instance(value);unicode(value);return System.Text.Encoding.UTF8.GetBytes(value);}
+    private static byte[] authPassword(string value){
+        byte[] bytes=authBytes(value);if(bytes.Length<1||bytes.Length>1024){System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes);throw failure("कूटशब्द १ से १०२४ UTF-8 बाइट होना चाहिए।");}return bytes;
+    }
+    private static byte[] authDerive(byte[] password,byte[] salt){
+        try{return System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(password,salt,600000,System.Security.Cryptography.HashAlgorithmName.SHA256,32);}
+        catch(System.Security.Cryptography.CryptographicException){throw failure("सुरक्षा प्रदाता उपलब्ध नहीं है।");}
+    }
+    internal static string appPasswordHash(string password){
+        authGuard();byte[] bytes=authPassword(password),salt=new byte[16],derived=Array.Empty<byte>();
+        try{System.Security.Cryptography.RandomNumberGenerator.Fill(salt);derived=authDerive(bytes,salt);return AUTH_PREFIX+Convert.ToHexString(salt).ToLowerInvariant()+"$"+Convert.ToHexString(derived).ToLowerInvariant();}
+        catch(System.Security.Cryptography.CryptographicException){throw failure("सुरक्षा प्रदाता उपलब्ध नहीं है।");}
+        finally{System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes);System.Security.Cryptography.CryptographicOperations.ZeroMemory(salt);System.Security.Cryptography.CryptographicOperations.ZeroMemory(derived);}
+    }
+    internal static bool appPasswordVerify(string password,string encoded){
+        authGuard();byte[] bytes=authPassword(password),salt=Array.Empty<byte>(),expected=Array.Empty<byte>(),derived=Array.Empty<byte>();
+        try{
+            BhashRuntime.instance(encoded);
+            if(encoded.Length!=AUTH_PREFIX.Length+97||!encoded.StartsWith(AUTH_PREFIX,StringComparison.Ordinal))return false;
+            string body=encoded.Substring(AUTH_PREFIX.Length);if(body[32]!='$')return false;
+            for(int i=0;i<body.Length;i++)if(i!=32&&!((body[i]>='0'&&body[i]<='9')||(body[i]>='a'&&body[i]<='f')))return false;
+            salt=Convert.FromHexString(body.Substring(0,32));expected=Convert.FromHexString(body.Substring(33));derived=authDerive(bytes,salt);
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(derived,expected);
+        }finally{foreach(byte[] part in new[]{bytes,salt,expected,derived})System.Security.Cryptography.CryptographicOperations.ZeroMemory(part);}
+    }
+    internal static string appSecureToken(){
+        authGuard();byte[] bytes=new byte[32];try{System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);return Convert.ToHexString(bytes).ToLowerInvariant();}
+        catch(System.Security.Cryptography.CryptographicException){throw failure("सुरक्षा प्रदाता उपलब्ध नहीं है।");}
+        finally{System.Security.Cryptography.CryptographicOperations.ZeroMemory(bytes);}
+    }
+    internal static bool appSecureEqual(string a,string b){
+        authGuard();byte[] x=authBytes(a),y=authBytes(b);
+        try{if(x.Length>8192||y.Length>8192)throw failure("सुरक्षा तुलना की सीमा ८१९२ UTF-8 बाइट है।");return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(x,y);}
+        finally{System.Security.Cryptography.CryptographicOperations.ZeroMemory(x);System.Security.Cryptography.CryptographicOperations.ZeroMemory(y);}
+    }
+    internal static long appMonotonic(){authGuard();return Environment.TickCount64;}
 }
