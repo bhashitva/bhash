@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="hi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>भाष · कार्य सूची</title>
+<style>body{font:18px system-ui;max-width:760px;margin:3rem auto;padding:0 1rem;background:#f6f7fb;color:#17253a}header{border-bottom:3px solid #1d7468}form{display:flex;gap:1rem;margin:2rem 0}input[type=text]{flex:1;padding:.7rem;min-width:0}button{padding:.6rem 1rem;cursor:pointer}li{display:flex;align-items:center;gap:1rem;background:white;padding:1rem;margin:.5rem 0;border-radius:.5rem}li span{flex:1}ul{padding:0}#status{min-height:2em}a{color:#1d7468}</style>
+<header><p>भाष · HTTP + SQLite</p><h1>मेरे कार्य</h1><p>छोटा अनुप्रयोग, पूरा जीवन चक्र।</p></header>
+<form id="add"><label for="title">नया कार्य</label><input id="title" type="text" required maxlength="200" placeholder="आज क्या करना है?"><button>जोड़ें</button></form>
+<p id="status" role="status" aria-live="polite"></p><ul id="tasks"></ul><p>अधिकतम 100 कार्य दिखते हैं। डेटा इसी सर्वर की SQLite फ़ाइल में रहता है।</p>
+<script>
+const status=document.querySelector('#status'),list=document.querySelector('#tasks');
+async function api(path,options={}){const r=await fetch(path,options);if(!r.ok)throw Error('अनुरोध असफल: '+r.status);return r.status===204?null:r.json()}
+function failure(e){status.textContent=e.message}
+async function load(){const tasks=await api('/api/tasks');list.replaceChildren();for(const task of tasks){const li=document.createElement('li'),check=document.createElement('input'),title=document.createElement('span'),remove=document.createElement('button');check.type='checkbox';check.checked=task.done;check.setAttribute('aria-label','पूरा हुआ: '+task.title);title.textContent=task.title;title.style.textDecoration=task.done?'line-through':'none';remove.textContent='हटाएँ';check.onchange=async()=>{try{await api('/api/tasks/'+encodeURIComponent(task.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:task.title,done:check.checked})});await load()}catch(e){failure(e)}};remove.onclick=async()=>{try{await api('/api/tasks/'+encodeURIComponent(task.id),{method:'DELETE'});await load()}catch(e){failure(e)}};li.append(check,title,remove);list.append(li)}}
+document.querySelector('#add').onsubmit=async e=>{e.preventDefault();try{await api('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:crypto.randomUUID(),title:document.querySelector('#title').value})});document.querySelector('#title').value='';status.textContent='कार्य सहेजा गया।';await load()}catch(e){failure(e)}};load().catch(failure);
+</script></html>
