@@ -483,3 +483,7 @@ Run **Bhash: Debug Native**; a separate verified GDB/Python package is installed
 automatically. Java 17+ and Microsoft's C/C++ extension are required on that host;
 WSL and preinstalled LLVM/C development tools are unnecessary. See the
 [Hindi native debugging guide](docs/native-vscode-debug.md).
+
+### HTTP server and web applications
+
+Build a small Bhash web application with the new server and router: [task-board example](examples/web-tasks/README.md), [Hindi walkthrough](tutorial/web-applications/README.md), and [protocol/deployment contract](docs/web-applications.md). Desktop JVM, CLR and native are supported; browser/WASM cannot listen for HTTP requests.

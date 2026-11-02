@@ -21,6 +21,10 @@ _Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
 #include <io.h>
 #include <fcntl.h>
 #define WIN32_LEAN_AND_MEAN
+#ifdef BHASH_SERVER
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#endif
 #include <windows.h>
 #include <shellapi.h>
 #include <wchar.h>
@@ -1916,4 +1920,8 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
 
 #ifdef BHASH_SQLITE
 #include "bhash_sqlite.inc"
+#endif
+
+#ifdef BHASH_SERVER
+#include "bhash_server.inc"
 #endif
