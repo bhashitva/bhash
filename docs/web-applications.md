@@ -94,3 +94,5 @@ Use the existing `native package` runtime compatibility checks and build on the 
 supported libc. The container template expects a Linux executable with glibc <= 2.35;
 copying a binary from a newer host does not make it portable. Cross-OS cross-compilation
 and a built-in authentication/session framework remain future work.
+
+Authentication, secure cookies, authorization and CSRF are described in the [authentication contract](authentication.md); the [authenticated notes example](../examples/auth-sessions/README.md) builds on this server and router.
