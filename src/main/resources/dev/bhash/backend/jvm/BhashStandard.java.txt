@@ -377,4 +377,176 @@ final class BhashStandard {
     static void netClose(long id){if(id<1||id>netNext)throw failure("अमान्य HTTP उत्तर पहचान।");netResponses.remove(id);}
     static long netClock(){return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime());}
 
+    // SQLite handles retain Java/JDBC objects only; Bhash resources own their lifetime.
+    private static final int DB_LIMIT=8388608, DB_COLUMNS=256;
+    private static final java.util.Map<Long,SqlConnection> sqlConnections=new java.util.HashMap<>();
+    private static final java.util.Map<Long,SqlStatement> sqlStatements=new java.util.HashMap<>();
+    private static long sqlConnectionNext,sqlStatementNext,sqlTransactionNext;
+    private static final class SqlConnection {
+        final java.sql.Connection connection;long transaction;
+        SqlConnection(java.sql.Connection value){connection=value;}
+    }
+    private static final class SqlStatement {
+        final SqlConnection owner;final java.sql.PreparedStatement statement;
+        final boolean[] bound;final String[] names;int state;java.sql.ResultSet result;Object[] values;int[] types;
+        SqlStatement(SqlConnection c,java.sql.PreparedStatement s,int parameters)throws java.sql.SQLException {
+            owner=c;statement=s;bound=new boolean[parameters];
+            try{var field=Class.forName("org.sqlite.core.CorePreparedStatement").getDeclaredField("columnCount");field.setAccessible(true);names=new String[field.getInt(s)];}
+            catch(ReflectiveOperationException e){throw new java.sql.SQLException("SQLite column metadata unavailable",e);}
+            for(int i=0;i<names.length;i++)names[i]=s.getMetaData().getColumnName(i+1);
+        }
+    }
+    private static BhashRuntime.Failure dbFailure(java.sql.SQLException e){
+        return failure(switch(e.getErrorCode()&255){
+            case 5,6->"SQLite डेटाबेस व्यस्त है।";case 19->"SQLite बाधा का उल्लंघन।";
+            case 8->"SQLite डेटाबेस केवल पढ़ने योग्य है।";case 11,26->"अमान्य SQLite डेटाबेस।";
+            case 18->"SQLite मान की सीमा ८३८८६०८ बाइट है।";case 10,14->"SQLite फ़ाइल तक पहुँच असफल।";
+            default->"SQLite कथन असफल।";
+        });
+    }
+    private static java.sql.Connection dbConnect(String path)throws java.sql.SQLException {
+        try{Class.forName("org.sqlite.JDBC");}
+        catch(ClassNotFoundException|LinkageError missing){throw failure("SQLite रनटाइम उपलब्ध नहीं है।");}
+        var properties=new java.util.Properties();properties.setProperty("busy_timeout","5000");
+        properties.setProperty("foreign_keys","true");properties.setProperty("enable_load_extension","false");
+        properties.setProperty("transaction_mode","DEFERRED");
+        java.sql.Connection connection=null;
+        try{
+            connection=java.sql.DriverManager.getConnection("jdbc:sqlite:"+path,properties);
+            if(!connection.getMetaData().getDatabaseProductVersion().equals("3.54.1"))throw failure("SQLite रनटाइम संस्करण मेल नहीं खाता।");
+            Class<?> limits=Class.forName("org.sqlite.SQLiteLimits");
+            var setter=connection.getClass().getMethod("setLimit",limits,int.class);
+            String[] names={"SQLITE_LIMIT_LENGTH","SQLITE_LIMIT_SQL_LENGTH","SQLITE_LIMIT_COLUMN","SQLITE_LIMIT_VARIABLE_NUMBER","SQLITE_LIMIT_ATTACHED"};
+            int[] values={DB_LIMIT,65536,DB_COLUMNS,999,0};
+            for(int i=0;i<names.length;i++)setter.invoke(connection,limits.getField(names[i]).get(null),values[i]);
+            try(var check=connection.createStatement();var row=check.executeQuery("PRAGMA schema_version")){row.next();}
+            var answer=connection;connection=null;return answer;
+        }catch(ReflectiveOperationException unsupported){throw failure("SQLite रनटाइम संस्करण मेल नहीं खाता।");}
+        finally{if(connection!=null)try{connection.close();}catch(java.sql.SQLException ignored){}}
+    }
+    private static SqlConnection dbConnection(long id){var value=sqlConnections.get(id);if(value==null)throw failure("SQLite डेटाबेस बंद है।");return value;}
+    private static SqlStatement dbStatement(long id){var value=sqlStatements.get(id);if(value==null)throw failure("SQLite कथन बंद है।");return value;}
+    private static int dbColumn(SqlStatement s,long column)throws java.sql.SQLException {
+        int count=s.names.length;
+        if(column<0||column>=count)throw failure("SQLite स्तंभ सूचकांक सीमा से बाहर है।");return (int)column;
+    }
+    private static int dbBinding(SqlStatement s,long index){
+        if(index<1||index>s.bound.length)throw failure("SQLite बंधन सूचकांक सीमा से बाहर है।");
+        if(s.state!=0)throw failure("SQLite कथन को रीसेट करें।");return (int)index;
+    }
+    private static void dbBound(SqlStatement s){for(boolean value:s.bound)if(!value)throw failure("सभी SQLite मापदंड बाँधें।");}
+    private static void dbResetValue(SqlStatement s,int state)throws java.sql.SQLException {
+        if(s.result!=null){try{s.result.close();}finally{s.result=null;}}
+        s.values=null;s.types=null;s.state=state;
+    }
+    private static void dbBoundary(SqlConnection c)throws java.sql.SQLException {
+        for(var s:sqlStatements.values())if(s.owner==c&&s.state!=0)dbResetValue(s,3);
+    }
+    private static int dbCell(SqlStatement s,long index,int expected)throws java.sql.SQLException {
+        int column=dbColumn(s,index);if(s.state!=1)throw failure("SQLite परिणाम की वर्तमान पंक्ति नहीं है।");
+        int kind=s.types[column];if(kind==5)throw failure("SQLite स्तंभ रिक्त है।");
+        if(kind!=expected&&(expected!=2||kind!=1))throw failure("SQLite स्तंभ का प्रकार मेल नहीं खाता।");return column;
+    }
+    static long dbOpen(String path){
+        BhashRuntime.instance(path);if(sqlConnections.size()>=32)throw failure("बहुत अधिक खुले SQLite डेटाबेस।");
+        try{var c=new SqlConnection(dbConnect(path));long id=++sqlConnectionNext;sqlConnections.put(id,c);return id;}
+        catch(java.sql.SQLException error){throw failure("SQLite डेटाबेस खोला नहीं जा सका।");}
+    }
+    static void dbClose(long id){
+        if(id<1||id>sqlConnectionNext)throw failure("SQLite डेटाबेस बंद है।");
+        var c=sqlConnections.remove(id);if(c==null)return;java.sql.SQLException pending=null;
+        for(var entry:new java.util.ArrayList<>(sqlStatements.entrySet()))if(entry.getValue().owner==c){
+            sqlStatements.remove(entry.getKey());try{entry.getValue().statement.close();}catch(java.sql.SQLException e){pending=e;}
+        }
+        try{if(!c.connection.getAutoCommit())c.connection.rollback();}catch(java.sql.SQLException e){if((e.getErrorCode()&255)!=1)pending=e;}
+        finally{try{c.connection.close();}catch(java.sql.SQLException e){pending=e;}}
+        if(pending!=null)throw dbFailure(pending);
+    }
+    static long dbPrepare(long id,String sql){
+        var c=dbConnection(id);if(sqlStatements.size()>=128)throw failure("बहुत अधिक खुले SQLite कथन।");
+        java.sql.PreparedStatement statement=null;
+        try{
+            statement=c.connection.prepareStatement(sql);int count=statement.getParameterMetaData().getParameterCount();
+            if(count>999)throw failure("SQLite मापदंड सीमा ९९९ है।");
+            var s=new SqlStatement(c,statement,count);long result=++sqlStatementNext;sqlStatements.put(result,s);statement=null;return result;
+        }catch(java.sql.SQLException e){throw dbFailure(e);}
+        finally{if(statement!=null)try{statement.close();}catch(java.sql.SQLException ignored){}}
+    }
+    static void dbFinalize(long id){
+        if(id<1||id>sqlStatementNext)throw failure("SQLite कथन बंद है।");var s=sqlStatements.remove(id);if(s==null)return;
+        try{s.statement.close();}catch(java.sql.SQLException e){if(s.state!=3)throw dbFailure(e);}
+    }
+    static void dbBindInt(long id,long index,long value){var s=dbStatement(id);int i=dbBinding(s,index);
+        try{s.statement.setLong(i,value);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static void dbBindReal(long id,long index,double value){var s=dbStatement(id);int i=dbBinding(s,index);
+        if(!Double.isFinite(value))throw failure("SQLite में सीमित दशमलव मान दें।");
+        try{s.statement.setDouble(i,value);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static void dbBindNull(long id,long index){var s=dbStatement(id);int i=dbBinding(s,index);
+        try{s.statement.setNull(i,java.sql.Types.NULL);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    private static byte[] dbArray(BhashRuntime.BBuffer buffer){
+        BhashRuntime.instance(buffer);if(buffer.size()>DB_LIMIT)throw failure("SQLite मान की सीमा ८३८८६०८ बाइट है।");
+        byte[] bytes=new byte[(int)buffer.size()];for(int i=0;i<bytes.length;i++)bytes[i]=(byte)(short)buffer.get(i);return bytes;
+    }
+    private static BhashRuntime.BBuffer dbBuffer(byte[] bytes){var result=new BhashRuntime.BBuffer(bytes.length);for(int i=0;i<bytes.length;i++)result.set(i,(short)(bytes[i]&255));return result;}
+    static void dbBindBytes(long id,long index,long kind,BhashRuntime.BBuffer value){var s=dbStatement(id);int i=dbBinding(s,index);byte[] data=dbArray(value);
+        try{if(kind==3)s.statement.setString(i,decodeUtf8(dbBuffer(data)));else if(kind==4)s.statement.setBytes(i,data);else throw failure("SQLite स्तंभ का प्रकार मेल नहीं खाता।");s.bound[i-1]=true;}
+        catch(java.sql.SQLException e){throw dbFailure(e);}}
+    private static long dbTotal(SqlConnection c)throws java.sql.SQLException {
+        try(var query=c.connection.createStatement();var result=query.executeQuery("SELECT total_changes()")){result.next();return result.getLong(1);}
+    }
+    static long dbExecute(long id){var s=dbStatement(id);if(s.state!=0)throw failure("SQLite कथन को रीसेट करें।");dbBound(s);
+        try{
+            if(s.names.length!=0)throw failure("SQLite पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");
+            long before=dbTotal(s.owner);s.statement.execute();s.state=2;return dbTotal(s.owner)-before;
+        }catch(java.sql.SQLException e){s.state=3;throw dbFailure(e);}
+    }
+    static boolean dbNext(long id){var s=dbStatement(id);if(s.state==2)return false;if(s.state==3)throw failure("SQLite कथन को रीसेट करें।");
+        int count=s.names.length;
+        if(count==0)throw failure("SQLite बदलाव के लिए चलाओ उपयोग करें।");
+        if(s.state==0)dbBound(s);
+        try{
+            if(s.state==0){s.statement.execute();s.result=s.statement.getResultSet();}
+            if(!s.result.next()){dbResetValue(s,2);return false;}
+            count=s.result.getMetaData().getColumnCount();s.values=new Object[count];s.types=new int[count];long size=0;
+            for(int i=0;i<count;i++){
+                Object value=s.result.getObject(i+1);int kind;
+                if(value==null)kind=5;
+                else if(value instanceof byte[]){kind=4;size+=((byte[])value).length;}
+                else if(value instanceof String){kind=3;value=s.result.getBytes(i+1);size+=((byte[])value).length;}
+                else if(value instanceof Float||value instanceof Double){kind=2;value=((Number)value).doubleValue();}
+                else if(value instanceof Number){kind=1;value=((Number)value).longValue();}
+                else throw failure("SQLite स्तंभ का प्रकार मेल नहीं खाता।");
+                if(size>DB_LIMIT)throw failure("SQLite पंक्ति की सीमा ८३८८६०८ बाइट है।");s.values[i]=value;s.types[i]=kind;
+            }
+            s.state=1;return true;
+        }catch(java.sql.SQLException e){try{dbResetValue(s,3);}catch(java.sql.SQLException ignored){}throw dbFailure(e);}
+        catch(RuntimeException e){try{dbResetValue(s,3);}catch(java.sql.SQLException ignored){}throw e;}
+    }
+    static void dbReset(long id){var s=dbStatement(id);try{dbResetValue(s,0);}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static void dbClear(long id){var s=dbStatement(id);if(s.state!=0)throw failure("SQLite कथन को रीसेट करें।");
+        try{s.statement.clearParameters();java.util.Arrays.fill(s.bound,false);}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static long dbColumns(long id){return dbStatement(id).names.length;}
+    static String dbName(long id,long index){var s=dbStatement(id);try{return s.names[dbColumn(s,index)];}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static long dbType(long id,long index){var s=dbStatement(id);try{int i=dbColumn(s,index);if(s.state!=1)throw failure("SQLite परिणाम की वर्तमान पंक्ति नहीं है।");return s.types[i];}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static long dbInteger(long id,long index){var s=dbStatement(id);try{return ((Number)s.values[dbCell(s,index,1)]).longValue();}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static double dbReal(long id,long index){var s=dbStatement(id);try{double value=((Number)s.values[dbCell(s,index,2)]).doubleValue();if(!Double.isFinite(value))throw failure("SQLite दशमलव सीमित नहीं है।");return value;}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static BhashRuntime.BBuffer dbBytes(long id,long index,long kind){var s=dbStatement(id);if(kind!=3&&kind!=4)throw failure("SQLite स्तंभ का प्रकार मेल नहीं खाता।");
+        try{return dbBuffer((byte[])s.values[dbCell(s,index,(int)kind)]);}catch(java.sql.SQLException e){throw dbFailure(e);}}
+    static long dbParameterCount(long id){return dbStatement(id).bound.length;}
+    static long dbTransaction(long id,long token,long operation){var c=dbConnection(id);
+        if(operation==3&&c.transaction!=token)return 0;
+        if(operation==0&&c.transaction!=0)throw failure("SQLite लेनदेन पहले से सक्रिय है।");
+        if(operation!=0&&(token==0||c.transaction!=token))throw failure("SQLite लेनदेन सक्रिय नहीं है।");
+        try{
+            dbBoundary(c);
+            if(operation==0){c.connection.setAutoCommit(false);c.transaction=++sqlTransactionNext;return c.transaction;}
+            if(operation==1)c.connection.commit();else if(operation==2||operation==3)c.connection.rollback();else throw failure("SQLite लेनदेन सक्रिय नहीं है।");
+            c.connection.setAutoCommit(true);c.transaction=0;return 0;
+        }catch(java.sql.SQLException e){
+            if(operation==3&&(e.getErrorCode()&255)==1){try{c.connection.setAutoCommit(true);}catch(java.sql.SQLException ignored){}c.transaction=0;return 0;}
+            throw dbFailure(e);
+        }
+    }
+    static String dbVersion(){try(var connection=dbConnect(":memory:")){return connection.getMetaData().getDatabaseProductVersion();}catch(java.sql.SQLException e){throw dbFailure(e);}}
+
 }
