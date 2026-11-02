@@ -28,8 +28,10 @@ public final class NativeBuildInfo {
         if(!text.contains("#define BHASH_NATIVE_ABI_VERSION "+ABI) || !text.contains(GUARD))throw new CompilationException("[BH9108] Bundled native runtime ABI does not match the compiler; rebuild/reinstall the compiler.");
         var info=new LinkedHashMap<String,Object>();info.put("format",FORMAT);info.put("target",TARGET);info.put("runtime_abi",ABI);
         byte[] http=resource("/dev/bhash/backend/native/bhash_http.inc");
-        byte[] runtime=java.util.Arrays.copyOf(source,source.length+http.length);
+        byte[] sqlite=resource("/dev/bhash/backend/native/bhash_sqlite.inc");
+        byte[] runtime=java.util.Arrays.copyOf(source,source.length+http.length+sqlite.length);
         System.arraycopy(http,0,runtime,source.length,http.length);
+        System.arraycopy(sqlite,0,runtime,source.length+http.length,sqlite.length);
         info.put("runtime_sha256",hash(runtime));info.put("runtime_header_sha256",hash(header));
         String version="development",compiler="development";
         try(var in=NativeBuildInfo.class.getResourceAsStream("/META-INF/maven/dev.bhash/bhash-compiler/pom.properties")){if(in!=null){var p=new Properties();p.load(in);version=p.getProperty("version",version);}}
