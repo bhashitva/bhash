@@ -98,7 +98,7 @@ Default capacity १,०२४, idle सीमा ३० मिनट और abs
 [02-sessions.bhash](examples/02-sessions.bhash) छोटी घड़ी से expiry का निश्चित
 उदाहरण देता है; उस घड़ी को production में न लगाएँ।
 
-**सत्रघड़ी (Session clock)** — इस अनुबंध का `अब() → पूर्णांक` कार्य tests में
+**सत्रघड़ी (Session clock)** — इस अनुबंध का `अब() → पूर्णांक` फलन tests में
 समय नियंत्रित करने देता है। **वास्तविकसत्रघड़ी (System session clock)** का
 `नया वास्तविकसत्रघड़ी()` और `अब()` default monotonic स्रोत प्रयोग करता है।
 घड़ी पीछे जाए तो प्रबंधक चुपचाप सत्र की आयु नहीं बढ़ाता, अपवाद देता है।
@@ -128,7 +128,7 @@ session ID और नया CSRF secret मिलता है; पुरान�
 **हटाओ (Revoke session)** — `म.हटाओ(मानक: सत्र) → शून्य` एक सत्र हटाता है।
 **उपयोगकर्ताहटाओ (Revoke all user sessions)** —
 `म.उपयोगकर्ताहटाओ(उपयोगकर्ता: पाठ) → शून्य` सभी उपकरणों के सत्र हटाता है।
-Password या permissions बदलते समय दूसरे कार्य का उपयोग करें; roles session में
+Password या permissions बदलते समय दूसरे फलन का उपयोग करें; roles session में
 snapshot हैं। केवल cookie मिटाने से सर्वर का सत्र नहीं हटता।
 
 **साफकरो (Purge expired sessions)** — `म.साफकरो() → शून्य` समाप्त entries

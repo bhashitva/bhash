@@ -7,7 +7,7 @@ Student source files in this folder use Bhash only.
 
 | Bhash | English concept | Java / C# bridge and limits |
 | --- | --- | --- |
-| `कार्य` | function / method | Java/C# usually put methods inside types; Bhash also allows top-level functions. |
+| `फलन` | function / method | Java/C# usually put methods inside types; Bhash also allows top-level functions. |
 | `मुख्य` | entry point | The Bhash entry function; Java uses `main`, C# uses `Main` or top-level statements. |
 | `लिखो(...)` | print / output | Similar purpose to `System.out.println` / `Console.WriteLine`; Bhash joins multiple arguments with spaces. |
 | `पढ़ो()` | read integer | Similar purpose to reading a line and parsing an integer; it is not a text-input function. |
@@ -16,7 +16,7 @@ Student source files in this folder use Bhash only.
 | `यदि` / `अन्यथा` | if / else | Boolean condition and mutually exclusive branches. |
 | `लौटाओ` | return | Ends the current function and optionally supplies its result. It does not print. |
 | `जबतक` | while | Tests the condition before each iteration; update state so the loop can finish. |
-| `प्रत्येक (... में ...)` | foreach / for-of | Iterates array/list values, or map key/value pairs; map APIs differ by language. |
+| `प्रत्येक (संग्रह में तत्व: प्रकार)` | foreach / for-of | Iterates array/list values, or map key/value pairs; map APIs differ by language. |
 | `विराम` / `जारी` | break / continue | Stop a loop/selection, or skip to the next loop iteration as permitted by context. |
 | `चयन` / `विकल्प` / `शेष` | switch / case / default | Bhash has no implicit case fall-through; Java/JavaScript colon-style switches differ. |
 | `पूर्णांक` | signed 64-bit integer | Java/C# `long`, **not** their 32-bit `int`; JavaScript Number is not an exact substitute for every 64-bit integer. |
@@ -41,7 +41,7 @@ Student source files in this folder use Bhash only.
 Bhash (a top-level function):
 
 ```bhash
-कार्य बड़ा(पहला: पूर्णांक, दूसरा: पूर्णांक) -> पूर्णांक {
+फलन बड़ा(पहला: पूर्णांक, दूसरा: पूर्णांक) -> पूर्णांक {
     यदि (पहला >= दूसरा) {
         लौटाओ पहला;
     }

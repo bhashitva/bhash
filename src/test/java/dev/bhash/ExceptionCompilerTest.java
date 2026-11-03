@@ -48,7 +48,7 @@ abstract class ExceptionCompilerTest {
     @Test void catchesMatchDerivedTypesInOrderPreserveIdentityAndRethrow() throws Exception {
         expect("""
             वर्ग विशेष विस्तार अपवाद { सार्वजनिक निर्माता(क: पाठ) : आधार(क) {} }
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 स्थिर मूल: विशेष = नया विशेष("मूल");
                 प्रयास {
                     प्रयास { फेंको मूल; }
@@ -62,15 +62,15 @@ abstract class ExceptionCompilerTest {
     }
     @Test void finallyRunsOnNormalReturnBreakContinueAndExceptionsFromCatch() throws Exception {
         expect("""
-            कार्य फल() -> पूर्णांक {
+            फलन फल() -> पूर्णांक {
                 प्रयास { लौटाओ ७; } अंततः { लिखो("वापसी"); }
             }
-            कार्य दूसरा() -> पूर्णांक {
+            फलन दूसरा() -> पूर्णांक {
                 प्रयास { फेंको नया अपवाद("क"); }
                 पकड़ो (गलती: अपवाद) { लौटाओ ८; }
                 अंततः { लिखो("पकड़"); }
             }
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 लिखो(फल(), दूसरा());
                 मान क: पूर्णांक = ०;
                 जबतक (क < ३) {
@@ -89,10 +89,10 @@ abstract class ExceptionCompilerTest {
     }
     @Test void finallyExceptionReplacesPendingExceptionOrReturn() throws Exception {
         expect("""
-            कार्य फल() -> पूर्णांक {
+            फलन फल() -> पूर्णांक {
                 प्रयास { लौटाओ १; } अंततः { फेंको नया अपवाद("सफाई"); }
             }
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 प्रयास { लिखो(फल()); } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
                 प्रयास {
                     प्रयास { फेंको नया अपवाद("पहला"); } अंततः { फेंको नया अपवाद("अंतिम"); }
@@ -102,7 +102,7 @@ abstract class ExceptionCompilerTest {
     }
     @Test void runtimeFailuresAreCatchableAndExecutionCanContinue() throws Exception {
         expect("""
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 प्रयास { लिखो(१ / ०); } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
                 प्रयास { लिखो(नया पूर्णांक[०].लो(०)); } पकड़ो (गलती: अपवाद) { लिखो("सीमा"); }
                 प्रयास { त्रुटि("स्वयं"); } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); }
@@ -123,13 +123,13 @@ abstract class ExceptionCompilerTest {
     @Test void staticInitializationFailuresCanBeCaught() throws Exception {
         expect("""
             वर्ग गलत { साझा मान अंक: पूर्णांक = १ / ०; }
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 प्रयास { लिखो(गलत.अंक); } पकड़ो (गलती: अपवाद) { लिखो("पकड़ा"); }
             }
             ""","पकड़ा\n");
     }
     @Test void uncaughtExceptionReportsFailureAfterFinally() throws Exception {
-        var result=run(compile("कार्य मुख्य() -> शून्य { प्रयास { फेंको नया अपवाद(\"असफल\"); } अंततः { लिखो(\"सफाई\"); } }"),"");
+        var result=run(compile("फलन मुख्य() -> शून्य { प्रयास { फेंको नया अपवाद(\"असफल\"); } अंततः { लिखो(\"सफाई\"); } }"),"");
         assertEquals(1,result.exit); assertEquals("सफाई\nभाष: असफल\n",result.text);
     }
     @Test void catchesResolveAcrossFilesAndInsideGenericBodies() throws Exception {
@@ -138,14 +138,14 @@ abstract class ExceptionCompilerTest {
             वर्ग संदेश {}
             सार्वजनिक वर्ग विशेष विस्तार अपवाद {
                 सार्वजनिक निर्माता() : आधार("विशेष") {}
-                सार्वजनिक कार्य लो() -> पाठ { लौटाओ संदेश; }
+                सार्वजनिक फलन लो() -> पाठ { लौटाओ संदेश; }
             }
-            सार्वजनिक कार्य जांच<त>(मानक: त) -> त {
+            सार्वजनिक फलन जांच<त>(मानक: त) -> त {
                 प्रयास { फेंको नया विशेष(); } पकड़ो (गलती: अपवाद) { लिखो(गलती.संदेश); लौटाओ मानक; }
             }
             """),new SourceFile("main.bhash","""
             संकुल प्रयोग; आयात दोष.विशेष; आयात दोष.जांच;
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 प्रयास { फेंको नया विशेष(); } पकड़ो (गलती: विशेष) { लिखो(गलती.लो()); }
                 लिखो(जांच<पूर्णांक>(५));
             }
@@ -164,11 +164,11 @@ abstract class ExceptionCompilerTest {
                 "जबतक (सत्य) { प्रयास {} अंततः { जारी; } }",
                 "फेंको नया अपवाद(); लिखो(१);",
                 "प्रयास {} पकड़ो (क: अपवाद) {} लिखो(क.संदेश);")) {
-            var failure=assertThrows(CompilationException.class,()->compile("कार्य मुख्य() -> शून्य { "+body+" }"),body);
+            var failure=assertThrows(CompilationException.class,()->compile("फलन मुख्य() -> शून्य { "+body+" }"),body);
             assertFalse(failure.getMessage().contains("generated"),failure.getMessage());
         }
-        assertThrows(CompilationException.class,()->compile("वर्ग अपवाद {} कार्य मुख्य() -> शून्य {}"));
-        assertThrows(CompilationException.class,()->compile("वर्ग क विस्तार अपवाद {} कार्य मुख्य() -> शून्य { प्रयास {} पकड़ो (क: अपवाद) {} पकड़ो (ख: क) {} }"));
-        assertThrows(CompilationException.class,()->compile("कार्य फल() -> पूर्णांक { प्रयास { लौटाओ १; } पकड़ो (क: अपवाद) {} } कार्य मुख्य() -> शून्य {}"));
+        assertThrows(CompilationException.class,()->compile("वर्ग अपवाद {} फलन मुख्य() -> शून्य {}"));
+        assertThrows(CompilationException.class,()->compile("वर्ग क विस्तार अपवाद {} फलन मुख्य() -> शून्य { प्रयास {} पकड़ो (क: अपवाद) {} पकड़ो (ख: क) {} }"));
+        assertThrows(CompilationException.class,()->compile("फलन फल() -> पूर्णांक { प्रयास { लौटाओ १; } पकड़ो (क: अपवाद) {} } फलन मुख्य() -> शून्य {}"));
     }
 }

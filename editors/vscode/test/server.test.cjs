@@ -26,8 +26,8 @@ test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode position
     const a=path.join(root,'मेरा project'),b=path.join(root,'other');
     for(const directory of [a,b]){await fs.mkdir(path.join(directory,'src'),{recursive:true});await fs.writeFile(path.join(directory,'bhash.project'),'name=demo\nsources=src\n');}
     const lib=path.join(a,'src','math.bhash'),main=path.join(a,'src','main.bhash');
-    const library='संकुल गणित;\nसार्वजनिक अभिलेख जोड़ा(अ: पूर्णांक, ब: पूर्णांक);\nसार्वजनिक कार्य दुगुना(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }\n';
-    const program='संकुल उपयोग;\nआयात गणित.दुगुना उपनाम दो;\nआयात गणित.जोड़ा;\nकार्य मुख्य() -> शून्य {\n    स्थिर क: पूर्णांक = दो(३);\n    लिखो(क);\n}\n';
+    const library='संकुल गणित;\nसार्वजनिक अभिलेख जोड़ा(अ: पूर्णांक, ब: पूर्णांक);\nसार्वजनिक फलन दुगुना(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }\n';
+    const program='संकुल उपयोग;\nआयात गणित.दुगुना उपनाम दो;\nआयात गणित.जोड़ा;\nफलन मुख्य() -> शून्य {\n    स्थिर क: पूर्णांक = दो(३);\n    लिखो(क);\n}\n';
     await fs.writeFile(lib,library);await fs.writeFile(main,program);await fs.writeFile(path.join(b,'src','other.bhash'),library);
     const lsp=transport();t.after(()=>lsp.process.kill());
     const uri=file=>pathToFileURL(file).href, document={uri:uri(main)};
@@ -52,7 +52,7 @@ test('stdio LSP: unsaved cross-file analysis, alias navigation, Unicode position
     await diagnostic(main,1,ds=>ds.some(d=>/Cannot|Expected|assign|type/i.test(d.message)));
     assert.equal(await fs.readFile(lib,'utf8'),library,'analysis must not save editor buffers');
     lsp.send('textDocument/didChange',{textDocument:{uri:uri(lib),version:3},contentChanges:[{text:library}]});
-    const unicode='कार्य मुख्य() -> शून्य { लिखो("😀"); लिखो(अज्ञात); }';
+    const unicode='फलन मुख्य() -> शून्य { लिखो("😀"); लिखो(अज्ञात); }';
     lsp.send('textDocument/didChange',{textDocument:{...document,version:2},contentChanges:[{text:unicode}]});
     const found=await diagnostic(main,2,ds=>ds.some(d=>d.message.includes('अज्ञात')));
     assert.deepEqual(found.params.diagnostics.find(d=>d.message.includes('अज्ञात')).range.start,position(unicode,'अज्ञात'));
@@ -78,9 +78,9 @@ test('stdio LSP: member types, signatures, automatic import edits and coded mult
     t.after(()=>fs.rm(root,{recursive:true,force:true}));
     await fs.mkdir(path.join(root,'src'));
     await fs.writeFile(path.join(root,'bhash.project'),'name=intelligence\nsources=src\n');
-    await fs.writeFile(path.join(root,'src/lib.bhash'),'संकुल गणित; सार्वजनिक अभिलेख बिंदु(अ: पूर्णांक, ब: पूर्णांक); सार्वजनिक कार्य जोड़(अ: पूर्णांक, ब: पूर्णांक) -> पूर्णांक { लौटाओ अ + ब; }');
+    await fs.writeFile(path.join(root,'src/lib.bhash'),'संकुल गणित; सार्वजनिक अभिलेख बिंदु(अ: पूर्णांक, ब: पूर्णांक); सार्वजनिक फलन जोड़(अ: पूर्णांक, ब: पूर्णांक) -> पूर्णांक { लौटाओ अ + ब; }');
     const main=path.join(root,'src/main.bhash'),uri=pathToFileURL(main).href,document={uri};
-    const source='संकुल उपयोग;\nआयात गणित.जोड़;\nकार्य मुख्य() -> शून्य { स्थिर क: बिंदु = नया बिंदु(१,२); लिखो(क.अ, जोड़(१, २)); }';
+    const source='संकुल उपयोग;\nआयात गणित.जोड़;\nफलन मुख्य() -> शून्य { स्थिर क: बिंदु = नया बिंदु(१,२); लिखो(क.अ, जोड़(१, २)); }';
     await fs.writeFile(main,source);
     const lsp=transport();t.after(()=>lsp.process.kill());
     const result=await lsp.request('initialize',{workspaceFolders:[{uri:pathToFileURL(root).href,name:'test'}],capabilities:{}});
@@ -98,7 +98,7 @@ test('stdio LSP: member types, signatures, automatic import edits and coded mult
     const members=await lsp.request('textDocument/completion',{textDocument:document,position:p});assert.ok(members.some(i=>i.label==='अ'&&i.detail==='अ: पूर्णांक'));
     const call=position(fixed,'जोड़(१, ');call.character+='जोड़(१, '.length;
     const signature=await lsp.request('textDocument/signatureHelp',{textDocument:document,position:call});assert.equal(signature.activeParameter,1);assert.ok(signature.signatures[0].label.includes('ब: पूर्णांक'));
-    const standard='आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { लिखो(पाठ्य.खोजो("भारत", "रत")); }';
+    const standard='आयात मानक.पाठ्य; फलन मुख्य() -> शून्य { लिखो(पाठ्य.खोजो("भारत", "रत")); }';
     lsp.send('textDocument/didChange',{textDocument:{...document,version:3},contentChanges:[{text:standard}]});
     const stdPosition=position(standard,'पाठ्य.खोजो');stdPosition.character+='पाठ्य.'.length;
     const stdMembers=await lsp.request('textDocument/completion',{textDocument:document,position:stdPosition});
@@ -106,7 +106,7 @@ test('stdio LSP: member types, signatures, automatic import edits and coded mult
     const stdDefinition=await lsp.request('textDocument/definition',{textDocument:document,position:position(standard,'खोजो(')});
     assert.equal(stdDefinition.length,1);assert.ok(stdDefinition[0].uri.includes('__bhash_standard_library__.bhash'));
     assert.ok((await fs.readFile(fileURLToPath(stdDefinition[0].uri),'utf8')).includes('संकुल मानक;'),'F12 target is a real declaration document');
-    const bad='कार्य मुख्य() -> शून्य { लिखो(अज्ञात); स्थिर क: पूर्णांक = १; क = २; }';
+    const bad='फलन मुख्य() -> शून्य { लिखो(अज्ञात); स्थिर क: पूर्णांक = १; क = २; }';
     lsp.send('textDocument/didChange',{textDocument:{...document,version:4},contentChanges:[{text:bad}]});
     const errors=await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri)&&m.params.version===4&&m.params.diagnostics.length===2);
     assert.deepEqual(errors.params.diagnostics.map(d=>d.code),['BH2001','BH4001']);
@@ -123,8 +123,8 @@ test('stdio LSP: locked library navigation and lock-change diagnostics', {timeou
     await fs.writeFile(manifest,'name=app\ndependency.lib.path=../library\ndependency.lib.version=1.0.0\n');
     await fs.writeFile(path.join(lib,'bhash.project'),'name=util\nkind=library\nversion=1.0.0\n');
     const library=path.join(lib,'src','library.bhash'),main=path.join(app,'src','main.bhash');
-    const source='संकुल पुस्तक; सार्वजनिक कार्य दुगुना(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }';
-    const program='आयात पुस्तक.दुगुना; कार्य मुख्य() -> शून्य { लिखो(दुगुना(३)); }';
+    const source='संकुल पुस्तक; सार्वजनिक फलन दुगुना(अंक: पूर्णांक) -> पूर्णांक { लौटाओ अंक * २; }';
+    const program='आयात पुस्तक.दुगुना; फलन मुख्य() -> शून्य { लिखो(दुगुना(३)); }';
     await fs.writeFile(library,source);await fs.writeFile(main,program);
     const cli=spawn('java',['-jar',jar,'deps','lock',app,'--offline']);let errors='';cli.stderr.on('data',d=>errors+=d);
     assert.equal(await new Promise(resolve=>cli.on('exit',resolve)),0,errors);

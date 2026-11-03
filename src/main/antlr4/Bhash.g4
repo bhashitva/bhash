@@ -81,7 +81,7 @@ catchClause : CATCH LPAREN parameter RPAREN block ;
 variableDecl : (LET | CONST) IDENTIFIER COLON valueType ASSIGN expression SEMI ;
 assignment : postfix ASSIGN expression SEMI ;
 ifStatement : IF LPAREN expression RPAREN block (ELSE (ifStatement | block))? ;
-foreachStatement : FOREACH LPAREN parameter (COMMA parameter)? IN expression RPAREN block ;
+foreachStatement : FOREACH LPAREN expression IN parameter (COMMA parameter)? RPAREN block ;
 whileStatement : WHILE LPAREN expression RPAREN block ;
 switchStatement : SWITCH LPAREN expression RPAREN LBRACE switchSection* RBRACE ;
 switchSection : (CASE caseValue COLON)+ statement* | DEFAULT COLON statement* ;
@@ -127,7 +127,7 @@ primary
 PACKAGE : 'संकुल' ;
 IMPORT : 'आयात' ;
 AS : 'उपनाम' ;
-FUNCTION : 'कार्य' ;
+FUNCTION : 'फलन' ;
 CLASS : 'वर्ग' ;
 RECORD : 'अभिलेख' ;
 ENUM : 'परिगणना' ;

@@ -43,7 +43,7 @@ standard-library text trimming के Unicode White_Space contract से अल
 syntax error मिलता है। Failed numeric read भी पूरी पंक्ति consume करता है।
 
 ```bhash
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     लिखो("नाम लिखें:");
     स्थिर नाम: पाठ = पाठपढ़ो();
     प्रयास {

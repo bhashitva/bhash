@@ -24,7 +24,7 @@ try {
     const exe=spawnSync(path.join(home,'hello-native'),[],{encoding:'utf8'});
     assert.equal(exe.status,0);assert.equal(exe.stdout,'नमस्ते, दुनिया!\n१\nबीच ४\n९\n');
     const consoleFile=path.join(home,'console.bhash');
-    fs.writeFileSync(consoleFile,'कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो()); लिखो(पढ़ो()); }\n');
+    fs.writeFileSync(consoleFile,'फलन मुख्य() -> शून्य { लिखो(पाठपढ़ो()); लिखो(पढ़ो()); }\n');
     const run=task('run',consoleFile,'भारत😀\n42\n');
     assert.equal(run.stdout,'भारत😀\n४२\n');
     const status=JSON.parse(spawnSync('java',['-jar',request.jar,'native','toolchain','status','--json'],{encoding:'utf8'}).stdout);

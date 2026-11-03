@@ -53,7 +53,7 @@ abstract class ManagedCompilerTest {
         assertEquals("-९२२३३७२०३६८५४७७५८०७\nसत्य सत्य\n२\n१ १\n-१ -१ ९२२३३७२०३६८५४७७५८०७\n१ २\n",result.output);
     }
     @Test void shiftsMaskWideAndNegativeCountsAndMatch64BitReferenceValues() throws Exception {
-        var source = new StringBuilder("कार्य जांच(मानक: पूर्णांक, गिनती: पूर्णांक) -> शून्य { लिखो(मानक << गिनती, मानक >> गिनती, मानक >>> गिनती, मानक & गिनती, मानक | गिनती, मानक ^ गिनती, ~मानक); } कार्य मुख्य() -> शून्य {");
+        var source = new StringBuilder("फलन जांच(मानक: पूर्णांक, गिनती: पूर्णांक) -> शून्य { लिखो(मानक << गिनती, मानक >> गिनती, मानक >>> गिनती, मानक & गिनती, मानक | गिनती, मानक ^ गिनती, ~मानक); } फलन मुख्य() -> शून्य {");
         var expected = new StringBuilder();
         for (long value : new long[]{0,1,-1,Long.MIN_VALUE,Long.MAX_VALUE,0x0123456789abcdefL}) {
             for (long count : new long[]{0,1,31,32,63,64,65,-1,-64,Long.MAX_VALUE,Long.MIN_VALUE}) {
@@ -76,8 +76,8 @@ abstract class ManagedCompilerTest {
     }
     @Test void bitwisePrecedenceAssociativityAndEagerEvaluationArePortable() throws Exception {
         var result = run(compile("""
-                कार्य अंक(मानक: पूर्णांक) -> पूर्णांक { लिखो(मानक); लौटाओ मानक; }
-                कार्य मुख्य() -> शून्य {
+                फलन अंक(मानक: पूर्णांक) -> पूर्णांक { लिखो(मानक); लौटाओ मानक; }
+                फलन मुख्य() -> शून्य {
                     लिखो(१ | २ ^ ३ & १, १ + १ << २ + १, ३२ >> १ >> २, ~१ + ३ * २);
                     लिखो((३ & १) == १ && (४ | १) == ५, १ << २ < ५, ८ >> १ == ४);
                     लिखो(० & अंक(१), -१ | अंक(२), ० ^ अंक(३));
@@ -96,13 +96,13 @@ abstract class ManagedCompilerTest {
                 संकुल बिट;
                 सार्वजनिक वर्ग पात्र<त> {
                     साझा स्थिर उच्च: पूर्णांक = १ << ६३;
-                    साझा कार्य लो() -> पूर्णांक { लौटाओ उच्च >>> ६३; }
+                    साझा फलन लो() -> पूर्णांक { लौटाओ उच्च >>> ६३; }
                 }
-                सार्वजनिक कार्य सरकाओ<त>(मानक: त) -> त { लौटाओ मानक << १; }
+                सार्वजनिक फलन सरकाओ<त>(मानक: त) -> त { लौटाओ मानक << १; }
                 """),new dev.bhash.frontend.SourceFile("main.bhash","""
                 आयात बिट.पात्र;
                 आयात बिट.सरकाओ;
-                कार्य मुख्य() -> शून्य {
+                फलन मुख्य() -> शून्य {
                     स्थिर वस्तु: पात्र<पात्र<पूर्णांक>> = नया पात्र<पात्र<पूर्णांक>>();
                     लिखो(पात्र<पात्र<पूर्णांक>>.लो(), सरकाओ<पूर्णांक>(३));
                     लिखो(बिट.पात्र<पात्र<पूर्णांक>>.उच्च >> ६३);
@@ -117,12 +117,12 @@ abstract class ManagedCompilerTest {
     @Test void bitwiseOperatorsRejectBooleansRealsTextReferencesAndWrongGenericArguments() {
         for (String operator : List.of("&","|","^","<<",">>",">>>")) {
             for (String operands : List.of("सत्य OP असत्य","१.० OP २.०","१ OP सत्य","१ OP १.०","\"अ\" OP \"ब\"","रिक्त OP रिक्त"))
-                reject("कार्य मुख्य() -> शून्य { लिखो("+operands.replace("OP",operator)+"); }","Expected");
+                reject("फलन मुख्य() -> शून्य { लिखो("+operands.replace("OP",operator)+"); }","Expected");
         }
         for (String operand : List.of("सत्य","१.०","\"अ\"","रिक्त"))
-            reject("कार्य मुख्य() -> शून्य { लिखो(~"+operand+"); }","Expected");
-        reject("कार्य मुख्य() -> शून्य { लिखो(१ & १ == १); }","Expected");
-        reject("कार्य गलत<त>(मानक: त) -> त { लौटाओ मानक << १; } कार्य मुख्य() -> शून्य { गलत<पाठ>(\"अ\"); }","Expected");
+            reject("फलन मुख्य() -> शून्य { लिखो(~"+operand+"); }","Expected");
+        reject("फलन मुख्य() -> शून्य { लिखो(१ & १ == १); }","Expected");
+        reject("फलन गलत<त>(मानक: त) -> त { लौटाओ मानक << १; } फलन मुख्य() -> शून्य { गलत<पाठ>(\"अ\"); }","Expected");
     }
     @Test void multiFileProjectRunsWithImportsGenericsOverloadsAndSharedObjectIdentity() throws Exception {
         var sources = dev.bhash.frontend.ProjectLoader.load(Path.of("examples/multi-file")).sources();
@@ -145,11 +145,11 @@ abstract class ManagedCompilerTest {
                 }
                 """),new dev.bhash.frontend.SourceFile("factory.bhash","""
                 संकुल पुस्तक;
-                सार्वजनिक कार्य बनाओ() -> पात्र<पूर्णांक> { लौटाओ नया पात्र<पूर्णांक>(); }
+                सार्वजनिक फलन बनाओ() -> पात्र<पूर्णांक> { लौटाओ नया पात्र<पूर्णांक>(); }
                 """),new dev.bhash.frontend.SourceFile("app.bhash","""
                 आयात पुस्तक.पात्र उपनाम डिब्बा;
                 आयात पुस्तक.बनाओ;
-                कार्य मुख्य() -> शून्य {
+                फलन मुख्य() -> शून्य {
                     स्थिर क: डिब्बा<पूर्णांक> = बनाओ();
                     स्थिर ख: पुस्तक.पात्र<पूर्णांक> = नया डिब्बा<पूर्णांक>();
                     स्थिर ग: डिब्बा<पूर्णांक> = क;
@@ -165,7 +165,7 @@ abstract class ManagedCompilerTest {
     }
     @Test void crossFileTypeErrorsFailBeforeInvokingTheTargetToolchain() {
         var sources = List.of(new dev.bhash.frontend.SourceFile("types.bhash","वर्ग वस्तु {}"),
-                new dev.bhash.frontend.SourceFile("main.bhash","कार्य मुख्य() -> शून्य { स्थिर क: वस्तु = १; }"));
+                new dev.bhash.frontend.SourceFile("main.bhash","फलन मुख्य() -> शून्य { स्थिर क: वस्तु = १; }"));
         var error = assertThrows(CompilationException.class,()-> {
             if (clr()) new ClrCompiler().compile(sources,directory.resolve("bad-clr"));
             else new JvmCompiler().compile(sources,directory.resolve("bad.jar"));
@@ -192,7 +192,7 @@ abstract class ManagedCompilerTest {
             assertTrue(result.output.startsWith("भाष:"), result.output);
             assertFalse(result.output.contains("Exception"), result.output);
         }
-        assertThrows(CompilationException.class, () -> compile("कार्य लंबाई() -> पूर्णांक { लौटाओ १; } कार्य मुख्य() -> शून्य {}"));
+        assertThrows(CompilationException.class, () -> compile("फलन लंबाई() -> पूर्णांक { लौटाओ १; } फलन मुख्य() -> शून्य {}"));
         assertThrows(CompilationException.class, () -> body("लिखो(\"a\" + १);"));
     }
     protected final Target target;
@@ -213,7 +213,7 @@ abstract class ManagedCompilerTest {
     }
 
     private Path body(String statements) throws Exception {
-        return compile("कार्य मुख्य() -> शून्य { " + statements + " }");
+        return compile("फलन मुख्य() -> शून्य { " + statements + " }");
     }
 
     private Execution run(Path jar, String input) throws Exception {
@@ -285,7 +285,7 @@ abstract class ManagedCompilerTest {
 
     @Test void loopsScopesForwardCallsAndReturnBranchesWork() throws Exception {
         String source = """
-                कार्य मुख्य() -> शून्य {
+                फलन मुख्य() -> शून्य {
                     मान गिनती: पूर्णांक = ०;
                     मान योग: पूर्णांक = ०;
                     जबतक (गिनती < १०) {
@@ -299,12 +299,12 @@ abstract class ManagedCompilerTest {
                     नमस्ते();
                     (चुनो(१));
                 }
-                कार्य चुनो(संख्या: पूर्णांक) -> पूर्णांक {
+                फलन चुनो(संख्या: पूर्णांक) -> पूर्णांक {
                     यदि (संख्या == ०) { लौटाओ १०; }
                     अन्यथा यदि (संख्या == १) { लौटाओ २०; }
                     अन्यथा { लौटाओ ३०; }
                 }
-                कार्य नमस्ते() -> शून्य { लिखो("ठीक"); लौटाओ; }
+                फलन नमस्ते() -> शून्य { लिखो("ठीक"); लौटाओ; }
                 """;
         var result = run(compile(source), "");
         assertEquals(0, result.exit);
@@ -313,9 +313,9 @@ abstract class ManagedCompilerTest {
 
     @Test void shortCircuitSkipsCallsAndArgumentsEvaluateLeftToRight() throws Exception {
         String source = """
-                कार्य जांच() -> तार्किक { लिखो("नहीं"); लौटाओ सत्य; }
-                कार्य पहचान(संख्या: पूर्णांक) -> पूर्णांक { लिखो(संख्या); लौटाओ संख्या; }
-                कार्य मुख्य() -> शून्य {
+                फलन जांच() -> तार्किक { लिखो("नहीं"); लौटाओ सत्य; }
+                फलन पहचान(संख्या: पूर्णांक) -> पूर्णांक { लिखो(संख्या); लौटाओ संख्या; }
+                फलन मुख्य() -> शून्य {
                     लिखो(असत्य && जांच(), सत्य || जांच());
                     लिखो(पहचान(१), पहचान(२));
                 }
@@ -357,8 +357,8 @@ abstract class ManagedCompilerTest {
 
     @Test void normalizedIdentifiersResolveAndCanonicalDuplicatesFail() throws Exception {
         assertEquals("५\n", run(body("मान क़दम: पूर्णांक = ५; लिखो(क़दम);"), "").output);
-        reject("कार्य मुख्य() -> शून्य { मान क़दम: पूर्णांक = १; मान क़दम: पूर्णांक = २; }", "Duplicate binding");
-        reject("कार्य क़दम() -> शून्य {} कार्य क़दम() -> शून्य {} कार्य मुख्य() -> शून्य {}", "Duplicate");
+        reject("फलन मुख्य() -> शून्य { मान क़दम: पूर्णांक = १; मान क़दम: पूर्णांक = २; }", "Duplicate binding");
+        reject("फलन क़दम() -> शून्य {} फलन क़दम() -> शून्य {} फलन मुख्य() -> शून्य {}", "Duplicate");
     }
 
     private void reject(String source, String message) {
@@ -384,32 +384,32 @@ abstract class ManagedCompilerTest {
         invalid.put("मान संख्या: पूर्णांक = संख्या;", "Undefined");
         invalid.put("मान पढ़ो: पूर्णांक = १; पढ़ो();", "not callable");
         invalid.put("१ + २;", "Only a function call");
-        for (var entry : invalid.entrySet()) reject("कार्य मुख्य() -> शून्य { " + entry.getKey() + " }", entry.getValue());
+        for (var entry : invalid.entrySet()) reject("फलन मुख्य() -> शून्य { " + entry.getKey() + " }", entry.getValue());
     }
 
     @Test void rejectsBadSignaturesScopeAndControlFlow() {
         reject("", "मुख्य");
-        reject("कार्य मुख्य(संख्या: पूर्णांक) -> शून्य {}", "मुख्य");
-        reject("कार्य मुख्य() -> पूर्णांक { लौटाओ १; }", "मुख्य");
-        reject("कार्य पढ़ो() -> पूर्णांक { लौटाओ १; } कार्य मुख्य() -> शून्य {}", "reserved");
-        reject("कार्य मुख्य() -> शून्य { विराम; }", "Loop control");
-        reject("कार्य मुख्य() -> शून्य { जारी; }", "Loop control");
-        reject("कार्य मुख्य() -> शून्य { लौटाओ १; }", "Void function");
-        reject("कार्य मुख्य() -> शून्य { लौटाओ; लिखो(१); }", "Unreachable");
-        reject("कार्य जांच() -> पूर्णांक { यदि (सत्य) { लौटाओ १; } } कार्य मुख्य() -> शून्य {}", "every path");
-        reject("कार्य जांच() -> पूर्णांक { लौटाओ; } कार्य मुख्य() -> शून्य {}", "Return value");
-        reject("कार्य जांच(संख्या: पूर्णांक) -> पूर्णांक { संख्या = २; लौटाओ संख्या; } कार्य मुख्य() -> शून्य {}", "immutable");
-        reject("कार्य जांच(संख्या: पूर्णांक) -> शून्य { मान संख्या: पूर्णांक = १; } कार्य मुख्य() -> शून्य {}", "Duplicate binding");
-        reject("कार्य जांच(संख्या: पूर्णांक, संख्या: पूर्णांक) -> शून्य {} कार्य मुख्य() -> शून्य {}", "Duplicate binding");
-        reject("कार्य मुख्य() -> शून्य { { मान संख्या: पूर्णांक = १; } लिखो(संख्या); }", "Undefined");
-        reject("कार्य जांच(संख्या: पूर्णांक) -> शून्य {} कार्य मुख्य() -> शून्य { जांच(सत्य); }", "Expected");
+        reject("फलन मुख्य(संख्या: पूर्णांक) -> शून्य {}", "मुख्य");
+        reject("फलन मुख्य() -> पूर्णांक { लौटाओ १; }", "मुख्य");
+        reject("फलन पढ़ो() -> पूर्णांक { लौटाओ १; } फलन मुख्य() -> शून्य {}", "reserved");
+        reject("फलन मुख्य() -> शून्य { विराम; }", "Loop control");
+        reject("फलन मुख्य() -> शून्य { जारी; }", "Loop control");
+        reject("फलन मुख्य() -> शून्य { लौटाओ १; }", "Void function");
+        reject("फलन मुख्य() -> शून्य { लौटाओ; लिखो(१); }", "Unreachable");
+        reject("फलन जांच() -> पूर्णांक { यदि (सत्य) { लौटाओ १; } } फलन मुख्य() -> शून्य {}", "every path");
+        reject("फलन जांच() -> पूर्णांक { लौटाओ; } फलन मुख्य() -> शून्य {}", "Return value");
+        reject("फलन जांच(संख्या: पूर्णांक) -> पूर्णांक { संख्या = २; लौटाओ संख्या; } फलन मुख्य() -> शून्य {}", "immutable");
+        reject("फलन जांच(संख्या: पूर्णांक) -> शून्य { मान संख्या: पूर्णांक = १; } फलन मुख्य() -> शून्य {}", "Duplicate binding");
+        reject("फलन जांच(संख्या: पूर्णांक, संख्या: पूर्णांक) -> शून्य {} फलन मुख्य() -> शून्य {}", "Duplicate binding");
+        reject("फलन मुख्य() -> शून्य { { मान संख्या: पूर्णांक = १; } लिखो(संख्या); }", "Undefined");
+        reject("फलन जांच(संख्या: पूर्णांक) -> शून्य {} फलन मुख्य() -> शून्य { जांच(सत्य); }", "Expected");
     }
 
     @Test void rejectsOutOfRangeLiteralsAndMalformedUnicodeBeforeWritingOutput() throws Exception {
-        reject("कार्य मुख्य() -> शून्य { लिखो(9223372036854775808); }", "64-bit");
-        reject("कार्य मुख्य() -> शून्य { लिखो(-9223372036854775809); }", "64-bit");
-        reject("कार्य मुख्य() -> शून्य { लिखो(" + "9".repeat(400) + ".0); }", "binary64");
-        reject("कार्य मुख्य() -> शून्य { लिखो(\"\\uD800\"); }", "surrogate");
+        reject("फलन मुख्य() -> शून्य { लिखो(9223372036854775808); }", "64-bit");
+        reject("फलन मुख्य() -> शून्य { लिखो(-9223372036854775809); }", "64-bit");
+        reject("फलन मुख्य() -> शून्य { लिखो(" + "9".repeat(400) + ".0); }", "binary64");
+        reject("फलन मुख्य() -> शून्य { लिखो(\"\\uD800\"); }", "surrogate");
         Path output = directory.resolve("existing.jar");
         Files.writeString(output, "existing artifact");
         assertThrows(CompilationException.class, () -> new JvmCompiler().compile("bad.bhash", "कार्य", output));
@@ -418,7 +418,7 @@ abstract class ManagedCompilerTest {
 
     @Test void cliCompileProtectsSourceAndReportsErrorsAndSupportedTargets() throws Exception {
         Path source = directory.resolve("input.bhash");
-        Files.writeString(source, "कार्य मुख्य() -> शून्य { लिखो(१२०); }");
+        Files.writeString(source, "फलन मुख्य() -> शून्य { लिखो(१२०); }");
         var stdout = new ByteArrayOutputStream();
         var stderr = new ByteArrayOutputStream();
         var out = new PrintStream(stdout, true, StandardCharsets.UTF_8);
@@ -426,7 +426,7 @@ abstract class ManagedCompilerTest {
         assertEquals(0, Main.run(new String[]{"compile", source.toString(), "--target", clr() ? "clr" : "jvm"}, out, err));
         assertEquals("१२०\n", run(directory.resolve(clr() ? "input-clr/BhashProgram.dll" : "input.jar"), "").output);
         assertEquals(2, Main.run(new String[]{"compile", source.toString(), "--target", clr() ? "clr" : "jvm", "-o", source.toString()}, out, err));
-        assertTrue(Files.readString(source).contains("कार्य"));
+        assertTrue(Files.readString(source).contains("फलन"));
         Path custom = directory.resolve(clr() ? "output folder/custom program-clr" : "output folder/custom program.jar");
         assertEquals(0, Main.run(new String[]{"compile", source.toString(), "--target", clr() ? "clr" : "jvm", "-o", custom.toString()}, out, err));
         assertEquals("१२०\n", run(clr() ? custom.resolve("BhashProgram.dll") : custom, "").output);
@@ -436,7 +436,7 @@ abstract class ManagedCompilerTest {
         assertEquals(2, Main.run(new String[]{"compile", source.toString(), "--unknown"}, out, err));
         assertEquals(0, Main.run(new String[]{"targets"}, out, err));
         assertTrue(stdout.toString(StandardCharsets.UTF_8).contains("[implemented]"));
-        Files.writeString(source, "कार्य मुख्य() -> शून्य { लिखो(अनजान); }");
+        Files.writeString(source, "फलन मुख्य() -> शून्य { लिखो(अनजान); }");
         assertEquals(1, Main.run(new String[]{"compile", source.toString(), "--target", clr() ? "clr" : "jvm"}, out, err));
         assertTrue(stderr.toString(StandardCharsets.UTF_8).contains("Undefined variable"));
     }
@@ -458,15 +458,15 @@ abstract class ManagedCompilerTest {
         String source = """
                 वर्ग वस्तु {
                     मान मूल्य: पूर्णांक = १;
-                    कार्य स्वयं() -> वस्तु { लौटाओ यह; }
-                    कार्य बढ़ाओ() -> शून्य { मूल्य = मूल्य + १; }
+                    फलन स्वयं() -> वस्तु { लौटाओ यह; }
+                    फलन बढ़ाओ() -> शून्य { मूल्य = मूल्य + १; }
                 }
                 वर्ग डिब्बा {
                     मान अंदर: वस्तु;
                     निर्माता(अंदर: वस्तु) { यह.अंदर = अंदर; }
-                    कार्य लो() -> वस्तु { लौटाओ अंदर; }
+                    फलन लो() -> वस्तु { लौटाओ अंदर; }
                 }
-                कार्य मुख्य() -> शून्य {
+                फलन मुख्य() -> शून्य {
                     स्थिर पात्र: डिब्बा = नया डिब्बा(नया वस्तु());
                     पात्र.लो().बढ़ाओ();
                     पात्र.अंदर.मूल्य = पात्र.अंदर.मूल्य + ३;
@@ -483,25 +483,25 @@ abstract class ManagedCompilerTest {
         String source = """
                 वर्ग प्रथम {
                     संरक्षित निर्माता() {}
-                    संरक्षित कार्य बीज() -> पूर्णांक { लौटाओ १; }
-                    कार्य मानदो() -> पूर्णांक { लौटाओ यह.बीज(); }
+                    संरक्षित फलन बीज() -> पूर्णांक { लौटाओ १; }
+                    फलन मानदो() -> पूर्णांक { लौटाओ यह.बीज(); }
                 }
                 वर्ग द्वितीय विस्तार प्रथम {
-                    अधिलेखन कार्य मानदो() -> पूर्णांक { लौटाओ आधार.मानदो() + २; }
-                    कार्य जांच(अन्य: द्वितीय) -> पूर्णांक { लौटाओ अन्य.बीज(); }
+                    अधिलेखन फलन मानदो() -> पूर्णांक { लौटाओ आधार.मानदो() + २; }
+                    फलन जांच(अन्य: द्वितीय) -> पूर्णांक { लौटाओ अन्य.बीज(); }
                 }
                 वर्ग तृतीय विस्तार द्वितीय {
-                    अधिलेखन कार्य मानदो() -> पूर्णांक { लौटाओ आधार.मानदो() + ४; }
+                    अधिलेखन फलन मानदो() -> पूर्णांक { लौटाओ आधार.मानदो() + ४; }
                 }
                 वर्ग गुप्त {
                     निजी मान रहस्य: पूर्णांक = ९;
-                    निजी कार्य छिपा() -> पूर्णांक { लौटाओ यह.रहस्य; }
-                    कार्य लो(अन्य: बालक) -> पूर्णांक { लौटाओ अन्य.रहस्य + अन्य.छिपा(); }
+                    निजी फलन छिपा() -> पूर्णांक { लौटाओ यह.रहस्य; }
+                    फलन लो(अन्य: बालक) -> पूर्णांक { लौटाओ अन्य.रहस्य + अन्य.छिपा(); }
                 }
                 वर्ग बालक विस्तार गुप्त {}
-                कार्य बनाओ() -> प्रथम { लौटाओ नया तृतीय(); }
-                कार्य पढ़(वस्तु: प्रथम) -> पूर्णांक { लौटाओ वस्तु.मानदो(); }
-                कार्य मुख्य() -> शून्य {
+                फलन बनाओ() -> प्रथम { लौटाओ नया तृतीय(); }
+                फलन पढ़(वस्तु: प्रथम) -> पूर्णांक { लौटाओ वस्तु.मानदो(); }
+                फलन मुख्य() -> शून्य {
                     मान आधारवस्तु: प्रथम = नया द्वितीय();
                     आधारवस्तु = बनाओ();
                     लिखो(पढ़(आधारवस्तु), पढ़(नया द्वितीय()), आधारवस्तु == रिक्त, नया द्वितीय().जांच(नया तृतीय()), नया गुप्त().लो(नया बालक()));
@@ -526,16 +526,16 @@ abstract class ManagedCompilerTest {
                         लिखो(यह.संख्या, यह.दशांश, यह.सही, यह.नाम, यह.अन्य == रिक्त, यह.सीमा);
                     }
                 }
-                कार्य मुख्य() -> शून्य { नया पात्र(); }
+                फलन मुख्य() -> शून्य { नया पात्र(); }
                 """;
         assertEquals("मूल\n० ०.० असत्य  सत्य १०\n", run(compile(source), "").output);
     }
 
     @Test void nullFieldAndMethodDereferencesFailCleanly() throws Exception {
         String source = """
-                वर्ग वस्तु { मान संख्या: पूर्णांक; कार्य मानदो(मानक: पूर्णांक) -> पूर्णांक { लौटाओ मानक; } }
-                कार्य चिह्न() -> पूर्णांक { लिखो("दुष्प्रभाव"); लौटाओ १; }
-                कार्य मुख्य() -> शून्य {
+                वर्ग वस्तु { मान संख्या: पूर्णांक; फलन मानदो(मानक: पूर्णांक) -> पूर्णांक { लौटाओ मानक; } }
+                फलन चिह्न() -> पूर्णांक { लिखो("दुष्प्रभाव"); लौटाओ १; }
+                फलन मुख्य() -> शून्य {
                     स्थिर वस्तु: वस्तु = रिक्त;
                     यदि (पढ़ो() == ०) { वस्तु.संख्या = चिह्न(); }
                     अन्यथा { लिखो(वस्तु.मानदो(चिह्न())); }
@@ -553,54 +553,54 @@ abstract class ManagedCompilerTest {
 
     @Test void accessControlRejectsPrivateAndProtectedMembers() {
         String prefix = "वर्ग मूल { निजी मान गुप्त: पूर्णांक; संरक्षित मान धन: पूर्णांक; "
-                + "निजी कार्य छिपा() -> पूर्णांक { लौटाओ १; } संरक्षित निर्माता() {} } ";
-        reject(prefix + "कार्य मुख्य() -> शून्य { नया मूल(); }", "Constructor is not accessible");
-        String members = "वर्ग वस्तु { निजी मान संख्या: पूर्णांक; निजी कार्य मानदो() -> पूर्णांक { लौटाओ १; } } ";
-        reject(members + "कार्य मुख्य() -> शून्य { लिखो(नया वस्तु().संख्या); }", "not accessible");
-        reject(members + "कार्य मुख्य() -> शून्य { नया वस्तु().मानदो(); }", "not accessible");
-        reject(prefix + "वर्ग बच्चा विस्तार मूल { कार्य जांच(अन्य: मूल) -> पूर्णांक { लौटाओ अन्य.धन; } } कार्य मुख्य() -> शून्य {}", "not accessible");
-        reject("वर्ग मूल { संरक्षित मान संख्या: पूर्णांक; } कार्य मुख्य() -> शून्य { लिखो(नया मूल().संख्या); }", "not accessible");
+                + "निजी फलन छिपा() -> पूर्णांक { लौटाओ १; } संरक्षित निर्माता() {} } ";
+        reject(prefix + "फलन मुख्य() -> शून्य { नया मूल(); }", "Constructor is not accessible");
+        String members = "वर्ग वस्तु { निजी मान संख्या: पूर्णांक; निजी फलन मानदो() -> पूर्णांक { लौटाओ १; } } ";
+        reject(members + "फलन मुख्य() -> शून्य { लिखो(नया वस्तु().संख्या); }", "not accessible");
+        reject(members + "फलन मुख्य() -> शून्य { नया वस्तु().मानदो(); }", "not accessible");
+        reject(prefix + "वर्ग बच्चा विस्तार मूल { फलन जांच(अन्य: मूल) -> पूर्णांक { लौटाओ अन्य.धन; } } फलन मुख्य() -> शून्य {}", "not accessible");
+        reject("वर्ग मूल { संरक्षित मान संख्या: पूर्णांक; } फलन मुख्य() -> शून्य { लिखो(नया मूल().संख्या); }", "not accessible");
     }
 
     @Test void rejectsInvalidClassesOverridesAndObjectTypeAssignments() {
-        String main = " कार्य मुख्य() -> शून्य {}";
+        String main = " फलन मुख्य() -> शून्य {}";
         reject("वर्ग वस्तु {} वर्ग वस्तु {}" + main, "Duplicate class");
         reject("वर्ग बच्चा विस्तार अज्ञात {}" + main, "Unknown base class");
         reject("वर्ग प्रथम विस्तार द्वितीय {} वर्ग द्वितीय विस्तार प्रथम {}" + main, "cycle");
         reject("वर्ग वस्तु { मान संख्या: पूर्णांक; मान संख्या: पूर्णांक; }" + main, "Duplicate or hidden");
         reject("वर्ग मूल { मान संख्या: पूर्णांक; } वर्ग बच्चा विस्तार मूल { मान संख्या: पूर्णांक; }" + main, "hidden");
-        reject("वर्ग वस्तु { अधिलेखन कार्य जांच() -> शून्य {} }" + main, "Override requires");
-        reject("वर्ग मूल { कार्य जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { कार्य जांच() -> शून्य {} }" + main, "अधिलेखन");
-        reject("वर्ग मूल { कार्य जांच() -> पूर्णांक { लौटाओ १; } } वर्ग बच्चा विस्तार मूल { अधिलेखन कार्य जांच() -> पाठ { लौटाओ \"एक\"; } }" + main, "preserve");
-        reject("वर्ग मूल { कार्य जांच(संख्या: पूर्णांक) -> शून्य {} } वर्ग बच्चा विस्तार मूल { अधिलेखन कार्य जांच(संख्या: पाठ) -> शून्य {} }" + main, "preserve");
-        reject("वर्ग मूल { निजी कार्य जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { अधिलेखन कार्य जांच() -> शून्य {} }" + main, "non-private");
-        reject("वर्ग मूल { कार्य जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { निजी अधिलेखन कार्य जांच() -> शून्य {} }" + main, "narrow access");
+        reject("वर्ग वस्तु { अधिलेखन फलन जांच() -> शून्य {} }" + main, "Override requires");
+        reject("वर्ग मूल { फलन जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { फलन जांच() -> शून्य {} }" + main, "अधिलेखन");
+        reject("वर्ग मूल { फलन जांच() -> पूर्णांक { लौटाओ १; } } वर्ग बच्चा विस्तार मूल { अधिलेखन फलन जांच() -> पाठ { लौटाओ \"एक\"; } }" + main, "preserve");
+        reject("वर्ग मूल { फलन जांच(संख्या: पूर्णांक) -> शून्य {} } वर्ग बच्चा विस्तार मूल { अधिलेखन फलन जांच(संख्या: पाठ) -> शून्य {} }" + main, "preserve");
+        reject("वर्ग मूल { निजी फलन जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { अधिलेखन फलन जांच() -> शून्य {} }" + main, "non-private");
+        reject("वर्ग मूल { फलन जांच() -> शून्य {} } वर्ग बच्चा विस्तार मूल { निजी अधिलेखन फलन जांच() -> शून्य {} }" + main, "narrow access");
         reject("वर्ग वस्तु { निर्माता() {} निर्माता() {} }" + main, "Duplicate constructor");
         reject("वर्ग मूल { निर्माता(संख्या: पूर्णांक) {} } वर्ग बच्चा विस्तार मूल {}" + main, "argument count");
         reject("वर्ग मूल { निजी निर्माता() {} } वर्ग बच्चा विस्तार मूल {}" + main, "Base constructor");
-        reject("कार्य मुख्य() -> शून्य { स्थिर वस्तु: अज्ञात = रिक्त; }", "Unknown type");
-        reject("कार्य मुख्य() -> शून्य { नया अज्ञात(); }", "Unknown class");
-        reject("वर्ग मूल {} वर्ग बच्चा विस्तार मूल {} कार्य मुख्य() -> शून्य { स्थिर वस्तु: बच्चा = नया मूल(); }", "Expected");
-        reject("वर्ग प्रथम {} वर्ग द्वितीय {} कार्य मुख्य() -> शून्य { लिखो(नया प्रथम() == नया द्वितीय()); }", "unrelated");
-        reject("वर्ग वस्तु {} कार्य मुख्य() -> शून्य { लिखो(नया वस्तु()); }", "primitive fields");
-        reject("वर्ग वस्तु {} कार्य मुख्य() -> शून्य { नया वस्तु().अज्ञात(); }", "Undefined method");
-        reject("कार्य मुख्य() -> शून्य { मान संख्या: पूर्णांक = १; संख्या.अज्ञात(); }", "class instance");
-        reject("वर्ग वस्तु {} कार्य मुख्य() -> शून्य { नया वस्तु() = नया वस्तु(); }", "Assignment requires");
+        reject("फलन मुख्य() -> शून्य { स्थिर वस्तु: अज्ञात = रिक्त; }", "Unknown type");
+        reject("फलन मुख्य() -> शून्य { नया अज्ञात(); }", "Unknown class");
+        reject("वर्ग मूल {} वर्ग बच्चा विस्तार मूल {} फलन मुख्य() -> शून्य { स्थिर वस्तु: बच्चा = नया मूल(); }", "Expected");
+        reject("वर्ग प्रथम {} वर्ग द्वितीय {} फलन मुख्य() -> शून्य { लिखो(नया प्रथम() == नया द्वितीय()); }", "unrelated");
+        reject("वर्ग वस्तु {} फलन मुख्य() -> शून्य { लिखो(नया वस्तु()); }", "primitive fields");
+        reject("वर्ग वस्तु {} फलन मुख्य() -> शून्य { नया वस्तु().अज्ञात(); }", "Undefined method");
+        reject("फलन मुख्य() -> शून्य { मान संख्या: पूर्णांक = १; संख्या.अज्ञात(); }", "class instance");
+        reject("वर्ग वस्तु {} फलन मुख्य() -> शून्य { नया वस्तु() = नया वस्तु(); }", "Assignment requires");
     }
 
     @Test void rejectsUnsafeConstructorsAndNonconstantFieldInitializers() {
-        String main = " कार्य मुख्य() -> शून्य {}";
+        String main = " फलन मुख्य() -> शून्य {}";
         reject("वर्ग वस्तु { स्थिर सीमा: पूर्णांक; }" + main, "requires an initializer");
         reject("वर्ग वस्तु { मान संख्या: पूर्णांक = पढ़ो(); }" + main, "constant expressions");
         reject("वर्ग वस्तु { मान अन्य: वस्तु = नया वस्तु(); }" + main, "constant expressions");
         reject("वर्ग वस्तु { मान संख्या: पूर्णांक = यह.संख्या; }" + main, "Instance access");
         reject("वर्ग वस्तु { स्थिर सीमा: पूर्णांक = १; निर्माता() { यह.सीमा = २; } }" + main, "immutable");
-        reject("वर्ग वस्तु { निर्माता() { जांच(); } कार्य जांच() -> शून्य {} }" + main, "Constructors cannot call");
+        reject("वर्ग वस्तु { निर्माता() { जांच(); } फलन जांच() -> शून्य {} }" + main, "Constructors cannot call");
         reject("वर्ग वस्तु { निर्माता() { स्थिर स्वयं: वस्तु = यह; } }" + main, "cannot escape");
         reject("वर्ग वस्तु { निर्माता() : आधार() {} }" + main, "requires a parent");
         reject("वर्ग मूल { निर्माता(संख्या: पूर्णांक) {} } वर्ग बच्चा विस्तार मूल { मान संख्या: पूर्णांक; निर्माता() : आधार(यह.संख्या) {} }" + main, "Instance access");
-        reject("कार्य मुख्य() -> शून्य { लिखो(यह); }", "Instance access");
-        reject("वर्ग वस्तु { कार्य जांच() -> शून्य { आधार.जांच(); } }" + main, "parent class");
+        reject("फलन मुख्य() -> शून्य { लिखो(यह); }", "Instance access");
+        reject("वर्ग वस्तु { फलन जांच() -> शून्य { आधार.जांच(); } }" + main, "parent class");
     }
 
     @Test void contractsGenericTypesFunctionsAndStaticMembersExecute() throws Exception {
@@ -610,16 +610,16 @@ abstract class ManagedCompilerTest {
     }
     @Test void overloadsChooseMostSpecificAndDispatchVirtually() throws Exception {
         String source="""
-            अनुबंध नामित { कार्य मानदो() -> पूर्णांक; }
+            अनुबंध नामित { फलन मानदो() -> पूर्णांक; }
             वर्ग मूल पालन नामित {
-                कार्य मानदो() -> पूर्णांक { लौटाओ १; }
-                कार्य जांच(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ संख्या + १०; }
-                कार्य जांच(शब्द: पाठ) -> पूर्णांक { लौटाओ २०; }
+                फलन मानदो() -> पूर्णांक { लौटाओ १; }
+                फलन जांच(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ संख्या + १०; }
+                फलन जांच(शब्द: पाठ) -> पूर्णांक { लौटाओ २०; }
             }
             वर्ग बच्चा विस्तार मूल {
-                अधिलेखन कार्य मानदो() -> पूर्णांक { लौटाओ २; }
-                अधिलेखन कार्य जांच(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ संख्या + १००; }
-                कार्य जांच(मानक: तार्किक) -> पूर्णांक { लौटाओ ३०; }
+                अधिलेखन फलन मानदो() -> पूर्णांक { लौटाओ २; }
+                अधिलेखन फलन जांच(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ संख्या + १००; }
+                फलन जांच(मानक: तार्किक) -> पूर्णांक { लौटाओ ३०; }
             }
             वर्ग पात्र {
                 मान मूल्य: पूर्णांक;
@@ -629,10 +629,10 @@ abstract class ManagedCompilerTest {
                 निर्माता(वस्तु: बच्चा) { यह.मूल्य = ४; }
             }
             वर्ग उपपात्र विस्तार पात्र { निर्माता(मूल्य: पूर्णांक) : आधार(मूल्य) {} }
-            कार्य चुनो(वस्तु: मूल) -> पूर्णांक { लौटाओ १; }
-            कार्य चुनो(वस्तु: बच्चा) -> पूर्णांक { लौटाओ २; }
-            कार्य चुनो(वस्तु: नामित) -> पूर्णांक { लौटाओ ३; }
-            कार्य मुख्य() -> शून्य {
+            फलन चुनो(वस्तु: मूल) -> पूर्णांक { लौटाओ १; }
+            फलन चुनो(वस्तु: बच्चा) -> पूर्णांक { लौटाओ २; }
+            फलन चुनो(वस्तु: नामित) -> पूर्णांक { लौटाओ ३; }
+            फलन मुख्य() -> शून्य {
                 स्थिर मूलवस्तु: मूल = नया बच्चा();
                 स्थिर अनुबंधवस्तु: नामित = मूलवस्तु;
                 लिखो(चुनो(मूलवस्तु), चुनो(नया बच्चा()), चुनो(अनुबंधवस्तु), चुनो(रिक्त));
@@ -646,17 +646,17 @@ abstract class ManagedCompilerTest {
     }
     @Test void nestedGenericsGenericInheritanceAndReferenceArgumentsWork() throws Exception {
         String source="""
-            अनुबंध प्रदाता<त> { कार्य लो() -> त; }
+            अनुबंध प्रदाता<त> { फलन लो() -> त; }
             वर्ग पात्र<त> पालन प्रदाता<त> {
                 मान अंदर: त;
                 निर्माता(मूल्य: त) { यह.अंदर = मूल्य; }
-                कार्य लो() -> त { लौटाओ अंदर; }
+                फलन लो() -> त { लौटाओ अंदर; }
             }
             वर्ग उपपात्र<त> विस्तार पात्र<त> { निर्माता(मूल्य: त) : आधार(मूल्य) {} }
             वर्ग वस्तु { मान संख्या: पूर्णांक = ७; }
-            कार्य पहचान<त>(त: त) -> त { लौटाओ त; }
-            कार्य पहचान<त>(पहला: त, दूसरा: त) -> त { लौटाओ दूसरा; }
-            कार्य मुख्य() -> शून्य {
+            फलन पहचान<त>(त: त) -> त { लौटाओ त; }
+            फलन पहचान<त>(पहला: त, दूसरा: त) -> त { लौटाओ दूसरा; }
+            फलन मुख्य() -> शून्य {
                 स्थिर बाहरी: प्रदाता<पात्र<वस्तु>> = नया उपपात्र<पात्र<वस्तु>>(नया पात्र<वस्तु>(नया वस्तु()));
                 लिखो(बाहरी.लो().लो().संख्या, पहचान<पूर्णांक>(१, ९), पहचान<तार्किक>(सत्य));
             }
@@ -667,54 +667,54 @@ abstract class ManagedCompilerTest {
         String source="""
             वर्ग मूल {
                 संरक्षित साझा मान संख्या: पूर्णांक = १;
-                निजी साझा कार्य रहस्य() -> पूर्णांक { लौटाओ ४; }
-                साझा कार्य लो() -> पूर्णांक { लौटाओ संख्या + रहस्य(); }
+                निजी साझा फलन रहस्य() -> पूर्णांक { लौटाओ ४; }
+                साझा फलन लो() -> पूर्णांक { लौटाओ संख्या + रहस्य(); }
             }
             वर्ग बच्चा विस्तार मूल {
-                साझा कार्य बढ़ाओ() -> शून्य { मूल.संख्या = मूल.संख्या + १; }
+                साझा फलन बढ़ाओ() -> शून्य { मूल.संख्या = मूल.संख्या + १; }
             }
-            कार्य मुख्य() -> शून्य { बच्चा.बढ़ाओ(); लिखो(मूल.लो(), बच्चा.लो()); }
+            फलन मुख्य() -> शून्य { बच्चा.बढ़ाओ(); लिखो(मूल.लो(), बच्चा.लो()); }
             """;
         assertEquals("६ ६\n",run(compile(source),"").output);
     }
     @Test void rejectsInvalidContractsOverloadsAndStaticAccess() {
-        String main=" कार्य मुख्य() -> शून्य {}";
-        reject("अनुबंध क { कार्य लो() -> पूर्णांक; } वर्ग ख पालन क {}"+main,"implement");
-        reject("अनुबंध क { कार्य लो() -> पूर्णांक; } वर्ग ख पालन क { निजी कार्य लो() -> पूर्णांक { लौटाओ १; } }"+main,"implement");
-        reject("अनुबंध क { कार्य लो() -> पूर्णांक; } वर्ग ख पालन क { साझा कार्य लो() -> पूर्णांक { लौटाओ १; } }"+main,"implement");
-        reject("अनुबंध क { कार्य लो() -> पूर्णांक; } वर्ग ख पालन क { कार्य लो() -> पाठ { लौटाओ \"एक\"; } }"+main,"implement");
-        reject("अनुबंध क {} कार्य मुख्य() -> शून्य { नया क(); }","construct an interface");
+        String main=" फलन मुख्य() -> शून्य {}";
+        reject("अनुबंध क { फलन लो() -> पूर्णांक; } वर्ग ख पालन क {}"+main,"implement");
+        reject("अनुबंध क { फलन लो() -> पूर्णांक; } वर्ग ख पालन क { निजी फलन लो() -> पूर्णांक { लौटाओ १; } }"+main,"implement");
+        reject("अनुबंध क { फलन लो() -> पूर्णांक; } वर्ग ख पालन क { साझा फलन लो() -> पूर्णांक { लौटाओ १; } }"+main,"implement");
+        reject("अनुबंध क { फलन लो() -> पूर्णांक; } वर्ग ख पालन क { फलन लो() -> पाठ { लौटाओ \"एक\"; } }"+main,"implement");
+        reject("अनुबंध क {} फलन मुख्य() -> शून्य { नया क(); }","construct an interface");
         reject("अनुबंध क विस्तार ख {} अनुबंध ख विस्तार क {}"+main,"cycle");
         reject("वर्ग क {} वर्ग ख पालन क {}"+main,"interface type");
         reject("अनुबंध क {} वर्ग ख विस्तार क {}"+main,"पालन");
-        reject("अनुबंध क { कार्य लो() -> पूर्णांक; } अनुबंध ख { कार्य लो() -> पाठ; } अनुबंध ग विस्तार क, ख {}"+main,"conflict");
-        reject("कार्य जांच(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ १; } कार्य जांच(संख्या: पूर्णांक) -> पाठ { लौटाओ \"एक\"; }"+main,"Duplicate");
-        reject("वर्ग क {} वर्ग ख {} कार्य जांच(वस्तु: क) -> शून्य {} कार्य जांच(वस्तु: ख) -> शून्य {} कार्य मुख्य() -> शून्य { जांच(रिक्त); }","Ambiguous overload");
-        reject("वर्ग क { मान संख्या: पूर्णांक; साझा कार्य लो() -> पूर्णांक { लौटाओ संख्या; } }"+main,"Instance access");
-        reject("वर्ग क { साझा कार्य लो() -> क { लौटाओ यह; } }"+main,"Instance access");
-        reject("वर्ग क { कार्य लो() -> पूर्णांक { लौटाओ १; } } कार्य मुख्य() -> शून्य { क.लो(); }","instance receiver");
-        reject("वर्ग क { साझा कार्य लो() -> पूर्णांक { लौटाओ १; } } कार्य मुख्य() -> शून्य { नया क().लो(); }","type receiver");
-        reject("वर्ग क { साझा स्थिर संख्या: पूर्णांक = १; } कार्य मुख्य() -> शून्य { क.संख्या = २; }","immutable");
-        reject("वर्ग क { साझा कार्य लो() -> शून्य {} } वर्ग ख विस्तार क { अधिलेखन कार्य लो() -> शून्य {} }"+main,"Static methods");
+        reject("अनुबंध क { फलन लो() -> पूर्णांक; } अनुबंध ख { फलन लो() -> पाठ; } अनुबंध ग विस्तार क, ख {}"+main,"conflict");
+        reject("फलन जांच(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ १; } फलन जांच(संख्या: पूर्णांक) -> पाठ { लौटाओ \"एक\"; }"+main,"Duplicate");
+        reject("वर्ग क {} वर्ग ख {} फलन जांच(वस्तु: क) -> शून्य {} फलन जांच(वस्तु: ख) -> शून्य {} फलन मुख्य() -> शून्य { जांच(रिक्त); }","Ambiguous overload");
+        reject("वर्ग क { मान संख्या: पूर्णांक; साझा फलन लो() -> पूर्णांक { लौटाओ संख्या; } }"+main,"Instance access");
+        reject("वर्ग क { साझा फलन लो() -> क { लौटाओ यह; } }"+main,"Instance access");
+        reject("वर्ग क { फलन लो() -> पूर्णांक { लौटाओ १; } } फलन मुख्य() -> शून्य { क.लो(); }","instance receiver");
+        reject("वर्ग क { साझा फलन लो() -> पूर्णांक { लौटाओ १; } } फलन मुख्य() -> शून्य { नया क().लो(); }","type receiver");
+        reject("वर्ग क { साझा स्थिर संख्या: पूर्णांक = १; } फलन मुख्य() -> शून्य { क.संख्या = २; }","immutable");
+        reject("वर्ग क { साझा फलन लो() -> शून्य {} } वर्ग ख विस्तार क { अधिलेखन फलन लो() -> शून्य {} }"+main,"Static methods");
         reject("वर्ग क { साझा निर्माता() {} }"+main,"Static constructors");
     }
     @Test void rejectsUnsafeGenericInstantiations() {
         String box="वर्ग पात्र<त> { मान अंदर: त; निर्माता(मूल्य: त) { यह.अंदर = मूल्य; } } ";
-        reject(box+"कार्य मुख्य() -> शून्य { नया पात्र<पूर्णांक>(\"गलत\"); }","Expected");
-        reject(box+"कार्य मुख्य() -> शून्य { स्थिर गलत: पात्र<पाठ> = नया पात्र<पूर्णांक>(१); }","Expected");
-        reject(box+"कार्य मुख्य() -> शून्य { नया पात्र<पूर्णांक, पाठ>(१); }","type argument count");
-        reject(box+"कार्य मुख्य() -> शून्य { नया पात्र<अज्ञात>(रिक्त); }","Unknown type");
-        reject(box+"कार्य मुख्य() -> शून्य { स्थिर गलत: पात्र = रिक्त; }","explicit type arguments");
-        reject("वर्ग पात्र<त, त> {} कार्य मुख्य() -> शून्य {}","Duplicate type parameter");
-        reject("वर्ग पात्र<त> {} वर्ग पात्र {} कार्य मुख्य() -> शून्य {}","Duplicate type");
-        reject("कार्य पढ़ो<त>() -> त { लौटाओ रिक्त; } कार्य मुख्य() -> शून्य {}","Reserved function");
-        reject("वर्ग पात्र<त> { कार्य लो() -> पूर्णांक { लौटाओ \"गलत\"; } } कार्य मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); }","Expected");
+        reject(box+"फलन मुख्य() -> शून्य { नया पात्र<पूर्णांक>(\"गलत\"); }","Expected");
+        reject(box+"फलन मुख्य() -> शून्य { स्थिर गलत: पात्र<पाठ> = नया पात्र<पूर्णांक>(१); }","Expected");
+        reject(box+"फलन मुख्य() -> शून्य { नया पात्र<पूर्णांक, पाठ>(१); }","type argument count");
+        reject(box+"फलन मुख्य() -> शून्य { नया पात्र<अज्ञात>(रिक्त); }","Unknown type");
+        reject(box+"फलन मुख्य() -> शून्य { स्थिर गलत: पात्र = रिक्त; }","explicit type arguments");
+        reject("वर्ग पात्र<त, त> {} फलन मुख्य() -> शून्य {}","Duplicate type parameter");
+        reject("वर्ग पात्र<त> {} वर्ग पात्र {} फलन मुख्य() -> शून्य {}","Duplicate type");
+        reject("फलन पढ़ो<त>() -> त { लौटाओ रिक्त; } फलन मुख्य() -> शून्य {}","Reserved function");
+        reject("वर्ग पात्र<त> { फलन लो() -> पूर्णांक { लौटाओ \"गलत\"; } } फलन मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); }","Expected");
     }
 
     @Test void staticInitializerFailuresReportBhashDiagnostics() throws Exception {
         var result=run(compile("""
             वर्ग गलत { साझा मान संख्या: पूर्णांक = १ / ०; }
-            कार्य मुख्य() -> शून्य { लिखो(गलत.संख्या); }
+            फलन मुख्य() -> शून्य { लिखो(गलत.संख्या); }
             """),"");
         assertEquals(1,result.exit);
         assertTrue(result.output.startsWith("भाष: शून्य से भाग"),result.output);
@@ -732,7 +732,7 @@ abstract class ManagedCompilerTest {
     }
     @Test void switchHandlesLongLimitsTextValuesBooleanAndDefaultPosition() throws Exception {
         String source="""
-            कार्य अंक(संख्या: पूर्णांक) -> पूर्णांक {
+            फलन अंक(संख्या: पूर्णांक) -> पूर्णांक {
                 चयन (संख्या) {
                     शेष: लौटाओ ०;
                     विकल्प -९२२३३७२०३६८५४७७५८०८: लौटाओ १;
@@ -740,7 +740,7 @@ abstract class ManagedCompilerTest {
                     विकल्प २१४७४८३६४८: लौटाओ ३;
                 }
             }
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 लिखो(अंक(-९२२३३७२०३६८५४७७५८०८), अंक(९२२३३७२०३६८५४७७५८०७), अंक(२१४७४८३६४८), अंक(५));
                 स्थिर शब्द: पाठ = "नमस्ते";
                 चयन (शब्द) {
@@ -760,9 +760,9 @@ abstract class ManagedCompilerTest {
         String source="""
             वर्ग गिनक {
                 साझा मान गिनती: पूर्णांक = ०;
-                साझा कार्य लो() -> पूर्णांक { गिनती = गिनती + १; लौटाओ २; }
+                साझा फलन लो() -> पूर्णांक { गिनती = गिनती + १; लौटाओ २; }
             }
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 स्थिर संख्या: पूर्णांक = ९;
                 चयन (गिनक.लो()) {
                     विकल्प १: स्थिर संख्या: पूर्णांक = १; लिखो(संख्या);
@@ -780,7 +780,7 @@ abstract class ManagedCompilerTest {
     }
     @Test void switchBreakContinueAndNestedLoopsTargetTheRightConstruct() throws Exception {
         String source="""
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 मान संख्या: पूर्णांक = ०;
                 जबतक (संख्या < ४) {
                     संख्या = संख्या + १;
@@ -801,12 +801,12 @@ abstract class ManagedCompilerTest {
     }
     @Test void switchWorksInsideGenericBodiesAndWithInterfaceCalls() throws Exception {
         String source="""
-            अनुबंध गणक { कार्य लो() -> पूर्णांक; }
-            वर्ग वस्तु पालन गणक { कार्य लो() -> पूर्णांक { लौटाओ २; } }
-            कार्य चुनो<त>(मानक: त) -> पाठ {
+            अनुबंध गणक { फलन लो() -> पूर्णांक; }
+            वर्ग वस्तु पालन गणक { फलन लो() -> पूर्णांक { लौटाओ २; } }
+            फलन चुनो<त>(मानक: त) -> पाठ {
                 चयन (मानक) { विकल्प २: लौटाओ "दो"; शेष: लौटाओ "अन्य"; }
             }
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 स्थिर गणना: गणक = नया वस्तु();
                 लिखो(चुनो<पूर्णांक>(गणना.लो()));
             }
@@ -814,22 +814,22 @@ abstract class ManagedCompilerTest {
         assertEquals("दो\n",run(compile(source),"").output);
     }
     @Test void switchRejectsDuplicateLabelsBadTypesScopeLeaksAndInvalidFlow() {
-        reject("कार्य मुख्य() -> शून्य { चयन (१) { विकल्प १: विकल्प +1: } }","Duplicate विकल्प");
-        reject("कार्य मुख्य() -> शून्य { चयन (०) { विकल्प -०: विकल्प 0: } }","Duplicate विकल्प");
-        reject("कार्य मुख्य() -> शून्य { चयन (\"अ\") { विकल्प \"अ\": विकल्प \"\\u0905\": } }","Duplicate विकल्प");
-        reject("कार्य मुख्य() -> शून्य { चयन (सत्य) { विकल्प सत्य: विकल्प सत्य: } }","Duplicate विकल्प");
-        reject("कार्य मुख्य() -> शून्य { चयन (१) { शेष: शेष: } }","Duplicate शेष");
-        reject("कार्य मुख्य() -> शून्य { चयन (१) { विकल्प \"एक\": } }","Expected");
-        reject("कार्य मुख्य() -> शून्य { चयन (१.०) {} }","चयन requires");
-        reject("वर्ग वस्तु {} कार्य मुख्य() -> शून्य { चयन (नया वस्तु()) {} }","चयन requires");
-        reject("कार्य मुख्य() -> शून्य { चयन (रिक्त) {} }","चयन requires");
-        reject("कार्य मुख्य() -> शून्य { चयन (१) { विकल्प 9223372036854775808: } }","64-bit");
-        reject("कार्य मुख्य() -> शून्य { चयन (१) { शेष: जारी; } }","Loop control");
-        reject("कार्य मुख्य() -> शून्य { चयन (१) { विकल्प १: स्थिर अंदर: पूर्णांक = १; शेष: लिखो(अंदर); } }","Undefined");
-        reject("कार्य मुख्य() -> शून्य { चयन (१) { शेष: विराम; लिखो(१); } }","Unreachable");
-        reject("कार्य गलत(क: पूर्णांक) -> पूर्णांक { चयन (क) { विकल्प १: लौटाओ १; } } कार्य मुख्य() -> शून्य {}","every path");
-        reject("कार्य गलत(क: पूर्णांक) -> पूर्णांक { चयन (क) { विकल्प १: विराम; शेष: लौटाओ १; } } कार्य मुख्य() -> शून्य {}","every path");
-        reject("कार्य मुख्य() -> शून्य { चयन (१) { विकल्प १: लौटाओ; शेष: लौटाओ; } लिखो(१); }","Unreachable");
+        reject("फलन मुख्य() -> शून्य { चयन (१) { विकल्प १: विकल्प +1: } }","Duplicate विकल्प");
+        reject("फलन मुख्य() -> शून्य { चयन (०) { विकल्प -०: विकल्प 0: } }","Duplicate विकल्प");
+        reject("फलन मुख्य() -> शून्य { चयन (\"अ\") { विकल्प \"अ\": विकल्प \"\\u0905\": } }","Duplicate विकल्प");
+        reject("फलन मुख्य() -> शून्य { चयन (सत्य) { विकल्प सत्य: विकल्प सत्य: } }","Duplicate विकल्प");
+        reject("फलन मुख्य() -> शून्य { चयन (१) { शेष: शेष: } }","Duplicate शेष");
+        reject("फलन मुख्य() -> शून्य { चयन (१) { विकल्प \"एक\": } }","Expected");
+        reject("फलन मुख्य() -> शून्य { चयन (१.०) {} }","चयन requires");
+        reject("वर्ग वस्तु {} फलन मुख्य() -> शून्य { चयन (नया वस्तु()) {} }","चयन requires");
+        reject("फलन मुख्य() -> शून्य { चयन (रिक्त) {} }","चयन requires");
+        reject("फलन मुख्य() -> शून्य { चयन (१) { विकल्प 9223372036854775808: } }","64-bit");
+        reject("फलन मुख्य() -> शून्य { चयन (१) { शेष: जारी; } }","Loop control");
+        reject("फलन मुख्य() -> शून्य { चयन (१) { विकल्प १: स्थिर अंदर: पूर्णांक = १; शेष: लिखो(अंदर); } }","Undefined");
+        reject("फलन मुख्य() -> शून्य { चयन (१) { शेष: विराम; लिखो(१); } }","Unreachable");
+        reject("फलन गलत(क: पूर्णांक) -> पूर्णांक { चयन (क) { विकल्प १: लौटाओ १; } } फलन मुख्य() -> शून्य {}","every path");
+        reject("फलन गलत(क: पूर्णांक) -> पूर्णांक { चयन (क) { विकल्प १: विराम; शेष: लौटाओ १; } } फलन मुख्य() -> शून्य {}","every path");
+        reject("फलन मुख्य() -> शून्य { चयन (१) { विकल्प १: लौटाओ; शेष: लौटाओ; } लिखो(१); }","Unreachable");
     }
 
 }

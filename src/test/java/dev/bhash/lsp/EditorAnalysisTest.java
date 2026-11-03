@@ -15,8 +15,8 @@ class EditorAnalysisTest {
         var source=new SourceFile("library.bhash","सार्वजनिक अभिलेख जोड़ा(अ: पूर्णांक, ब: पूर्णांक);");
         assertDoesNotThrow(()->ManagedEmitter.check(List.of(source)));
         assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(source),Target.JVM));
-        assertThrows(CompilationException.class,()->ManagedEmitter.check(List.of(new SourceFile("invalid.bhash","कार्य मुख्य(अ: पूर्णांक) -> शून्य {}"))));
-        assertThrows(CompilationException.class,()->ManagedEmitter.check(List.of(new SourceFile("library.bhash","कार्य गलत() -> पूर्णांक { लौटाओ सत्य; }"))));
+        assertThrows(CompilationException.class,()->ManagedEmitter.check(List.of(new SourceFile("invalid.bhash","फलन मुख्य(अ: पूर्णांक) -> शून्य {}"))));
+        assertThrows(CompilationException.class,()->ManagedEmitter.check(List.of(new SourceFile("library.bhash","फलन गलत() -> पूर्णांक { लौटाओ सत्य; }"))));
     }
     @Test void projectOverlaysIncludeNewFilesAndUnsavedManifestWithoutWritingDisk() throws Exception {
         Files.createDirectories(root.resolve("src"));Files.createDirectories(root.resolve("other"));

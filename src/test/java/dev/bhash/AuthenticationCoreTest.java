@@ -16,7 +16,7 @@ class AuthenticationCoreTest {
         }
     }
     @Test void ordinaryApplicationsDoNotRequireCryptoProviders()throws Exception {
-        assertFalse(ManagedEmitter.core(List.of(new SourceFile("hello.bhash","कार्य मुख्य() -> शून्य { लिखो(१); }"))).authentication());
+        assertFalse(ManagedEmitter.core(List.of(new SourceFile("hello.bhash","फलन मुख्य() -> शून्य { लिखो(१); }"))).authentication());
     }
     @Test void exampleAndItsPureTestsCompileForAllBackends()throws Exception {
         var sources=AuthenticationHttpFixture.sources();

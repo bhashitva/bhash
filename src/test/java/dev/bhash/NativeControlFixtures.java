@@ -9,7 +9,7 @@ final class NativeControlFixtures {
     record Fixture(String name,String source,String expected){}
     static List<Fixture> cases()throws Exception{
         var fixtures=new ArrayList<Fixture>();
-        var bits=new StringBuilder("कार्य जांच(क: पूर्णांक, ख: पूर्णांक) -> शून्य { लिखो(क << ख, क >> ख, क >>> ख, क & ख, क | ख, क ^ ख, ~क); } कार्य मुख्य() -> शून्य {");
+        var bits=new StringBuilder("फलन जांच(क: पूर्णांक, ख: पूर्णांक) -> शून्य { लिखो(क << ख, क >> ख, क >>> ख, क & ख, क | ख, क ^ ख, ~क); } फलन मुख्य() -> शून्य {");
         var expected=new StringBuilder();
         for(long value:new long[]{0,1,-1,Long.MIN_VALUE,Long.MAX_VALUE,0x0123456789abcdefL})for(long count:new long[]{0,1,7,31,32,63,64,65,127,128,-1,-63,-64,-65,Long.MIN_VALUE,Long.MAX_VALUE}){
             bits.append("जांच(").append(value).append(',').append(count).append(");");int distance=(int)(count&63);
@@ -18,8 +18,8 @@ final class NativeControlFixtures {
         bits.append("स्थिर ब: बाइट = परिवर्तित<बाइट>(२५५); लिखो(ब & १५,~ब,ब << १,ब >>> १); }");expected.append("15 -256 510 127\n");
         fixtures.add(new Fixture("shift-boundaries",bits.toString(),ConsoleFixtures.devanagari(expected.toString())));
         fixtures.add(new Fixture("precedence-and-order","""
-            कार्य अंक(क: पूर्णांक) -> पूर्णांक { लिखो(क); लौटाओ क; }
-            कार्य मुख्य() -> शून्य {
+            फलन अंक(क: पूर्णांक) -> पूर्णांक { लिखो(क); लौटाओ क; }
+            फलन मुख्य() -> शून्य {
                 लिखो(१ | २ ^ ३ & १, १ + १ << २ + १, ३२ >> १ >> २, ~१ + ३ * २);
                 लिखो((३ & १)==१ && (४ | १)==५,१ << २ < ५,८ >> १==४);
                 लिखो(० & अंक(१),-१ | अंक(२),० ^ अंक(३));
@@ -30,9 +30,9 @@ final class NativeControlFixtures {
         fixtures.add(new Fixture("selection-values-and-scopes","""
             वर्ग गिनक {
                 मान गिनती: पूर्णांक = ०;
-                कार्य लो() -> पूर्णांक { यह.गिनती=यह.गिनती+१; लौटाओ २; }
+                फलन लो() -> पूर्णांक { यह.गिनती=यह.गिनती+१; लौटाओ २; }
             }
-            कार्य सीमा(क: पूर्णांक) -> पाठ {
+            फलन सीमा(क: पूर्णांक) -> पाठ {
                 चयन (क) {
                     शेष: लौटाओ "अन्य";
                     विकल्प -९२२३३७२०३६८५४७७५८०८: लौटाओ "न्यून";
@@ -40,7 +40,7 @@ final class NativeControlFixtures {
                     विकल्प -१: विकल्प +०: विकल्प १: लौटाओ "समूह";
                 }
             }
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 लिखो(सीमा(-९२२३३७२०३६८५४७७५८०८),सीमा(९२२३३७२०३६८५४७७५८०७),सीमा(०),सीमा(२));
                 स्थिर ग: गिनक = नया गिनक();स्थिर बाहर: पूर्णांक = ९;
                 चयन (ग.लो()) { विकल्प १: स्थिर बाहर: पूर्णांक = १; लिखो(बाहर); विकल्प २: स्थिर बाहर: पूर्णांक = २; लिखो(बाहर); शेष: स्थिर बाहर: पूर्णांक = ३; लिखो(बाहर); }
@@ -57,7 +57,7 @@ final class NativeControlFixtures {
             }
             ""","न्यून अधिक समूह अन्य\n२\n९ १\n२\nकेवल शेष\nअसत्य मिला\nसत्य मिला\nबाइट\nपाठ\nखाली\nordinal\nNUL\n"));
         fixtures.add(new Fixture("nested-targets-and-finally","""
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 मान क: पूर्णांक = ०;
                 जबतक (क < ४) {
                     क=क+१;
@@ -72,7 +72,7 @@ final class NativeControlFixtures {
                     लिखो(क);
                 }
                 मान योग: पूर्णांक = ०;
-                प्रत्येक (अ: पूर्णांक में नया सूची<पूर्णांक>{१,२,३}) {
+                प्रत्येक (नया सूची<पूर्णांक>{१,२,३} में अ: पूर्णांक) {
                     चयन (अ) {
                         विकल्प १: प्रयास { जारी; } अंततः { मानक.पाठ्य.दोहराओ("क",१०); }
                         विकल्प २: प्रयास { विराम; } अंततः { मानक.पाठ्य.दोहराओ("क",१०); }

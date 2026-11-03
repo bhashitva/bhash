@@ -158,7 +158,7 @@ async function newProject() {
     await fs.mkdir(path.join(directory, 'src'));
     await fs.writeFile(path.join(directory, 'bhash.project'), `name=${name}\nsources=src\n`, {encoding: 'utf8', flag: 'wx'});
     const source = path.join(directory, 'src', 'main.bhash');
-    await fs.writeFile(source, 'कार्य मुख्य() -> शून्य {\n    लिखो("नमस्ते, दुनिया!");\n}\n', {encoding: 'utf8', flag: 'wx'});
+    await fs.writeFile(source, 'फलन मुख्य() -> शून्य {\n    लिखो("नमस्ते, दुनिया!");\n}\n', {encoding: 'utf8', flag: 'wx'});
     await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(source));
 }
 export function activate(extensionContext: vscode.ExtensionContext) {

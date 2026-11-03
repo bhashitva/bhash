@@ -21,7 +21,7 @@ class ProjectLoaderTest {
         Path manifest = project("name=परीक्षण\nsources=src,shared\n");
         write("src/दूसरा/ख.bhash","वर्ग ख {}");
         write("src/पहला/क.bhash","वर्ग क {}");
-        write("shared/मुख्य.bhash","कार्य मुख्य() -> शून्य {}");
+        write("shared/मुख्य.bhash","फलन मुख्य() -> शून्य {}");
         write("src/ignored.txt","not a source file");
         var loaded = ProjectLoader.load(directory);
         assertEquals("परीक्षण",loaded.name());
@@ -31,7 +31,7 @@ class ProjectLoaderTest {
                 loaded.sourcePaths().stream().map(p -> p.toString().replace('\\','/')).toList());
     }
     @Test void rejectsBadManifestsMissingSourcesAndOverlappingRoots() throws Exception {
-        write("src/nested/क.bhash","कार्य मुख्य() -> शून्य {}");
+        write("src/nested/क.bhash","फलन मुख्य() -> शून्य {}");
         for (String config : new String[]{"unknown=value", "sources=missing", "sources=src,", "sources=src,src/nested",
                 "sources=../", "sources=src\nname=../bad", "name=first\nname=second"}) {
             var error = assertThrows(IOException.class,()->ProjectLoader.load(project(config)),config);
@@ -42,31 +42,31 @@ class ProjectLoaderTest {
     }
     @Test void defaultsToSrcAndPreservesSingleFileLoadingWithBom() throws Exception {
         project("");
-        Path source = write("src/मुख्य.bhash","\uFEFFकार्य मुख्य() -> शून्य {}");
+        Path source = write("src/मुख्य.bhash","\uFEFFफलन मुख्य() -> शून्य {}");
         assertTrue(ProjectLoader.load(directory).sources().get(0).parse().valid());
         assertTrue(ProjectLoader.load(source).sources().get(0).parse().valid());
     }
     @Test void projectCliCompilesUsingManifestNameAndRejectsSourceOverwrite() throws Exception {
         project("name=sample");
-        Path source = write("src/मुख्य.bhash","कार्य मुख्य() -> शून्य {}");
+        Path source = write("src/मुख्य.bhash","फलन मुख्य() -> शून्य {}");
         var bytes = new ByteArrayOutputStream(); var sink = new PrintStream(bytes,true,StandardCharsets.UTF_8);
         assertEquals(0,Main.run(new String[]{"check",directory.toString()},sink,sink),bytes.toString(StandardCharsets.UTF_8));
         assertEquals(0,Main.run(new String[]{"compile",directory.toString()},sink,sink),bytes.toString(StandardCharsets.UTF_8));
         assertTrue(Files.isRegularFile(directory.resolve("build/sample.jar")));
         assertEquals(2,Main.run(new String[]{"parse",directory.toString()},sink,sink));
         assertEquals(2,Main.run(new String[]{"compile",directory.toString(),"-o",source.toString()},sink,sink));
-        assertEquals("कार्य मुख्य() -> शून्य {}",Files.readString(source));
+        assertEquals("फलन मुख्य() -> शून्य {}",Files.readString(source));
         assertEquals(2,Main.run(new String[]{"compile",directory.toString(),"--target","clr","-o",directory.resolve("src").toString()},sink,sink));
         assertEquals(2,Main.run(new String[]{"compile",directory.toString(),"-o",directory.resolve("bhash.project").toString()},sink,sink));
     }
     @Test void projectSyntaxCheckFindsErrorsInOtherFolders() throws Exception {
-        project(""); write("src/a/क.bhash","कार्य मुख्य() -> शून्य {}"); write("src/b/ख.bhash","वर्ग");
+        project(""); write("src/a/क.bhash","फलन मुख्य() -> शून्य {}"); write("src/b/ख.bhash","वर्ग");
         var bytes = new ByteArrayOutputStream(); var sink = new PrintStream(bytes,true,StandardCharsets.UTF_8);
         assertEquals(1,Main.run(new String[]{"check",directory.toString()},sink,sink));
         assertTrue(bytes.toString(StandardCharsets.UTF_8).contains("ख.bhash"),bytes.toString(StandardCharsets.UTF_8));
     }
     @Test void outputProtectionAlsoCoversResolvedParentSymlinks() throws Exception {
-        project(""); Path source = write("src/मुख्य.bhash","कार्य मुख्य() -> शून्य {}");
+        project(""); Path source = write("src/मुख्य.bhash","फलन मुख्य() -> शून्य {}");
         Path alias = directory.resolve("alias");
         try { Files.createSymbolicLink(alias,directory.resolve("src")); }
         catch (IOException | UnsupportedOperationException | SecurityException unsupported) {

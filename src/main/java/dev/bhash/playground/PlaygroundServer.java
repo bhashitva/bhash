@@ -120,7 +120,7 @@ public final class PlaygroundServer implements AutoCloseable {
                 if(source.isBlank() || source.length()>MAX_SOURCE) throw new Rejected(400,"Enter between 1 and "+MAX_SOURCE+" source characters");
                 if(!Set.of("scratch","program").contains(mode)) throw new Rejected(400,"Unknown editor mode");
                 if(fields.size()!=2) throw new Rejected(400,"Only source and mode are accepted");
-                String full=mode.equals("scratch")?"कार्य मुख्य() -> शून्य {\n"+source+"\n}\n":source;
+                String full=mode.equals("scratch")?"फलन मुख्य() -> शून्य {\n"+source+"\n}\n":source;
                 Job job=submit(full,mode.equals("scratch"));
                 json(exchange,202,jobJson(job));return;
             }

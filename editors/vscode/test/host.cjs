@@ -43,6 +43,8 @@ exports.run=async()=>{
     const label=item=>typeof item.label==='string'?item.label:item.label.label;
     const completion=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,position),list=>list?.items?.some(i=>label(i)==='दोहरा'),'compiler keyword completion');
     assert.ok(completion.items.some(i=>label(i).startsWith('स्थिर')));
+    assert.ok(completion.items.some(i=>label(i)==='फलन · function'));
+    assert.ok(!completion.items.some(i=>label(i)==='कार्य · function'));
     const definition=await vscode.commands.executeCommand('vscode.executeDefinitionProvider',uri,position);
     assert.ok(definition.some(location=>location.uri && path.relative(path.join(workspace,'src','math.bhash'),location.uri.fsPath)===''),'cross-file definition');
     const outline=await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider',uri);assert.ok(outline.some(symbol=>symbol.name==='मुख्य'));
@@ -51,7 +53,7 @@ exports.run=async()=>{
     const restore=new vscode.WorkspaceEdit();restore.replace(uri,new vscode.Range(0,0,document.lineCount,0),source);await vscode.workspace.applyEdit(restore);await document.save();
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'diagnostic clearing');
     // Exercise new features through VS Code's actual provider adapters.
-    const rich='कार्य मुख्य() -> शून्य { स्थिर अंक: सूची<पूर्णांक> = नया सूची<पूर्णांक>(); अंक.जोड़ो(१); }';
+    const rich='फलन मुख्य() -> शून्य { स्थिर अंक: सूची<पूर्णांक> = नया सूची<पूर्णांक>(); अंक.जोड़ो(१); }';
     const change=new vscode.WorkspaceEdit();change.replace(uri,new vscode.Range(0,0,document.lineCount,0),rich);await vscode.workspace.applyEdit(change);
     const memberPosition=document.positionAt(rich.indexOf('अंक.जोड़ो')+'अंक.'.length);
     const memberList=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,memberPosition),list=>list?.items?.some(i=>label(i)==='जोड़ो'),'typed list member completion');
@@ -59,7 +61,7 @@ exports.run=async()=>{
     const signaturePosition=document.positionAt(rich.indexOf('जोड़ो(')+'जोड़ो('.length);
     const signature=await vscode.commands.executeCommand('vscode.executeSignatureHelpProvider',uri,signaturePosition,'(');
     assert.ok(signature?.signatures.some(s=>s.label.includes('पूर्णांक')),'typed list signature help');
-    const standard='आयात मानक.पाठ्य; कार्य मुख्य() -> शून्य { पाठ्य.बाँटो("अ", ","); }';
+    const standard='आयात मानक.पाठ्य; फलन मुख्य() -> शून्य { पाठ्य.बाँटो("अ", ","); }';
     const stdEdit=new vscode.WorkspaceEdit();stdEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),standard);await vscode.workspace.applyEdit(stdEdit);
     const stdPosition=document.positionAt(standard.indexOf('पाठ्य.बाँटो')+'पाठ्य.'.length);
     const stdItems=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,stdPosition),list=>list?.items?.some(i=>label(i)==='बाँटो'),'standard-library completion');
@@ -69,7 +71,7 @@ exports.run=async()=>{
     const stdDoc=await vscode.workspace.openTextDocument(stdDefinitions[0].uri);assert.ok(stdDoc.getText().includes('संकुल मानक;'));
     // Validate the new bundled authentication catalog through the real VS Code
     // adapters. Editing must only analyze this source, never execute its KDF.
-    const authentication='आयात मानक.कूटशब्द; आयात मानक.सत्रप्रबंधक; कार्य मुख्य() -> शून्य { स्थिर म: सत्रप्रबंधक = नया सत्रप्रबंधक("https://example.test"); स्थिर ह: पाठ = कूटशब्द.हैशबनाओ("सुरक्षित-कूटशब्द-भारत😀"); म.साफकरो(); }';
+    const authentication='आयात मानक.कूटशब्द; आयात मानक.सत्रप्रबंधक; फलन मुख्य() -> शून्य { स्थिर म: सत्रप्रबंधक = नया सत्रप्रबंधक("https://example.test"); स्थिर ह: पाठ = कूटशब्द.हैशबनाओ("सुरक्षित-कूटशब्द-भारत😀"); म.साफकरो(); }';
     const authEdit=new vscode.WorkspaceEdit();authEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),authentication);await vscode.workspace.applyEdit(authEdit);
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'authentication diagnostics');
     const passwordItems=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(authentication.indexOf('कूटशब्द.हैशबनाओ')+'कूटशब्द.'.length)),list=>list?.items?.some(i=>label(i)==='हैशबनाओ'),'password hashing completion');

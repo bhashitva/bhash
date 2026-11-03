@@ -8,7 +8,7 @@ for(const target of ['jvm','clr','native'])test(`Windows direct terminal: ${targ
     const folder=fs.mkdtempSync(path.join(os.tmpdir(),'bhash-target-भारत-'));
     try {
         const source=path.join(folder,'console.bhash');
-        fs.writeFileSync(source,'कार्य मुख्य() -> शून्य { लिखो("तैयार😀"); लिखो(पाठपढ़ो()); लिखो(पढ़ो()); }\n');
+        fs.writeFileSync(source,'फलन मुख्य() -> शून्य { लिखो("तैयार😀"); लिखो(पाठपढ़ो()); लिखो(पढ़ो()); }\n');
         const request={java:process.env.BHASH_TEST_JAVA||'java',jar:path.resolve(__dirname,'../server/bhash-compiler.jar'),
             mode:'managed',home:process.env.BHASH_TEST_TOOLCHAIN_HOME||'',operation:'run',target,input:source};
         if(target==='native')assert.ok(fs.existsSync(path.join(request.home,'active.json')),'use an existing SDK; this test must not install one');
@@ -25,7 +25,7 @@ for(const target of ['jvm','clr','native'])test(`Windows direct terminal: ${targ
         };
         let result=await invoke();assert.equal(result.status,0,JSON.stringify(result));
         assert.equal(result.output,'तैयार😀\r\nभारत😀\r\n४२\r\nभारत😀\r\n४२\r\n');
-        fs.writeFileSync(source,'कार्य मुख्य() -> शून्य { लिखो(अनजान); }\n');
+        fs.writeFileSync(source,'फलन मुख्य() -> शून्य { लिखो(अनजान); }\n');
         result=await invoke();assert.equal(result.status,1,JSON.stringify(result));
         assert.match(result.output,/अनजान/);assert.doesNotMatch(result.output,/�/);
     } finally {fs.rmSync(folder,{recursive:true,force:true});}

@@ -27,7 +27,7 @@ class NativeReleaseTest {
     }
     @Test void runtimeContractMatchesHeaderAndEmittedGuard()throws Exception{
         var identity=NativeBuildInfo.identity();assertEquals(15,identity.get("runtime_abi"));
-        String source="कार्य मुख्य() -> शून्य { लिखो(१); }";
+        String source="फलन मुख्य() -> शून्य { लिखो(१); }";
         String ir=LlvmEmitter.emit(ManagedEmitter.core(List.of(new SourceFile("hello.bhash",source))));
         assertTrue(ir.contains("call void @bh_runtime_abi_v15()"));assertTrue(ir.contains("section \""+(NativePlatform.macos()?"__DATA,__bhash_build":NativePlatform.windows()?".bhash":".bhash.build")+"\""));assertTrue(ir.contains("@llvm.used"));
         assertEquals(identity,NativeBuildInfo.identity());
@@ -68,7 +68,7 @@ class NativeReleaseTest {
         files.put("../escape",new byte[0]);assertThrows(IOException.class,()->NativePackage.writeZip(new ByteArrayOutputStream(),"root",files,0));
     }
     @Test void mappingRemovesWorkspacePathsAndRejectsEscapingSources()throws Exception{
-        String text="कार्य मुख्य() -> शून्य { लिखो(१); }";String previous=null;
+        String text="फलन मुख्य() -> शून्य { लिखो(१); }";String previous=null;
         for(String name:List.of("first space","दूसरा-स्थान")){
             Path root=Files.createDirectories(temporary.resolve(name)),file=root.resolve("hello.bhash");Files.writeString(file,text);
             var mapped=NativeCompiler.normalizeSources(List.of(new SourceFile(file.toString(),text)),root);assertEquals("/bhash/source/hello.bhash",mapped.get(0).name());

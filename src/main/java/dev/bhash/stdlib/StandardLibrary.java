@@ -36,7 +36,7 @@ public final class StandardLibrary {
         for(var entry:owners.entrySet()) {
             lines.add("सार्वजनिक वर्ग "+entry.getKey()+" {");lines.add("    निजी निर्माता() {}");
             for(var f:entry.getValue()) {
-                lines.add("    सार्वजनिक साझा कार्य "+f[1]+"("+f[4]+") -> "+f[3]+" { फेंको नया अपवाद(\"मानक पुस्तकालय\"); }");
+                lines.add("    सार्वजनिक साझा फलन "+f[1]+"("+f[4]+") -> "+f[3]+" { फेंको नया अपवाद(\"मानक पुस्तकालय\"); }");
                 natives.put(lines.size(),f[2]);
             }
             lines.add("}");

@@ -253,7 +253,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         }
         var entries = functions.get(Identifiers.key("मुख्य"));
         if (entries == null && requireEntry || entries != null && (entries.size()!=1 || entries.get(0).result != Type.VOID || !entries.get(0).parameters.isEmpty()))
-            throw error(program, "Executable requires exactly one कार्य मुख्य() -> शून्य.");
+            throw error(program, "Executable requires exactly one फलन मुख्य() -> शून्य.");
         var main=entries == null ? null : entries.get(0);
         if (target == Target.JVM) {
             output.append("public final class BhashProgram {\n");

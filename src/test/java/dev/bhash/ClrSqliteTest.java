@@ -41,7 +41,7 @@ class ClrSqliteTest {
     }
     @Test void oldOutputMarkerNeverClaimsUserSqliteLibraries()throws Exception {
         Path output=directory.resolve("preserve");var compiler=new ClrCompiler();
-        compiler.compile("pure.bhash","कार्य मुख्य() -> शून्य {}",output);
+        compiler.compile("pure.bhash","फलन मुख्य() -> शून्य {}",output);
         Files.writeString(output.resolve("bhash_sqlite.dll"),"user-owned");
         assertThrows(java.io.IOException.class,()->compiler.compile("sqlite.bhash",SqliteFixtures.BASIC,output));
         assertEquals("user-owned",Files.readString(output.resolve("bhash_sqlite.dll")));
@@ -54,6 +54,6 @@ class ClrSqliteTest {
         Files.write(library,new byte[]{0});Path log=directory.resolve("tamper.log");
         var child=new ProcessBuilder(ClrCompiler.executable(),output.resolve("BhashProgram.dll").toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try{assertTrue(child.waitFor(30,TimeUnit.SECONDS));assertEquals(1,child.exitValue());assertTrue(Files.readString(log).contains("SQLite रनटाइम का सत्यापन असफल।"));}finally{child.destroyForcibly();}
-        compiler.compile("pure.bhash","कार्य मुख्य() -> शून्य {}",output);assertFalse(Files.exists(library));
+        compiler.compile("pure.bhash","फलन मुख्य() -> शून्य {}",output);assertFalse(Files.exists(library));
     }
 }

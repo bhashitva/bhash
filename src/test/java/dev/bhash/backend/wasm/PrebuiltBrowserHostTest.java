@@ -47,7 +47,7 @@ class PrebuiltBrowserHostTest {
         Path root=fixture();var host=PrebuiltBrowserHost.open(root);String id=host.id();
         for(Path output:List.of(root,root.resolve("program"),directory))
             assertTrue(assertThrows(IOException.class,()->host.compile("unused",output)).getMessage().contains("overlap"));
-        assertThrows(IOException.class,()->new WasmCompiler().compile("hello.bhash","कार्य मुख्य() -> शून्य {}",root));
+        assertThrows(IOException.class,()->new WasmCompiler().compile("hello.bhash","फलन मुख्य() -> शून्य {}",root));
         assertEquals(id,PrebuiltBrowserHost.open(root).id());
     }
     @org.junit.jupiter.api.RepeatedTest(5) void interruptStopsCompilerAndItsDescendantsBeforeReturning() throws Exception {

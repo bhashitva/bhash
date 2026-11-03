@@ -15,7 +15,7 @@ class WasmCompilerTest {
     @Test void invalidExceptionsFailBeforeBrowserPublishing() {
         for (String body:new String[]{"फेंको १;", "फेंको;", "प्रयास {} पकड़ो (क: पूर्णांक) {}", "प्रयास {} अंततः { लौटाओ; }"}) {
             var error=assertThrows(CompilationException.class,()->new WasmCompiler().compile("exceptions.bhash",
-                    "कार्य मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
+                    "फलन मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
             assertTrue(error.getMessage().startsWith("exceptions.bhash:1:"),error.getMessage());
         }
         assertFalse(Files.exists(directory.resolve("web")));
@@ -23,7 +23,7 @@ class WasmCompilerTest {
     @Test void invalidTypeFeaturesFailBeforeBrowserPublishing() {
         for (String body:new String[]{"स्थिर क: बाइट = १;", "लिखो(सुरक्षितरूप<पूर्णांक>(१));", "स्थिर ब: बाइटबफ़र = नया बाइटबफ़र(१); ब[०] = १;"}) {
             var error=assertThrows(CompilationException.class,()->new WasmCompiler().compile("types.bhash",
-                    "कार्य मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
+                    "फलन मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
             assertTrue(error.getMessage().startsWith("types.bhash:1:"),error.getMessage());
         }
         assertFalse(Files.exists(directory.resolve("web")));
@@ -32,14 +32,14 @@ class WasmCompilerTest {
         var compiler = new WasmCompiler();
         assertThrows(CompilationException.class, () -> compiler.compile("bad.bhash", "कार्य", directory.resolve("web")));
         var error = assertThrows(CompilationException.class, () -> compiler.compile("bad.bhash",
-                "कार्य मुख्य() -> शून्य { लिखो(अज्ञात); }", directory.resolve("web")));
+                "फलन मुख्य() -> शून्य { लिखो(अज्ञात); }", directory.resolve("web")));
         assertFalse(error.getMessage().isBlank());
         assertFalse(Files.exists(directory.resolve("web")));
     }
     @Test void crossFileTypeMismatchIsRejectedBeforeBrowserPublishing() {
         var sources = java.util.List.of(
                 new dev.bhash.frontend.SourceFile("types.bhash","संकुल पुस्तक; सार्वजनिक वर्ग वस्तु {}"),
-                new dev.bhash.frontend.SourceFile("app.bhash","आयात पुस्तक.वस्तु; कार्य मुख्य() -> शून्य { स्थिर क: वस्तु = १; }"));
+                new dev.bhash.frontend.SourceFile("app.bhash","आयात पुस्तक.वस्तु; फलन मुख्य() -> शून्य { स्थिर क: वस्तु = १; }"));
         var error = assertThrows(CompilationException.class,()->new WasmCompiler().compile(sources,directory.resolve("web")));
         assertTrue(error.getMessage().startsWith("app.bhash:1:"),error.getMessage());
         assertTrue(error.getMessage().contains("Expected पुस्तक.वस्तु"),error.getMessage());
@@ -48,16 +48,16 @@ class WasmCompilerTest {
     @Test void invalidBitwiseOperandsFailBeforeBrowserPublishing() {
         for (String expression : new String[]{"सत्य & असत्य", "सत्य | असत्य", "सत्य ^ असत्य", "१ << सत्य", "१ >> १.०", "१ >>> \"अ\"", "~रिक्त"}) {
             var error = assertThrows(CompilationException.class,()->new WasmCompiler().compile("bits.bhash",
-                    "कार्य मुख्य() -> शून्य { लिखो("+expression+"); }",directory.resolve("web")));
+                    "फलन मुख्य() -> शून्य { लिखो("+expression+"); }",directory.resolve("web")));
             assertTrue(error.getMessage().contains("Expected"),error.getMessage());
             assertTrue(error.getMessage().startsWith("bits.bhash:1:"),error.getMessage());
         }
         assertFalse(Files.exists(directory.resolve("web")));
     }
     @Test void invalidCollectionTypesFailBeforeBrowserPublishing() {
-        for (String body:new String[]{"स्थिर क: पूर्णांक[] = नया पूर्णांक[]{सत्य};", "स्थिर क: सूची<पाठ> = नया सूची<पूर्णांक>();", "प्रत्येक (क: पूर्णांक में १) {}"}) {
+        for (String body:new String[]{"स्थिर क: पूर्णांक[] = नया पूर्णांक[]{सत्य};", "स्थिर क: सूची<पाठ> = नया सूची<पूर्णांक>();", "प्रत्येक (१ में क: पूर्णांक) {}"}) {
             var error=assertThrows(CompilationException.class,()->new WasmCompiler().compile("collections.bhash",
-                    "कार्य मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
+                    "फलन मुख्य() -> शून्य { "+body+" }",directory.resolve("web")));
             assertTrue(error.getMessage().startsWith("collections.bhash:1:"),error.getMessage());
         }
         assertFalse(Files.exists(directory.resolve("web")));
@@ -65,10 +65,10 @@ class WasmCompilerTest {
     @Test void refusesUnmanagedOutputAndSourceDirectories() throws Exception {
         var compiler = new WasmCompiler();
         Files.writeString(directory.resolve("notes.txt"), "keep");
-        assertThrows(IOException.class, () -> compiler.compile("test.bhash", "कार्य मुख्य() -> शून्य {}", directory));
+        assertThrows(IOException.class, () -> compiler.compile("test.bhash", "फलन मुख्य() -> शून्य {}", directory));
         assertEquals("keep", Files.readString(directory.resolve("notes.txt")));
         Path source = directory.resolve("input.bhash");
-        Files.writeString(source, "कार्य मुख्य() -> शून्य {}");
+        Files.writeString(source, "फलन मुख्य() -> शून्य {}");
         var errors = new ByteArrayOutputStream();
         assertEquals(2, Main.run(new String[]{"compile", source.toString(), "--target", "wasm-browser", "-o", directory.toString()},
                 new PrintStream(OutputStream.nullOutputStream()), new PrintStream(errors)));

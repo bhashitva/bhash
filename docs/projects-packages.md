@@ -62,7 +62,7 @@ A file may begin with exactly one package declaration:
 सार्वजनिक वर्ग ग्राहक {
     निजी मान नाम: पाठ;
     निर्माता(नाम: पाठ) { यह.नाम = नाम; }
-    सार्वजनिक कार्य परिचय() -> पाठ { लौटाओ यह.नाम; }
+    सार्वजनिक फलन परिचय() -> पाठ { लौटाओ यह.नाम; }
 }
 ```
 
@@ -85,7 +85,7 @@ of a given function name must use the same top-level visibility. Duplicate
 parameter signatures remain errors; return types do not distinguish overloads.
 Built-in function names remain reserved in every package.
 
-An executable project must have exactly one global `कार्य मुख्य() -> शून्य`
+An executable project must have exactly one global `फलन मुख्य() -> शून्य`
 across all packages and source roots. Each file does not need an entry point.
 The entry point may be package-private; it is not imported under a short alias.
 This version builds executables, not separately compiled library artifacts.
@@ -101,7 +101,7 @@ Imports follow the optional package declaration and precede declarations:
 सार्वजनिक वर्ग आदेश {
     निजी मान खरीदार: ग्राहक;
     निर्माता(व्यक्ति: ग्राहक) { यह.खरीदार = व्यक्ति; }
-    कार्य ग्राहकनाम() -> पाठ { लौटाओ यह.खरीदार.परिचय(); }
+    फलन ग्राहकनाम() -> पाठ { लौटाओ यह.खरीदार.परिचय(); }
 }
 ```
 

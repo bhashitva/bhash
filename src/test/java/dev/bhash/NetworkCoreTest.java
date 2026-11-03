@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class NetworkCoreTest {
     static final String PURE="""
         आयात मानक.एचटीटीपी; आयात मानक.एचटीटीपीअनुरोध; आयात मानक.जालनियम; आयात मानक.परीक्षण;
-        कार्य मुख्य() -> शून्य {
+        फलन मुख्य() -> शून्य {
             परीक्षण.बराबर("a%20%2B%26%2F%E0%A4%AD%E0%A4%BE%E0%A4%B0%E0%A4%A4%F0%9F%98%80",एचटीटीपी.कूटित("a +&/भारत😀"));
             परीक्षण.बराबर("http://example.com/a/c?q=x",जालनियम.पता("HTTP://EXAMPLE.COM:080/a/b/../c?q=x#part")[०]);
             परीक्षण.बराबर("http://example.com/d?x",जालनियम.समाधान(जालनियम.पता("http://example.com/a/b"),"../d?x")[०]);
@@ -19,7 +19,7 @@ class NetworkCoreTest {
             परीक्षण.बराबर("http://other.test/",जालनियम.समाधान(जालनियम.पता("http://example.com/"),"//other.test")[०]);
             परीक्षण.बराबर("http://example.com/a/x?q=http://other.test/",जालनियम.समाधान(जालनियम.पता("http://example.com/a/b"),"x?q=http://other.test/")[०]);
             परीक्षण.बराबर("http://[::1]:123/a",जालनियम.पता("http://[::1]:123/a")[०]);
-            प्रत्येक (प: पाठ में नया सूची<पाठ>{"file:///tmp/a","http://a@b/","http://a:0/","http://a:65536/","http://a/%xy","http://a/क","http://a/\\u0000"}) {
+            प्रत्येक (नया सूची<पाठ>{"file:///tmp/a","http://a@b/","http://a:0/","http://a:65536/","http://a/%xy","http://a/क","http://a/\\u0000"} में प: पाठ) {
                 मान पकड़ा: तार्किक = असत्य; प्रयास { जालनियम.पता(प); } पकड़ो (ग: अपवाद) { पकड़ा = सत्य; }
                 परीक्षण.सत्यहै(पकड़ा,"अमान्य URL अस्वीकार हो।");
             }
@@ -49,7 +49,7 @@ class NetworkCoreTest {
         }
     }
     @Test void minimalProgramsDoNotEnableNetworking()throws Exception {
-        var core=ManagedEmitter.core(List.of(new SourceFile("minimal.bhash","कार्य मुख्य() -> शून्य {}")));
+        var core=ManagedEmitter.core(List.of(new SourceFile("minimal.bhash","फलन मुख्य() -> शून्य {}")));
         assertFalse(core.networking());assertEquals(1,core.functions().size());assertEquals(0,core.classes().size());
     }
 }
