@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Preserve payload and create isolated implementation branch
         run: |
           cp .github/workflows/database-payload.json.gz "$RUNNER_TEMP/database-payload.json.gz"
