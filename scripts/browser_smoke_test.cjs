@@ -21,6 +21,17 @@ function compile(name, source) {
     build(name, file);
 }
 build('types', path.resolve('examples/types'));
+compile('async-core', `
+वर्ग साधन { सार्वजनिक असमकालिक फलन बंदकरो()->शून्य { प्रतीक्षा मानक.कार्य.विलंब(२); लिखो("सफ़ाई"); } }
+असमकालिक फलन दुगुना(अ:पूर्णांक)->पूर्णांक { प्रतीक्षा मानक.कार्य.विलंब(२); लौटाओ अ*२; }
+असमकालिक फलन मुख्य()->शून्य {
+    स्थिर संकेत:पूर्णांक=पढ़ो();
+    असमकालिक संसाधन(स:साधन=नया साधन()) {
+        यदि(संकेत==१){प्रतीक्षा मानक.कार्य.विलंब(१०००००);}
+        अन्यथा{लिखो(प्रतीक्षा दुगुना(२१));}
+    }
+}
+`);
 compile('standard-library', fs.readFileSync('examples/standard-library/portable.bhash', 'utf8'));
 compile('standard-library-browser', fs.readFileSync('src/test/resources/stdlib/browser.bhash', 'utf8'));
 compile('type-semantics', fs.readFileSync('src/test/resources/types/browser.bhash', 'utf8'));
@@ -266,10 +277,22 @@ const server = http.createServer((request, response) => {
         await page.locator('#run').click();
         assert.equal(await page.locator('#stop').isEnabled(), true);
         await page.locator('#stop').click();
-        assert.equal(await page.locator('#status').textContent(), 'Stopped');
+        await page.waitForFunction(() => document.querySelector('#status').textContent === 'Stopped');
         assert.equal(await page.locator('#run').isEnabled(), true);
         await page.screenshot({ path: 'target/browser-tests.png', fullPage: true });
         assert.deepEqual(pageErrors, []);
+        await run('async-core','0','४२\nसफ़ाई\n');
+        const cancelled=await page.evaluate(()=>new Promise((resolve,reject)=>{
+            const w=new Worker(new URL('./worker.js',location.href),{type:'module'});
+            const deadline=setTimeout(()=>{w.terminate();reject(new Error('Async cancellation timed out'));},30000);
+            w.onmessage=({data})=>{if(data.type==='running'){setTimeout(()=>w.postMessage({type:'cancel'}),100);return;}
+                clearTimeout(deadline);w.terminate();resolve(data);};
+            w.onerror=e=>{clearTimeout(deadline);w.terminate();reject(new Error(e.message));};
+            w.postMessage({input:'1'});
+        }));
+        assert.equal(cancelled.exitCode,1);
+        assert.equal(cancelled.output,'सफ़ाई\n');
+        assert.match(cancelled.errors,/कार्य निरस्त/);
         console.log('Browser WASM smoke tests passed (including restart and stop).');
     } finally {
         await browser?.close();
