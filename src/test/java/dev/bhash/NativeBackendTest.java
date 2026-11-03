@@ -17,6 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void nativeSqliteProviderMigrationsPreserveDataAndRollbackUnderForcedGc()throws Exception {
+        requireTools();String source=DatabaseProviderTest.MIGRATIONS.replace("app.db",temporary.resolve("provider.db").toString().replace('\\','/'));
+        var result=nativeOnlyRun(List.of(new SourceFile("provider.bhash",source)),GC_STRESS);
+        assertEquals(0,result.exit(),result.err());assertEquals("१\n१\n०\nभारत😀 सत्य\nपुराना रोका\n",result.out());assertEquals(0L,stats(result).get("live"));
+    }
     @Test void collectionFirstSyntaxPreservesEvaluationOrderAndHeapValuesUnderForcedGc() throws Exception {
         requireNumericTargets();
         var result=numericExact(HindiSyntaxFixtures.PROGRAM);

@@ -139,7 +139,7 @@ static uint64_t pg_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
             if(op==12){const char *n=pg_PQcmdTuples(r);uint64_t count=*n?(uint64_t)strtoull(n,NULL,10):0;pg_rows_clear(s,2);return count;}
         }
         s->row++;if(s->row>=pg_PQntuples(s->rows)){pg_rows_clear(s,2);return 0;}
-        uint64_t bytes=0;for(int i=0;i<cols;i++)bytes+=(uint64_t)pg_PQgetlength(s->rows,s->row,i);if(bytes>8388608){pg_rows_clear(s,3);runtime_error(location,"PostgreSQL पंक्ति सीमा से बाहर है।");}s->state=1;return 1;
+        uint64_t bytes=0;for(int i=0;i<cols;i++){unsigned int oid=pg_PQftype(s->rows,i);uint64_t n=(uint64_t)pg_PQgetlength(s->rows,s->row,i);if(oid==17)bytes+=n>=2?(n-2)/2:0;else if(oid!=20&&oid!=21&&oid!=23&&oid!=700&&oid!=701&&oid!=16)bytes+=n;}if(bytes>8388608){pg_rows_clear(s,3);runtime_error(location,"PostgreSQL पंक्ति सीमा से बाहर है।");}s->state=1;return 1;
     }
     if(op==14){pg_rows_clear(s,0);return 0;}
     if(op==15){pg_ready(s,location);for(int i=0;i<s->n;i++){free(s->params[i]);s->params[i]=NULL;s->bound[i]=0;}return 0;}

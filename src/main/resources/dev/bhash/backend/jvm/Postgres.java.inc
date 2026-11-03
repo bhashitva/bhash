@@ -13,7 +13,7 @@
             this.owner=owner;this.query=query;bound=new boolean[query.getParameterMetaData().getParameterCount()];
             var meta=query.getMetaData();int n=meta==null?0:meta.getColumnCount();names=new String[n];types=new String[n];
             if(n>256||bound.length>999)throw failure("PostgreSQL परिणाम या मापदंड सीमा से बाहर है।");
-            for(int i=0;i<n;i++){names[i]=meta.getColumnLabel(i+1);types[i]=pgKind(meta.getColumnType(i+1));}
+            for(int i=0;i<n;i++){names[i]=meta.getColumnLabel(i+1);types[i]=pgKind(meta.getColumnType(i+1),meta.getColumnTypeName(i+1));}
         }
     }
     private static BhashRuntime.Failure pgFailure(java.sql.SQLException e,PgConnection c){
@@ -72,14 +72,15 @@
     static long pgExecute(long id){var s=pgStatement(id);pgHealthy(s.owner);pgReady(s);pgBound(s);
         if(s.names.length!=0)throw failure("PostgreSQL पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");
         try{long n=s.query.executeLargeUpdate();s.state=2;return n;}catch(java.sql.SQLException e){s.state=3;throw pgFailure(e,s.owner);}}
-    private static String pgKind(int type){return switch(type){
+    private static String pgKind(int type,String name){return switch(type){
         case java.sql.Types.BIGINT,java.sql.Types.INTEGER,java.sql.Types.SMALLINT->"पूर्णांक";
         case java.sql.Types.REAL,java.sql.Types.FLOAT,java.sql.Types.DOUBLE->"दशमलव";
         case java.sql.Types.BOOLEAN,java.sql.Types.BIT->"तार्किक";
         case java.sql.Types.NUMERIC,java.sql.Types.DECIMAL->"सटीकदशमलव";
         case java.sql.Types.BINARY,java.sql.Types.VARBINARY,java.sql.Types.LONGVARBINARY->"बाइटबफ़र";
         case java.sql.Types.DATE,java.sql.Types.TIME,java.sql.Types.TIMESTAMP,java.sql.Types.TIMESTAMP_WITH_TIMEZONE,java.sql.Types.TIME_WITH_TIMEZONE->"समय";
-        case java.sql.Types.CHAR,java.sql.Types.VARCHAR,java.sql.Types.LONGVARCHAR,java.sql.Types.OTHER->"पाठ";
+        case java.sql.Types.CHAR,java.sql.Types.VARCHAR,java.sql.Types.LONGVARCHAR->"पाठ";
+        case java.sql.Types.OTHER->java.util.Set.of("uuid","json","jsonb").contains(name)?"पाठ":"असमर्थित";
         default->"असमर्थित";};}
     static boolean pgNext(long id){var s=pgStatement(id);pgHealthy(s.owner);if(s.state==2)return false;if(s.state==3)throw failure("PostgreSQL कथन को रीसेट करें।");
         if(s.names.length==0)throw failure("PostgreSQL बदलाव के लिए चलाओ उपयोग करें।");
@@ -89,7 +90,7 @@
             s.values=new Object[s.names.length];long bytes=0;
             for(int i=0;i<s.values.length;i++){
                 if(s.rows.getObject(i+1)==null){s.values[i]=null;continue;}
-                s.values[i]=switch(s.types[i]){case "पूर्णांक"->s.rows.getLong(i+1);case "दशमलव"->s.rows.getDouble(i+1);case "तार्किक"->s.rows.getBoolean(i+1);case "बाइटबफ़र"->s.rows.getBytes(i+1);case "असमर्थित"->throw failure("PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");default->s.rows.getString(i+1);};
+                s.values[i]=switch(s.types[i]){case "पूर्णांक"->s.rows.getLong(i+1);case "दशमलव"->s.rows.getDouble(i+1);case "तार्किक"->s.rows.getBoolean(i+1);case "बाइटबफ़र"->s.rows.getBytes(i+1);default->s.rows.getString(i+1);};
                 if(s.values[i] instanceof byte[] b)bytes+=b.length;
                 if(s.values[i] instanceof String t)bytes+=t.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
             }

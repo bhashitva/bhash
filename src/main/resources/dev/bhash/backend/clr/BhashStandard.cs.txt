@@ -811,7 +811,7 @@ internal static class BhashStandard {
     internal static long pgExecute(long id){var s=pgStatement(id);pgHealthy(s.owner);pgReady(s);if(PgNative.PQnfields(s.meta)!=0)throw failure("PostgreSQL पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");pgExecuteStart(s);string count=pgString(PgNative.PQcmdTuples(s.rows));long n=count.Length==0?0:long.Parse(count,CultureInfo.InvariantCulture);pgRowsClear(s,2);return n;}
     internal static bool pgNext(long id){var s=pgStatement(id);pgHealthy(s.owner);if(s.state==2)return false;if(s.state==3)throw failure("PostgreSQL कथन को रीसेट करें।");if(PgNative.PQnfields(s.meta)==0)throw failure("PostgreSQL बदलाव के लिए चलाओ उपयोग करें।");if(s.state==0)pgExecuteStart(s);
         s.row++;if(s.row>=PgNative.PQntuples(s.rows)){pgRowsClear(s,2);return false;}
-        long bytes=0;for(int i=0;i<PgNative.PQnfields(s.rows);i++)bytes+=PgNative.PQgetlength(s.rows,s.row,i);if(bytes>8388608){pgRowsClear(s,3);throw failure("PostgreSQL पंक्ति सीमा से बाहर है।");}s.state=1;return true;}
+        long bytes=0;for(int i=0;i<PgNative.PQnfields(s.rows);i++){uint oid=PgNative.PQftype(s.rows,i);long n=PgNative.PQgetlength(s.rows,s.row,i);if(oid==17)bytes+=n>=2?(n-2)/2:0;else if(oid!=20&&oid!=21&&oid!=23&&oid!=700&&oid!=701&&oid!=16)bytes+=n;}if(bytes>8388608){pgRowsClear(s,3);throw failure("PostgreSQL पंक्ति सीमा से बाहर है।");}s.state=1;return true;}
     internal static void pgReset(long id)=>pgRowsClear(pgStatement(id),0);
     internal static void pgClear(long id){var s=pgStatement(id);pgReady(s);Array.Clear(s.values);Array.Clear(s.bound);}
     internal static long pgColumns(long id)=>PgNative.PQnfields(pgStatement(id).meta);
