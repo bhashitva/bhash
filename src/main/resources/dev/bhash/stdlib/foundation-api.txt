@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
+कार्यघड़ी|अब|appTaskClock|पूर्णांक|
+कार्यघड़ी|विश्राम|appTaskSleep|शून्य|
 # Compiler bindings used by foundations.bhash; use its public resource classes.
 तंत्र|पठनखोलो|appOpenRead|पूर्णांक|पथ: पाठ
 तंत्र|लेखनखोलो|appOpenWrite|पूर्णांक|पथ: पाठ
