@@ -50,7 +50,7 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native inspect target/hello -
 ./target/hello --bhash-build-info
 ```
 
-Inspector `readelf` से ELF header, loader, dynamic libraries, GLIBC symbol requirements और `.bhash.build` section पढ़ता है। वह input executable या `ldd` नहीं चलाता। `--bhash-build-info` executable का अपना विकल्प है: वह JSON provenance देता है, user का मुख्य कार्यक्रम नहीं चलाता।
+Inspector `readelf` से ELF header, loader, dynamic libraries, GLIBC symbol requirements और `.bhash.build` section पढ़ता है। वह input executable या `ldd` नहीं चलाता। `--bhash-build-info` executable का अपना विकल्प है: वह JSON provenance देता है, user का मुख्य क्रमानुदेश नहीं चलाता।
 
 Metadata में format/target, internal ABI **15**, runtime C/header SHA-256, compiler version/JAR SHA-256, LLVM patch, linker, build glibc और debug/release mode हैं। यह embedded C runtime है; अलग shared Bhash runtime installation की जरूरत नहीं। `bh_runtime_abi_v15` link guard compiler/runtime version का गलत संयोजन link करते समय रोकता है। ABI बदलने पर पुराने executable को वर्तमान compiler से inspect/package करने के बजाय फिर build करें।
 
@@ -79,7 +79,7 @@ sha256sum -c SHA256SUMS
 ./run.sh
 ```
 
-Launcher Linux/x86-64, glibc loader और minimum glibc version जाँचकर कार्यक्रम को arguments के साथ चलाता है। Java/.NET/LLVM की जरूरत नहीं। glibc system dependency बनी रहती है; executable पूर्ण static binary नहीं है। Archive का top-level SHA-256 trusted channel से मिलाएँ; अंदर के checksums corruption पहचानते हैं। Signing, automatic installer/update, public binary releases, cross-compilation और fully pinned builder image आगे के काम हैं। CI archive review/testing artifact है; यह कोई production deployment या automatic public release नहीं करता।
+Launcher Linux/x86-64, glibc loader और minimum glibc version जाँचकर क्रमानुदेश को arguments के साथ चलाता है। Java/.NET/LLVM की जरूरत नहीं। glibc system dependency बनी रहती है; executable पूर्ण static binary नहीं है। Archive का top-level SHA-256 trusted channel से मिलाएँ; अंदर के checksums corruption पहचानते हैं। Signing, automatic installer/update, public binary releases, cross-compilation और fully pinned builder image आगे के काम हैं। CI archive review/testing artifact है; यह कोई production deployment या automatic public release नहीं करता।
 
 Debug source paths के लिए:
 

@@ -1,6 +1,6 @@
 # मानक पुस्तकालय (Standard Library)
 
-भाष का मानक पुस्तकालय मानक संकुल में compiler के साथ आता है। यह सामग्री compiler revision cf46f367d67b0236e5a0aa7a434d98679d5b723b के catalog पर आधारित है। अलग package download नहीं करना पड़ता; तैयार कार्यक्रम अपने runtime support के साथ चलते हैं। यह संदर्भ पहले से थोड़ा प्रोग्रामिंग जानने वाले पाठक को भी हर फ़ंक्शन का अर्थ, सही call और सीमाएँ समझाता है।
+भाष का मानक पुस्तकालय मानक संकुल में compiler के साथ आता है। यह सामग्री compiler revision cf46f367d67b0236e5a0aa7a434d98679d5b723b के catalog पर आधारित है। अलग package download नहीं करना पड़ता; तैयार क्रमानुदेश अपने runtime support के साथ चलते हैं। यह संदर्भ पहले से थोड़ा प्रोग्रामिंग जानने वाले पाठक को भी हर फ़ंक्शन का अर्थ, सही call और सीमाएँ समझाता है।
 
 ## विषय-सूची (Contents)
 
@@ -18,7 +18,7 @@
 
 ## शुरुआत (Getting Started)
 
-[Playground](https://play.bhashitva.org/) में पूरी example file चिपकाएँ और दूसरे dropdown **लेखन** में **पूरा कार्यक्रम · Full program** चुनें। imports और मुख्य() सहित कार्यक्रम को Statements मोड में देने पर वह दोबारा मुख्य() में लपेटा जाएगा और त्रुटि आएगी। केवल कथन लिखते समय fully qualified नाम, जैसे मानक.गणित.वर्गमूल(८१.०), इस्तेमाल कर सकते हैं।
+[Playground](https://play.bhashitva.org/) में पूरी example file चिपकाएँ और दूसरे dropdown **लेखन** में **पूरा क्रमानुदेश · Full program** चुनें। imports और मुख्य() सहित क्रमानुदेश को Statements मोड में देने पर वह दोबारा मुख्य() में लपेटा जाएगा और त्रुटि आएगी। केवल कथन लिखते समय fully qualified नाम, जैसे मानक.गणित.वर्गमूल(८१.०), इस्तेमाल कर सकते हैं।
 
 ```bhash
 आयात मानक.पाठ्य;
@@ -57,7 +57,7 @@ New-Item -ItemType Directory -Force target/tutorial-files
 
 ## Target के अंतर (Target Differences)
 
-पाठ, गणित, यादृच्छिक, JSON और UTC समय JVM, CLR और browser WASM में उपलब्ध हैं। फ़ाइल.समर्थित() JVM/CLR पर सत्य और browser पर असत्य है; बाकी फ़ाइल methods browser पर अपवाद देती हैं। browser कार्यक्रम अपने सर्वर या आपके computer की disk तक इस API से नहीं पहुँचते।
+पाठ, गणित, यादृच्छिक, JSON और UTC समय JVM, CLR और browser WASM में उपलब्ध हैं। फ़ाइल.समर्थित() JVM/CLR पर सत्य और browser पर असत्य है; बाकी फ़ाइल methods browser पर अपवाद देती हैं। browser क्रमानुदेश अपने सर्वर या आपके computer की disk तक इस API से नहीं पहुँचते।
 
 ब्राउज़र के लिए स्थानीय build में .NET 10 SDK और wasm-tools workload चाहिए। उदाहरण:
 
@@ -70,7 +70,7 @@ python -m http.server 8000 --directory target/tutorial-web
 
 ## उदाहरणों की जाँच (Verification)
 
-Node.js के साथ catalog और snippets की जाँच करें, या compiler बनाकर सात example programs और कथाओं में दिए गए छह पूरे कार्यक्रमों के आउटपुट मिलाएँ। runner फ़ाइलों को अलग temporary sandbox में लिखता है और वास्तविक उपयोगकर्ता फ़ाइलें नहीं बदलता।
+Node.js के साथ catalog और snippets की जाँच करें, या compiler बनाकर सात example programs और कथाओं में दिए गए छह पूरे क्रमानुदेशों के आउटपुट मिलाएँ। runner फ़ाइलों को अलग temporary sandbox में लिखता है और वास्तविक उपयोगकर्ता फ़ाइलें नहीं बदलता।
 
 ```sh
 node tutorial/standard-library/verify.mjs --coverage-only

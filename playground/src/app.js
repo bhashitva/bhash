@@ -158,7 +158,7 @@ async function run() {
     frame = document.createElement('iframe'); frame.title = 'Isolated Bhash execution'; frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
     nonce = crypto.randomUUID(); frame.src = url.href; $('runner-slot').append(frame);
     timer = setTimeout(() => stop('Runtime loading timed out. Check the connection and try again.'), 90000);
-  } catch (error) { if (id !== current) return; track('playground_run_failed', {stage: 'compile'}); showCompilerErrors(error.message, compiledSource); finish('Could not run · कार्यक्रम नहीं चला'); }
+  } catch (error) { if (id !== current) return; track('playground_run_failed', {stage: 'compile'}); showCompilerErrors(error.message, compiledSource); finish('Could not run · क्रमानुदेश नहीं चला'); }
 }
 $('run').addEventListener('click', run);
 addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); run(); } });
