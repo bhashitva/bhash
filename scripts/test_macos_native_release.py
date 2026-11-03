@@ -41,7 +41,7 @@ def main():
     roots = [OUT/'first workspace', OUT/'दूसरा स्थान']
     for root in roots:
         root.mkdir(parents=True, exist_ok=True)
-        (root/'hello.bhash').write_text('कार्य मुख्य() -> शून्य { लिखो("नमस्ते 😀"); }\n', encoding='utf-8')
+        (root/'hello.bhash').write_text('फलन मुख्य() -> शून्य { लिखो("नमस्ते 😀"); }\n', encoding='utf-8')
     for debug in (False, True):
         binaries, archives = [], []
         for root in roots:

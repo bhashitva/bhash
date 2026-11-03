@@ -11,11 +11,11 @@
 
 | पाठ | विषय | अंग्रेज़ी अवधारणा |
 | --- | --- | --- |
-| 1 | [पहला कार्यक्रम](01-output/README.md) | कार्य → function; लिखो → print |
+| 1 | [पहला कार्यक्रम](01-output/README.md) | फलन → function; लिखो → print |
 | 2 | [मान और गणना](02-values/README.md) | मान → mutable variable; स्थिर → constant binding |
 | 3 | [इनपुट और निर्णय](03-decisions/README.md) | यदि / अन्यथा → if / else |
 | 4 | [दोहराव और संचय](04-loops/README.md) | जबतक → while |
-| 5 | [कार्य और वापसी](05-functions/README.md) | कार्य / लौटाओ → function / return |
+| 5 | [फलन और वापसी](05-functions/README.md) | फलन / लौटाओ → function / return |
 | 6 | [गुणनफल और पुनरावृत्ति](06-recursion/README.md) | recursive call → स्वयं को बुलाना |
 | 7 | [सरणी और अनुक्रमण](07-arrays/README.md) | सरणी / प्रत्येक → array / foreach |
 | 8 | [सूची और मानचित्र](08-collections/README.md) | सूची / मानचित्र → List / Map |

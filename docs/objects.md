@@ -20,7 +20,7 @@ class. This is not a JavaScript prototype or dynamic-property model.
 | `अधिलेखन` | Override an inherited instance method |
 | `रिक्त` | Null object reference |
 
-Existing keywords are reused: `कार्य` declares a member function; `मान` declares
+Existing keywords are reused: `फलन` declares a member function; `मान` declares
 a mutable field; `स्थिर` declares an immutable field or binding. `स्थिर` does
 **not** mean a static class member. `शून्य` continues to mean no return value.
 The new words are reserved; longer names such as `वर्गीकरण` remain identifiers.
@@ -29,17 +29,17 @@ The new words are reserved; longer names such as `वर्गीकरण` rema
 
 ```text
 वर्ग गणक {
-    कार्य गणना(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ संख्या; }
+    फलन गणना(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ संख्या; }
 }
 
 वर्ग गुणनफलगणक विस्तार गणक {
-    अधिलेखन कार्य गणना(संख्या: पूर्णांक) -> पूर्णांक {
+    अधिलेखन फलन गणना(संख्या: पूर्णांक) -> पूर्णांक {
         यदि (संख्या <= १) { लौटाओ १; }
         लौटाओ संख्या * यह.गणना(संख्या - १);
     }
 }
 
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     स्थिर वस्तु: गणक = नया गुणनफलगणक();
     लिखो(वस्तु.गणना(५));
 }
@@ -61,7 +61,7 @@ mutation, base calls and inheritance with a small account model.
         यह.नाम = नाम;
     }
 
-    कार्य परिचय() -> पाठ { लौटाओ यह.नाम; }
+    फलन परिचय() -> पाठ { लौटाओ यह.नाम; }
 }
 ```
 
@@ -89,7 +89,7 @@ mutation, base calls and inheritance with a small account model.
 
 ## Methods, inheritance and visibility
 
-- Methods use `कार्य नाम(...) -> प्रकार { ... }`; `शून्य` remains valid for
+- Methods use `फलन नाम(...) -> प्रकार { ... }`; `शून्य` remains valid for
   methods returning no value. Inside a method, fields and other methods can be
   named implicitly or through `यह`.
 - Public/protected methods dispatch virtually. An inherited method must be

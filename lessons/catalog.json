@@ -2,7 +2,7 @@
   {
     "path": "01-output",
     "title": "पहला कार्यक्रम",
-    "concept": "कार्य → function; लिखो → print",
+    "concept": "फलन → function; लिखो → print",
     "cases": [
       {
         "input": "",
@@ -81,8 +81,8 @@
   },
   {
     "path": "05-functions",
-    "title": "कार्य और वापसी",
-    "concept": "कार्य / लौटाओ → function / return",
+    "title": "फलन और वापसी",
+    "concept": "फलन / लौटाओ → function / return",
     "cases": [
       {
         "input": "३\n९\n",

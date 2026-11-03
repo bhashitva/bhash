@@ -18,7 +18,7 @@ class FrontendTest {
         var result=Frontend.parse("types.bhash","""
             परिगणना रंग { लाल, हरा = ५, नीला, }
             अभिलेख जोड़ा<त>(क: त, ख: त);
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 स्थिर ब: बाइट = परिवर्तित<बाइट>(२५५);
                 स्थिर ल: लघुपूर्णांक = परिवर्तित<लघुपूर्णांक>(२);
                 स्थिर क: सर्ववस्तु = नया जोड़ा<बाइट>(ब,ब);
@@ -35,7 +35,7 @@ class FrontendTest {
             assertEquals(token,lexer.nextToken().getType());
         assertFalse(parseBody("लिखो(परिवर्तित<>(१));").valid());
         assertFalse(parseBody("लिखो(प्रकारहै<पूर्णांक>());").valid());
-        assertFalse(Frontend.parse("bad","परिगणना रंग {} कार्य मुख्य() -> शून्य {}").valid());
+        assertFalse(Frontend.parse("bad","परिगणना रंग {} फलन मुख्य() -> शून्य {}").valid());
     }
 
     @Test void parsesExceptionFormsAndRejectsIncompleteTry() {
@@ -56,9 +56,9 @@ class FrontendTest {
                 वर्ग बच्चा विस्तार मूल {
                     निजी मान अगला: मूल = रिक्त;
                     निर्माता(संख्या: पूर्णांक) : आधार() { यह.संख्या = संख्या; }
-                    सार्वजनिक अधिलेखन कार्य स्वयं() -> मूल { लौटाओ यह; }
+                    सार्वजनिक अधिलेखन फलन स्वयं() -> मूल { लौटाओ यह; }
                 }
-                कार्य मुख्य() -> शून्य { नया बच्चा(१).स्वयं().संख्या = २; }
+                फलन मुख्य() -> शून्य { नया बच्चा(१).स्वयं().संख्या = २; }
                 """);
         assertTrue(result.valid(), () -> result.diagnostics().toString());
         assertEquals(2, result.tree().classDecl().size());
@@ -72,7 +72,7 @@ class FrontendTest {
             assertEquals(expected, lexer.nextToken().getType());
     }
     private Frontend.Result parseBody(String body) {
-        return Frontend.parse("test.bhash", "कार्य मुख्य() -> शून्य { " + body + " }");
+        return Frontend.parse("test.bhash", "फलन मुख्य() -> शून्य { " + body + " }");
     }
     @Test void examplesParse() throws Exception {
         for (var name : new String[]{"hello", "factorial"}) {
@@ -101,7 +101,7 @@ class FrontendTest {
     @Test void rejectsMixedDigitLiteral() { assertFalse(parseBody("लिखो(1२);").valid()); }
     @Test void rejectsMissingSemicolonAndTrailingGarbage() {
         assertFalse(parseBody("लिखो(१)").valid());
-        assertFalse(Frontend.parse("bad", "कार्य मुख्य() -> शून्य {} @").valid());
+        assertFalse(Frontend.parse("bad", "फलन मुख्य() -> शून्य {} @").valid());
     }
     @Test void rejectsInvalidStringAndUnterminatedComment() {
         assertFalse(parseBody("लिखो(\"bad\\q\");").valid());
@@ -128,7 +128,7 @@ class FrontendTest {
             assertTrue(parseBody("लिखो("+expression+");").valid(),expression);
         var parsed = Frontend.parse("nested.bhash","""
                 वर्ग पात्र<त> { मान मूल्य: त; }
-                कार्य मुख्य() -> शून्य {
+                फलन मुख्य() -> शून्य {
                     स्थिर क: पात्र<पात्र<पात्र<पूर्णांक>>> = नया पात्र<पात्र<पात्र<पूर्णांक>>>();
                     लिखो(८>>>१);
                 }
@@ -139,18 +139,18 @@ class FrontendTest {
     }
     @Test void collectionSyntaxPreservesGenericAnglesArrayRanksAndComparisons() {
         var result=Frontend.parse("arrays.bhash","""
-            कार्य लो<त>(आ: सूची<त[]>) -> मानचित्र<पाठ,त[]> { लौटाओ नया मानचित्र<पाठ,त[]>(); }
-            कार्य मुख्य() -> शून्य {
+            फलन लो<त>(आ: सूची<त[]>) -> मानचित्र<पाठ,त[]> { लौटाओ नया मानचित्र<पाठ,त[]>(); }
+            फलन मुख्य() -> शून्य {
                 स्थिर क: पूर्णांक[][] = नया पूर्णांक[२][३];
                 स्थिर ख: सूची<पूर्णांक[]> = नया सूची<पूर्णांक[]>{नया पूर्णांक[]{१}};
-                प्रत्येक (अ: पूर्णांक[] में क) { लिखो(अ[०] << १); }
-                प्रत्येक (कुंजी: पाठ, मानक: पूर्णांक[] में लो<पूर्णांक>(ख)) { मानक[०] = २; }
+                प्रत्येक (क में अ: पूर्णांक[]) { लिखो(अ[०] << १); }
+                प्रत्येक (लो<पूर्णांक>(ख) में कुंजी: पाठ, मानक: पूर्णांक[]) { मानक[०] = २; }
                 स्थिर ग: पूर्णांक = ०;
                 लिखो(ग < क[०][०] >> १, ग < २);
             }
             """);
         assertTrue(result.valid(),result.diagnostics().toString());
-        for (String body:new String[]{"स्थिर क: पूर्णांक[] = नया पूर्णांक[]{;", "प्रत्येक (क: पूर्णांक में) {}", "लिखो(क[]);"})
+        for (String body:new String[]{"स्थिर क: पूर्णांक[] = नया पूर्णांक[]{;", "प्रत्येक ( में क: पूर्णांक) {}", "लिखो(क[]);"})
             assertFalse(parseBody(body).valid());
     }
     @Test void iterationKeywordsAreReservedWhileLongerIdentifiersRemainValid() {
@@ -162,7 +162,7 @@ class FrontendTest {
         assertEquals(Identifiers.key("क़दम"), Identifiers.key("क़दम"));
     }
     @Test void diagnosticsCarryLocations() {
-        var result = Frontend.parse("broken.bhash", "कार्य मुख्य() -> शून्य {\n @\n}");
+        var result = Frontend.parse("broken.bhash", "फलन मुख्य() -> शून्य {\n @\n}");
         assertFalse(result.valid());
         assertEquals("broken.bhash", result.diagnostics().get(0).source());
         assertEquals(2, result.diagnostics().get(0).line());
@@ -175,7 +175,7 @@ class FrontendTest {
         try {
             Files.writeString(bad, "कार्य");
             assertEquals(1, Main.run(new String[]{"check", bad.toString()}, sink, sink));
-            Files.writeString(bad, "\uFEFFकार्य मुख्य() -> शून्य {}");
+            Files.writeString(bad, "\uFEFFफलन मुख्य() -> शून्य {}");
             assertEquals(0, Main.run(new String[]{"check", bad.toString()}, sink, sink));
         } finally { Files.deleteIfExists(bad); }
     }

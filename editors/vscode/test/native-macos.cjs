@@ -17,7 +17,7 @@ function task(operation,input,stdin){
 try{
     assert.notEqual(spawnSync('clang-18',['--version'],{env}).status,0,'LLVM 18 must not be on PATH');
     const source=path.join(home,'नमस्ते.bhash');
-    fs.writeFileSync(source,'कार्य मुख्य() -> शून्य { स्थिर नाम: पाठ = पाठपढ़ो(); स्थिर संख्या: पूर्णांक = पढ़ो(); लिखो(नाम, संख्या); }\n');
+    fs.writeFileSync(source,'फलन मुख्य() -> शून्य { स्थिर नाम: पाठ = पाठपढ़ो(); स्थिर संख्या: पूर्णांक = पढ़ो(); लिखो(नाम, संख्या); }\n');
     const first=task('run',source,'भारत😀\n+४२\n');assert.match(first.stdout,/भारत😀 ४२/);
     const active=path.join(env.BHASH_TOOLCHAIN_HOME,'active.json');assert.ok(fs.existsSync(active));
     const receipt=fs.readFileSync(active,'utf8');

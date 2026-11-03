@@ -30,7 +30,7 @@ def checksum(name, n, calls):
 def generate(directory, sizes, warmup_ms, batch_ms, batches, names=None):
     directory.mkdir(parents=True, exist_ok=False)
     cases = [{"name": "startup", "size": "minimal", "source": "startup.bhash", "expected": 42}]
-    (directory / "startup.bhash").write_text('कार्य मुख्य() -> शून्य { लिखो("BHASH_OK", ४२); }\n', encoding="utf-8")
+    (directory / "startup.bhash").write_text('फलन मुख्य() -> शून्य { लिखो("BHASH_OK", ४२); }\n', encoding="utf-8")
     for name in names or SIZES:
         body = (ROOT / "workloads" / (name + ".bhash")).read_text(encoding="utf-8")
         for size in sizes:
@@ -39,7 +39,7 @@ def generate(directory, sizes, warmup_ms, batch_ms, batches, names=None):
             # prevent the driver from presenting an unused constant computation.
             driver = f'''
 आयात मानक.समय उपनाम समय;
-कार्य चरण(अवधि: पूर्णांक) -> शून्य {{
+फलन चरण(अवधि: पूर्णांक) -> शून्य {{
     स्थिर शुरू: पूर्णांक = समय.अभी(); मान गिनती: पूर्णांक = ०; मान योग: पूर्णांक = ०;
     जबतक (समय.अभी() - शुरू < अवधि) {{
         स्थिर न: पूर्णांक = {n} + गिनती % २;
@@ -50,7 +50,7 @@ def generate(directory, sizes, warmup_ms, batch_ms, batches, names=None):
     }}
     लिखो("BHASH_RESULT", गिनती, योग);
 }}
-कार्य मुख्य() -> शून्य {{
+फलन मुख्य() -> शून्य {{
     लिखो("BHASH_READY"); चरण({warmup_ms});
     मान इ: पूर्णांक = ०;
     जबतक (इ < {batches}) {{
@@ -75,6 +75,6 @@ def generate(directory, sizes, warmup_ms, batch_ms, batches, names=None):
         for i in range(count):
             (project / "src" / f"part{i}.bhash").write_text(f"कार्य भाग{i}(न: पूर्णांक) -> पूर्णांक {{ लौटाओ न + {i}; }}\n", encoding="utf-8")
         calls = " + ".join(f"भाग{i}(१)" for i in range(count))
-        (project / "src" / "main.bhash").write_text(f'कार्य मुख्य() -> शून्य {{ लिखो("BHASH_OK", {calls}); }}\n', encoding="utf-8")
+        (project / "src" / "main.bhash").write_text(f'फलन मुख्य() -> शून्य {{ लिखो("BHASH_OK", {calls}); }}\n', encoding="utf-8")
         cases.append({"name": "project", "size": size, "source": f"project-{size}/bhash.project", "files": count + 1, "expected": count * (count + 1) // 2})
     return cases

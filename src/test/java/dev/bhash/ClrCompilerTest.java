@@ -30,7 +30,7 @@ class ClrCompilerTest extends ManagedCompilerTest {
     @Test void outputDirectoryRebuildsAndPreservesPriorOutputOnFailure() throws Exception {
         Path output = directory.resolve("rebuild");
         var compiler = new ClrCompiler();
-        String valid = "कार्य मुख्य() -> शून्य { लिखो(५); }";
+        String valid = "फलन मुख्य() -> शून्य { लिखो(५); }";
         compiler.compile("test.bhash", valid, output);
         byte[] original = Files.readAllBytes(output.resolve("BhashProgram.dll"));
         assertThrows(CompilationException.class, () -> compiler.compile("bad.bhash", "कार्य", output));
@@ -41,7 +41,7 @@ class ClrCompilerTest extends ManagedCompilerTest {
 
     @Test void refusesUnmanagedOrUnrelatedOutputFiles() throws Exception {
         var compiler = new ClrCompiler();
-        String source = "कार्य मुख्य() -> शून्य {}";
+        String source = "फलन मुख्य() -> शून्य {}";
         Path output = directory.resolve("unrelated");
         Files.createDirectories(output);
         Files.writeString(output.resolve("notes.txt"), "keep me");
@@ -56,7 +56,7 @@ class ClrCompilerTest extends ManagedCompilerTest {
     @Test void legacyOutputsUpgradeAndPreservePreviouslyUnrelatedLicenseFiles() throws Exception {
         var compiler=new ClrCompiler();
         Path output=directory.resolve("legacy");
-        String source="कार्य मुख्य() -> शून्य {}";
+        String source="फलन मुख्य() -> शून्य {}";
         compiler.compile("test.bhash",source,output);
         for (String name:dev.bhash.backend.Licensing.APPLICATION_FILES) Files.delete(output.resolve(name));
         Files.writeString(output.resolve(".bhash-clr-output"),"Bhash CLR output v1\n");

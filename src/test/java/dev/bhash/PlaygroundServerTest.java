@@ -40,7 +40,7 @@ class PlaygroundServerTest {
             assertTrue(editorPolicy.contains("https://www.googletagmanager.com"));
             assertTrue(editorPolicy.contains("https://region1.google-analytics.com"));
             var response=post(app,form("लिखो(१);","scratch"));assertEquals(202,response.statusCode());String id=id(response.body());
-            assertTrue(finished(app,id).contains("\"ready\""));assertEquals("कार्य मुख्य() -> शून्य {\nलिखो(१);\n}\n",source.get());
+            assertTrue(finished(app,id).contains("\"ready\""));assertEquals("फलन मुख्य() -> शून्य {\nलिखो(१);\n}\n",source.get());
             assertEquals(id,id(post(app,form("लिखो(१);","scratch")).body()));assertEquals(1,calls.get());
             assertEquals(404,get(app.origin().resolve("/artifacts/"+id+"/runner.html")).statusCode());
             var runner=get(app.runOrigin().resolve("/artifacts/"+id+"/runner.html"));assertEquals(200,runner.statusCode());assertTrue(runner.body().contains("runner.js"));

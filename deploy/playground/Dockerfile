@@ -29,7 +29,7 @@ RUN dotnet workload install wasm-tools
 COPY --from=compiler /src/target/bhash-compiler-0.1.0-SNAPSHOT.jar /opt/bhash/compiler.jar
 COPY --from=editor /src/playground/dist /opt/bhash/web
 RUN mkdir -p /data /opt/nuget /tmp/warm \
-    && printf 'कार्य मुख्य() -> शून्य { लिखो("तैयार"); }' > /tmp/warm/hello.bhash \
+    && printf 'फलन मुख्य() -> शून्य { लिखो("तैयार"); }' > /tmp/warm/hello.bhash \
     && BHASH_WASM_OFFLINE=false NUGET_PACKAGES=/opt/nuget java -jar /opt/bhash/compiler.jar compile /tmp/warm/hello.bhash --target wasm-browser -o /tmp/warm/web \
     && BHASH_WASM_OFFLINE=false NUGET_PACKAGES=/opt/nuget java -cp /opt/bhash/compiler.jar dev.bhash.backend.wasm.PrebuiltBrowserHost /opt/bhash/browser-host \
     && (dotnet --version; sha256sum /opt/bhash/compiler.jar) > /opt/bhash/warm-version \

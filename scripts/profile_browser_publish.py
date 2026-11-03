@@ -25,10 +25,10 @@ def run(label, command, extra):
         raise RuntimeError(f'{label} failed: {result.stdout.decode(errors="replace")[-6000:]}')
 source = out/'hello.bhash'
 for i in range(3):
-    source.write_text(f'कार्य मुख्य() -> शून्य {{ लिखो("नमस्ते {i}"); }}', encoding='utf-8')
+    source.write_text(f'फलन मुख्य() -> शून्य {{ लिखो("नमस्ते {i}"); }}', encoding='utf-8')
     run(f'baseline-{i}', ['java','-jar',str(jar),'compile',str(source),'--target','wasm-browser','-o',str(out/f'baseline-web-{i}')], {})
 run('prepare', ['java','-cp',str(jar),'dev.bhash.backend.wasm.PrebuiltBrowserHost',str(host)], {})
 for i in range(3):
-    source.write_text(f'कार्य मुख्य() -> शून्य {{ लिखो("नमस्ते {i}"); }}', encoding='utf-8')
+    source.write_text(f'फलन मुख्य() -> शून्य {{ लिखो("नमस्ते {i}"); }}', encoding='utf-8')
     run(f'prebuilt-{i}', ['java','-jar',str(jar),'compile',str(source),'--target','wasm-browser','-o',str(out/f'prebuilt-web-{i}')], {'BHASH_BROWSER_HOST':str(host),'BHASH_BROWSER_SHARED':'true'})
 print(json.dumps(results,indent=2))

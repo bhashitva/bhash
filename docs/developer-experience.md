@@ -9,7 +9,7 @@ The shared managed checker collects up to **50** independent errors across
 statements, functions, constructors, field initializers and source files. For example:
 
 ```bhash
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     लिखो(अज्ञात);
     स्थिर क: पूर्णांक = १;
     क = २;

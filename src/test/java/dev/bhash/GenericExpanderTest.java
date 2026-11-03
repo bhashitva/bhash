@@ -15,7 +15,7 @@ class GenericExpanderTest {
     @Test void recursiveClosedTypesReuseTheirSpecialization() throws Exception {
         String code=emit("""
                 वर्ग कड़ी<त> { मान अगली: कड़ी<त>; मान मूल्य: त; }
-                कार्य मुख्य() -> शून्य {
+                फलन मुख्य() -> शून्य {
                     स्थिर पहली: कड़ी<पूर्णांक> = नया कड़ी<पूर्णांक>();
                     पहली.अगली = नया कड़ी<पूर्णांक>();
                     पहली.अगली.मूल्य = ७;
@@ -29,18 +29,18 @@ class GenericExpanderTest {
     @Test void expandingRecursiveTemplatesFailWithADiagnostic() {
         var error=assertThrows(CompilationException.class,()->emit("""
                 वर्ग पात्र<त> { मान अगला: पात्र<पात्र<त>>; }
-                कार्य मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); }
+                फलन मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); }
                 """));
         assertTrue(error.getMessage().contains("specialization limit"),error.getMessage());
     }
     @Test void specializedBodyErrorsPreserveOriginalSourceLines() {
         var error=assertThrows(CompilationException.class,()->emit("""
                 वर्ग पात्र<त> {
-                    कार्य गलत() -> पूर्णांक {
+                    फलन गलत() -> पूर्णांक {
                         लौटाओ "गलत";
                     }
                 }
-                कार्य मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); }
+                फलन मुख्य() -> शून्य { नया पात्र<पूर्णांक>(); }
                 """));
         assertTrue(error.getMessage().startsWith("generic.bhash:3:"),error.getMessage());
     }

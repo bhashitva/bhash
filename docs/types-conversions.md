@@ -187,7 +187,7 @@ Lengths must be 0–2^31−1 and actual allocation is limited by host memory.
 ब.पूर्णांकलिखो(०,४२,सत्य);       // big-endian signed 64-bit
 ब.दशमलवलिखो(८,१.५,असत्य);      // little-endian binary64
 लिखो(ब.पूर्णांकपढ़ो(०,सत्य), ब.दशमलवपढ़ो(८,असत्य));
-प्रत्येक (अंक: बाइट में ब) { लिखो(अंक); }
+प्रत्येक (ब में अंक: बाइट) { लिखो(अंक); }
 ```
 
 | API | Behavior |

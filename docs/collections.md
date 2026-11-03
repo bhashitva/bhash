@@ -137,11 +137,11 @@ keys and values. Binding types are explicit and must accept the corresponding
 source types; ordinary class/interface upcasts are permitted.
 
 ```text
-प्रत्येक (अंक: पूर्णांक में नया पूर्णांक[]{१,२,३}) {
+प्रत्येक (नया पूर्णांक[]{१,२,३} में अंक: पूर्णांक) {
     लिखो(अंक);
 }
 
-प्रत्येक (कुंजी: पाठ, मानक: पूर्णांक में अंक) {
+प्रत्येक (अंक में कुंजी: पाठ, मानक: पूर्णांक) {
     लिखो(कुंजी, मानक);
 }
 ```
@@ -161,7 +161,7 @@ Breaking/returning immediately does not advance the iterator again.
 To remove map entries while iterating, iterate a key snapshot:
 
 ```text
-प्रत्येक (कुंजी: पाठ में अंक.कुंजियाँ()) { अंक.हटाओ(कुंजी); }
+प्रत्येक (अंक.कुंजियाँ() में कुंजी: पाठ) { अंक.हटाओ(कुंजी); }
 ```
 
 ## Types, references and evaluation

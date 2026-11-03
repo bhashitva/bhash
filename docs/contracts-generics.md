@@ -17,7 +17,7 @@ The complete runnable example is [contracts-generics.bhash](../examples/contract
 
 ```text
 अनुबंध प्रदाता<त> {
-    कार्य लो() -> त;
+    फलन लो() -> त;
 }
 वर्ग पात्र<त> पालन प्रदाता<त> {
     निजी मान मूल्य: त;
@@ -26,10 +26,10 @@ The complete runnable example is [contracts-generics.bhash](../examples/contract
         यह.मूल्य = मूल्य;
         पात्र<त>.गिनती = पात्र<त>.गिनती + १;
     }
-    कार्य लो() -> त { लौटाओ मूल्य; }
+    फलन लो() -> त { लौटाओ मूल्य; }
 }
-कार्य पहचान<त>(मूल्य: त) -> त { लौटाओ मूल्य; }
-कार्य मुख्य() -> शून्य {
+फलन पहचान<त>(मूल्य: त) -> त { लौटाओ मूल्य; }
+फलन मुख्य() -> शून्य {
     स्थिर वस्तु: प्रदाता<पूर्णांक> = नया पात्र<पूर्णांक>(४२);
     लिखो(पहचान<पूर्णांक>(वस्तु.लो()), पात्र<पूर्णांक>.गिनती);
 }
@@ -39,7 +39,7 @@ This prints `४२ १`.
 
 ## Interface contracts
 
-Use `अनुबंध नाम { कार्य विधि(...) -> प्रकार; }`. Methods are public instance signatures;
+Use `अनुबंध नाम { फलन विधि(...) -> प्रकार; }`. Methods are public instance signatures;
 they have no body. Use `अनुबंध विस्तृत विस्तार पहला, दूसरा { ... }` for multiple interface
 inheritance, and `वर्ग बच्चा विस्तार मूल पालन पहला, दूसरा { ... }` for implementation.
 A class can also omit the base-class clause: `वर्ग बच्चा पालन पहला { ... }`.
@@ -56,7 +56,7 @@ implementations are errors. Fields, default methods and static interface members
 ## Generic types and functions
 
 Classes, interfaces and global functions can declare one or more type parameters:
-`वर्ग जोड़ी<क, ख> { ... }` or `कार्य पहचान<त>(मूल्य: त) -> त { ... }`.
+`वर्ग जोड़ी<क, ख> { ... }` or `फलन पहचान<त>(मूल्य: त) -> त { ... }`.
 Supply explicit type arguments at every use: `जोड़ी<पूर्णांक, पाठ>` and `पहचान<पाठ>("नमस्ते")`.
 There is no type-argument inference or raw generic type. Parameters can stand for any existing
 value type, including integers, reals, booleans, text, classes, interfaces and nested generic types.
@@ -105,8 +105,8 @@ Put `साझा` after an optional visibility modifier:
 वर्ग गणित {
     साझा स्थिर सीमा: पूर्णांक = १००;
     निजी साझा मान गिनती: पूर्णांक = ०;
-    साझा कार्य दुगुना(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ संख्या * २; }
-    साझा कार्य दुगुना(संख्या: दशमलव) -> दशमलव { लौटाओ संख्या * २.०; }
+    साझा फलन दुगुना(संख्या: पूर्णांक) -> पूर्णांक { लौटाओ संख्या * २; }
+    साझा फलन दुगुना(संख्या: दशमलव) -> दशमलव { लौटाओ संख्या * २.०; }
 }
 ```
 

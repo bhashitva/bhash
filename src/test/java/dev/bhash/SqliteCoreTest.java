@@ -15,7 +15,7 @@ class SqliteCoreTest {
         assertTrue(ir.contains("call i64 @bh_database_call"));assertTrue(ir.contains("@bh_roots_push"));assertTrue(ir.contains("@bh_protect"));
     }
     @Test void purePolicyAndUnrelatedProgramsDoNotIncludeSQLite()throws Exception {
-        for(String source:List.of("कार्य मुख्य() -> शून्य {}",SqliteFixtures.PURE)){
+        for(String source:List.of("फलन मुख्य() -> शून्य {}",SqliteFixtures.PURE)){
             var core=ManagedEmitter.core(List.of(new SourceFile("pure.bhash",source)));assertFalse(core.database());
         }
     }

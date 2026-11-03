@@ -19,12 +19,12 @@ class FoundationCoreTest {
         assertTrue(ir.contains("@bh_protect"));
     }
     @Test void unusedFoundationsDoNotChangeSimpleProgramLayouts()throws Exception {
-        var core=ManagedEmitter.core(List.of(new SourceFile("minimal.bhash","कार्य मुख्य() -> शून्य {}")));
+        var core=ManagedEmitter.core(List.of(new SourceFile("minimal.bhash","फलन मुख्य() -> शून्य {}")));
         assertEquals(1,core.functions().size());assertEquals(0,core.classes().size());
     }
     @Test void resourceContractRejectsMissingOrWrongCloseMethod() {
-        for(String body:List.of("", "सार्वजनिक कार्य बंदकरो() -> पूर्णांक { लौटाओ १; }"))
+        for(String body:List.of("", "सार्वजनिक फलन बंदकरो() -> पूर्णांक { लौटाओ १; }"))
             assertThrows(CompilationException.class,()->ManagedEmitter.check(List.of(new SourceFile("bad.bhash",
-                "वर्ग क {"+body+"} कार्य मुख्य() -> शून्य { संसाधन (ग: क = नया क()) {} }"))));
+                "वर्ग क {"+body+"} फलन मुख्य() -> शून्य { संसाधन (ग: क = नया क()) {} }"))));
     }
 }

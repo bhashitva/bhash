@@ -42,7 +42,7 @@ abstract class StandardLibraryTest {
     @Test void foundationArgumentsAndStructuredLogsArePortable()throws Exception {
         assertEquals("portable\n{\"level\":1,\"message\":\"नमस्ते😀\",\"fields\":{\"job\":7}}\n",execute("""
             आयात मानक.विन्यास; आयात मानक.लेखा;
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 स्थिर व: विन्यास = विन्यास.तर्क(); लिखो(व.पढ़ो("name", "missing"));
                 स्थिर क्षेत्र: मानचित्र<पाठ,सर्ववस्तु> = नया मानचित्र<पाठ,सर्ववस्तु>{"job":७};
                 लेखा.स्तर(१); लेखा.घटनालिखो(०,"छिपा",क्षेत्र); लेखा.घटनालिखो(१,"नमस्ते😀",क्षेत्र);
@@ -57,7 +57,7 @@ abstract class StandardLibraryTest {
     @Test void textFormattingUnicodeAndLiteralSeparatorsHaveOnePortableContract() throws Exception {
         assertEquals("२ 😀\n३ सत्य सत्य सत्य\n|अ||\nक + ख\nabcZ\nहिन्दी\n0.12 0.38 -0.00 2.62\n१२.५०\nसत्य\n",execute("""
             आयात मानक.पाठ्य उपनाम प;
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 लिखो(प.खोजो("a😀भारत", "भारत"), प.अंश("a😀भारत",१,२));
                 लिखो(प.लंबाई("क😀ख"),प.है("भारत","रत"),प.आरंभ("भारत","भा"),प.अंत("भारत","रत"));
                 लिखो(प.जोड़ो(प.बाँटो(".अ..","."),"|"));
@@ -75,7 +75,7 @@ abstract class StandardLibraryTest {
             आयात मानक.गणित उपनाम ग;
             आयात मानक.यादृच्छिक उपनाम य;
             आयात मानक.समय;
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 लिखो(ग.घात(२.०,१०.०)==१०२४.०,ग.वर्गमूल(८१.०)==९.०,ग.न्यूनतम(७,२)==२,ग.अधिकतम(-१,२)==२);
                 लिखो(ग.निकटतम(२.५)==२.०,ग.निकटतम(३.५)==४.०,ग.ज्या(०.०)==०.० && ग.कोज्या(०.०)==१.०);
                 लिखो(समय.पाठबनाओ(०));
@@ -88,7 +88,7 @@ abstract class StandardLibraryTest {
     }
     @Test void jsonRejectsMalformedDocumentsPreservesTypesAndDetectsCycles() throws Exception {
         String[] invalid={"", "01", "[1,]", "{\"a\":1,\"a\":2}", "[", "true false", "1e9999", "9223372036854775808", "\"\\ud800\"", "{\"a\" 1}", "+1", "[१२]", "NaN"};
-        var body=new StringBuilder("आयात मानक.जेसन; कार्य मुख्य() -> शून्य {");
+        var body=new StringBuilder("आयात मानक.जेसन; फलन मुख्य() -> शून्य {");
         for(String s:invalid)body.append("प्रयास { जेसन.पढ़ो(").append(literal(s)).append("); लिखो(\"गलत\"); } पकड़ो (ग: अपवाद) { लिखो(\"अमान्य\"); }");
         body.append("""
             स्थिर मूल: सर्ववस्तु = जेसन.पढ़ो("[1,1.0,true,null,\\\"😀\\\"]");
@@ -105,7 +105,7 @@ abstract class StandardLibraryTest {
     }
     @Test void invalidArgumentsAndUnsupportedJsonValuesAreCatchable() throws Exception {
         String[] expressions={"मानक.पाठ्य.बाँटो(\"अ\",\"\")","मानक.पाठ्य.दोहराओ(\"अ\",-१)","मानक.पाठ्य.दोहराओ(\"अ\",१०४८५७७)","मानक.पाठ्य.संख्यापाठ(१.०,१६)","मानक.गणित.निरपेक्ष(-९२२३३७२०३६८५४७७५८०८)","मानक.गणित.वर्गमूल(-१.०)","मानक.गणित.लघुगणक(०.०)","मानक.यादृच्छिक.पूर्णांकचुनो(१,१)","मानक.यादृच्छिक.पूर्णांकचुनो(-९२२३३७२०३६८५४७७५८०८,९२२३३७२०३६८५४७७५८०७)","मानक.समय.पढ़ो(\"1900-02-29T00:00:00.000Z\")","मानक.समय.पढ़ो(\"2026-01-01T00:00:00Z\")","मानक.समय.पाठबनाओ(२५३४०२३००८०००००)","मानक.जेसन.पाठबनाओ(नया मानचित्र<पूर्णांक,पूर्णांक>{१:२})"};
-        var body=new StringBuilder("कार्य मुख्य() -> शून्य {");
+        var body=new StringBuilder("फलन मुख्य() -> शून्य {");
         for(String e:expressions)body.append("प्रयास { ").append(e).append("; लिखो(\"गलत\"); } पकड़ो (ग: अपवाद) { लिखो(\"पकड़ा\"); }");
         body.append('}');assertEquals("पकड़ा\n".repeat(expressions.length),execute(body.toString()));
     }
@@ -116,7 +116,7 @@ abstract class StandardLibraryTest {
             channel.position(16777216);channel.write(java.nio.ByteBuffer.wrap(new byte[]{0}));
         }
         String code="""
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 प्रयास { मानक.जेसन.पढ़ो(मानक.पाठ्य.दोहराओ("[",६५) + "0" + मानक.पाठ्य.दोहराओ("]",६५)); } पकड़ो (ग: अपवाद) { लिखो("गहराई"); }
                 प्रयास { मानक.जेसन.पाठबनाओ(मानक.पाठ्य.दोहराओ("अ",१०४८५७६)); } पकड़ो (ग: अपवाद) { लिखो("सीमा"); }
                 प्रयास { मानक.फ़ाइल.बाइटपढ़ो(OVERSIZED); } पकड़ो (ग: अपवाद) { लिखो("फ़ाइल सीमा"); }
@@ -128,16 +128,16 @@ abstract class StandardLibraryTest {
     }
     @Test void incorrectSignaturesAndCompilerOwnedDeclarationsAreRejectedBeforeTheToolchain() {
         for(String body:List.of("मानक.गणित.वर्गमूल(१);","मानक.पाठ्य.जोड़ो(नया सूची<पूर्णांक>(),\",\");","नया मानक.जेसन();","मानक.फ़ाइल.पाठलिखो(\"x\",१);"))
-            assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("bad.bhash","कार्य मुख्य() -> शून्य {"+body+"}")),clr?Target.CLR:Target.JVM));
+            assertThrows(CompilationException.class,()->ManagedEmitter.emit(List.of(new SourceFile("bad.bhash","फलन मुख्य() -> शून्य {"+body+"}")),clr?Target.CLR:Target.JVM));
         var reserved=assertThrows(CompilationException.class,()->ManagedEmitter.check(List.of(new SourceFile("reserved.bhash","संकुल मानक; सार्वजनिक वर्ग गणित {}"))));
         assertTrue(reserved.getMessage().startsWith("reserved.bhash:1:"),reserved.getMessage());
-        assertThrows(CompilationException.class,()->ManagedEmitter.check(List.of(new SourceFile(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME,"कार्य मुख्य() -> शून्य {}"))));
+        assertThrows(CompilationException.class,()->ManagedEmitter.check(List.of(new SourceFile(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME,"फलन मुख्य() -> शून्य {}"))));
     }
     @Test void fileIoUsesStrictUtf8BinaryBuffersAndCallerPaths() throws Exception {
         String path=literal(directory.resolve("हिन्दी file.txt").toString()),binary=literal(directory.resolve("bytes.bin").toString());
         assertEquals("सत्य\nनमस्ते😀\nसत्य २ २५५\nअनुपस्थित\nअमान्य\n",execute("""
             आयात मानक.फ़ाइल;
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 लिखो(फ़ाइल.समर्थित());
                 फ़ाइल.पाठलिखो(PATH,"नमस्ते😀"); लिखो(फ़ाइल.पाठपढ़ो(PATH));
                 स्थिर ब: बाइटबफ़र = नया बाइटबफ़र{परिवर्तित<बाइट>(०),परिवर्तित<बाइट>(२५५)};
@@ -156,7 +156,7 @@ abstract class StandardLibraryTest {
         Files.createSymbolicLink(broken,directory.resolve("missing"));Files.createSymbolicLink(dir,directory);Files.createSymbolicLink(loop,loop);
         String code="""
             आयात मानक.फ़ाइल उपनाम फ;
-            कार्य मुख्य() -> शून्य { लिखो(फ.है(LINK),फ.है(BROKEN),फ.है(DIR),फ.है(LOOP)); }
+            फलन मुख्य() -> शून्य { लिखो(फ.है(LINK),फ.है(BROKEN),फ.है(DIR),फ.है(LOOP)); }
             """.replace("LINK",literal(link.toString())).replace("BROKEN",literal(broken.toString()))
                 .replace("DIR",literal(dir.toString())).replace("LOOP",literal(loop.toString()));
         assertEquals("सत्य असत्य असत्य असत्य\n",execute(code));
@@ -164,7 +164,7 @@ abstract class StandardLibraryTest {
     @Test void timeRejectsYearZeroWithPortableFailure()throws Exception{
         assertEquals("अमान्य UTC समय पाठ।\n",execute("""
             आयात मानक.समय उपनाम स;
-            कार्य मुख्य() -> शून्य {
+            फलन मुख्य() -> शून्य {
                 प्रयास { स.पढ़ो("0000-01-01T00:00:00.000Z"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
 
             }

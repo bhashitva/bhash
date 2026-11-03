@@ -43,7 +43,7 @@ arithmetic is checked and exhausted memory is a controlled fatal runtime failure
 ```bhash
 आयात मानक.पाठ्य;
 
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     // पाठ जोड़ना (Concatenation): परिणाम अपने अलग प्रबंधित भंडारण में रहता है।
     स्थिर संदेश: पाठ = "नमस्ते, " + "दुनिया!";
     लिखो(संदेश);

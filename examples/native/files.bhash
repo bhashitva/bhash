@@ -2,7 +2,7 @@
 // Creates/replaces target/native-file-example/state.json; create its parent first.
 आयात मानक.फ़ाइल उपनाम फ;
 आयात मानक.जेसन उपनाम ज;
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     लिखो(फ.समर्थित());
     स्थिर पथ: पाठ = "target/native-file-example/state.json";
     मान गिनती: पूर्णांक = ०;

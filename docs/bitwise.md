@@ -27,7 +27,7 @@ shift operators. Counts are not range errors: 64 means zero, 65 means one, and
 A zero-distance shift preserves the original signed value, including `-१ >>> ६४`.
 
 ```text
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     लिखो(१ << ६३);        // -९२२३३७२०३६८५४७७५८०८
     लिखो(-१ >> १);       // -१
     लिखो(-१ >>> १);      // ९२२३३७२०३६८५४७७५८०७

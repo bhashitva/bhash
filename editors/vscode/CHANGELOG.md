@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Replace the function declaration keyword with `फलन` and use collection-first iteration: `प्रत्येक (संग्रह में तत्व: प्रकार)`; old declaration/loop forms are no longer accepted.
+- Update snippets, syntax highlighting, project templates, compiler diagnostics, playground snippets and all bundled standard-library declarations.
+- See [syntax migration](../../docs/hindi-syntax.md) before rebuilding existing source projects.
+
 ## 0.13.0
 
 - Bundle the merged authentication and sessions compiler/library milestone for JVM, CLR and native Linux/Windows x64 and macOS ARM64.

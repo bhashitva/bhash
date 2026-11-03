@@ -13,7 +13,7 @@ final class ConsoleFixtures {
     static final String RANGE="पूर्णांक 64-बिट सीमा से बाहर है।";
     static final String TEXT_EOF="इनपुट समाप्त: पाठ अपेक्षित था।";
     static final String INT_EOF="इनपुट समाप्त: एक पूर्णांक अपेक्षित था।";
-    static String reader(boolean integer,int count){return "कार्य मुख्य() -> शून्य { मान क: पूर्णांक = ०; जबतक (क < "+count+") { प्रयास { लिखो("+(integer?"पढ़ो()":"पाठपढ़ो()")+"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); } क=क+१; } }";}
+    static String reader(boolean integer,int count){return "फलन मुख्य() -> शून्य { मान क: पूर्णांक = ०; जबतक (क < "+count+") { प्रयास { लिखो("+(integer?"पढ़ो()":"पाठपढ़ो()")+"); } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); } क=क+१; } }";}
     static String devanagari(String value){var result=new StringBuilder();for(char c:value.toCharArray())result.append(c>='0'&&c<='9'?(char)('०'+c-'0'):c);return result.toString();}
     static List<Fixture> cases(){
         var cases=new ArrayList<Fixture>();
@@ -43,12 +43,12 @@ final class ConsoleFixtures {
             cases.add(new Fixture("malformed-"+integer,reader(integer,10),input.toByteArray(),output.toString()));
         }
         String stress="""
-            कार्य सुरक्षित() -> पाठ {
+            फलन सुरक्षित() -> पाठ {
                 प्रयास { लौटाओ पाठपढ़ो(); }
                 अंततः { मानक.पाठ्य.दोहराओ("सफाई",५०); }
             }
-            कार्य जोड़ा(अ: पाठ,ब: पाठ) -> पाठ { लौटाओ अ+ब; }
-            कार्य मुख्य() -> शून्य {
+            फलन जोड़ा(अ: पाठ,ब: पाठ) -> पाठ { लौटाओ अ+ब; }
+            फलन मुख्य() -> शून्य {
                 स्थिर बड़ा: पाठ = सुरक्षित(); लिखो(लंबाई(बड़ा),अंश(बड़ा,०,२));
                 मान क: पूर्णांक = ०; मान गलत: पूर्णांक = ०;
                 जबतक (क < १०००) {

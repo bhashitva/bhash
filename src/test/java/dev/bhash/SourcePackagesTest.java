@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SourcePackagesTest {
     @TempDir Path directory;
-    static final String LIB="संकुल पुस्तक; सार्वजनिक कार्य उत्तर() -> पूर्णांक { लौटाओ ४२; }\n";
-    static final String APP="आयात पुस्तक.उत्तर; कार्य मुख्य() -> शून्य { लिखो(उत्तर()); }\n";
+    static final String LIB="संकुल पुस्तक; सार्वजनिक फलन उत्तर() -> पूर्णांक { लौटाओ ४२; }\n";
+    static final String APP="आयात पुस्तक.उत्तर; फलन मुख्य() -> शून्य { लिखो(उत्तर()); }\n";
     Path write(String file,String text) throws IOException {
         Path path=directory.resolve(file);Files.createDirectories(path.getParent());Files.writeString(path,text);return path;
     }

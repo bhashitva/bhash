@@ -19,6 +19,10 @@ See [SUPPORT.md](SUPPORT.md) for help and bug-report guidance.
 
 ## Learn and teach Bhash
 
+Functions now use `फलन`, and iteration uses `प्रत्येक (संग्रह में तत्व: प्रकार)`.
+See the [syntax update and source migration guide](docs/hindi-syntax.md) when
+rebuilding programs written with earlier compiler releases.
+
 The [12-lesson classroom course](lessons/README.md) includes Hindi lesson plans,
 Bhash-only examples, challenge starters and reference solutions. Teachers can use
 the [Bhash-to-English concept map](lessons/concept-map.md) to connect `यदि`/`लौटाओ`
@@ -160,7 +164,7 @@ insertion-ordered maps (`मानचित्र<क,व>`) and collection iter
 ```text
 स्थिर अंक: सूची<पूर्णांक> = नया सूची<पूर्णांक>{१,२,३};
 अंक.जोड़ो(४);
-प्रत्येक (अ: पूर्णांक में अंक) { लिखो(अ); }
+प्रत्येक (अंक में अ: पूर्णांक) { लिखो(अ); }
 ```
 
 The same [multi-file collection example](examples/collections/) works on all three targets:
@@ -232,7 +236,7 @@ The compiler bundles the `मानक` package on JVM, .NET CLR and browser WAS
 ```text
 आयात मानक.पाठ्य;
 आयात मानक.जेसन;
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     स्थिर शब्द: सूची<पाठ> = पाठ्य.बाँटो("भाष,भारत,ज्ञान", ",");
     लिखो(पाठ्य.जोड़ो(शब्द, " · "));
     लिखो(जेसन.पाठबनाओ(शब्द));
@@ -264,7 +268,7 @@ Bhash v0.9 adds checked numeric conversions, unsigned `बाइट`, signed 32-
 ```text
 परिगणना स्थिति { लंबित, तैयार = ५ }
 अभिलेख बिंदु(अ: पूर्णांक, ब: पूर्णांक);
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     स्थिर छोटा: बाइट = परिवर्तित<बाइट>(२५५);
     स्थिर मूल: सर्ववस्तु = नया बिंदु(२,३);
     लिखो(छोटा, प्रकारहै<बिंदु>(मूल), परिवर्तित<बिंदु>(मूल).अ);
@@ -282,12 +286,12 @@ and the [multi-file example](examples/types/).
 ## The program
 
 ```text
-कार्य गुणनफल(संख्या: पूर्णांक) -> पूर्णांक {
+फलन गुणनफल(संख्या: पूर्णांक) -> पूर्णांक {
     यदि (संख्या <= १) { लौटाओ १; }
     लौटाओ संख्या * गुणनफल(संख्या - १);
 }
 
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     लिखो("० से २० तक एक पूर्णांक लिखें:");
     स्थिर संख्या: पूर्णांक = पढ़ो();
     यदि (संख्या < ० || संख्या > २०) {
@@ -307,7 +311,7 @@ range message and return normally. Integer output uses Devanagari digits.
 ## Objects, classes and inheritance
 
 The v0.2 core supports classes (`वर्ग`), constructors (`निर्माता`), object creation
-(`नया`), fields, instance methods (`कार्य`), single inheritance (`विस्तार`), explicit
+(`नया`), fields, instance methods (`फलन`), single inheritance (`विस्तार`), explicit
 method overriding (`अधिलेखन`), `यह`/`आधार`, access modifiers and null references
 (`रिक्त`). These features compile on **JVM, .NET CLR and browser WebAssembly**.
 

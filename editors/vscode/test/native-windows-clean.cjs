@@ -51,7 +51,7 @@ try {
     assert.equal(report.target,'x86_64-w64-windows-gnu');
     assert.ok(report.libraries.every(x=>x==='kernel32.dll'||x==='shell32.dll'||x==='ucrtbase.dll'||x.startsWith('api-ms-win-crt-')));
     const consoleFile=path.join(home,'console.bhash');
-    fs.writeFileSync(consoleFile,'कार्य मुख्य() -> शून्य { लिखो(पाठपढ़ो()); लिखो(पढ़ो()); }\n');
+    fs.writeFileSync(consoleFile,'फलन मुख्य() -> शून्य { लिखो(पाठपढ़ो()); लिखो(पढ़ो()); }\n');
     assert.equal(task('run',consoleFile,'भारत😀\r\n+४२\r\n').stdout,'भारत😀\n४२\n');
     for(const directory of ["native-file-example","native-byte-example"])fs.mkdirSync(path.join(home,"target",directory),{recursive:true});
     // Exercise collector, callbacks/unwinding, object layout and platform file APIs.

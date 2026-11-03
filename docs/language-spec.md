@@ -12,6 +12,11 @@ implement the full v0.9 language. See [native profile and runtime design](native
 
 ## 1. Source and lexical rules
 
+Function declarations use `फलन`; collection iteration is
+`प्रत्येक (sourceExpression में element: Type[, value: Type])`.
+The previous keyword and binding-first loop forms are no longer accepted.
+See [Hindi syntax and migration examples](hindi-syntax.md).
+
 - UTF-8 source files; `.bhash` extension. The CLI accepts one optional leading BOM.
 - Keywords and identifiers are case-sensitive and use Devanagari. No English keyword aliases.
 - Identifiers start with a Devanagari letter. Later characters may also be
@@ -43,8 +48,8 @@ implement the full v0.9 language. See [native profile and runtime design](native
 | --- | --- | --- |
 | `संकुल` | Package declaration | `संकुल संस्था.गणित;` |
 | `आयात` / `उपनाम` | Import / import alias | `आयात संस्था.गणित.गणक उपनाम गणना;` |
-| `प्रत्येक` / `में` | Collection iteration | `प्रत्येक (अ: पूर्णांक में अंक) { ... }` |
-| `कार्य` | Function declaration | `कार्य जोड़(...) -> पूर्णांक { ... }` |
+| `प्रत्येक` / `में` | Collection iteration | `प्रत्येक (अंक में अ: पूर्णांक) { ... }` |
+| `फलन` | Function declaration | `फलन जोड़(...) -> पूर्णांक { ... }` |
 | `अनुबंध` / `पालन` | Interface / implementation | `वर्ग क पालन ख { ... }` |
 | `साझा` | Static member | `साझा मान गिनती: पूर्णांक = ०;` |
 | `मान` | Mutable binding | `मान गिनती: पूर्णांक = ०;` |
@@ -68,7 +73,7 @@ implement the full v0.9 language. See [native profile and runtime design](native
 | `दशमलव` | IEEE 754 binary64 floating-point | `३.१४` |
 | `तार्किक` | Boolean | `सत्य`, `असत्य` |
 | `पाठ` | Immutable Unicode string | `"भाष"` |
-| `शून्य` | No return value (void) | `कार्य मुख्य() -> शून्य { ... }` |
+| `शून्य` | No return value (void) | `फलन मुख्य() -> शून्य { ... }` |
 
 `दशमलव` is the proposed spelling for binary floating point, not exact decimal
 arithmetic; revisit the name if exact decimal becomes a language requirement.
@@ -77,11 +82,11 @@ arithmetic; revisit the name if exact decimal becomes a language requirement.
 ## 3. Functions and program structure
 
 ```text
-कार्य जोड़(पहला: पूर्णांक, दूसरा: पूर्णांक) -> पूर्णांक {
+फलन जोड़(पहला: पूर्णांक, दूसरा: पूर्णांक) -> पूर्णांक {
     लौटाओ पहला + दूसरा;
 }
 
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     लिखो(जोड़(२, ३));
 }
 ```
@@ -206,7 +211,7 @@ parameters and return positions; derived-to-base assignment is implicit. Text is
 still a primitive value, while class equality uses reference identity.
 
 New reserved keywords: `वर्ग`, `विस्तार`, `निर्माता`, `नया`, `यह`, `आधार`,
-`सार्वजनिक`, `निजी`, `संरक्षित`, `अधिलेखन` and `रिक्त`. Existing `कार्य`, `मान`
+`सार्वजनिक`, `निजी`, `संरक्षित`, `अधिलेखन` and `रिक्त`. Existing `फलन`, `मान`
 and `स्थिर` are reused for members. `स्थिर` denotes immutability, not static storage.
 All detailed syntax, initialization order, constructor-safety constraints and access
 rules are specified in [Objects and inheritance](objects.md).
@@ -232,7 +237,7 @@ nearest loop or selection; `जारी` continues the enclosing loop. See [sel
 `त[]` (also `सरणी<त>`) is an invariant fixed-length array. `सूची<त>` and
 `मानचित्र<क,व>` are predeclared invariant reference types. Collections support
 indexing, checked writes and typed initializers; lists grow and maps preserve
-insertion order. `प्रत्येक (element: type में source)` iterates elements or map
+insertion order. `प्रत्येक (source में element: type)` iterates elements or map
 keys, and a second typed binding iterates map values alongside their keys.
 See [v0.7 collection rules](collections.md) for APIs, equality, mutation checks,
 array dimensions, evaluation order and multi-file examples.

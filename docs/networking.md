@@ -8,7 +8,7 @@ or dynamically loaded system libcurl (Linux/macOS native).
 ```bhash
 आयात मानक.एचटीटीपी;
 आयात मानक.एचटीटीपीअनुरोध;
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     स्थिर अ: एचटीटीपीअनुरोध = नया एचटीटीपीअनुरोध("POST", "https://example.com/api");
     अ.पाठरखो("{\"नाम\":\"भारत😀\"}");
     अ.शीर्षरखो("Content-Type", "application/json; charset=utf-8");

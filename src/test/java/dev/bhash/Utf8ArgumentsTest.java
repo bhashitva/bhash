@@ -13,7 +13,7 @@ class Utf8ArgumentsTest {
     @TempDir Path root;
     private String encode(String... args){return Base64.getEncoder().encodeToString(new Gson().toJson(args).getBytes(StandardCharsets.UTF_8));}
     @Test void preservesHindiEmojiPathsAndArgumentBoundaries()throws Exception{
-        Path source=root.resolve("नमस्ते 😀 space.bhash");Files.writeString(source,"कार्य मुख्य() -> शून्य { लिखो(१); }");
+        Path source=root.resolve("नमस्ते 😀 space.bhash");Files.writeString(source,"फलन मुख्य() -> शून्य { लिखो(१); }");
         var bytes=new ByteArrayOutputStream();var output=new PrintStream(bytes,true,StandardCharsets.UTF_8);
         assertEquals(0,Main.run(new String[]{"--utf8-args",encode("check",source.toString())},output,output));
     }

@@ -25,7 +25,7 @@ const language = StreamLanguage.define({
 const snippets = [
   ['लिखो', 'print', 'लिखो(${उत्तर});'], ['स्थिर', 'const', 'स्थिर ${नाम}: ${पूर्णांक} = ${०};'],
   ['मान', 'let', 'मान ${नाम}: ${पूर्णांक} = ${०};'], ['यदि', 'if', 'यदि (${शर्त}) {\n    ${}\n}'],
-  ['कार्य', 'function', 'कार्य ${नाम}() -> शून्य {\n    ${}\n}'], ['परिगणना', 'enum', 'परिगणना ${स्थिति} { ${लंबित}, ${तैयार} }'],
+  ['फलन', 'function', 'फलन ${नाम}() -> शून्य {\n    ${}\n}'], ['परिगणना', 'enum', 'परिगणना ${स्थिति} { ${लंबित}, ${तैयार} }'],
   ['अभिलेख', 'record', 'अभिलेख ${बिंदु}(${अ}: पूर्णांक, ${ब}: पूर्णांक);'],
   ['प्रयास', 'try', 'प्रयास {\n    ${}\n} पकड़ो (गलती: अपवाद) {\n    लिखो(गलती.संदेश);\n}']
 ];
@@ -35,24 +35,24 @@ const completionOptions = [...keywordData.map(({value}) => ({label: value, type:
 ])];
 const examples = {
   hello: {mode: 'scratch', source: 'लिखो("नमस्ते, दुनिया!");', input: ''},
-  factorial: {mode: 'program', input: '५', source: `कार्य गुणनफल(अंक: पूर्णांक) -> पूर्णांक {
+  factorial: {mode: 'program', input: '५', source: `फलन गुणनफल(अंक: पूर्णांक) -> पूर्णांक {
     यदि (अंक <= १) { लौटाओ १; }
     लौटाओ अंक * गुणनफल(अंक - १);
 }
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     स्थिर अंक: पूर्णांक = पढ़ो();
     यदि (अंक < ० || अंक > २०) { त्रुटि("० से २० तक पूर्णांक दें।"); }
     लिखो("गुणनफल:", गुणनफल(अंक));
 }`},
   collections: {mode: 'scratch', input: '', source: `स्थिर अंक: सूची<पूर्णांक> = नया सूची<पूर्णांक>{१,२,३};
 अंक.जोड़ो(४);
-प्रत्येक (अ: पूर्णांक में अंक) {
+प्रत्येक (अंक में अ: पूर्णांक) {
     लिखो(अ);
 }`},
   standard: {mode: 'program', input: '', source: `आयात मानक.पाठ्य;
 आयात मानक.गणित;
 आयात मानक.जेसन;
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     स्थिर शब्द: सूची<पाठ> = पाठ्य.बाँटो("भाष,भारत,ज्ञान", ",");
     लिखो(पाठ्य.जोड़ो(शब्द, " · "));
     लिखो(पाठ्य.संख्यापाठ(गणित.वर्गमूल(२.०), ४));
@@ -61,7 +61,7 @@ const examples = {
 }`},
   types: {mode: 'program', input: '', source: `परिगणना स्थिति { लंबित, तैयार = ५ }
 अभिलेख बिंदु(अ: पूर्णांक, ब: पूर्णांक);
-कार्य मुख्य() -> शून्य {
+फलन मुख्य() -> शून्य {
     स्थिर क: बिंदु = नया बिंदु(२,३);
     स्थिर मूल: सर्ववस्तु = क;
     लिखो(स्थिति.तैयार.नाम, क.अ, क.ब);
@@ -115,7 +115,7 @@ $('example').addEventListener('change', () => { const item = examples[$('example
 for (const button of document.querySelectorAll('[data-insert]')) button.addEventListener('click', () => { const insert = button.dataset.insert.replaceAll('\\"', '"'); editor.dispatch(editor.state.replaceSelection(insert)); editor.focus(); });
 for (const name of ['output', 'input']) $(`${name}-tab`).addEventListener('click', () => { for (const other of ['output', 'input']) { $(`${other}-tab`).classList.toggle('selected', other === name); $(`${other}-tab`).setAttribute('aria-selected', String(other === name)); $(`${other}-panel`).hidden = other !== name; } });
 $('download').addEventListener('click', () => {
-  const text = editor.state.doc.toString(), source = $('mode').value === 'scratch' ? `कार्य मुख्य() -> शून्य {\n${text}\n}\n` : text;
+  const text = editor.state.doc.toString(), source = $('mode').value === 'scratch' ? `फलन मुख्य() -> शून्य {\n${text}\n}\n` : text;
   const url = URL.createObjectURL(new Blob([source], {type: 'text/plain;charset=utf-8'}));
   const a = document.createElement('a'); a.href = url; a.download = 'playground.bhash'; a.click(); track('playground_download'); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
