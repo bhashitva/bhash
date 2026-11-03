@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.0
+
+- Bundle the merged PR #63 compiler with typed function values, lambdas and lexical closures on JVM, CLR/WASM and native targets.
+- Support higher-order calls, named function references, escaping/nested closures and shared mutable captures with native GC safety.
+- Add lambda and function-value snippets, editor-host regression coverage and links to the Hindi callback/closure tutorial.
+- Use क्रमानुदेश consistently in the bundled documentation and compiler messages from PR #62.
+- Callbacks are synchronous; async scheduling and automatic conversion to existing callback interfaces remain separate features.
+
 ## 0.15.0
 
 - Bundle the merged PR #61 compiler with shared SQLite/PostgreSQL connection, statement and transaction APIs on JVM, CLR and native.
