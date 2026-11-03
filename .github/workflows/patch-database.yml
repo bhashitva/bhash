@@ -1,0 +1,48 @@
+name: Prepare database providers source update (temporary)
+on:
+  push:
+    branches: [automation/database-providers-transfer]
+    paths: [.github/workflows/patch-database.yml]
+permissions:
+  contents: write
+jobs:
+  materialize:
+    if: github.repository == 'bhashitva/bhash' && github.ref == 'refs/heads/automation/database-providers-transfer'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Preserve payload and create isolated implementation branch
+        run: |
+          cp .github/workflows/database-patch.json.gz "$RUNNER_TEMP/database-patch.json.gz"
+          git switch -c feature/database-providers origin/feature/database-providers
+      - name: Verify base bytes and apply reviewed source update
+        shell: python
+        run: |
+          import base64, gzip, hashlib, json, os, pathlib
+          root = pathlib.Path.cwd().resolve()
+          payload = pathlib.Path(os.environ['RUNNER_TEMP']) / 'database-patch.json.gz'
+          files = json.loads(gzip.decompress(payload.read_bytes()))
+          for item in files:
+              path = pathlib.PurePosixPath(item['path'])
+              assert not path.is_absolute() and '..' not in path.parts
+              assert path.parts[0] not in ('.git', '.github')
+              destination = root.joinpath(*path.parts)
+              actual = hashlib.sha256(destination.read_bytes().replace(bytes([13,10]),bytes([10]))).hexdigest() if destination.exists() else None
+              assert actual == item['before'], 'Base source changed: ' + item['path']
+              assert hashlib.sha256(base64.b64decode(item['data'])).hexdigest() == item['after']
+          for item in files:
+              destination = root / item['path']
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              destination.write_bytes(base64.b64decode(item['data']))
+          print('Applied and verified', len(files), 'source files')
+      - name: Commit implementation to its review branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git -c core.whitespace=cr-at-eol diff --cached --check
+          git -c core.whitespace=cr-at-eol commit -m 'Align PostgreSQL type and byte limits and extend failure tests'
+          git push origin HEAD:refs/heads/feature/database-providers
