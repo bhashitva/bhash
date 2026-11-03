@@ -296,3 +296,12 @@ to cover these until their semantics and tests are agreed.
 ## Function values, lambdas and closures
 
 Function types, capture semantics and cross-target lowering are specified in [function-values.md](function-values.md). See the [Hindi tutorial](../tutorial/functions/README.md) for executable examples.
+
+## Async functions and tasks
+
+The task-core contract is specified in [task-core-implementation.md](task-core-implementation.md).
+An `असमकालिक फलन` returns `कार्यफल<T>` to callers while its body returns T.
+`प्रतीक्षा` suspends only inside async bodies. Async `मुख्य()->शून्य` drives
+structured task completion. `असमकालिक संसाधन` awaits `बंदकरो()->कार्यफल<शून्य>`;
+both sync and async resources drain children before disposal. See the
+[Hindi tutorial](../tutorial/async/README.md) and [approved design](async-await-design.md).
