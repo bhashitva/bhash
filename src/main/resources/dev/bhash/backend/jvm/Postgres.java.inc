@@ -13,7 +13,7 @@
             this.owner=owner;this.query=query;bound=new boolean[query.getParameterMetaData().getParameterCount()];
             var meta=query.getMetaData();int n=meta==null?0:meta.getColumnCount();names=new String[n];types=new String[n];
             if(n>256||bound.length>999)throw failure("PostgreSQL परिणाम या मापदंड सीमा से बाहर है।");
-            for(int i=0;i<n;i++){names[i]=meta.getColumnLabel(i+1);types[i]=pgKind(meta.getColumnType(i+1),meta.getColumnTypeName(i+1));}
+            for(int i=0;i<n;i++){names[i]=meta.getColumnLabel(i+1);types[i]=pgKind(meta.getColumnTypeName(i+1));}
         }
     }
     private static BhashRuntime.Failure pgFailure(java.sql.SQLException e,PgConnection c){
@@ -26,17 +26,20 @@
         String[] a=config.split("\n",-1);if(a.length!=10)throw failure("अमान्य PostgreSQL विन्यास।");
         java.sql.Connection db=null;
         try{
-            Class.forName("org.postgresql.Driver");
+            Class<?> sourceClass=Class.forName("org.postgresql.ds.PGSimpleDataSource");
+            Object source=sourceClass.getConstructor().newInstance();
             var p=new java.util.Properties();p.setProperty("PGHOST",a[0]);p.setProperty("PGPORT",a[1]);p.setProperty("PGDBNAME",a[2]);
             p.setProperty("user",a[3]);p.setProperty("password",a[4]);p.setProperty("sslmode",a[5]);
             if(!a[6].isEmpty())p.setProperty("sslrootcert",a[6]);
             p.setProperty("connectTimeout",a[7]);p.setProperty("socketTimeout",Integer.toString((Integer.parseInt(a[8])+999)/1000+5));
             p.setProperty("options","-c statement_timeout="+a[8]+" -c lock_timeout="+a[8]+" -c timezone=UTC -c datestyle=ISO -c standard_conforming_strings=on -c bytea_output=hex");
             p.setProperty("ApplicationName","Bhash");p.setProperty("gssEncMode","disable");p.setProperty("allowEncodingChanges","false");
-            db=java.sql.DriverManager.getConnection("jdbc:postgresql:",p);
+            var property=sourceClass.getMethod("setProperty",String.class,String.class);
+            for(String key:p.stringPropertyNames())property.invoke(source,key,p.getProperty(key));
+            db=((javax.sql.DataSource)source).getConnection();
             if(db.getMetaData().getDatabaseMajorVersion()<14)throw failure("PostgreSQL 14 या नया संस्करण चाहिए।");
             var c=new PgConnection(db);long id=++pgConnectionNext;pgConnections.put(id,c);db=null;return id;
-        }catch(ClassNotFoundException|LinkageError missing){throw failure("PostgreSQL JDBC रनटाइम उपलब्ध नहीं है।");}
+        }catch(ReflectiveOperationException|LinkageError missing){throw failure("PostgreSQL JDBC रनटाइम उपलब्ध नहीं है।");}
         catch(java.sql.SQLException e){throw failure("PostgreSQL त्रुटि [XXXXX]।");}
         finally{if(db!=null)try{db.close();}catch(java.sql.SQLException ignored){}}
     }
@@ -72,15 +75,14 @@
     static long pgExecute(long id){var s=pgStatement(id);pgHealthy(s.owner);pgReady(s);pgBound(s);
         if(s.names.length!=0)throw failure("PostgreSQL पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");
         try{long n=s.query.executeLargeUpdate();s.state=2;return n;}catch(java.sql.SQLException e){s.state=3;throw pgFailure(e,s.owner);}}
-    private static String pgKind(int type,String name){return switch(type){
-        case java.sql.Types.BIGINT,java.sql.Types.INTEGER,java.sql.Types.SMALLINT->"पूर्णांक";
-        case java.sql.Types.REAL,java.sql.Types.FLOAT,java.sql.Types.DOUBLE->"दशमलव";
-        case java.sql.Types.BOOLEAN,java.sql.Types.BIT->"तार्किक";
-        case java.sql.Types.NUMERIC,java.sql.Types.DECIMAL->"सटीकदशमलव";
-        case java.sql.Types.BINARY,java.sql.Types.VARBINARY,java.sql.Types.LONGVARBINARY->"बाइटबफ़र";
-        case java.sql.Types.DATE,java.sql.Types.TIME,java.sql.Types.TIMESTAMP,java.sql.Types.TIMESTAMP_WITH_TIMEZONE,java.sql.Types.TIME_WITH_TIMEZONE->"समय";
-        case java.sql.Types.CHAR,java.sql.Types.VARCHAR,java.sql.Types.LONGVARCHAR->"पाठ";
-        case java.sql.Types.OTHER->java.util.Set.of("uuid","json","jsonb").contains(name)?"पाठ":"असमर्थित";
+    private static String pgKind(String name){return switch(name){
+        case "int2","int4","int8"->"पूर्णांक";
+        case "float4","float8"->"दशमलव";
+        case "bool"->"तार्किक";
+        case "numeric"->"सटीकदशमलव";
+        case "bytea"->"बाइटबफ़र";
+        case "date","time","timetz","timestamp","timestamptz"->"समय";
+        case "char","name","text","bpchar","varchar","uuid","json","jsonb"->"पाठ";
         default->"असमर्थित";};}
     static boolean pgNext(long id){var s=pgStatement(id);pgHealthy(s.owner);if(s.state==2)return false;if(s.state==3)throw failure("PostgreSQL कथन को रीसेट करें।");
         if(s.names.length==0)throw failure("PostgreSQL बदलाव के लिए चलाओ उपयोग करें।");
