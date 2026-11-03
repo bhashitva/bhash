@@ -213,8 +213,10 @@ final class AsyncSourceLowering {
             int broken=flow.broken<0?-1:closeResource(r,value,scope,previous,flow.broken,flow,false);
             int continued=flow.continued<0?-1:closeResource(r,value,scope,previous,flow.continued,flow,false);
             int body=block(r.block(),normal,new Flow(failed,returned,broken,continued,flow.caught));
-            int begin=action("यदि("+value+"==रिक्त){फेंको नया अपवाद(\"रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।\");}"+previous+"="+arg+".आंतरिकसीमा;"+scope+"=नया "+standard("कार्यसीमा")+"();"+standard("कार्यतंत्र")+".सीमाआरम्भ("+scope+");"+arg+".आंतरिकसीमा="+scope+";",body,flow,r.start);
-            return expression(r.expression(),value,begin,flow);
+            int registrationFailed=closeResource(r,value,null,previous,flow.failed,flow,true);
+            int begin=action(previous+"="+arg+".आंतरिकसीमा;"+scope+"=नया "+standard("कार्यसीमा")+"();"+standard("कार्यतंत्र")+".सीमाआरम्भ("+scope+");"+arg+".आंतरिकसीमा="+scope+";",body,new Flow(registrationFailed,flow.returned,flow.broken,flow.continued,flow.caught),r.start);
+            int nonnull=action("यदि("+value+"==रिक्त){फेंको नया अपवाद(\"रिक्त वस्तु के सदस्य का उपयोग नहीं किया जा सकता।\");}",begin,flow,r.start);
+            return expression(r.expression(),value,nonnull,flow);
         }
         int closeResource(ResourceStatementContext r,String value,String scope,String previous,int target,Flow outer,boolean failed)throws CompilationException {
             String pending=ref(field("अपवाद"));String shield=ref(field("तार्किक"));
@@ -224,6 +226,7 @@ final class AsyncSourceLowering {
             if(r.ASYNC()!=null){String task=ref(field(standard("कार्यआधार")));int resume=action(task+".आंतरिकपरिणामजाँचो();",finish,new Flow(closeFailure,0,0,0,null),r.start);close=state(task+"="+value+".बंदकरो();"+ref(pc)+"="+resume+";"+task+".आंतरिकप्रतीक्षा("+arg+");लौटाओ;",closeFailure,r.start);}
             else close=action(value+".बंदकरो();",finish,new Flow(closeFailure,0,0,0,null),r.start);
             int prepare=action(arg+".आंतरिकसीमा="+previous+";"+shield+"="+arg+".आंतरिकआवरण;"+arg+".आंतरिकआवरण=सत्य;",close,outer,r.start);
+            if(scope==null)return action(pending+"="+ref(error)+";",prepare,outer,r.start);
             int drainFailed=action("यदि("+pending+"==रिक्त){"+pending+"="+ref(error)+";}",prepare,outer,r.start);
             int drained=action(scope+".आंतरिकपरिणामजाँचो();",prepare,new Flow(drainFailed,0,0,0,null),r.start);
             return state(pending+"="+(failed?ref(error):"रिक्त")+";"+(failed?scope+".आंतरिकचिह्न.निरस्तकरो();":"")+scope+".आंतरिकसफल();"+ref(pc)+"="+drained+";"+scope+".आंतरिकप्रतीक्षा("+arg+");लौटाओ;",outer.failed,r.start);

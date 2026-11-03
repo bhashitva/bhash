@@ -13,9 +13,12 @@ final class AsyncSignatures {
     private final StringBuilder text=new StringBuilder();
     private final NavigableMap<Integer,Token> origins=new TreeMap<>();
     private int offset;
+    private final Set<String> taskNames=new HashSet<>(Set.of("कार्यफल"));
     static ProgramContext normalize(ProgramContext tree)throws CompilationException {
         if(!required(tree))return tree;
-        var p=new AsyncSignatures();p.render(tree);
+        var p=new AsyncSignatures();
+        for(var i:tree.importDecl())if(i.qualifiedName().getText().equals("मानक.कार्यफल") && i.IDENTIFIER()!=null)p.taskNames.add(i.IDENTIFIER().getText());
+        p.render(tree);
         var result=Frontend.parse("async-signatures",p.text.toString());
         if(!result.valid())throw new CompilationException(result.diagnostics().toString());
         ProjectResolver.remap(result.tree(),p.origins);return result.tree();
@@ -31,7 +34,9 @@ final class AsyncSignatures {
         }
         if(n instanceof TypeArgumentsContext t && !t.VOID().isEmpty()) {
             String owner=t.getParent() instanceof ValueTypeContext v && v.IDENTIFIER()!=null?v.IDENTIFIER().getText():"";
-            if(!owner.equals("कार्यफल") && !(owner.equals("मानक") && t.getParent().getText().startsWith("मानक.कार्यफल<")))
+            if(t.getParent() instanceof PrimaryContext p && p.IDENTIFIER()!=null)owner=p.IDENTIFIER().getText();
+            if(t.getParent() instanceof PostfixPartContext p && p.IDENTIFIER()!=null)owner=p.IDENTIFIER().getText();
+            if(!taskNames.contains(owner) && !(owner.equals("मानक") && t.getParent().getText().startsWith("मानक.कार्यफल<")))
                 throw new CompilationException("शून्य केवल कार्यफल<शून्य> में प्रकार तर्क हो सकता है।");
             if(t.getChildCount()!=3)throw new CompilationException("कार्यफल के लिए एक प्रकार तर्क चाहिए।");
             add("<मानक.कार्यशून्य>",t.start);return;

@@ -105,7 +105,6 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public sealed interface Expression permits DatabaseCall, ServerCall, NetworkCall, FoundationCall, StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
-    /** Must be eliminated by suspension lowering before any synchronous emitter. */
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
     public record Constant(Type type, Object value, Source source) implements Expression {}
     public record Read(Binding binding, Source source) implements Expression {
