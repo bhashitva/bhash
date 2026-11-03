@@ -637,4 +637,6 @@ final class BhashStandard {
         finally{Arrays.fill(x,(byte)0);Arrays.fill(y,(byte)0);}
     }
     static long appMonotonic(){return (System.nanoTime()&Long.MAX_VALUE)/1000000;}
+    static long appTaskClock(){return (System.nanoTime()&Long.MAX_VALUE)/1000000;}
+    static void appTaskSleep(){try{Thread.sleep(1);}catch(InterruptedException e){Thread.currentThread().interrupt();throw failure("कार्य प्रेषण बाधित।");}}
 }
