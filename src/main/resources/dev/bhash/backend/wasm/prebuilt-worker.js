@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import {runtimeBase, reportRunning} from './browser-host-config.js';
+import {runtimeBase} from './browser-host-config.js';
 self.onmessage = async ({data}) => {
   self.onmessage = null;
   try {
@@ -13,8 +13,10 @@ self.onmessage = async ({data}) => {
     const {getAssemblyExports, getConfig} = await dotnet.create();
     const api = (await getAssemblyExports(getConfig().mainAssemblyName)).BhashBrowser;
     api.Load(btoa(binary));
-    if (reportRunning) self.postMessage({type:'running'});
-    const exitCode = api.Run(data.input);
+    self.onmessage = ({data: message}) => { if(message?.type === 'cancel') api.Cancel(); };
+    self.postMessage({type:'running'});
+    const exitCode = await api.Run(data.input);
+    self.onmessage = null;
     self.postMessage({output:api.Output(), errors:api.Errors(), exitCode});
   } catch (error) { self.postMessage({output:'', errors:String(error), exitCode:1}); }
 };
