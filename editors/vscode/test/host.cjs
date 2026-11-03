@@ -100,6 +100,14 @@ exports.run=async()=>{
     assert.ok(dbDefinitions.length>0,'database provider F12');
     const dbDoc=await vscode.workspace.openTextDocument(dbDefinitions[0].uri);assert.ok(dbDoc.getText().includes('पोस्टग्रेस'),'readable provider declaration');
     console.log('PASS bundled databases: diagnostics, provider/migration completion, signature help and F12 without opening connections.');
+    // Prove the bundled server accepts closures and reports errors inside lambda bodies.
+    const closure='फलन बनाओ(आरंभ: पूर्णांक) -> फलन()->पूर्णांक { मान गिनती: पूर्णांक=आरंभ; लौटाओ फलन()->पूर्णांक { गिनती=गिनती+१; लौटाओ गिनती; }; } फलन मुख्य()->शून्य { स्थिर क: फलन()->पूर्णांक=बनाओ(४); लिखो(क()); }';
+    const closureBad=closure.replace('लौटाओ गिनती;','लौटाओ "गलत";');
+    const closureEdit=new vscode.WorkspaceEdit();closureEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),closureBad);await vscode.workspace.applyEdit(closureEdit);
+    await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.some(d=>d.source==='bhash'&&d.severity===vscode.DiagnosticSeverity.Error),'lambda return type diagnostic');
+    const closureRestore=new vscode.WorkspaceEdit();closureRestore.replace(uri,new vscode.Range(0,0,document.lineCount,0),closure);await vscode.workspace.applyEdit(closureRestore);
+    await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'valid closure diagnostic clearing');
+    console.log('PASS bundled closures: typed function values, mutable captures and lambda return diagnostics.');
     const original=new vscode.WorkspaceEdit();original.replace(uri,new vscode.Range(0,0,document.lineCount,0),source);await vscode.workspace.applyEdit(original);await document.save();
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'diagnostic clearing after provider tests');
     const tasks=await vscode.tasks.fetchTasks({type:'bhash'});const build=tasks.find(task=>task.definition.command==='build');assert.ok(build,'configured Bhash task resolves');

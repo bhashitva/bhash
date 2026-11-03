@@ -5,6 +5,22 @@ bundles the Bhash compiler and a Java language server. Source analysis stays on
 the extension host; it does not send code to the public playground or execute
 programs while you edit.
 
+## 0.16.0: Function values, lambdas and closures / फलन मान और संवृतियाँ
+
+This release bundles the compiler from merged PR #63. Pass, return and store
+`फलन(पूर्णांक) -> पूर्णांक` values, write typed lambdas, and capture lexical
+bindings in nested or escaping closures. Mutable captures share storage;
+native closure environments are traced automatically by the collector.
+
+Use the `lambda` / `लैम्ब्डा` and `callback` snippets to get started. See the
+[Hindi tutorial](../../tutorial/functions/README.md),
+[runnable callback example](../../tutorial/functions/callbacks.bhash), and
+[function-value contract](../../docs/function-values.md).
+
+The feature works on JVM, CLR, browser/WASM and native targets. Parameters and
+return types are explicit. Callbacks run synchronously; this release does not
+add async/await or implicit adapters for existing callback interfaces.
+
 ## 0.15.0: PostgreSQL and migrations / डेटाबेस माइग्रेशन
 
 This release bundles the compiler from merged PR #61. Use a common connection,

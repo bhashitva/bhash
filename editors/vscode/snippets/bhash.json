@@ -1,4 +1,6 @@
 {
+  "Lambda": {"prefix": ["lambda", "लैम्ब्डा"], "body": ["फलन(${1:अंक}: ${2:पूर्णांक}) -> ${3:पूर्णांक} {", "    लौटाओ ${0:अंक};", "}"], "description": "Typed lambda · अनाम फलन"},
+  "Function value": {"prefix": ["callback", "फलनमान"], "body": ["स्थिर ${1:क}: फलन(${2:पूर्णांक}) -> ${3:पूर्णांक} =", "    फलन(${4:अंक}: ${2:पूर्णांक}) -> ${3:पूर्णांक} { लौटाओ ${0:अंक}; };"], "description": "Function value · फलन मान"},
   "Main function": {"prefix": ["main", "मुख्य"], "body": ["फलन मुख्य() -> शून्य {", "    ${0:लिखो(\"नमस्ते, दुनिया!\");}", "}"], "description": "Program entry point · मुख्य"},
   "Function": {"prefix": ["function", "फलन"], "body": ["फलन ${1:नाम}(${2:अंक: पूर्णांक}) -> ${3:शून्य} {", "    $0", "}"], "description": "Typed function"},
   "Class": {"prefix": ["class", "वर्ग"], "body": ["सार्वजनिक वर्ग ${1:नाम} {", "    सार्वजनिक निर्माता() {", "        $0", "    }", "}"], "description": "Public class with constructor"},

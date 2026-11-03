@@ -11,6 +11,9 @@ test('TextMate honors Devanagari word boundaries, declarations, strings, comment
     assert.ok(!scopes('कार्य फलनमान').some(([,s])=>s.includes('keyword')));
     const snippets=JSON.parse(fs.readFileSync(path.join(__dirname,'../snippets/bhash.json'),'utf8'));
     assert.deepEqual(snippets.Function.prefix,['function','फलन']);
+    assert.deepEqual(snippets.Lambda.prefix,['lambda','लैम्ब्डा']);
+    assert.ok(scopes('फलन(अ: पूर्णांक) -> पूर्णांक { लौटाओ अ; }').some(([word,s])=>word==='फलन'&&s.includes('keyword')));
+    assert.ok(!scopes('फलन(अ: पूर्णांक) -> पूर्णांक { लौटाओ अ; }').some(([word,s])=>word==='अ'&&s.includes('entity.name.function')));
     assert.equal(snippets['Collection iteration'].body[0],'प्रत्येक (${1:सूची} में ${2:अंक}: ${3:पूर्णांक}) {');
     assert.ok(scopes('स्थिर क: पूर्णांक = १२;').some(([word,s])=>word==='स्थिर'&&s.includes('keyword')));
     assert.ok(!scopes('स्थिरता').some(([,s])=>s.includes('keyword')));
