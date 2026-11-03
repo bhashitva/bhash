@@ -105,7 +105,7 @@ final class SourceIndex {
         }
         boolean scope = context instanceof BlockContext || context instanceof ClassDeclContext || context instanceof InterfaceDeclContext
                 || context instanceof EnumDeclContext || context instanceof FunctionDeclContext || context instanceof ConstructorDeclContext
-                || context instanceof CatchClauseContext || context instanceof ForeachStatementContext || context instanceof ResourceStatementContext;
+                || context instanceof LambdaExpressionContext || context instanceof CatchClauseContext || context instanceof ForeachStatementContext || context instanceof ResourceStatementContext;
         int childStart = scope?start(context):scopeStart, childEnd=scope?end(context):scopeEnd;
         for (int i=0;i<context.getChildCount();i++) if (context.getChild(i) instanceof ParserRuleContext child)
             collect(child,children,false,false,childStart,childEnd);

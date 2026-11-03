@@ -17,6 +17,13 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class ManagedCompilerTest {
+    @Test void closureFixturesMatchManagedContract()throws Exception {
+        for(var f:ClosureFixtures.cases()) {
+            var result=run(compile(f.source()),"");
+            assertEquals(0,result.exit,f.name()+result.output);assertEquals(f.expected(),result.output,f.name());
+        }
+    }
+
     @Test void nativeGenericFixturesMatchManagedContract()throws Exception{
         for(var fixture:NativeGenericFixtures.cases()){
             var result=run(compile(fixture.source()),"");assertEquals(0,result.exit,fixture.name()+result.output);assertEquals(fixture.expected(),result.output,fixture.name());

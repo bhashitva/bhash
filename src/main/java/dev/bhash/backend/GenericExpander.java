@@ -97,7 +97,11 @@ final class GenericExpander {
     }
     private String type(ValueTypeContext type, Map<String,String> subst) throws CompilationException {
         String result;
-        if (type.IDENTIFIER()==null) result=type.getChild(0).getText();
+        if (type.functionType()!=null) {
+            var f=type.functionType(); var args=new ArrayList<String>();
+            for(var a:f.valueType()) args.add(type(a,subst));
+            result="फलन("+String.join(",",args)+") -> "+(f.returnType().VOID()!=null?"शून्य":type(f.returnType().valueType(),subst));
+        } else if (type.IDENTIFIER()==null) result=type.getChild(0).getText();
         else {
             String name=Identifiers.key(type.IDENTIFIER().getText());
             if (subst.containsKey(name)) {
@@ -116,7 +120,7 @@ final class GenericExpander {
                 result=name;
             }
         }
-        return result+"[]".repeat(type.arraySuffix().size());
+        return (type.functionType()!=null && !type.arraySuffix().isEmpty()?"("+result+")":result)+"[]".repeat(type.arraySuffix().size());
     }
     private void append(String value, Token origin) {
         origins.put(renderedCodePoints,origin);
@@ -129,7 +133,7 @@ final class GenericExpander {
         if (node instanceof PrimaryContext p && p.typeArguments()!=null) {
             if (p.LPAREN()==null && CollectionTypes.builtin(p.IDENTIFIER().getText()))
                 throw error(p,"Collection types have no static members; construct them with नया.");
-            String name=instantiate(p.LPAREN()==null?types:functions,p.IDENTIFIER().getText(),p.typeArguments(),subst);
+            String name=instantiate(p.LPAREN()!=null || functions.containsKey(Identifiers.key(p.IDENTIFIER().getText()))?functions:types,p.IDENTIFIER().getText(),p.typeArguments(),subst);
             append(name,p.start);
             for (int i=2;i<p.getChildCount();i++) render(p.getChild(i),subst,renamed,replacement);
             return;

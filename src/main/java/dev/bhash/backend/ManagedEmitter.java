@@ -150,7 +150,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var emitter = new ManagedEmitter("project", Target.JVM);
             emitter.analysis = new Analysis();
             emitter.analysis.exceptionClass=emitter.exceptionClass;
-            var tree = GenericExpander.expand("project", resolution.tree());
+            var tree = ClosureExpander.expand("project", GenericExpander.expand("project", resolution.tree()));
             // Validate concrete specializations, just as the managed targets check them.
             CoreProgram.validateProfile(tree);
             emitter.program(tree, true);
@@ -181,7 +181,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return emitResolved(sourceName, resolution, target, true);
     }
     private static String emitResolved(String sourceName, ProjectResolver.Resolution resolution, Target target, boolean requireEntry) throws CompilationException {
-        try { return new ManagedEmitter(sourceName, target).program(GenericExpander.expand(sourceName, resolution.tree()), requireEntry); }
+        try { return new ManagedEmitter(sourceName, target).program(ClosureExpander.expand(sourceName, GenericExpander.expand(sourceName, resolution.tree())), requireEntry); }
         catch (Invalid error) { throw new CompilationException(resolution.describe(error.getMessage())); }
         catch (CompilationException error) { throw new CompilationException(resolution.describe(error.getMessage())); }
     }

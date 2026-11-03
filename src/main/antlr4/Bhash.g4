@@ -21,11 +21,13 @@ grammar Bhash;
             if (token == EOF) return false;
             if (token == LT) depth++;
             else if (token == GT) {
-                if (--depth == 0) return _input.LA(i + 1) == LPAREN || _input.LA(i + 1) == DOT;
+                if (--depth == 0) return _input.LA(i + 1) == LPAREN || _input.LA(i + 1) == DOT
+                    || _input.LA(i + 1) == SEMI || _input.LA(i + 1) == COMMA || _input.LA(i + 1) == RPAREN || _input.LA(i + 1) == RBRACK;
             } else if (token != IDENTIFIER && token != COMMA && token != DOT
                     && token != INT_TYPE && token != REAL_TYPE && token != BOOL_TYPE && token != TEXT_TYPE
                     && token != BYTE_TYPE && token != INT32_TYPE && token != OBJECT_TYPE && token != BUFFER_TYPE
-                    && token != LBRACK && token != RBRACK)
+                    && token != LBRACK && token != RBRACK && token != FUNCTION && token != LPAREN
+                    && token != RPAREN && token != ARROW && token != VOID)
                 return false;
         }
     }
@@ -51,7 +53,9 @@ functionDecl : FUNCTION IDENTIFIER typeParameters? LPAREN parameters? RPAREN ARR
 parameters : parameter (COMMA parameter)* ;
 parameter : IDENTIFIER COLON valueType ;
 returnType : valueType | VOID ;
-valueType : (INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | BYTE_TYPE | INT32_TYPE | OBJECT_TYPE | BUFFER_TYPE | IDENTIFIER typeQualifier* typeArguments?) arraySuffix* ;
+functionType : FUNCTION LPAREN (valueType (COMMA valueType)*)? RPAREN ARROW returnType ;
+lambdaExpression : FUNCTION LPAREN parameters? RPAREN ARROW returnType block ;
+valueType : (functionType | LPAREN functionType RPAREN | INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | BYTE_TYPE | INT32_TYPE | OBJECT_TYPE | BUFFER_TYPE | IDENTIFIER typeQualifier* typeArguments?) arraySuffix* ;
 arraySuffix : LBRACK RBRACK ;
 arrayDimension : LBRACK expression RBRACK ;
 collectionInitializer : LBRACE (mapEntry (COMMA mapEntry)* | arguments)? RBRACE ;
@@ -107,9 +111,10 @@ additive : multiplicative ((PLUS | MINUS) multiplicative)* ;
 multiplicative : unary ((STAR | SLASH | PERCENT) unary)* ;
 unary : (NOT | BIT_NOT | MINUS | PLUS) unary | postfix ;
 postfix : primary postfixPart* ;
-postfixPart : DOT IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)? | LBRACK expression RBRACK ;
+postfixPart : DOT IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)? | LBRACK expression RBRACK | LPAREN arguments? RPAREN ;
 primary
-    : INTEGER_LITERAL
+    : lambdaExpression
+    | INTEGER_LITERAL
     | REAL_LITERAL
     | STRING_LITERAL
     | TRUE
