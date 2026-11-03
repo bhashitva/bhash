@@ -52,14 +52,19 @@ jobs:
       - name: Build distributable compiler
         run: mvn --batch-mode --no-transfer-progress -DskipTests package
       - name: Build standalone PostgreSQL application
-        run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile src/test/resources/postgresql/integration.bhash --target native -o target/postgres-app
+        run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native package src/test/resources/postgresql/integration.bhash -o target/postgres-1-linux.tar.gz --name postgres --version 1 --max-glibc 2.39
       - name: Validate runtime-only deployment
         run: |
           printf 'FROM ubuntu:24.04\nRUN apt-get update && apt-get install -y --no-install-recommends libpq5 ca-certificates && rm -rf /var/lib/apt/lists/*\n' > target/Dockerfile.pg
           docker build -t bhash-postgres-runtime -f target/Dockerfile.pg target
           docker run --rm --network host -v "$PWD/target:/artifacts:ro" -e BHASH_PG_HOST -e BHASH_PG_DATABASE -e BHASH_PG_USER -e BHASH_PG_PASSWORD -e BHASH_PG_SSLMODE -e BHASH_PG_CA=/artifacts/pg-tls/server.crt bhash-postgres-runtime sh -eu -c '
             for tool in java dotnet clang gcc; do ! command -v "$tool"; done
-            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 /artifacts/postgres-app > /tmp/out 2> /tmp/err
+            cd /tmp
+            tar -xzf /artifacts/postgres-1-linux.tar.gz
+            cd postgres-1-linux-x86_64
+            sha256sum -c SHA256SUMS
+            grep libpq.so.5 manifest.json
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./run.sh > /tmp/out 2> /tmp/err
             grep "PostgreSQL ठीक" /tmp/out
             grep "live=0" /tmp/err
           '
