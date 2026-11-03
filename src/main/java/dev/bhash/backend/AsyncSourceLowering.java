@@ -178,7 +178,10 @@ final class AsyncSourceLowering {
         int statement(StatementContext s,int next,Flow flow)throws CompilationException {
             if(s.variableDecl()!=null){var v=s.variableDecl();return expression(v.expression(),ref(binding(analysis.bindings.get(v))),next,flow);}
             if(s.RETURN()!=null)return s.expression()==null?flow.returned:expression(s.expression(),arg+".आंतरिकमूल्य",flow.returned,flow);
-            if(s.THROW()!=null)return s.expression()==null?action(ref(error)+"="+flow.caught+";",flow.failed,flow,s.start):expression(s.expression(),ref(error),flow.failed,flow);
+            if(s.THROW()!=null){
+                int throwing=state("फेंको "+(s.expression()==null?flow.caught:ref(error))+";",flow.failed,s.start);
+                return s.expression()==null?throwing:expression(s.expression(),ref(error),throwing,flow);
+            }
             if(s.BREAK()!=null)return flow.broken;
             if(s.CONTINUE()!=null)return flow.continued;
             if(s.block()!=null)return block(s.block(),next,flow);
