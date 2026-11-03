@@ -53,8 +53,10 @@ final class ClosureExpander {
     private Binding self;
 
     private ClosureExpander(String source) { this.source=source; }
-    static ProgramContext expand(String source,ProgramContext program)throws CompilationException {
-        return new ClosureExpander(source).program(program);
+    static ProgramContext expand(String source,ProgramContext program,Set<String> callableTypes)throws CompilationException {
+        var expander=new ClosureExpander(source);var result=expander.program(program);
+        for(var signature:expander.signatures.values())callableTypes.add(signature.name);
+        return result;
     }
     private CompilationException error(ParserRuleContext at,String message) {
         return new CompilationException(LocatedToken.source(at.start,source)+":"+at.start.getLine()+":"+(at.start.getCharPositionInLine()+1)+": "+message);
@@ -185,40 +187,6 @@ final class ClosureExpander {
             if(key(p.IDENTIFIER().getText()).equals(key(name)))return type(p.valueType());
         return "";
     }
-    private String inferred(ParseTree n) {
-        if(n instanceof PrimaryContext p) {
-            var b=reads.get(p);
-            if(b!=null) {
-                String t=b.type;
-                if(memberReads.containsKey(p)){var m=member(t,memberReads.get(p));t=m.fieldDecl()!=null?type(m.fieldDecl().valueType()):result(m.functionDecl().returnType());}
-                if(p.LPAREN()!=null && (memberReads.get(p)==null || callableMembers.contains(p)))return invocationResult(t);
-                return t;
-            }
-            if(p.lambdaExpression()!=null)return lambdas.get(p.lambdaExpression()).contract;
-            if(p.valueType()!=null)return type(p.valueType());
-            if(p.IDENTIFIER()!=null && p.LPAREN()==null && classes.containsKey(p.IDENTIFIER().getText()))return p.IDENTIFIER().getText();
-            if(p.IDENTIFIER()!=null && p.LPAREN()!=null){var fs=functions.get(key(p.IDENTIFIER().getText()));if(fs!=null && fs.size()==1)return result(fs.get(0).returnType());}
-            if(p.expression()!=null)return inferred(p.expression());
-            return "";
-        }
-        if(n instanceof PostfixContext p){String t=inferred(p.primary());for(var part:p.postfixPart())t=following(t,part);return t;}
-        return n.getChildCount()==1?inferred(n.getChild(0)):"";
-    }
-    private String invocationResult(String type){return signatures.values().stream().filter(s->s.name.equals(type)).map(s->s.result).findFirst().orElse("");}
-    private String following(String owner,PostfixPartContext p) {
-        if(p.LBRACK()!=null) {
-            if(owner.endsWith("[]"))return owner.substring(0,owner.length()-2);
-            int start=owner.indexOf('<'), depth=0,last=start;
-            if(start>=0){for(int i=start+1;i<owner.length()-1;i++){char c=owner.charAt(i);if(c=='<')depth++;else if(c=='>')depth--;else if(c==',' && depth==0)last=i;}return owner.substring(last+1,owner.length()-1);}
-            return "";
-        }
-        if(p.IDENTIFIER()==null)return invocationResult(owner);
-        String field=fieldType(owner,p.IDENTIFIER().getText());
-        if(!field.isEmpty())return p.LPAREN()!=null?invocationResult(field):field;
-        var m=member(owner,p.IDENTIFIER().getText());if(m==null)return "";
-        String t=m.fieldDecl()!=null?type(m.fieldDecl().valueType()):result(m.functionDecl().returnType());
-        return m.fieldDecl()!=null && p.LPAREN()!=null?invocationResult(t):t;
-    }
     private ClassMemberContext member(String owner,String name) {
         return member(owner,name,new HashSet<>());
     }
@@ -232,19 +200,6 @@ final class ClosureExpander {
         return c.valueType()!=null?member(type(c.valueType()),name,visited):null;
     }
     private void render(ParseTree n)throws CompilationException {
-        if(n instanceof PostfixContext p) {
-            String owner=inferred(p.primary());render(p.primary());
-            for(var part:p.postfixPart()) {
-                if(part.IDENTIFIER()==null && part.LPAREN()!=null && !owner.isEmpty() && !callable(owner))
-                    throw error(part,"Expression is not a function value.");
-                if(part.IDENTIFIER()!=null && part.LPAREN()!=null && callableField(owner,part.IDENTIFIER().getText())) {
-                    append("."+part.IDENTIFIER().getText()+"."+INVOKE+"(",part.start);
-                    if(part.arguments()!=null)render(part.arguments());append(")",part.stop);
-                }else render(part);
-                owner=following(owner,part);
-            }
-            return;
-        }
         if(n instanceof ClassDeclContext c && c.RECORD()==null) {
             for(int i=0;i<n.getChildCount()-1;i++)render(n.getChild(i));
             for(var l:ordered)if(c.IDENTIFIER().getText().equals(l.lexicalClass)) {
@@ -291,7 +246,8 @@ final class ClosureExpander {
             if(f!=null){append("नया "+wrappers.get(f)+"()",p.start);return;}
         }
         if(n instanceof PostfixPartContext p && p.LPAREN()!=null && p.IDENTIFIER()==null) {
-            append("."+INVOKE+"(",p.start);if(p.arguments()!=null)render(p.arguments());append(")",p.stop);return;
+            // Leave indirect calls explicit until semantic checking knows the exact receiver type.
+            append("(",p.start);if(p.arguments()!=null)render(p.arguments());append(")",p.stop);return;
         }
         if(n instanceof TerminalNode t){if(t.getSymbol().getType()!=Token.EOF)append(t.getText(),t.getSymbol());return;}
         for(int i=0;i<n.getChildCount();i++)render(n.getChild(i));

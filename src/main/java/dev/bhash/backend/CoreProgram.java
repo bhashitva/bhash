@@ -726,7 +726,12 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                     if(f!=null && f.intrinsic!=null){value=libraryCall(f,part,part.arguments());previous=a.expressions.get(part).type();continue;}
                     var selected=a.fields.get(part);
                     if(f!=null && f.shared){value=new Call(type(f.result,part),ids.get(f),checkedArguments(part.arguments(),f.parameters),source(part));previous=a.expressions.get(part).type();continue;}
-                    if(selected!=null && selected.shared()){value=new StaticRead(statics.get(selected),source(part));previous=a.expressions.get(part).type();continue;}
+                    if(selected!=null) {
+                        if(selected.shared())value=new StaticRead(statics.get(selected),source(part));
+                        else {if(value==null)value=expression(p.primary());value=new FieldRead(value,fields.get(selected),source(part));}
+                        if(f!=null){var args=new ArrayList<Expression>();args.add(value);args.addAll(arguments(part.arguments()));value=methodCall(f,args,part);}
+                        previous=a.expressions.get(part).type();continue;
+                    }
                     if(value==null)value=expression(p.primary());
                     if(f!=null){
                         if(!ids.containsKey(f) && !interfaceSlots.containsKey(f))throw unsupported(part);

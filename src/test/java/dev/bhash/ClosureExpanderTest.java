@@ -39,6 +39,15 @@ class ClosureExpanderTest {
         var sources=List.of(new SourceFile("stable.bhash",ClosureFixtures.cases().stream().filter(f->f.name().equals("escaping-shared-mutation")).findFirst().orElseThrow().source()));
         assertEquals(dev.bhash.backend.llvm.LlvmEmitter.emit(ManagedEmitter.core(sources)),dev.bhash.backend.llvm.LlvmEmitter.emit(ManagedEmitter.core(sources)));
     }
+    @Test void anOrdinaryMethodDoesNotMakeAnObjectCallable() {
+        var e=assertThrows(CompilationException.class,()->ManagedEmitter.core(List.of(new SourceFile("not-callable.bhash","""
+            वर्ग क { सार्वजनिक फलन आह्वान()->पूर्णांक { लौटाओ १; } }
+            फलन लो(अ: पूर्णांक)->क { लौटाओ नया क(); }
+            फलन लो(अ: पाठ)->क { लौटाओ नया क(); }
+            फलन मुख्य()->शून्य { लिखो(लो(१)()); }
+            """))));
+        assertTrue(e.getMessage().contains("not a function value"),e.getMessage());
+    }
     @Test void invalidCaptureAssignmentRetainsSourceLocation(){
         var e=assertThrows(CompilationException.class,()->ManagedEmitter.core(List.of(new SourceFile("capture.bhash","""
             फलन मुख्य()->शून्य {

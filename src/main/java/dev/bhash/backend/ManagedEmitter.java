@@ -150,7 +150,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var emitter = new ManagedEmitter("project", Target.JVM);
             emitter.analysis = new Analysis();
             emitter.analysis.exceptionClass=emitter.exceptionClass;
-            var tree = ClosureExpander.expand("project", GenericExpander.expand("project", resolution.tree()));
+            var tree = ClosureExpander.expand("project", GenericExpander.expand("project", resolution.tree()),emitter.callableTypes);
             // Validate concrete specializations, just as the managed targets check them.
             CoreProgram.validateProfile(tree);
             emitter.program(tree, true);
@@ -161,6 +161,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private ManagedEmitter(String sourceName, Target target) { this.sourceName = sourceName; this.target = target; }
+    private final Set<String> callableTypes=new HashSet<>();
 
     public static String emit(String sourceName, ProgramContext program, Target target) throws CompilationException {
         if (target != Target.JVM && target != Target.CLR) throw new IllegalArgumentException("Not a managed target");
@@ -181,7 +182,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return emitResolved(sourceName, resolution, target, true);
     }
     private static String emitResolved(String sourceName, ProjectResolver.Resolution resolution, Target target, boolean requireEntry) throws CompilationException {
-        try { return new ManagedEmitter(sourceName, target).program(ClosureExpander.expand(sourceName, GenericExpander.expand(sourceName, resolution.tree())), requireEntry); }
+        try {
+            var emitter=new ManagedEmitter(sourceName,target);
+            return emitter.program(ClosureExpander.expand(sourceName,GenericExpander.expand(sourceName,resolution.tree()),emitter.callableTypes),requireEntry);
+        }
         catch (Invalid error) { throw new CompilationException(resolution.describe(error.getMessage())); }
         catch (CompilationException error) { throw new CompilationException(resolution.describe(error.getMessage())); }
     }
@@ -1414,6 +1418,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return new Expr(method.result, receiver + "." + method.java + "(" + join(arguments) + ")", true);
     }
     private Expr classReceiver(ClassInfo definition) { return new Expr(definition.type,definition.java,false,null,false,true); }
+    private Expr callValue(ParserRuleContext at,Expr receiver,List<Expr> arguments) {
+        if(callableTypes.stream().noneMatch(name->subclass(receiver.type.object,classes.get(name))))
+            throw error(at,"Expression is not a function value.");
+        return callMethod(at,receiver,"आह्वान",arguments);
+    }
     @Override public Expr visitPostfix(PostfixContext ctx) {
         Expr value = visit(ctx.primary());
         if (ctx.postfixPart().isEmpty() && value.typeReceiver) throw error(ctx,"A type name is only valid as a static member receiver.");
@@ -1422,9 +1431,17 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             throw error(ctx, "Constructors may use यह only as a direct field receiver; the new object cannot escape early.");
         for (var part : ctx.postfixPart()) {
             if (part.LBRACK()!=null) { value=indexed(part,value,visit(part.expression())); if(analysis!=null)analysis.expressions.put(part,value); continue; }
+            if(part.LPAREN()!=null && part.IDENTIFIER()==null) {
+                value=callValue(part,value,arguments(part.arguments()));
+                if(analysis!=null)analysis.expressions.put(part,value);
+                continue;
+            }
             if (value.type.object == null && value.type.collection==null) throw error(part, "Member access requires a class instance.");
-            value = part.LPAREN() == null ? readField(part, value, part.IDENTIFIER().getText())
-                    : callMethod(part, value, part.IDENTIFIER().getText(), arguments(part.arguments()));
+            String member=part.IDENTIFIER().getText();
+            if(part.LPAREN()!=null && methods(value.type.object,member).isEmpty() && field(value.type.object,member)!=null)
+                value=callValue(part,readField(part,value,member),arguments(part.arguments()));
+            else value = part.LPAREN() == null ? readField(part, value, member)
+                    : callMethod(part, value, member, arguments(part.arguments()));
             if(analysis!=null)analysis.expressions.put(part,value);
         }
         return value;
