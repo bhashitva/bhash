@@ -15,7 +15,7 @@ public final class PostgresAssets {
         try(var lock=PostgresAssets.class.getResourceAsStream(prefix+"jdbc.lock.json")) {
             if(lock==null)throw new IOException("Missing PostgreSQL JDBC lockfile");
             var metadata=JsonParser.parseString(new String(lock.readAllBytes(),StandardCharsets.UTF_8)).getAsJsonObject();
-            try(var payload=PostgresAssets.class.getResourceAsStream(prefix+"postgresql-"+metadata.get("version").getAsString()+".jar")) {
+            try(var payload=PostgresAssets.class.getResourceAsStream(prefix+"postgresql-"+metadata.get("version").getAsString()+".zip")) {
                 if(payload==null)throw new IOException("Missing PostgreSQL JDBC runtime");
                 byte[] data=payload.readAllBytes();
                 try{if(!java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data)).equals(metadata.get("sha256").getAsString()))throw new IOException("PostgreSQL JDBC checksum mismatch");}
