@@ -7,7 +7,9 @@ import java.nio.file.*;
 public final class BrowserCompilerProcessFixture {
     public static void main(String[] args) throws Exception {
         Path directory=Path.of(args[0]);
-        Files.writeString(directory.resolve(args[1]+".pid"),Long.toString(ProcessHandle.current().pid()));
+        Path pending=directory.resolve(args[1]+".pending");
+        Files.writeString(pending,Long.toString(ProcessHandle.current().pid()));
+        Files.move(pending,directory.resolve(args[1]+".pid"),StandardCopyOption.ATOMIC_MOVE);
         if(args[1].equals("parent")) {
             String java=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
             new ProcessBuilder(java,"-cp",System.getProperty("java.class.path"),BrowserCompilerProcessFixture.class.getName(),args[0],"child").inheritIO().start();
