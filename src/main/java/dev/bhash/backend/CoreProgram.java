@@ -105,6 +105,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
     public sealed interface Expression permits DatabaseCall, ServerCall, NetworkCall, FoundationCall, StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
+    /** Must be eliminated by suspension lowering before any synchronous emitter. */
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
     public record Constant(Type type, Object value, Source source) implements Expression {}
     public record Read(Binding binding, Source source) implements Expression {
@@ -561,7 +562,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             }
             if(f.intrinsic!=null && f.intrinsic.startsWith("app")) {
                 var names=List.of("appOpenRead","appOpenWrite","appRead","appWrite","appFlush","appClose","appDirectoryExists","appMakeDirectory","appEntries","appDeleteFile","appDeleteDirectory","appEnvironment","appLog","appArguments","appPasswordHash","appPasswordVerify","appSecureToken","appSecureEqual","appMonotonic");
-                int op=names.indexOf(f.intrinsic);if(op<0)throw unsupported(at);if(op>=14)authentication=true;
+                int op=names.indexOf(f.intrinsic);if(f.intrinsic.equals("appTaskClock"))op=19;if(f.intrinsic.equals("appTaskSleep"))op=20;if(op<0)throw unsupported(at);if(op>=14&&op<=18)authentication=true;
                 ensureStructuredTypes(at);
                 return new FoundationCall(type(f.result,at),op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             }
@@ -597,6 +598,10 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             return new TextCall(type(f.result,at),operation,arguments(args),source(at));
         }
         CollectionOperation collectionOperation(String spelling,int arity){
+            if(spelling.equals("आंतरिकसंस्करण"))return CollectionOperation.VERSION;
+            if(spelling.equals("आंतरिकजाँच"))return CollectionOperation.ITER_CHECK;
+            if(spelling.equals("आंतरिककुंजी"))return CollectionOperation.ITER_KEY;
+            if(spelling.equals("आंतरिकमान"))return CollectionOperation.ITER_VALUE;
             String name=Identifiers.key(spelling);
             for(var item:Map.ofEntries(Map.entry("आकार",CollectionOperation.SIZE),Map.entry("लंबाई",CollectionOperation.SIZE),
                 Map.entry("खाली",CollectionOperation.EMPTY),Map.entry("लो",arity==2?CollectionOperation.GET_OR:CollectionOperation.GET),
@@ -713,6 +718,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                                 ManagedEmitter.Type expected=switch(operation){
                                     case GET,GET_OR,REMOVE,SET->i==0?key:element;
                                     case CONTAINS->map?key:element;case ADD->element;case INSERT->i==0?ManagedEmitter.Type.INT:element;
+                                    case ITER_CHECK,ITER_KEY,ITER_VALUE->ManagedEmitter.Type.INT;
                                     default->throw unsupported(part);
                                 };
                                 args.set(i,coerce(args.get(i),type(expected,part)));

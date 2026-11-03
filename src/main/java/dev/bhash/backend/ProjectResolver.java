@@ -53,12 +53,14 @@ public final class ProjectResolver {
         if(trees.isEmpty())throw new CompilationException("Project contains no .bhash source files.");
         for(var input:trees)if(dev.bhash.stdlib.StandardLibrary.reserved(LocatedToken.source(input.start,"")))throw new CompilationException("Reserved standard library source name.");
         var resolver = new ProjectResolver();
-        var all=new ArrayList<>(trees);
+        var all=new ArrayList<ProgramContext>();
+        for(var input:trees)all.add(AsyncSignatures.normalize(input));
         var library=dev.bhash.stdlib.StandardLibrary.source().parse();
         if(!library.valid())throw new IllegalStateException("Invalid bundled standard library: "+library.diagnostics());
         all.add(library.tree());
         var referenced=new HashSet<String>();
-        for(var input:trees)collectIdentifiers(input,referenced);
+        for(var input:all.subList(0,trees.size()))collectIdentifiers(input,referenced);
+        if(referenced.contains("कार्यफल"))referenced.addAll(List.of("कार्यतंत्र","कार्य","कार्यसीमा","असमकालिकबंदनीय"));
         for(var source:dev.bhash.stdlib.StandardLibrary.implementations(referenced)) {
             var implementation=source.parse();
             if(!implementation.valid())throw new IllegalStateException("Invalid bundled implementation: "+implementation.diagnostics());
@@ -170,6 +172,7 @@ public final class ProjectResolver {
         else {
             String imported = unit.imports.get(name);
             symbol = table.get(imported == null ? full(unit,name) : imported);
+            if(symbol==null && kind==Kind.TYPE && Set.of("कार्यफल","निरस्तीकरणचिह्न","निरस्तीकरणस्रोत").contains(name))symbol=table.get("मानक."+name);
         }
         if (symbol != null) accessible(symbol,unit,at);
         return symbol;
