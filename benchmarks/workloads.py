@@ -73,7 +73,7 @@ def generate(directory, sizes, warmup_ms, batch_ms, batches, names=None):
         (project / "src").mkdir(parents=True)
         (project / "bhash.project").write_text("name=benchmark-project\nsources=src\n", encoding="utf-8")
         for i in range(count):
-            (project / "src" / f"part{i}.bhash").write_text(f"कार्य भाग{i}(न: पूर्णांक) -> पूर्णांक {{ लौटाओ न + {i}; }}\n", encoding="utf-8")
+            (project / "src" / f"part{i}.bhash").write_text(f"फलन भाग{i}(न: पूर्णांक) -> पूर्णांक {{ लौटाओ न + {i}; }}\n", encoding="utf-8")
         calls = " + ".join(f"भाग{i}(१)" for i in range(count))
         (project / "src" / "main.bhash").write_text(f'फलन मुख्य() -> शून्य {{ लिखो("BHASH_OK", {calls}); }}\n', encoding="utf-8")
         cases.append({"name": "project", "size": size, "source": f"project-{size}/bhash.project", "files": count + 1, "expected": count * (count + 1) // 2})
