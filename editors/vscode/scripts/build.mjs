@@ -26,7 +26,7 @@ const syntax = {name:'Bhash',scopeName:'source.bhash',patterns:[
     {name:'comment.block.bhash',begin:'/\\*',end:'\\*/'},
     {name:'string.quoted.double.bhash',begin:'"',end:'"|$',patterns:[{name:'constant.character.escape.bhash',match:'\\\\(?:["\\\\nrt]|u[0-9a-fA-F]{4})'}]},
     {match:`(${bounded(['वर्ग','अनुबंध','अभिलेख','परिगणना'])})\\s+(${identifier}+)`,captures:{1:{name:'keyword.declaration.bhash'},2:{name:'entity.name.type.bhash'}}},
-    {match:`(${bounded(['कार्य'])})\\s+(${identifier}+)`,captures:{1:{name:'keyword.declaration.function.bhash'},2:{name:'entity.name.function.bhash'}}},
+    {match:`(${bounded(words.filter(([,token])=>token==='FUNCTION').map(([, ,word])=>word))})\\s+(${identifier}+)`,captures:{1:{name:'keyword.declaration.function.bhash'},2:{name:'entity.name.function.bhash'}}},
     {name:'storage.type.bhash',match:bounded(words.filter(([token])=>token.endsWith('_TYPE')||token==='VOID').map(([, ,word])=>word).concat(['सूची','मानचित्र','सरणी','अपवाद']))},
     {name:'constant.language.bhash',match:bounded(['सत्य','असत्य','रिक्त'])},
     {name:'keyword.control.bhash',match:bounded(words.filter(([token])=>!token.endsWith('_TYPE')&&!['VOID','TRUE','FALSE','NULL'].includes(token)).map(([, ,word])=>word))},
