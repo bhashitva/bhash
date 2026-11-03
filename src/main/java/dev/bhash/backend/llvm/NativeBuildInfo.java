@@ -28,7 +28,9 @@ public final class NativeBuildInfo {
         if(!text.contains("#define BHASH_NATIVE_ABI_VERSION "+ABI) || !text.contains(GUARD))throw new CompilationException("[BH9108] Bundled native runtime ABI does not match the compiler; rebuild/reinstall the compiler.");
         var info=new LinkedHashMap<String,Object>();info.put("format",FORMAT);info.put("target",TARGET);info.put("runtime_abi",ABI);
         byte[] http=resource("/dev/bhash/backend/native/bhash_http.inc");
-        byte[] sqlite=resource("/dev/bhash/backend/native/bhash_sqlite.inc");
+        byte[] sqliteSource=resource("/dev/bhash/backend/native/bhash_sqlite.inc"),postgres=resource("/dev/bhash/backend/native/bhash_postgres.inc");
+        byte[] sqlite=Arrays.copyOf(sqliteSource,sqliteSource.length+postgres.length);
+        System.arraycopy(postgres,0,sqlite,sqliteSource.length,postgres.length);
         byte[] server=resource("/dev/bhash/backend/native/bhash_server.inc");
         byte[] auth=resource("/dev/bhash/backend/native/bhash_auth.inc");
         byte[] runtime=java.util.Arrays.copyOf(source,source.length+http.length+sqlite.length+server.length+auth.length);

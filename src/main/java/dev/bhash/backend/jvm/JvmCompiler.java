@@ -7,6 +7,7 @@ import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.Target;
 import dev.bhash.backend.Licensing;
 import dev.bhash.backend.SqliteAssets;
+import dev.bhash.backend.PostgresAssets;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +25,7 @@ public final class JvmCompiler {
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
         String java = ManagedEmitter.emit(sources, Target.JVM);
         boolean sqlite=java.contains("BhashStandard.db");
+        boolean postgres=java.contains("BhashStandard.pg");
         var compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) throw new CompilationException("JVM compilation requires a full JDK 17 or newer (not a JRE).");
         Path temporary = Files.createTempDirectory("bhash-jvm-");
@@ -39,7 +41,13 @@ public final class JvmCompiler {
             Path standard=temporary.resolve("BhashStandard.java");
             try(var resource=JvmCompiler.class.getResourceAsStream("BhashStandard.java.txt")) {
                 if(resource==null)throw new CompilationException("Missing JVM standard library runtime.");
-                Files.copy(resource,standard);
+                String text=new String(resource.readAllBytes(),StandardCharsets.UTF_8);
+                try(var pg=JvmCompiler.class.getResourceAsStream("Postgres.java.inc")) {
+                    if(pg==null)throw new CompilationException("Missing PostgreSQL runtime source.");
+                    int end=text.lastIndexOf('}');
+                    text=text.substring(0,end)+new String(pg.readAllBytes(),StandardCharsets.UTF_8)+text.substring(end);
+                }
+                Files.writeString(standard,text,StandardCharsets.UTF_8);
             }
             Path classes = Files.createDirectory(temporary.resolve("classes"));
             var diagnostics = new DiagnosticCollector<JavaFileObject>();
@@ -67,6 +75,7 @@ public final class JvmCompiler {
                  var paths = Files.walk(classes)) {
                 Licensing.addToJar(jar);
                 if(sqlite)SqliteAssets.addJdbc(jar);
+                if(postgres)PostgresAssets.addJdbc(jar);
                 for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
                     var entry = new JarEntry(classes.relativize(file).toString().replace('\\', '/'));
                     entry.setTime(0);
