@@ -128,9 +128,18 @@ $('share').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(url); track('playground_share'); $('status').textContent = 'Link copied · लिंक कॉपी हुआ'; }
   catch { $('errors').textContent = `Copy this link:\n${url}`; }
 });
-let config, current = 0, abort, frame, timer, nonce;
-function finish(message) { abort?.abort(); abort = null; clearTimeout(timer); frame?.remove(); frame = null; nonce = null; $('run').disabled = !config || !navigator.onLine; $('stop').disabled = true; $('indicator').classList.remove('active'); $('status').textContent = message; }
-function stop(message = 'Stopped · रोक दिया गया') { current++; frame?.contentWindow?.postMessage({type: 'stop'}, config?.runOrigin ?? location.origin); finish(message); }
+let config, current = 0, abort, frame, timer, nonce, running = false, stoppingMessage;
+function finish(message) { abort?.abort(); abort = null; clearTimeout(timer); frame?.remove(); frame = null; nonce = null; running = false; stoppingMessage = undefined; $('run').disabled = !config || !navigator.onLine; $('stop').disabled = true; $('indicator').classList.remove('active'); $('status').textContent = message; }
+function stop(message = 'Stopped · रोक दिया गया') {
+  if (stoppingMessage) return;
+  current++;
+  if (frame && running) {
+    abort?.abort(); abort = null; clearTimeout(timer); stoppingMessage = message;
+    $('stop').disabled = true; $('status').textContent = 'Stopping · सफ़ाई की प्रतीक्षा…';
+    frame.contentWindow.postMessage({type: 'stop'}, config.runOrigin);
+    timer = setTimeout(() => finish(message), 1100);
+  } else finish(message);
+}
 $('stop').addEventListener('click', () => { track('playground_stop'); stop(); });
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function run() {
@@ -166,8 +175,8 @@ addEventListener('message', event => {
   if (!frame || event.source !== frame.contentWindow || event.origin !== config.runOrigin || !event.data) return;
   if (event.data.type === 'ready') { frame.contentWindow.postMessage({type: 'start', input: $('stdin').value, nonce}, config.runOrigin); return; }
   if (event.data.nonce !== nonce) return;
-  if (event.data.type === 'running') { clearTimeout(timer); $('status').textContent = 'Running · चल रहा है…'; timer = setTimeout(() => stop('Execution stopped after 15 seconds.'), config.executionSeconds * 1000); return; }
-  if (event.data.type === 'result') { track('playground_run_complete', {outcome: event.data.exitCode === 0 ? 'success' : 'error'}); $('output').textContent = event.data.output || ''; $('errors').textContent = event.data.errors || ''; finish(`Finished (exit ${event.data.exitCode}) · पूरा हुआ`); }
+  if (event.data.type === 'running') { if(stoppingMessage)return; running = true; clearTimeout(timer); $('status').textContent = 'Running · चल रहा है…'; timer = setTimeout(() => stop('Execution stopped after 15 seconds.'), config.executionSeconds * 1000); return; }
+  if (event.data.type === 'result') { track('playground_run_complete', {outcome: event.data.exitCode === 0 ? 'success' : 'error'}); $('output').textContent = event.data.output || ''; $('errors').textContent = event.data.errors || ''; finish(stoppingMessage || `Finished (exit ${event.data.exitCode}) · पूरा हुआ`); }
 });
 async function connect() {
   $('network').textContent = navigator.onLine ? 'Online compilation' : 'Offline · editing available';
