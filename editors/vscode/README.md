@@ -5,6 +5,33 @@ bundles the Bhash compiler and a Java language server. Source analysis stays on
 the extension host; it does not send code to the public playground or execute
 programs while you edit.
 
+## 0.14.0: updated Hindi syntax / नया हिन्दी शब्दक्रम
+
+This release bundles the compiler from PR #59. Declare functions with **`फलन`**
+and write the collection first in **`प्रत्येक`** loops:
+
+```bhash
+फलन मुख्य() -> शून्य {
+    स्थिर अंक: पूर्णांक[] = नया पूर्णांक[]{१,२,३};
+    प्रत्येक (अंक में मानक: पूर्णांक) { लिखो(मानक); }
+}
+```
+
+**Source update required:** change function declarations from `कार्य` to `फलन`,
+and change `प्रत्येक (तत्व: प्रकार में संग्रह)` to
+`प्रत्येक (संग्रह में तत्व: प्रकार)`. Map key/value bindings both follow `में`.
+The old declaration and loop forms are rejected. Update source dependencies too;
+regenerate their lockfiles through the normal dependency workflow when needed.
+
+फलन (Function) घोषित करने के लिए अब `फलन` लिखें। प्रत्येक (For-each) में पहले
+संग्रह, फिर `में`, फिर तत्व का नाम और प्रकार लिखें। पुराने स्रोत को बदलकर फिर
+संकलित करें। टिप्पणियों, संदेशों और साधारण हिन्दी गद्य में `कार्य` बदलना आवश्यक
+नहीं है। पहले से बने अनुप्रयोग चलते रहेंगे।
+
+See the [Hindi syntax and migration guide](../../docs/hindi-syntax.md).
+Highlighting, snippets, completion, project templates and the bundled compiler
+use the same syntax. Java 17+ and the existing target/toolchain requirements apply.
+
 ## Community and support / समुदाय और सहायता
 
 Join the [Bhash Discord community](https://discord.gg/qC5zdJy6Qw) to learn with other Bhash users,

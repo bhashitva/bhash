@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.14.0
 
 - Replace the function declaration keyword with `फलन` and use collection-first iteration: `प्रत्येक (संग्रह में तत्व: प्रकार)`; old declaration/loop forms are no longer accepted.
 - Update snippets, syntax highlighting, project templates, compiler diagnostics, playground snippets and all bundled standard-library declarations.
+- Bundle the compiler from merged PR #59, with matching completion, navigation, build/run and native debugging support.
 - See [syntax migration](../../docs/hindi-syntax.md) before rebuilding existing source projects.
 
 ## 0.13.0
