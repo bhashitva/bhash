@@ -17,6 +17,21 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class ManagedCompilerTest {
+    @Test void asyncLanguageFixturesMatch()throws Exception {
+        for(var f:AsyncFixtures.cases()) {
+            System.out.println("Async "+target+": "+f.name());
+            var result=run(compile(f.source()),"");
+            assertEquals(0,result.exit,f.name()+result.output);
+            assertEquals(f.expected(),result.output,f.name());
+        }
+    }
+    @Test void taskCoreFixturesMatchManagedContract()throws Exception {
+        for(var f:TaskCoreFixtures.cases()) {
+            var result=run(compile(f.source()),"");
+            assertEquals(0,result.exit,f.name()+result.output);
+            assertEquals(f.expected(),result.output,f.name());
+        }
+    }
     @Test void closureFixturesMatchManagedContract()throws Exception {
         for(var f:ClosureFixtures.cases()) {
             var result=run(compile(f.source()),"");

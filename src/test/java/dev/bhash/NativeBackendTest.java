@@ -2018,7 +2018,7 @@ class NativeBackendTest {
     }
     @Test void corePreservesInt32TypeIdentityBoxMetadataAndScalarCollectionKinds()throws Exception{
         var program=core("वर्ग पात्र { सार्वजनिक मान क: लघुपूर्णांक; } फलन मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[२]; स्थिर ब: सर्ववस्तु = परिवर्तित<लघुपूर्णांक>(१); लिखो(प्रकारहै<लघुपूर्णांक>(ब),परिवर्तित<लघुपूर्णांक>(ब)); }");
-        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v15"));
+        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v16"));
         assertTrue(program.collections().stream().anyMatch(c->c.valueKind()==8));
     }
     @Test void nativeInt32FixturesMatchJvmClrAndForcedGc()throws Exception{
@@ -2416,6 +2416,40 @@ class NativeBackendTest {
         assertEquals(1,result.exit());assertTrue(result.err().contains("  में नया_दोष (finally.bhash:2:"),result.err());assertFalse(result.err().contains("  में पुराना ("),result.err());assertEquals(0L,stats(result).get("live"));
     }
 
+    @Test void nativeAsyncLanguageUnderForcedGc()throws Exception {
+        requireTools();for(var f:AsyncFixtures.cases()) {
+            System.out.println("Async native: "+f.name());
+            var result=nativeOnlyRun(List.of(new SourceFile(f.name()+".bhash",f.source())),GC_STRESS);
+            assertEquals(0,result.exit(),f.name()+result.err());assertEquals(f.expected(),result.out(),f.name());
+            assertEquals(0L,stats(result).get("live"),f.name());
+            if(f.name().equals("frames-gc-stress")){assertTrue(stats(result).get("collections")>1000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());}
+        }
+    }
+    @Test void nativeAsyncFailureRetainsOriginalSourceLocation()throws Exception {
+        requireTools();
+        var result=nativeOnlyRun(List.of(new SourceFile("async-trace.bhash","""
+            असमकालिक फलन दोष()->शून्य {
+                प्रतीक्षा मानक.कार्य.छोड़ो(); फेंको नया अपवाद("मूल दोष");
+            }
+            असमकालिक फलन मुख्य()->शून्य { प्रतीक्षा दोष(); }
+            """)),GC_STRESS);
+        assertEquals(1,result.exit(),result.err());
+        assertTrue(result.err().contains("मूल दोष"),result.err());
+        assertTrue(result.err().contains("दोष (async-trace.bhash:2:"),result.err());
+        assertEquals(0L,stats(result).get("live"));
+    }
+    @Test void nativeTaskCorePreservesFramesUnderForcedGc()throws Exception {
+        requireTools();for(var fixture:TaskCoreFixtures.cases()) {
+            var result=nativeOnlyRun(List.of(new SourceFile(fixture.name()+".bhash",fixture.source())),GC_STRESS);
+            assertEquals(0,result.exit(),fixture.name()+result.err());
+            assertEquals(fixture.expected(),result.out(),fixture.name());
+            assertEquals(0L,stats(result).get("live"),fixture.name());
+            if(fixture.name().equals("task-cycles-gc-stress")) {
+                assertTrue(stats(result).get("collections")>200,result.err());
+                assertTrue(stats(result).get("peak")<100000,result.err());
+            }
+        }
+    }
     @Test void nativeClosuresPreserveCapturesCyclesAndUnwindingUnderForcedGc()throws Exception {
         requireTools();for(var fixture:ClosureFixtures.cases()) {
             var result=nativeOnlyRun(List.of(new SourceFile(fixture.name()+".bhash",fixture.source())),GC_STRESS);
@@ -2483,7 +2517,7 @@ class NativeBackendTest {
         var p=core("अभिलेख पात्र(नाम: पाठ, न: पूर्णांक, व: सर्ववस्तु); फलन मुख्य() -> शून्य { स्थिर क: पात्र=नया पात्र(\"क\",१,रिक्त); लिखो(क==नया पात्र(\"क\",१,रिक्त)); }");
         var c=p.classes().get(0);assertEquals(List.of(CoreProgram.Type.TEXT,CoreProgram.Type.INT,CoreProgram.Type.ANY),c.fields().stream().map(CoreProgram.ObjectField::type).toList());
         assertTrue(c.assignableTypes().contains(-9));assertTrue(c.virtualMethods().isEmpty());assertTrue(p.initializations().isEmpty());
-        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v15"));
+        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v16"));
     }
     @Test void nativeRecordDiagnosticsMatchManaged(){
         for(String declaration:List.of(
