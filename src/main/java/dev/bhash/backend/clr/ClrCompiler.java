@@ -59,6 +59,7 @@ public final class ClrCompiler {
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
         String code = ManagedEmitter.emit(sources, Target.CLR);
         boolean sqlite=code.contains("BhashStandard.db");
+        boolean postgres=code.contains("BhashStandard.pg");
         Path destination = output.toAbsolutePath().normalize();
         validateDestination(destination);
         Files.createDirectories(destination.getParent());
@@ -107,6 +108,7 @@ public final class ClrCompiler {
                     throw new CompilationException("CLR backend did not produce " + name);
             }
             Files.writeString(stage.resolve(MARKER), sqlite?SQLITE_STAMP:STAMP, StandardCharsets.UTF_8);
+            if(postgres)Files.writeString(stage.resolve("POSTGRESQL_RUNTIME.txt"),"Requires PostgreSQL libpq 14+ client runtime and its dependencies. Set BHASH_LIBPQ to an absolute library path if needed. The PostgreSQL server/client runtime is not bundled. TLS defaults to verify-full; configure the application CA certificate.\n",StandardCharsets.UTF_8);
             install(stage, destination);
         } finally {
             deleteTree(stage);
@@ -125,6 +127,7 @@ public final class ClrCompiler {
             throw new IOException("Refusing to replace a directory not created by the Bhash CLR compiler: " + destination);
         Set<String> allowed=new HashSet<>(stamp.equals(LEGACY_STAMP)?LEGACY_FILES:FILES);
         if(stamp.equals(SQLITE_STAMP))allowed.addAll(SqliteAssets.APPLICATION_FILES);
+        allowed.add("POSTGRESQL_RUNTIME.txt");
         try (var entries = Files.list(destination)) {
             for (Path entry : entries.toList()) {
                 if (!allowed.contains(entry.getFileName().toString()) || !Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS))

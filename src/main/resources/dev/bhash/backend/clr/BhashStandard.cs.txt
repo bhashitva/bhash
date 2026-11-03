@@ -668,4 +668,192 @@ internal static class BhashStandard {
         finally{System.Security.Cryptography.CryptographicOperations.ZeroMemory(x);System.Security.Cryptography.CryptographicOperations.ZeroMemory(y);}
     }
     internal static long appMonotonic(){authGuard();return Environment.TickCount64;}
+
+    // BEGIN PostgreSQL provider (generated declarations; implementation below).
+#if !BHASH_BROWSER
+    private static class PgNative {
+        private static IntPtr library;
+        internal static void Load(){
+            if(library!=IntPtr.Zero)return;
+            string configured=Environment.GetEnvironmentVariable("BHASH_LIBPQ");
+            if(!string.IsNullOrEmpty(configured)&&!Path.IsPathFullyQualified(configured))throw failure("BHASH_LIBPQ में पूर्ण पथ दें।");
+            string name=string.IsNullOrEmpty(configured)?(OperatingSystem.IsWindows()?"libpq.dll":OperatingSystem.IsMacOS()?"libpq.5.dylib":"libpq.so.5"):configured;
+            try{library=System.Runtime.InteropServices.NativeLibrary.Load(name,typeof(BhashStandard).Assembly,System.Runtime.InteropServices.DllImportSearchPath.SafeDirectories | System.Runtime.InteropServices.DllImportSearchPath.UseDllDirectoryForDependencies);}
+            catch(Exception e) when(e is DllNotFoundException||e is BadImageFormatException){throw failure("PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।");}
+            try {
+            PQconnectdb=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQconnectdbDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQconnectdb"));
+            PQstatus=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQstatusDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQstatus"));
+            PQfinish=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQfinishDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQfinish"));
+            PQserverVersion=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQserverVersionDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQserverVersion"));
+            PQlibVersion=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQlibVersionDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQlibVersion"));
+            PQexec=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQexecDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQexec"));
+            PQprepare=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQprepareDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQprepare"));
+            PQdescribePrepared=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQdescribePreparedDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQdescribePrepared"));
+            PQexecParams=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQexecParamsDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQexecParams"));
+            PQresultStatus=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQresultStatusDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQresultStatus"));
+            PQresultErrorField=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQresultErrorFieldDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQresultErrorField"));
+            PQclear=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQclearDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQclear"));
+            PQnparams=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQnparamsDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQnparams"));
+            PQnfields=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQnfieldsDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQnfields"));
+            PQntuples=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQntuplesDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQntuples"));
+            PQfname=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQfnameDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQfname"));
+            PQftype=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQftypeDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQftype"));
+            PQgetisnull=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQgetisnullDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQgetisnull"));
+            PQgetlength=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQgetlengthDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQgetlength"));
+            PQgetvalue=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQgetvalueDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQgetvalue"));
+            PQcmdTuples=System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer<PQcmdTuplesDelegate>(System.Runtime.InteropServices.NativeLibrary.GetExport(library,"PQcmdTuples"));
+            if(PQlibVersion()<140000)throw failure("PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।");
+            } catch { System.Runtime.InteropServices.NativeLibrary.Free(library);library=IntPtr.Zero;throw failure("PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।"); }
+        }
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQconnectdbDelegate(byte[] info);
+        internal static PQconnectdbDelegate PQconnectdb;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQstatusDelegate(IntPtr c);
+        internal static PQstatusDelegate PQstatus;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate void PQfinishDelegate(IntPtr c);
+        internal static PQfinishDelegate PQfinish;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQserverVersionDelegate(IntPtr c);
+        internal static PQserverVersionDelegate PQserverVersion;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQlibVersionDelegate();
+        internal static PQlibVersionDelegate PQlibVersion;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQexecDelegate(IntPtr c,byte[] sql);
+        internal static PQexecDelegate PQexec;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQprepareDelegate(IntPtr c,byte[] name,byte[] sql,int count,IntPtr types);
+        internal static PQprepareDelegate PQprepare;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQdescribePreparedDelegate(IntPtr c,byte[] name);
+        internal static PQdescribePreparedDelegate PQdescribePrepared;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQexecParamsDelegate(IntPtr c,byte[] sql,int count,IntPtr types,IntPtr[] values,IntPtr lengths,IntPtr formats,int format);
+        internal static PQexecParamsDelegate PQexecParams;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQresultStatusDelegate(IntPtr r);
+        internal static PQresultStatusDelegate PQresultStatus;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQresultErrorFieldDelegate(IntPtr r,int code);
+        internal static PQresultErrorFieldDelegate PQresultErrorField;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate void PQclearDelegate(IntPtr r);
+        internal static PQclearDelegate PQclear;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQnparamsDelegate(IntPtr r);
+        internal static PQnparamsDelegate PQnparams;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQnfieldsDelegate(IntPtr r);
+        internal static PQnfieldsDelegate PQnfields;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQntuplesDelegate(IntPtr r);
+        internal static PQntuplesDelegate PQntuples;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQfnameDelegate(IntPtr r,int col);
+        internal static PQfnameDelegate PQfname;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate uint PQftypeDelegate(IntPtr r,int col);
+        internal static PQftypeDelegate PQftype;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQgetisnullDelegate(IntPtr r,int row,int col);
+        internal static PQgetisnullDelegate PQgetisnull;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate int PQgetlengthDelegate(IntPtr r,int row,int col);
+        internal static PQgetlengthDelegate PQgetlength;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQgetvalueDelegate(IntPtr r,int row,int col);
+        internal static PQgetvalueDelegate PQgetvalue;
+        [System.Runtime.InteropServices.UnmanagedFunctionPointer(System.Runtime.InteropServices.CallingConvention.Cdecl)]internal delegate IntPtr PQcmdTuplesDelegate(IntPtr r);
+        internal static PQcmdTuplesDelegate PQcmdTuples;
+    }
+    private sealed class PgConnection {internal IntPtr db;internal long transaction;internal bool failed;}
+    private sealed class PgStatement {internal PgConnection owner;internal IntPtr meta,rows;internal byte[] sql;internal string[] values;internal bool[] bound;internal int state,row=-1;}
+    private static readonly Dictionary<long,PgConnection> pgConnections=new();
+    private static readonly Dictionary<long,PgStatement> pgStatements=new();
+    private static long pgConnectionNext,pgStatementNext,pgTransactionNext;
+    private static byte[] pgUtf8(string s)=>Encoding.UTF8.GetBytes(s+"\0");
+    private static string pgString(IntPtr p)=>System.Runtime.InteropServices.Marshal.PtrToStringUTF8(p)??"";
+    private static BhashRuntime.Failure pgFailure(PgConnection c,IntPtr r){
+        string code=r==IntPtr.Zero?"XXXXX":pgString(PgNative.PQresultErrorField(r,67));
+        if(code.Length!=5)code="XXXXX";foreach(char ch in code)if(!(ch>='A'&&ch<='Z'||ch>='0'&&ch<='9')){code="XXXXX";break;}
+        if(r!=IntPtr.Zero)PgNative.PQclear(r);if(c!=null&&c.transaction!=0)c.failed=true;
+        return failure("PostgreSQL त्रुटि ["+code+"]।");
+    }
+    private static IntPtr pgChecked(PgConnection c,IntPtr r){if(r==IntPtr.Zero||PgNative.PQresultStatus(r)!=1&&PgNative.PQresultStatus(r)!=2)throw pgFailure(c,r);return r;}
+    private static string pgQuote(string s)=>"'"+s.Replace("\\","\\\\").Replace("'","\\'")+"'";
+    internal static long pgOpen(string config){
+        PgNative.Load();if(pgConnections.Count>=32)throw failure("बहुत अधिक खुले PostgreSQL संबंध।");
+        string[] a=config.Split('\n');if(a.Length!=10)throw failure("अमान्य PostgreSQL विन्यास।");
+        string options="-c statement_timeout="+a[8]+" -c lock_timeout="+a[8]+" -c timezone=UTC -c datestyle=ISO -c standard_conforming_strings=on -c bytea_output=hex";
+        string info="host="+pgQuote(a[0])+" port="+pgQuote(a[1])+" dbname="+pgQuote(a[2])+" user="+pgQuote(a[3])+" password="+pgQuote(a[4])+" sslmode="+pgQuote(a[5])+" connect_timeout="+pgQuote(a[7])+" client_encoding=UTF8 application_name=Bhash gssencmode=disable options="+pgQuote(options);
+        if(a[6].Length!=0)info+=" sslrootcert="+pgQuote(a[6]);
+        IntPtr db=PgNative.PQconnectdb(pgUtf8(info));
+        if(db==IntPtr.Zero||PgNative.PQstatus(db)!=0){if(db!=IntPtr.Zero)PgNative.PQfinish(db);throw pgFailure(null,IntPtr.Zero);}
+        if(PgNative.PQserverVersion(db)<140000){PgNative.PQfinish(db);throw failure("PostgreSQL 14 या नया संस्करण चाहिए।");}
+        long id=++pgConnectionNext;pgConnections.Add(id,new PgConnection{db=db});return id;
+    }
+    private static PgConnection pgConnection(long id){if(!pgConnections.TryGetValue(id,out var c))throw failure("PostgreSQL संबंध बंद है।");return c;}
+    private static PgStatement pgStatement(long id){if(!pgStatements.TryGetValue(id,out var s))throw failure("PostgreSQL कथन बंद है।");return s;}
+    private static void pgHealthy(PgConnection c){if(c.transaction!=0&&c.failed)throw failure("PostgreSQL लेनदेन असफल है; वापस लें।");}
+    private static void pgReady(PgStatement s){if(s.state!=0)throw failure("PostgreSQL कथन को रीसेट करें।");}
+    private static int pgBinding(PgStatement s,long i){pgReady(s);if(i<1||i>s.bound.Length)throw failure("PostgreSQL बंधन सूचकांक सीमा से बाहर है।");return (int)i-1;}
+    private static int pgColumn(PgStatement s,long i){if(i<0||i>=PgNative.PQnfields(s.meta))throw failure("PostgreSQL स्तंभ सूचकांक सीमा से बाहर है।");return (int)i;}
+    private static string pgKind(uint oid)=>oid switch{20 or 21 or 23=>"पूर्णांक",700 or 701=>"दशमलव",16=>"तार्किक",17=>"बाइटबफ़र",1700=>"सटीकदशमलव",1082 or 1083 or 1114 or 1184 or 1266=>"समय",18 or 19 or 25 or 1042 or 1043 or 114 or 3802 or 2950=>"पाठ",_=>"असमर्थित"};
+    private static string pgCell(PgStatement s,long i,string kind){int n=pgColumn(s,i);if(s.state!=1)throw failure("PostgreSQL परिणाम की वर्तमान पंक्ति नहीं है।");if(PgNative.PQgetisnull(s.rows,s.row,n)!=0)throw failure("PostgreSQL स्तंभ रिक्त है।");if(pgKind(PgNative.PQftype(s.meta,n))!=kind)throw failure("PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");return pgString(PgNative.PQgetvalue(s.rows,s.row,n));}
+    private static void pgRowsClear(PgStatement s,int state){if(s.rows!=IntPtr.Zero)PgNative.PQclear(s.rows);s.rows=IntPtr.Zero;s.row=-1;s.state=state;}
+    private static void pgDispose(PgStatement s){pgRowsClear(s,0);if(s.meta!=IntPtr.Zero)PgNative.PQclear(s.meta);s.meta=IntPtr.Zero;}
+    internal static long pgPrepare(long id,string original,string converted){var c=pgConnection(id);pgHealthy(c);if(pgStatements.Count>=128)throw failure("बहुत अधिक खुले PostgreSQL कथन।");
+        var sql=pgUtf8(converted);IntPtr r=pgChecked(c,PgNative.PQprepare(c.db,pgUtf8(""),sql,0,IntPtr.Zero));PgNative.PQclear(r);
+        r=pgChecked(c,PgNative.PQdescribePrepared(c.db,pgUtf8("")));int n=PgNative.PQnparams(r);
+        if(n>999||PgNative.PQnfields(r)>256){PgNative.PQclear(r);throw failure("PostgreSQL परिणाम या मापदंड सीमा से बाहर है।");}
+        long key=++pgStatementNext;pgStatements.Add(key,new PgStatement{owner=c,sql=sql,meta=r,values=new string[n],bound=new bool[n]});return key;
+    }
+    internal static void pgClose(long id){if(!pgConnections.Remove(id,out var c))return;foreach(var item in new List<KeyValuePair<long,PgStatement>>(pgStatements))if(item.Value.owner==c){pgStatements.Remove(item.Key);pgDispose(item.Value);}PgNative.PQfinish(c.db);}
+    internal static void pgFinalize(long id){if(pgStatements.Remove(id,out var s))pgDispose(s);}
+    internal static long pgParameterCount(long id)=>pgStatement(id).bound.Length;
+    private static void pgBind(long id,long index,string value){var s=pgStatement(id);int i=pgBinding(s,index);s.values[i]=value;s.bound[i]=true;}
+    internal static void pgBindInt(long id,long i,long v)=>pgBind(id,i,v.ToString(CultureInfo.InvariantCulture));
+    internal static void pgBindReal(long id,long i,double v){if(!double.IsFinite(v))throw failure("PostgreSQL दशमलव सीमित नहीं है।");pgBind(id,i,v.ToString("G17",CultureInfo.InvariantCulture));}
+    internal static void pgBindBool(long id,long i,bool v)=>pgBind(id,i,v?"true":"false");
+    internal static void pgBindText(long id,long i,string v){BhashRuntime.instance(v);if(v.IndexOf('\0')>=0||Encoding.UTF8.GetByteCount(v)>8388608)throw failure("अमान्य PostgreSQL पाठ।");pgBind(id,i,v);}
+    internal static void pgBindBytes(long id,long i,BhashRuntime.BBuffer v){BhashRuntime.instance(v);if(v.size()>8388608)throw failure("PostgreSQL मान सीमा से बाहर है।");var t=new StringBuilder("\\x");for(long k=0;k<v.size();k++)t.Append(((byte)v.get(k)).ToString("x2",CultureInfo.InvariantCulture));pgBind(id,i,t.ToString());}
+    internal static void pgBindNull(long id,long i)=>pgBind(id,i,null);
+    private static void pgExecuteStart(PgStatement s){
+        foreach(bool b in s.bound)if(!b)throw failure("सभी PostgreSQL मापदंड बाँधें।");
+        var values=new IntPtr[s.values.Length];try{
+            for(int i=0;i<values.Length;i++)if(s.values[i]!=null)values[i]=System.Runtime.InteropServices.Marshal.StringToCoTaskMemUTF8(s.values[i]);
+            IntPtr r=PgNative.PQexecParams(s.owner.db,s.sql,values.Length,IntPtr.Zero,values,IntPtr.Zero,IntPtr.Zero,0);
+            if(r==IntPtr.Zero||PgNative.PQresultStatus(r)!=1&&PgNative.PQresultStatus(r)!=2){s.state=3;throw pgFailure(s.owner,r);}s.rows=r;
+        }finally{foreach(IntPtr p in values)if(p!=IntPtr.Zero)System.Runtime.InteropServices.Marshal.FreeCoTaskMem(p);}
+    }
+    internal static long pgExecute(long id){var s=pgStatement(id);pgHealthy(s.owner);pgReady(s);if(PgNative.PQnfields(s.meta)!=0)throw failure("PostgreSQL पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");pgExecuteStart(s);string count=pgString(PgNative.PQcmdTuples(s.rows));long n=count.Length==0?0:long.Parse(count,CultureInfo.InvariantCulture);pgRowsClear(s,2);return n;}
+    internal static bool pgNext(long id){var s=pgStatement(id);pgHealthy(s.owner);if(s.state==2)return false;if(s.state==3)throw failure("PostgreSQL कथन को रीसेट करें।");if(PgNative.PQnfields(s.meta)==0)throw failure("PostgreSQL बदलाव के लिए चलाओ उपयोग करें।");if(s.state==0)pgExecuteStart(s);
+        s.row++;if(s.row>=PgNative.PQntuples(s.rows)){pgRowsClear(s,2);return false;}
+        long bytes=0;for(int i=0;i<PgNative.PQnfields(s.rows);i++){uint oid=PgNative.PQftype(s.rows,i);long n=PgNative.PQgetlength(s.rows,s.row,i);if(oid==17)bytes+=n>=2?(n-2)/2:0;else if(oid!=20&&oid!=21&&oid!=23&&oid!=700&&oid!=701&&oid!=16)bytes+=n;}if(bytes>8388608){pgRowsClear(s,3);throw failure("PostgreSQL पंक्ति सीमा से बाहर है।");}s.state=1;return true;}
+    internal static void pgReset(long id)=>pgRowsClear(pgStatement(id),0);
+    internal static void pgClear(long id){var s=pgStatement(id);pgReady(s);Array.Clear(s.values);Array.Clear(s.bound);}
+    internal static long pgColumns(long id)=>PgNative.PQnfields(pgStatement(id).meta);
+    internal static string pgName(long id,long i){var s=pgStatement(id);return pgString(PgNative.PQfname(s.meta,pgColumn(s,i)));}
+    internal static string pgType(long id,long i){var s=pgStatement(id);int n=pgColumn(s,i);if(s.state!=1)throw failure("PostgreSQL परिणाम की वर्तमान पंक्ति नहीं है।");return PgNative.PQgetisnull(s.rows,s.row,n)!=0?"रिक्त":pgKind(PgNative.PQftype(s.meta,n));}
+    internal static bool pgIsNull(long id,long i)=>pgType(id,i)=="रिक्त";
+    internal static long pgInteger(long id,long i){var s=pgStatement(id);if(!long.TryParse(pgCell(s,i,"पूर्णांक"),NumberStyles.AllowLeadingSign,CultureInfo.InvariantCulture,out long v))throw failure("PostgreSQL पूर्णांक सीमा से बाहर है।");return v;}
+    internal static double pgReal(long id,long i){var s=pgStatement(id);if(!double.TryParse(pgCell(s,i,"दशमलव"),NumberStyles.Float,CultureInfo.InvariantCulture,out double v)||!double.IsFinite(v))throw failure("PostgreSQL दशमलव सीमित नहीं है।");return v;}
+    internal static bool pgBool(long id,long i)=>pgCell(pgStatement(id),i,"तार्किक")=="t";
+    internal static string pgText(long id,long i){var s=pgStatement(id);string kind=pgKind(PgNative.PQftype(s.meta,pgColumn(s,i)));if(kind!="पाठ"&&kind!="सटीकदशमलव"&&kind!="समय")throw failure("PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");return pgCell(s,i,kind);}
+    internal static BhashRuntime.BBuffer pgBytes(long id,long i){string hex=pgCell(pgStatement(id),i,"बाइटबफ़र");if(!hex.StartsWith("\\x",StringComparison.Ordinal)||hex.Length%2!=0)throw failure("अमान्य PostgreSQL बाइटबफ़र।");byte[] bytes;try{bytes=Convert.FromHexString(hex.Substring(2));}catch(FormatException){throw failure("अमान्य PostgreSQL बाइटबफ़र।");}var b=new BhashRuntime.BBuffer(bytes.Length);for(int k=0;k<bytes.Length;k++)b.set(k,bytes[k]);return b;}
+    internal static long pgTransaction(long id,long token,long op){if(!pgConnections.TryGetValue(id,out var c)){if(op==3)return 0;throw failure("PostgreSQL संबंध बंद है।");}if(op==3&&c.transaction!=token)return 0;
+        if(op==0&&c.transaction!=0||op!=0&&(token==0||token!=c.transaction))throw failure("PostgreSQL लेनदेन सक्रिय नहीं है।");if(op==1)pgHealthy(c);
+        IntPtr r=pgChecked(c,PgNative.PQexec(c.db,pgUtf8(op==0?"BEGIN":op==1?"COMMIT":"ROLLBACK")));PgNative.PQclear(r);
+        foreach(var s in pgStatements.Values)if(s.owner==c&&s.state!=0)pgRowsClear(s,3);c.failed=false;c.transaction=op==0?++pgTransactionNext:0;return c.transaction;
+    }
+#else
+    internal static long pgOpen(string a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgClose(long a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static long pgPrepare(long a0,string a1,string a2) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgFinalize(long a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static long pgTransaction(long a0,long a1,long a2) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static long pgParameterCount(long a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgBindInt(long a0,long a1,long a2) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgBindReal(long a0,long a1,double a2) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgBindBool(long a0,long a1,bool a2) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgBindText(long a0,long a1,string a2) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgBindBytes(long a0,long a1,BhashRuntime.BBuffer a2) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgBindNull(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static long pgExecute(long a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static bool pgNext(long a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgReset(long a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static void pgClear(long a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static long pgColumns(long a0) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static string pgName(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static string pgType(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static bool pgIsNull(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static long pgInteger(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static double pgReal(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static bool pgBool(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static string pgText(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+    internal static BhashRuntime.BBuffer pgBytes(long a0,long a1) => throw failure("ब्राउज़र लक्ष्य पर PostgreSQL उपलब्ध नहीं है।");
+#endif
+    // END PostgreSQL provider
 }

@@ -10,7 +10,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
-public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes, List<StaticField> staticFields, List<ClassInitialization> initializations, boolean networking, boolean database, boolean server, boolean authentication) {
+public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes, List<StaticField> staticFields, List<ClassInitialization> initializations, boolean networking, boolean database, boolean postgresql, boolean server, boolean authentication) {
     public enum Type { INT, BYTE, INT32, REAL, BOOL, TEXT, OBJECT, ANY, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT || this==ANY; }
     }
@@ -193,7 +193,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         final Map<ManagedEmitter.Type,Integer> collectionIds=new IdentityHashMap<>();
         final List<CollectionType> collections=new ArrayList<>();
         StructuredTypes structuredTypes;
-        boolean networking, database, server, authentication;
+        boolean networking, database, postgresql, server, authentication;
         void ensureStructuredTypes(ParserRuleContext at)throws CompilationException{
             if(structuredTypes!=null)return;
             int texts=collectionId(listType(ManagedEmitter.Type.TEXT),at);
@@ -414,7 +414,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             result.replaceAll(f->new Function(f.id(),f.result(),f.parameters(),f.body(),f.source(),f.initialization(),functionNames.getOrDefault(f.id(),"")));
             return new CoreProgram(List.copyOf(result),entry,List.copyOf(objectTypes),types.stream()
                 .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections),new ObjectType(-5,"अपवाद",List.of(messageField,locationField),List.of(),
-                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().filter(c->!c.record()).map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList(),networking,database,server,authentication);
+                    Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().filter(c->!c.record()).map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList(),networking,database,postgresql,server,authentication);
         }
         void collectTypes(ManagedEmitter.ClassInfo c, Set<ManagedEmitter.ClassInfo> result) throws CompilationException {
             if(c==null || !result.add(c))return;
@@ -539,6 +539,11 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 case "stdFileReadBytes"->BufferOperation.READ_FILE;case "stdFileWriteBytes"->BufferOperation.WRITE_FILE;default->null;};
             if(buffer!=null)return new BufferCall(type(f.result,at),buffer,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             TextOperation operation=null;
+            if(f.intrinsic!=null && f.intrinsic.startsWith("pg")) {
+                int op=List.of("pgOpen","pgClose","pgPrepare","pgFinalize","pgTransaction","pgParameterCount","pgBindInt","pgBindReal","pgBindBool","pgBindText","pgBindBytes","pgBindNull","pgExecute","pgNext","pgReset","pgClear","pgColumns","pgName","pgType","pgIsNull","pgInteger","pgReal","pgBool","pgText","pgBytes").indexOf(f.intrinsic);
+                if(op<0)throw unsupported(at);database=true;postgresql=true;ensureStructuredTypes(at);
+                return new DatabaseCall(type(f.result,at),100+op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
+            }
             if(f.intrinsic!=null && f.intrinsic.startsWith("db")) {
                 int op=List.of("dbOpen","dbClose","dbPrepare","dbFinalize","dbBindInt","dbBindReal","dbBindBytes","dbBindNull","dbExecute","dbNext","dbReset","dbClear","dbColumns","dbName","dbType","dbInteger","dbReal","dbBytes","dbTransaction","dbVersion","dbParameterCount").indexOf(f.intrinsic);
                 if(op<0)throw unsupported(at);database=true;ensureStructuredTypes(at);

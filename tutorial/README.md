@@ -14,3 +14,7 @@
 | [पुनः उपयोग योग्य संकुल (Reusable Packages)](packages/README.md) | स्थानीय और Git निर्भरताएँ, लॉकफ़ाइल, बहाली और सत्यापन |
 
 भविष्य के विषय अपने अलग उपफ़ोल्डर में जोड़े जाएँगे। हर विषय में हिन्दी कथा, आरंभ में अंग्रेज़ी नाम, सही हस्ताक्षर, उपयोग के उदाहरण, परिणाम और व्यवहार की सीमाएँ रहेंगी। [लेखन परंपराएँ](CONTRIBUTING.md) देखें।
+
+## PostgreSQL and migrations / डेटाबेस माइग्रेशन
+
+See the [shared database providers and migration guide](database-providers/README.md) for SQLite/PostgreSQL, parameterized SQL, transactions, deployment requirements and Hindi examples.

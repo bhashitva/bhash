@@ -501,3 +501,7 @@ OpenSSL 3 `libcrypto.so.3` runtime, without development headers.
 ### HTTP server and web applications
 
 Build a small Bhash web application with the new server and router: [task-board example](examples/web-tasks/README.md), [Hindi walkthrough](tutorial/web-applications/README.md), and [protocol/deployment contract](docs/web-applications.md). Desktop JVM, CLR and native are supported; browser/WASM cannot listen for HTTP requests.
+
+## PostgreSQL and migrations / डेटाबेस माइग्रेशन
+
+See the [shared database providers and migration guide](docs/database-providers.md) for SQLite/PostgreSQL, parameterized SQL, transactions, deployment requirements and Hindi examples.

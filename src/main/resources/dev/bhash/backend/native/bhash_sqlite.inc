@@ -2,6 +2,7 @@
  * SQLite owns every address in these registries. No Bhash references survive a call.
  * Included only for programs using the database intrinsics. */
 #include "sqlite3.h"
+#include "bhash_postgres.inc"
 #define DB_LIMIT 8388608
 #define DB_COLUMNS 256
 typedef struct {uint64_t id,token;sqlite3 *db;int failed;} db_connection;
@@ -62,6 +63,7 @@ static uint64_t db_text(const char *value,const void *location){
     void *result=new_text(n,location);memcpy(text_data(result),value,n);return pointer_bits(result);
 }
 uint64_t bh_database_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,const bh_collection_info *info,const void *location){
+    if(op>=100)return pg_call(op-100,a,b,c,d,info,location);
     db_initialize(location);
     if(op==19)return db_text(sqlite3_libversion(),location);
     if(op==0){

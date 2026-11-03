@@ -58,6 +58,7 @@ public final class NativeCompiler {
             var networkInfo=com.google.gson.JsonParser.parseString(buildInfo).getAsJsonObject();
             networkInfo.addProperty("networking",core.networking());
             networkInfo.addProperty("sqlite",core.database());
+            networkInfo.addProperty("postgresql",core.postgresql());
             networkInfo.addProperty("http_server",core.server());
             networkInfo.addProperty("authentication",core.authentication());
             if(core.database()){networkInfo.addProperty("sqlite_version",SqliteAssets.VERSION);networkInfo.add("sqlite_source_sha3_256",SqliteAssets.lock().get("source_sha3_256"));}
@@ -73,7 +74,7 @@ public final class NativeCompiler {
             }
             if(NativePlatform.windows())notices.append("\n--- MinGW-w64 runtime notices ---\n").append(new String(NativeBuildInfo.resource("/dev/bhash/backend/native/MINGW_RUNTIME_NOTICES.txt"),StandardCharsets.UTF_8));
             Files.writeString(work.resolve("program.ll"),LlvmEmitter.emit(core,notices.toString(),debug,buildInfo),StandardCharsets.UTF_8);
-            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_http.inc","bhash_sqlite.inc","bhash_server.inc","bhash_auth.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
+            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_http.inc","bhash_sqlite.inc","bhash_postgres.inc","bhash_server.inc","bhash_auth.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
                 if(in==null)throw new IOException("Missing native runtime: "+name);
                 Files.copy(in,work.resolve(name));
             }
@@ -98,7 +99,7 @@ public final class NativeCompiler {
             var link=new ArrayList<>(List.of(clang,"program.o","runtime.o","-lm"));
             if(core.database()){link.add("sqlite3.o");if(!NativePlatform.windows())link.add("-pthread");}
             if(NativePlatform.windows()){link.add("-lshell32");if(core.networking())link.add("-lwinhttp");if(core.server())link.add("-lws2_32");if(core.authentication())link.add("-lbcrypt");}
-            else if(!NativePlatform.macos()&&(core.networking()||core.authentication()))link.add("-ldl");
+            else if(!NativePlatform.macos()&&(core.networking()||core.authentication()||core.database()))link.add("-ldl");
             // Darwin's content-derived UUID is required by current dyld, including release builds.
             if(NativePlatform.macos()){
                 if(debug)link.add("-Wl,-no_deduplicate,-oso_prefix,"+work+"/");

@@ -53,6 +53,10 @@ public final class NativePackage {
                 if(!windows&&!NativePlatform.macos())dynamicLibraries.add("libcrypto.so.3");
                 files.put("README.txt",(new String(files.get("README.txt"),StandardCharsets.UTF_8)+crypto).getBytes(StandardCharsets.UTF_8));
             }
+            if(compatibility.buildInfo().has("postgresql")&&compatibility.buildInfo().get("postgresql").getAsBoolean()) {
+                dynamicLibraries.add(windows?"libpq.dll":NativePlatform.macos()?"libpq.5.dylib":"libpq.so.5");
+                files.put("README.txt",(new String(files.get("README.txt"),StandardCharsets.UTF_8)+"PostgreSQL requires the libpq 14+ client runtime and its transitive runtime dependencies (not development headers).\nInstall your OS PostgreSQL client runtime, or set BHASH_LIBPQ to its absolute library path.\nTLS defaults to verify-full; supply a trusted CA certificate through the application configuration.\nThe PostgreSQL server and client runtime are not embedded in this archive.\n").getBytes(StandardCharsets.UTF_8));
+            }
             var manifest=new LinkedHashMap<String,Object>();manifest.put("dynamic_libraries",dynamicLibraries);manifest.put("format",1);manifest.put("name",name);manifest.put("version",version);manifest.put("target",compatibility.target());manifest.put("build",compatibility.buildInfo());manifest.put("minimum_glibc",compatibility.minimumGlibc());manifest.put("interpreter",compatibility.interpreter());manifest.put("libraries",compatibility.libraries());manifest.put("source_date_epoch",epoch);
             if(windows){manifest.put("minimum_windows","10.0");manifest.put("c_runtime","ucrt");}
             if(NativePlatform.macos()){manifest.put("minimum_macos",compatibility.minimumMacos());manifest.put("c_runtime","libSystem");}

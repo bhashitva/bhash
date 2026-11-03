@@ -1,0 +1,75 @@
+name: PostgreSQL providers and migrations
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: bhash_test
+          POSTGRES_USER: bhash
+          POSTGRES_PASSWORD: ci-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bhash -d bhash_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      BHASH_REQUIRE_POSTGRES: 'true'
+      BHASH_PG_HOST: localhost
+      BHASH_PG_DATABASE: bhash_test
+      BHASH_PG_USER: bhash
+      BHASH_PG_PASSWORD: ci-test-only
+      BHASH_PG_SSLMODE: disable
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install compiler and PostgreSQL client runtime
+        run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18 libpq5
+      - name: Enable verified TLS on the isolated test server
+        run: |
+          mkdir -p target/pg-tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -keyout target/pg-tls/server.key -out target/pg-tls/server.crt -subj /CN=localhost -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'
+          container=$(docker ps --filter ancestor=postgres:17 --format '{{.ID}}')
+          docker cp target/pg-tls/server.key "$container:/var/lib/postgresql/data/server.key"
+          docker cp target/pg-tls/server.crt "$container:/var/lib/postgresql/data/server.crt"
+          docker exec -u root "$container" sh -c 'chown postgres:postgres /var/lib/postgresql/data/server.key /var/lib/postgresql/data/server.crt && chmod 600 /var/lib/postgresql/data/server.key'
+          docker exec -u postgres "$container" sh -c 'printf "\\nssl = on\\n" >> /var/lib/postgresql/data/postgresql.conf; pg_ctl reload -D /var/lib/postgresql/data'
+          echo "BHASH_PG_SSLMODE=verify-full" >> "$GITHUB_ENV"
+          echo "BHASH_PG_CA=$PWD/target/pg-tls/server.crt" >> "$GITHUB_ENV"
+      - name: Validate all providers and forced-GC native execution
+        run: mvn --batch-mode --no-transfer-progress -Dtest=DatabaseProviderTest,PostgresIntegrationTest test
+      - name: Build distributable compiler
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Build standalone PostgreSQL application
+        run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native package src/test/resources/postgresql/integration.bhash -o target/postgres-1-linux.tar.gz --name postgres --version 1 --max-glibc 2.39
+      - name: Validate runtime-only deployment
+        run: |
+          printf 'FROM ubuntu:24.04\nRUN apt-get update && apt-get install -y --no-install-recommends libpq5 ca-certificates && rm -rf /var/lib/apt/lists/*\n' > target/Dockerfile.pg
+          docker build -t bhash-postgres-runtime -f target/Dockerfile.pg target
+          docker run --rm --network host -v "$PWD/target:/artifacts:ro" -e BHASH_PG_HOST -e BHASH_PG_DATABASE -e BHASH_PG_USER -e BHASH_PG_PASSWORD -e BHASH_PG_SSLMODE -e BHASH_PG_CA=/artifacts/pg-tls/server.crt bhash-postgres-runtime sh -eu -c '
+            for tool in java dotnet clang gcc; do ! command -v "$tool"; done
+            cd /tmp
+            tar -xzf /artifacts/postgres-1-linux.tar.gz
+            cd postgres-1-linux-x86_64
+            sha256sum -c SHA256SUMS
+            grep libpq.so.5 manifest.json
+            BHASH_GC_STRESS=1 BHASH_GC_STATS=1 ./run.sh > /tmp/out 2> /tmp/err
+            grep "PostgreSQL ठीक" /tmp/out
+            grep "live=0" /tmp/err
+          '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: postgres-test-results
+          path: target/surefire-reports/
