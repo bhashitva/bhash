@@ -86,6 +86,20 @@ exports.run=async()=>{
     const unimported=authentication.replace('आयात मानक.सत्रप्रबंधक; ','');const importEdit=new vscode.WorkspaceEdit();importEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),unimported);await vscode.workspace.applyEdit(importEdit);
     await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(unimported.indexOf('सत्रप्रबंधक')+'सत्रप्रबंधक'.length)),list=>list?.items?.some(i=>label(i)==='सत्रप्रबंधक'&&i.additionalTextEdits?.some(e=>e.newText.includes('आयात मानक.सत्रप्रबंधक;'))),'session automatic import');
     console.log('PASS bundled authentication: diagnostics, crypto/session completion, signature help, F12 and automatic imports without executing code.');
+    // Database completion must analyze declarations without connecting to a server.
+    const database='आयात मानक.डेटा; आयात मानक.डेटासंबंध; आयात मानक.पोस्टग्रेसविन्यास; आयात मानक.माइग्रेशन; आयात मानक.माइग्रेशनयोजना; फलन मुख्य() -> शून्य { स्थिर व: पोस्टग्रेसविन्यास = नया पोस्टग्रेसविन्यास(); स्थिर ड: डेटासंबंध = डेटा.पोस्टग्रेस(व); स्थिर य: माइग्रेशनयोजना = नया माइग्रेशनयोजना(नया सूची<माइग्रेशन>()); य.लागूकरो(ड); ड.बंदकरो(); }';
+    const dbEdit=new vscode.WorkspaceEdit();dbEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),database);await vscode.workspace.applyEdit(dbEdit);
+    const dbItems=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(database.indexOf('डेटा.पोस्टग्रेस')+'डेटा.'.length)),list=>list?.items?.some(i=>label(i)==='पोस्टग्रेस'),'PostgreSQL provider completion');
+    assert.ok(dbItems.items.some(i=>label(i)==='एसक्यूलाइट'),'SQLite provider completion');
+    await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'database provider diagnostics');
+    const dbSignature=await vscode.commands.executeCommand('vscode.executeSignatureHelpProvider',uri,document.positionAt(database.indexOf('पोस्टग्रेस(')+'पोस्टग्रेस('.length),'(');
+    assert.ok(dbSignature?.signatures.some(s=>s.label.includes('पोस्टग्रेसविन्यास')),'PostgreSQL signature help');
+    const migrationItems=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(database.indexOf('य.लागूकरो')+'य.'.length)),list=>list?.items?.some(i=>label(i)==='लागूकरो'),'migration completion');
+    assert.ok(migrationItems.items.some(i=>label(i)==='स्थिति'),'migration status completion');
+    const dbDefinitions=await vscode.commands.executeCommand('vscode.executeDefinitionProvider',uri,document.positionAt(database.indexOf('पोस्टग्रेस(')));
+    assert.ok(dbDefinitions.length>0,'database provider F12');
+    const dbDoc=await vscode.workspace.openTextDocument(dbDefinitions[0].uri);assert.ok(dbDoc.getText().includes('पोस्टग्रेस'),'readable provider declaration');
+    console.log('PASS bundled databases: diagnostics, provider/migration completion, signature help and F12 without opening connections.');
     const original=new vscode.WorkspaceEdit();original.replace(uri,new vscode.Range(0,0,document.lineCount,0),source);await vscode.workspace.applyEdit(original);await document.save();
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'diagnostic clearing after provider tests');
     const tasks=await vscode.tasks.fetchTasks({type:'bhash'});const build=tasks.find(task=>task.definition.command==='build');assert.ok(build,'configured Bhash task resolves');

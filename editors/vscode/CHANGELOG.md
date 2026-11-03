@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.0
+
+- Bundle the merged PR #61 compiler with shared SQLite/PostgreSQL connection, statement and transaction APIs on JVM, CLR and native.
+- Include parameterized PostgreSQL access, verified TLS by default, typed values, exact NUMERIC text, sanitized errors and scoped resource cleanup.
+- Add ordered, checksum-verified SQLite/PostgreSQL migrations with transactional rollback and Hindi examples.
+- Expose provider and migration declarations through completion, signature help, navigation and automatic imports.
+- Bundle the verified JDBC payload for JVM programs; document the external libpq 14+ client runtime required by CLR/native PostgreSQL applications. Browser/WASM database access remains unsupported.
+
 ## 0.14.0
 
 - Replace the function declaration keyword with `फलन` and use collection-first iteration: `प्रत्येक (संग्रह में तत्व: प्रकार)`; old declaration/loop forms are no longer accepted.

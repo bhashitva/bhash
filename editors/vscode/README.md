@@ -5,9 +5,33 @@ bundles the Bhash compiler and a Java language server. Source analysis stays on
 the extension host; it does not send code to the public playground or execute
 programs while you edit.
 
-## 0.14.0: updated Hindi syntax / नया हिन्दी शब्दक्रम
+## 0.15.0: PostgreSQL and migrations / डेटाबेस माइग्रेशन
 
-This release bundles the compiler from PR #59. Declare functions with **`फलन`**
+This release bundles the compiler from merged PR #61. Use a common connection,
+statement and transaction API for SQLite or PostgreSQL, with parameterized SQL,
+verified TLS, typed values and deterministic cleanup. Apply ordered schema
+migrations with SHA-256 history validation and atomic rollback on failure.
+
+Start with the [Hindi database-provider tutorial](../../tutorial/database-providers/README.md),
+[runnable migration example](../../tutorial/database-providers/migrations.bhash),
+and [provider/runtime contract](../../docs/database-providers.md).
+
+JVM applications include the verified PostgreSQL JDBC driver. CLR and native
+PostgreSQL applications require the **libpq 14+ client runtime** and its dependencies:
+`libpq5` on Linux, or a PostgreSQL client distribution on Windows/macOS. Set
+`BHASH_LIBPQ` to an absolute library path if needed. No PostgreSQL development
+headers are required. Native applications still need neither JVM nor .NET.
+The server and libpq are not installed by this extension; SQLite remains bundled.
+Direct database access is unavailable in browser/WASM.
+
+साझा डेटाबेस (Database provider) API से SQLite तथा PostgreSQL पर मापदंड वाले
+कथन और लेनदेन चलाएँ। माइग्रेशन (Migrations) से तालिका में क्रमबद्ध बदलाव करें;
+विफलता पर नया बैच वापस होता है। PostgreSQL का सामान्य TLS विकल्प `verify-full`
+है; मेज़बान और विश्वसनीय CA प्रमाणपत्र का विन्यास करें। गुप्तशब्द स्रोत में न रखें।
+
+## Hindi syntax / नया हिन्दी शब्दक्रम
+
+Declare functions with **`फलन`**
 and write the collection first in **`प्रत्येक`** loops:
 
 ```bhash
