@@ -67,6 +67,23 @@ exports.run=async()=>{
     const stdDefinitions=await vscode.commands.executeCommand('vscode.executeDefinitionProvider',uri,document.positionAt(standard.indexOf('बाँटो(')));
     assert.ok(stdDefinitions.length>0,'standard-library F12');
     const stdDoc=await vscode.workspace.openTextDocument(stdDefinitions[0].uri);assert.ok(stdDoc.getText().includes('संकुल मानक;'));
+    // Validate the new bundled authentication catalog through the real VS Code
+    // adapters. Editing must only analyze this source, never execute its KDF.
+    const authentication='आयात मानक.कूटशब्द; आयात मानक.सत्रप्रबंधक; कार्य मुख्य() -> शून्य { स्थिर म: सत्रप्रबंधक = नया सत्रप्रबंधक("https://example.test"); स्थिर ह: पाठ = कूटशब्द.हैशबनाओ("सुरक्षित-कूटशब्द-भारत😀"); म.साफकरो(); }';
+    const authEdit=new vscode.WorkspaceEdit();authEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),authentication);await vscode.workspace.applyEdit(authEdit);
+    await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'authentication diagnostics');
+    const passwordItems=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(authentication.indexOf('कूटशब्द.हैशबनाओ')+'कूटशब्द.'.length)),list=>list?.items?.some(i=>label(i)==='हैशबनाओ'),'password hashing completion');
+    assert.ok(passwordItems.items.some(i=>label(i)==='जाँचो'),'password verification completion');
+    const authSignature=await vscode.commands.executeCommand('vscode.executeSignatureHelpProvider',uri,document.positionAt(authentication.indexOf('हैशबनाओ(')+'हैशबनाओ('.length),'(');
+    assert.ok(authSignature?.signatures.some(s=>s.label.includes('पाठ')),'password signature help');
+    const sessionItems=await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(authentication.indexOf('म.साफकरो')+'म.'.length)),list=>list?.items?.some(i=>label(i)==='सीएसआरएफजाँचो'),'session/CSRF member completion');
+    assert.ok(sessionItems.items.some(i=>label(i)==='उपयोगकर्ताहटाओ'),'session revocation completion');
+    const authDefinitions=await vscode.commands.executeCommand('vscode.executeDefinitionProvider',uri,document.positionAt(authentication.indexOf('हैशबनाओ(')));
+    assert.ok(authDefinitions.length>0,'authentication F12');
+    const authDoc=await vscode.workspace.openTextDocument(authDefinitions[0].uri);assert.ok(authDoc.getText().includes('हैशबनाओ'),'readable authentication declaration');
+    const unimported=authentication.replace('आयात मानक.सत्रप्रबंधक; ','');const importEdit=new vscode.WorkspaceEdit();importEdit.replace(uri,new vscode.Range(0,0,document.lineCount,0),unimported);await vscode.workspace.applyEdit(importEdit);
+    await until(()=>vscode.commands.executeCommand('vscode.executeCompletionItemProvider',uri,document.positionAt(unimported.indexOf('सत्रप्रबंधक')+'सत्रप्रबंधक'.length)),list=>list?.items?.some(i=>label(i)==='सत्रप्रबंधक'&&i.additionalTextEdits?.some(e=>e.newText.includes('आयात मानक.सत्रप्रबंधक;'))),'session automatic import');
+    console.log('PASS bundled authentication: diagnostics, crypto/session completion, signature help, F12 and automatic imports without executing code.');
     const original=new vscode.WorkspaceEdit();original.replace(uri,new vscode.Range(0,0,document.lineCount,0),source);await vscode.workspace.applyEdit(original);await document.save();
     await until(()=>vscode.languages.getDiagnostics(uri),ds=>ds.filter(d=>d.source==='bhash').length===0,'diagnostic clearing after provider tests');
     const tasks=await vscode.tasks.fetchTasks({type:'bhash'});const build=tasks.find(task=>task.definition.command==='build');assert.ok(build,'configured Bhash task resolves');

@@ -154,7 +154,7 @@ The bundled compiler includes text, math/random, JSON, dates/time, file I/O and
 UTF-8/binary data support. It also includes collection algorithms, streams,
 paths/directories, scoped resource cleanup (`संसाधन`), configuration, logging,
 a Bhash test runner, HTTP client/server networking, a small web application framework
-and SQLite database access.
+and SQLite database access, plus password hashing, authentication and sessions.
 
 Use imports such as `आयात मानक.पाठ्य;` or `आयात मानक.एसक्यूलाइट;`, or fully
 qualified names. Completion, signature help and automatic imports use the same
@@ -195,6 +195,30 @@ See the [server contract and deployment limits](../../docs/web-applications.md).
 
 A separate [HTTP and SQLite cache example](../../examples/http-sqlite/README.md)
 shows importing remote JSON into a transactional offline cache.
+
+## Authentication and sessions
+
+The bundled compiler supports `मानक.कूटशब्द`, `सुरक्षा`, `सत्रप्रबंधक`,
+`सुरक्षितवेब`, `अधिकृतचालक` and `प्रवेशरक्षक` on desktop JVM, CLR and native
+Linux/Windows x64 and macOS ARM64. The APIs provide provider-backed PBKDF2 password
+hashing, cryptographic tokens, secure cookies, bounded server-side sessions,
+idle/absolute expiry, rotation and revocation, role authorization, CSRF protection
+and login attempt limits. Completion, signature help, automatic imports and F12
+use the bundled library declarations.
+
+Start with the [Hindi authentication reference](../../tutorial/authentication/README.md)
+and [HTTP/SQLite login and notes application](../../examples/auth-sessions/README.md).
+The walkthrough explains explicit account provisioning, parameterized SQL,
+transactions, resource cleanup and per-user data access. Build using the existing
+target choices, then run the generated application with the arguments documented
+in the example; build/run tasks do not forward application arguments.
+
+Public deployments require an HTTPS reverse proxy. Sessions and login attempt
+counters are process-local; restarting signs users out. Plain HTTP is available
+only through the explicit loopback development mode. Windows uses OS CNG and
+macOS uses CommonCrypto; native Linux password operations require the OpenSSL 3
+`libcrypto.so.3` runtime (no development headers). Server authentication is
+unavailable in browser/WASM. See the [security and runtime contract](../../docs/authentication.md).
 
 ## Reusable source packages
 
