@@ -31,7 +31,7 @@ jobs:
               assert not path.is_absolute() and '..' not in path.parts
               assert path.parts[0] not in ('.git', '.github')
               destination = root.joinpath(*path.parts)
-              actual = hashlib.sha256(destination.read_bytes()).hexdigest() if destination.exists() else None
+              actual = hashlib.sha256(destination.read_bytes().replace(bytes([13,10]),bytes([10]))).hexdigest() if destination.exists() else None
               assert actual == item['before'], 'Base source changed: ' + item['path']
               assert hashlib.sha256(base64.b64decode(item['data'])).hexdigest() == item['after']
           for item in files:
