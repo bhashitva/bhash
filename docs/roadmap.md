@@ -7,6 +7,7 @@ The [approved design](async-await-design.md) is saved for future work. The
 lowering, timers, cancellation, structured resource cleanup and browser driving.
 See the [Hindi tutorial](../tutorial/async/README.md) for examples. Asynchronous
 HTTP/database transports remain the next separate milestone.
+
 ## Completed: syntax, JVM, CLR and browser WebAssembly backends
 
 - ANTLR grammar, Java parser, CLI and syntax diagnostics.

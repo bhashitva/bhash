@@ -1,6 +1,10 @@
 # Async/await, tasks and asynchronous HTTP/database operations
 
-**Status: approved design; task-core implementation in progress.**
+**Status: approved design.**
+
+The task-core implementation and its current boundaries are recorded in
+[task-core-implementation.md](task-core-implementation.md). The proposals below
+also cover later HTTP/database milestones; they are retained as the approved design.
 
 Date: 3 November 2026. Baseline: function values and closures from PR #63, distributed in VS Code 0.16.0 (PR #64). Prepared against the local release source snapshot. The user approved this design before implementation. The syntax and APIs below describe the intended contract, not features available in the current release. The task-core milestone comes first; asynchronous HTTP and database adapters follow separately.
 

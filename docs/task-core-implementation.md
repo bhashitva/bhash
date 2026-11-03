@@ -28,7 +28,8 @@ pending outcomes, following existing language semantics.
 cooperative dispatcher mutates the graph; no Bhash code runs on foreign workers.
 Each invocation owns its children. Resource scopes establish nested owners:
 children drain before close, failure requests cancellation, and normal joins
-propagate the earliest registered unobserved child failure after draining.
+propagate the earliest registered unobserved child failure after draining. A
+fault takes precedence over sibling cancellation caused by that fault.
 Successful and observed completed children are removed from the owner list.
 Self, ancestor and dependency-cycle awaits are rejected.
 
@@ -44,9 +45,11 @@ passing a cancelled token still cancels an operation. Capacity is 1024 live task
 plus 32 reserved cleanup slots; exhaustion is catchable. Timers and cancellable
 waits are polled between FIFO turns. Timer precision is best-effort.
 
-Internal `आंतरिक…` fields and scheduler methods are unsupported implementation
-details. Explicit task-group and completion-source convenience APIs are not
-exposed in this milestone; invocation/resource scopes provide structured owners.
+`कार्यफल<T>.पूरा(value)` and `.असफल(exception)` construct settled tasks;
+`मानक.कार्य.पूरा()` constructs a unit task. `मानक.कार्यसमूह.चलाओ(callback)`
+queues a unit-task callback in its own structured lifetime. Await the group to
+drain its children. Internal `आंतरिक…` fields/scheduler methods remain unsupported
+implementation details; external promise resolvers are not exposed.
 
 ## GC and hosts
 
