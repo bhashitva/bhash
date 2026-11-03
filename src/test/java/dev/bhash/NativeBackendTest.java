@@ -2416,6 +2416,14 @@ class NativeBackendTest {
         assertEquals(1,result.exit());assertTrue(result.err().contains("  में नया_दोष (finally.bhash:2:"),result.err());assertFalse(result.err().contains("  में पुराना ("),result.err());assertEquals(0L,stats(result).get("live"));
     }
 
+    @Test void nativeClosuresPreserveCapturesCyclesAndUnwindingUnderForcedGc()throws Exception {
+        requireTools();for(var fixture:ClosureFixtures.cases()) {
+            var result=nativeOnlyRun(List.of(new SourceFile(fixture.name()+".bhash",fixture.source())),GC_STRESS);
+            assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
+            assertEquals(0L,stats(result).get("live"),fixture.name());
+            if(fixture.name().equals("cycles-and-unwinding"))assertTrue(stats(result).get("collections")>200,result.err());
+        }
+    }
     @Test void nativeGenericFixturesMatchJvmClrAndForcedGc()throws Exception{
         requireNumericTargets();for(var fixture:NativeGenericFixtures.cases()){
             var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());

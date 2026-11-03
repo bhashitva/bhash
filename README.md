@@ -349,6 +349,7 @@ I/O error. `run` forwards the generated process's exit status.
 - Devanagari keywords and NFC-normalized identifiers; ASCII/Devanagari numbers.
 - Signed 64-bit integers, binary64 reals, booleans, immutable Unicode text and class references.
 - Typed functions, forward calls, recursion, mutable/immutable locals and lexical scope.
+- [Function values, typed lambdas and closures](docs/function-values.md), with shared mutable captures on JVM, CLR/WASM and native; [Hindi tutorial](tutorial/functions/README.md).
 - Conditions, loops, break/continue, returns, short-circuit operators and text equality.
 - Entry-point, name, type, return-path, literal-range and control-flow checks.
 - UTF-8 console input/output, a JVM backend and a .NET 10 CLR backend.

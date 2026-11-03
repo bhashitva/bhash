@@ -11,6 +11,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class EditorAnalysisTest {
     @TempDir Path root;
+    @Test void lambdaParametersAreVisibleOnlyInsideTheirLexicalScope() {
+        String source="फलन मुख्य()->शून्य { स्थिर क: फलन(पूर्णांक)->पूर्णांक=फलन(अंक: पूर्णांक)->पूर्णांक { लौटाओ अंक; }; लिखो(१); }";
+        var index=new SourceIndex(new SourceFile(root.resolve("lambda.bhash").toString(),source));
+        var inside=index.coordinates.position(source.indexOf("लौटाओ अंक")+7);
+        var outside=index.coordinates.position(source.indexOf("लिखो"));
+        assertTrue(index.visibleLexical(inside).stream().anyMatch(s->s.name().equals("अंक")));
+        assertFalse(index.visibleLexical(outside).stream().anyMatch(s->s.name().equals("अंक")));
+    }
     @Test void libraryAnalysisDoesNotRelaxExecutableRequirements() throws Exception {
         var source=new SourceFile("library.bhash","सार्वजनिक अभिलेख जोड़ा(अ: पूर्णांक, ब: पूर्णांक);");
         assertDoesNotThrow(()->ManagedEmitter.check(List.of(source)));

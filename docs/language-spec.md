@@ -291,3 +291,8 @@ Confirm vocabulary; choose exact real formatting; extend dependency package dist
 extend records and generic member methods; extend exception metadata; settle WASI vs browser environments and native OS/ABI support; define
 foreign-function interfaces separately for each platform. Do not grow the grammar
 to cover these until their semantics and tests are agreed.
+
+
+## Function values, lambdas and closures
+
+Function types, capture semantics and cross-target lowering are specified in [function-values.md](function-values.md). See the [Hindi tutorial](../tutorial/functions/README.md) for executable examples.

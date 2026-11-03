@@ -246,9 +246,9 @@ public final class ProjectResolver {
             scopes.pop();
             return;
         }
-        boolean callable = node instanceof FunctionDeclContext || node instanceof ConstructorDeclContext;
+        boolean callable = node instanceof FunctionDeclContext || node instanceof ConstructorDeclContext || node instanceof LambdaExpressionContext;
         if (callable) {
-            ParametersContext params = node instanceof FunctionDeclContext f ? f.parameters() : ((ConstructorDeclContext)node).parameters();
+            ParametersContext params = node instanceof FunctionDeclContext f ? f.parameters() : node instanceof LambdaExpressionContext l ? l.parameters() : ((ConstructorDeclContext)node).parameters();
             if (node instanceof FunctionDeclContext f) typeParameters = parameters(f.typeParameters(),typeParameters);
             var locals = new HashSet<String>();
             if (params!=null) for (var param : params.parameter()) locals.add(key(param.IDENTIFIER().getText()));
@@ -307,6 +307,7 @@ public final class ProjectResolver {
                 if (part.IDENTIFIER()==null) break;
                 path += "." + key(part.IDENTIFIER().getText());
                 Symbol candidate = (part.LPAREN()==null ? types : functions).get(path);
+                if(candidate==null && part.LPAREN()==null)candidate=functions.get(path);
                 if (candidate!=null) { match=candidate; end=part; }
                 if (part.LPAREN()!=null || part.typeArguments()!=null) break;
             }
@@ -317,6 +318,7 @@ public final class ProjectResolver {
             }
         }
         Symbol symbol = lookup(unit,name,p.LPAREN()==null ? Kind.TYPE : Kind.FUNCTION,first);
+        if (symbol==null && p.LPAREN()==null) symbol=lookup(unit,name,Kind.FUNCTION,first);
         if (symbol!=null && (p.LPAREN()!=null || !typeParameters.contains(name))) unit.replacements.put(first.getTokenIndex(),symbol.lowered);
         else if (name.equals(key("मुख्य")) && p.LPAREN()!=null) throw error(first,"Undefined function in this package: मुख्य");
     }
