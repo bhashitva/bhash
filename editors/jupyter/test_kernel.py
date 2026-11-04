@@ -37,20 +37,26 @@ def execute(client, source, expected=None, status="ok", streams=None, stdin=None
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("compiler", type=Path)
+    parser.add_argument("compiler", type=Path, nargs="?")
+    parser.add_argument("--installed", action="store_true", help="Use the installed bhash kernelspec")
+    parser.add_argument("--notebook", type=Path, help="Also execute the Hindi starter notebook")
     parser.add_argument("--java", default="java")
     args = parser.parse_args()
+    if args.installed == (args.compiler is not None):
+        parser.error("Provide either a compiler JAR or --installed")
     with TemporaryDirectory(prefix="bhash-kernel-test-") as temporary:
         spec = Path(temporary, "bhash")
-        spec.mkdir()
-        (spec / "kernel.json").write_text(json.dumps({
-            "argv": [sys.executable, "-m", "bhash_jupyter.kernel", "-f", "{connection_file}",
-                     "--BhashKernel.compiler=" + str(args.compiler.resolve()), "--BhashKernel.java=" + args.java],
-            "display_name": "Bhash",
-            "language": "bhash",
-        }), encoding="utf-8")
+        if not args.installed:
+            spec.mkdir()
+            (spec / "kernel.json").write_text(json.dumps({
+                "argv": [sys.executable, "-m", "bhash_jupyter.kernel", "-f", "{connection_file}",
+                         "--BhashKernel.compiler=" + str(args.compiler.resolve()), "--BhashKernel.java=" + args.java],
+                "display_name": "Bhash",
+                "language": "bhash",
+            }), encoding="utf-8")
         manager = KernelManager(kernel_name="bhash", connection_file=str(Path(temporary, "connection.json")),
-                                kernel_spec_manager=KernelSpecManager(kernel_dirs=[temporary]))
+                                kernel_spec_manager=KernelSpecManager() if args.installed
+                                else KernelSpecManager(kernel_dirs=[temporary]))
         manager.start_kernel()
         client = manager.client()
         client.start_channels()
@@ -77,6 +83,12 @@ def main():
             manager.restart_kernel()
             client.wait_for_ready(timeout=30)
             execute(client, "कुल", status="error")
+            if args.notebook:
+                notebook = json.loads(args.notebook.read_text(encoding="utf-8"))
+                code = ["".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"]
+                assert len(code) == 4
+                for source, expected in zip(code, [None, "२", None, "४"]):
+                    execute(client, source, expected=expected)
         finally:
             client.stop_channels()
             manager.shutdown_kernel()
