@@ -34,7 +34,8 @@ grammar Bhash;
 }
 
 program : packageDecl? importDecl* (PUBLIC? (functionDecl | classDecl | interfaceDecl | enumDecl))* EOF ;
-notebookCell : importDecl* functionDecl* variableDecl* statement* expression? EOF ;
+notebookCell : packageDecl? importDecl* notebookDeclaration* variableDecl* statement* expression? EOF ;
+notebookDeclaration : PUBLIC? (functionDecl | classDecl | interfaceDecl | enumDecl) ;
 packageDecl : PACKAGE qualifiedName SEMI ;
 importDecl : IMPORT qualifiedName (AS IDENTIFIER)? SEMI ;
 qualifiedName : IDENTIFIER (DOT IDENTIFIER)* ;
