@@ -26,7 +26,7 @@ class NativeReleaseTest {
         assertThrows(IllegalArgumentException.class,()->NativeCompatibility.compareVersions("2.39;bad","2.39"));
     }
     @Test void runtimeContractMatchesHeaderAndEmittedGuard()throws Exception{
-        var identity=NativeBuildInfo.identity();assertEquals(16,identity.get("runtime_abi"));
+        var identity=NativeBuildInfo.identity();assertEquals(17,identity.get("runtime_abi"));
         String source="फलन मुख्य() -> शून्य { लिखो(१); }";
         String ir=LlvmEmitter.emit(ManagedEmitter.core(List.of(new SourceFile("hello.bhash",source))));
         assertTrue(ir.contains("call void @bh_runtime_abi_v17()"));assertTrue(ir.contains("section \""+(NativePlatform.macos()?"__DATA,__bhash_build":NativePlatform.windows()?".bhash":".bhash.build")+"\""));assertTrue(ir.contains("@llvm.used"));

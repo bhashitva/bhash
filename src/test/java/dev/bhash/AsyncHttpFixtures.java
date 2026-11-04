@@ -64,4 +64,3 @@ final class AsyncHttpFixtures {
         """.replace("BASE",StandardLibraryTest.literal(base));}
     static String untrusted(String source){return source.replace("फलन मुख्य()", "असमकालिक फलन मुख्य()").replace("एचटीटीपी.पाओ(","प्रतीक्षा एचटीटीपी.पाओअसमकालिक(");}
 }
-
