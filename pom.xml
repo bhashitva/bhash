@@ -19,6 +19,14 @@
     <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
     <antlr.version>4.13.2</antlr.version>
   </properties>
+  <dependencyManagement>
+    <dependencies>
+      <!-- Pin LSP4J's transitive Gson range as well as our direct dependency. -->
+      <dependency>
+        <groupId>com.google.code.gson</groupId><artifactId>gson</artifactId><version>2.13.2</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
   <dependencies>
     <dependency>
       <groupId>org.xerial</groupId><artifactId>sqlite-jdbc</artifactId><version>3.54.1.0</version><scope>runtime</scope>
