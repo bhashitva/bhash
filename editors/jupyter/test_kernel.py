@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import sys
 from tempfile import TemporaryDirectory
 from time import monotonic
@@ -46,7 +47,27 @@ def execute(client, source, expected=None, status="ok", streams=None, stdin=None
     assert "".join(output).replace("\r\n", "\n") == (streams or ""), output
 
 
-def test_language(run):
+def assert_keyword_coverage(sources):
+    grammar = Path(__file__).resolve().parents[2] / "src/main/antlr4/Bhash.g4"
+    keywords = set(re.findall(r"(?m)^[A-Z][A-Z_0-9]*\s*:\s*'([\u0900-\u097f]+)'\s*;",
+                              grammar.read_text(encoding="utf-8")))
+    assert keywords, "No Bhash keyword rules found"
+    seen = set()
+    for source in sources:
+        code = re.sub(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*[\s\S]*?\*/', " ", source)
+        seen.update(re.findall(r"[\u0900-\u097f_0-9]+", code))
+    assert not keywords - seen, "Missing notebook keyword coverage: " + ", ".join(sorted(keywords - seen))
+    print(f"Notebook coverage includes all {len(keywords)} Bhash keywords")
+
+
+def test_language(execute_case):
+    successful_sources = []
+
+    def run(source, **expected):
+        execute_case(source, **expected)
+        if expected.get("status", "ok") == "ok":
+            successful_sources.append(source)
+
     run("""सार्वजनिक वर्ग गणक {
         निजी मान संख्या: पूर्णांक;
         निर्माता(प्रारंभ: पूर्णांक) { यह.संख्या = प्रारंभ; }
@@ -112,6 +133,7 @@ def test_language(run):
         } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
         अंततः { लिखो("अंत"); }
     """, streams="बंद\nदोष\nअंत\n")
+    assert_keyword_coverage(successful_sources)
 
 
 def main():
