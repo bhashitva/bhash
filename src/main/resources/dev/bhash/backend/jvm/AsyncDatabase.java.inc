@@ -58,7 +58,8 @@
         if(op==3||op==4||op==5){statement=adStatements.get(handle);if(statement==null||statement.closed){if(op==5)return adCompleted();throw failure("असमकालिक डेटाकथन बंद है।");}connection=statement.owner;}
         else if(op>=2){connection=adConnections.get(handle);if(connection==null||connection.closed){if(op==8||op==9)return adCompleted();throw failure("असमकालिक डेटासंबंध बंद है।");}}
         if(connection!=null&&connection.busy)throw failure("असमकालिक डेटासंबंध व्यस्त है।");
-        if(op<2&&adConnections.size()>=32||op==2&&adStatements.size()>=128)throw failure("असमकालिक डेटा क्षमता समाप्त।");
+        long opening=adJobs.values().stream().filter(j->j.operation<2&&!j.claimed).count(),preparing=adJobs.values().stream().filter(j->j.operation==2&&!j.claimed).count();
+        if(op<2&&adConnections.size()+opening>=32||op==2&&adStatements.size()+preparing>=128)throw failure("असमकालिक डेटा क्षमता समाप्त।");
         long reservation=op==4?DB_LIMIT:0;
         for(int i=0;i<values.size();i++){
             Object value=values.get(i);
@@ -217,7 +218,7 @@
         finally{if(connection!=null)try{connection.close();}catch(java.sql.SQLException ignored){}}
     }
     private static java.sql.Connection adPostgresConnect(String config){
-        
+
         String[] a=config.split("\n",-1);if(a.length!=10)throw new AdError("अमान्य PostgreSQL विन्यास।");
         java.sql.Connection db=null;
         try{
@@ -274,7 +275,7 @@
                 for(int i=0;i<count;i++){
                     Object value=rows.getObject(i+1);String kind;
                     if(c.postgres){
-                        kind=pgKind(meta.getColumnTypeName(i+1));
+                        kind=value==null?"रिक्त":pgKind(meta.getColumnTypeName(i+1));
                         if(value!=null)value=switch(kind){
                             case "पूर्णांक" -> rows.getLong(i+1);
                             case "दशमलव" -> rows.getDouble(i+1);
@@ -286,7 +287,11 @@
                     }else{
                         if(value==null)kind="रिक्त";
                         else if(value instanceof byte[])kind="बाइटबफ़र";
-                        else if(value instanceof String)kind="पाठ";
+                        else if(value instanceof String){
+                            kind="पाठ";
+                            try{value=StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT).onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(rows.getBytes(i+1))).toString();}
+                            catch(java.nio.charset.CharacterCodingException invalid){throw new AdError("अमान्य यूनिकोड पाठ।");}
+                        }
                         else if(value instanceof Float||value instanceof Double){kind="दशमलव";value=((Number)value).doubleValue();}
                         else if(value instanceof Number){kind="पूर्णांक";value=((Number)value).longValue();}
                         else throw new AdError("डेटाकथन स्तंभ का प्रकार मेल नहीं खाता।");
