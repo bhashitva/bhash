@@ -163,6 +163,29 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     private ManagedEmitter(String sourceName, Target target) { this.sourceName = sourceName; this.target = target; }
     private final Set<String> callableTypes=new HashSet<>();
+    private NotebookCell notebook;
+    private boolean notebookDisplay;
+    private String notebookDisplayFunction;
+
+    public record NotebookCell(String storage, List<String> initializers) {}
+
+    public static String emitNotebook(List<SourceFile> sources, NotebookCell cell) throws CompilationException {
+        var resolution = ProjectResolver.resolve(sources);
+        String name = sources.get(sources.size()-1).name();
+        var emitter = new ManagedEmitter(name, Target.JVM);
+        var lowered = new HashMap<String,String>();
+        resolution.names().forEach((internal, original) -> lowered.put(original, internal));
+        emitter.notebook = new NotebookCell(lowered.get(cell.storage()),
+                cell.initializers().stream().map(lowered::get).toList());
+        emitter.notebookDisplayFunction = lowered.get("भाषकक्षफल");
+        try {
+            return emitter.program(prepare(name, resolution, emitter, true), true);
+        } catch (Invalid error) {
+            throw new CompilationException(resolution.describe(error.getMessage()));
+        } catch (CompilationException error) {
+            throw new CompilationException(resolution.describe(error.getMessage()));
+        }
+    }
 
     public static String emit(String sourceName, ProgramContext program, Target target) throws CompilationException {
         if (target != Target.JVM && target != Target.CLR) throw new IllegalArgumentException("Not a managed target");
@@ -195,6 +218,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         var tree=ClosureExpander.expand(source,GenericExpander.expand(source,resolution.tree()),emitter.callableTypes);
         if(!AsyncSourceLowering.needed(tree))return tree;
         var checker=new ManagedEmitter(source,Target.JVM);checker.callableTypes.addAll(emitter.callableTypes);
+        checker.notebook=emitter.notebook;
         checker.analysis=new Analysis();checker.analysis.exceptionClass=checker.exceptionClass;
         checker.program(tree,requireEntry);
         return AsyncSourceLowering.lower(tree,checker.analysis,resolution.names());
@@ -278,6 +302,21 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     .append(" if (!(f instanceof BhashRuntime.BException || f instanceof ArithmeticException)) throw e;")
                     .append(" BhashRuntime.report(f.getMessage()); System.exit(1); } }\n");
             output.append("private static Throwable bhashFailure(Throwable e) { while(e instanceof ExceptionInInitializerError && e.getCause()!=null) e=e.getCause(); return e; }\n");
+            if (notebook != null) {
+                var storage = classes.get(Identifiers.key(notebook.storage()));
+                output.append("public static Class<?> notebookStorage() { ").append(storage.java)
+                        .append(".bhashInitialize(); return ").append(storage.java).append(".class; }\n");
+                output.append("public static String[] notebookFields() { return new String[]{");
+                for (var field : storage.fields.values()) output.append('"').append(field.java).append("\",");
+                output.append("}; }\npublic static Object notebookResult;\n")
+                        .append("public static final java.util.Set<String> notebookInitialized = new java.util.HashSet<>();\n")
+                        .append("public static void notebookRun() { ").append(main.java).append("(); }\n");
+                for (int i=0; i<notebook.initializers().size(); i++) {
+                    var initializer=functions.get(Identifiers.key(notebook.initializers().get(i))).get(0);
+                    output.append("public static Object notebookInit").append(i).append("() { return ")
+                            .append(initializer.java).append("(); }\n");
+                }
+            }
         } else {
             output.append("using System;\ninternal static class BhashProgram {\n");
             output.append("public static int Main(string[] args) { try { BhashStandard.appSetArguments(args); ").append(main.java)
@@ -303,6 +342,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private void emitFunction(Function function) {
         if(function.intrinsic!=null)return;
         var declaration = function.declaration;
+        notebookDisplay = declaration.IDENTIFIER().getText().equals(notebookDisplayFunction);
         currentClass = function.owner;
         currentStatic = function.shared;
         asyncBody=declaration.ASYNC()!=null;
@@ -329,6 +369,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         currentClass = null;
         currentStatic = false;
         asyncBody=false;
+        notebookDisplay=false;
     }
 
     private List<Type> parameters(ParametersContext parameters) {
@@ -620,10 +661,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         for(var initializer:staticInitializers.entrySet())output.append(initializer.getKey().java).append('=').append(initializer.getValue()).append(";\n");
         output.append("bhashInitState=2; return true; } catch(BhashRuntime.BException failure){bhashInitFailure=failure; bhashInitState=3; throw failure;} }\n");
         for(var field:staticInitializers.keySet()){
+            String notebookGuard = notebook != null && definition == classes.get(Identifiers.key(notebook.storage()))
+                    ? "if(!notebookInitialized.contains(\"" + field.java
+                        + "\")) throw new BhashRuntime.Failure(\"Notebook binding used before initialization.\");"
+                    : "";
             output.append("public static ").append(typeName(field.type)).append(" bhashGet_").append(field.java)
-                .append("(){bhashInitialize();return ").append(field.java).append(";}\n");
+                .append("(){bhashInitialize();").append(notebookGuard).append("return ").append(field.java).append(";}\n");
             if(field.mutable)output.append("public static void bhashSet_").append(field.java).append('(').append(typeName(field.type))
-                .append(" value){bhashInitialize();").append(field.java).append("=value;}\n");
+                .append(" value){bhashInitialize();").append(notebookGuard).append(field.java).append("=value;}\n");
         }
         currentStatic=false;
         for (Constructor constructor:definition.constructors) recover(() -> emitConstructor(definition,constructor,initializers));
@@ -843,7 +888,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 valueRequired(statement, arg.type);
                 if (arg.type.reference()) throw error(statement, "Print an object's primitive fields or method results, not the object reference.");
             }
-            output.append("BhashRuntime.print(").append(join(args)).append(");\n");
+            if (notebookDisplay) output.append("notebookResult = ").append(join(args)).append(";\n");
+            else output.append("BhashRuntime.print(").append(join(args)).append(");\n");
         } else if (statement.block() != null) {
             return block(statement.block());
         } else {
@@ -1541,6 +1587,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 }
                 var member=field(currentClass,name);
                 if (member!=null) return readField(ctx,member.shared?classReceiver(currentClass):self(ctx,false),name);
+                if (notebook != null) {
+                    var storage = classes.get(Identifiers.key(notebook.storage()));
+                    if (field(storage,name)!=null) return readField(ctx,classReceiver(storage),name);
+                }
                 var definition=classes.get(Identifiers.key(name));
                 if (definition!=null) return classReceiver(definition);
                 throw error(ctx, "Undefined variable: " + name);
