@@ -167,7 +167,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private boolean notebookDisplay;
     private String notebookDisplayFunction;
 
-    public record NotebookCell(String storage, List<String> initializers) {}
+    public record NotebookCell(String storage, Map<String, String> initializers) {}
 
     private ClassInfo notebookStorageClass() {
         return notebook == null || notebook.storage() == null ? null : classes.get(Identifiers.key(notebook.storage()));
@@ -179,8 +179,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         var emitter = new ManagedEmitter(name, Target.JVM);
         var lowered = new HashMap<String,String>();
         resolution.names().forEach((internal, original) -> lowered.put(original, internal));
-        emitter.notebook = new NotebookCell(lowered.get(cell.storage()),
-                cell.initializers().stream().map(lowered::get).toList());
+        var initializers = new HashMap<String, String>();
+        cell.initializers().forEach((function, binding) -> initializers.put(lowered.get(function), binding));
+        emitter.notebook = new NotebookCell(lowered.get(cell.storage()), initializers);
         emitter.notebookDisplayFunction = lowered.get("भाषकक्षफल");
         try {
             return emitter.program(prepare(name, resolution, emitter, true), true);
@@ -318,11 +319,6 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 output.append("}; }\npublic static Object notebookResult;\n")
                         .append("public static final java.util.Set<String> notebookInitialized = new java.util.HashSet<>();\n")
                         .append("public static void notebookRun() { ").append(main.java).append("(); }\n");
-                for (int i=0; i<notebook.initializers().size(); i++) {
-                    var initializer=functions.get(Identifiers.key(notebook.initializers().get(i))).get(0);
-                    output.append("public static Object notebookInit").append(i).append("() { return ")
-                            .append(initializer.java).append("(); }\n");
-                }
             }
         } else {
             output.append("using System;\ninternal static class BhashProgram {\n");
@@ -366,6 +362,15 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         output.append(typeName(function.result)).append(' ').append(function.java).append('(');
         emitParameters(declaration.parameters(), function.parameters);
         output.append(") {\n");
+        String notebookBinding = notebook == null ? null : notebook.initializers().get(declaration.IDENTIFIER().getText());
+        if (notebookBinding != null) {
+            var storage = notebookStorageClass();
+            var field = field(storage, notebookBinding);
+            var parameter = declaration.parameters().parameter(0);
+            output.append(storage.java).append('.').append(field.java).append(" = ")
+                    .append(find(parameter.IDENTIFIER().getText()).java).append(";\n")
+                    .append("notebookInitialized.add(\"").append(field.java).append("\");\n");
+        }
         if(function.owner!=null && function.shared)output.append(function.owner.java).append(".bhashInitialize();\n");
         int errorsBeforeBody = diagnostics.size();
         var flow = statements(declaration.block());
