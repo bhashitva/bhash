@@ -36,7 +36,7 @@ def digest(path):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     doctor = json.loads(cli('native', 'doctor', '--json'))
-    assert doctor['version'].startswith('18.') and doctor['runtimeAbi'] == 16
+    assert doctor['version'].startswith('18.') and doctor['runtimeAbi'] == 17
     (OUT/'doctor.json').write_text(json.dumps(doctor, indent=2)+'\n')
     roots = [OUT/'first workspace', OUT/'दूसरा बहुत अलग स्थान']
     for root in roots:
