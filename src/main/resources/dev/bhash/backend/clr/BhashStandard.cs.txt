@@ -1236,7 +1236,7 @@ internal static class BhashStandard {
                 if(!retained)PgNative.PQclear(result);
             }else await System.Threading.Tasks.Task.Delay(1).ConfigureAwait(false);
         }
-        if(error!=null){if(c.Transaction)c.Failed=true;if(j.Operation==7&&(error.Contains("[08",StringComparison.Ordinal)||error.Contains("[XXXXX]",StringComparison.Ordinal))){adClose(c);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");}throw new AdError(error);}
+        if(error!=null){if(c.Transaction)c.Failed=true;if(j.Operation==7&&(error.Contains("[08",StringComparison.Ordinal)||error.Contains("[XXXXX]",StringComparison.Ordinal)||error.Contains("[40003]",StringComparison.Ordinal)||error.Contains("[57P01]",StringComparison.Ordinal)||error.Contains("[57P02]",StringComparison.Ordinal)||error.Contains("[57P03]",StringComparison.Ordinal))){adClose(c);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");}throw new AdError(error);}
     }
     private static async System.Threading.Tasks.Task adPostgres(AdJob j){
         lock(adLoader){PgNative.Load();}
