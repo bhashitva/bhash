@@ -80,7 +80,10 @@ public final class NativeCompiler {
             }
             if(core.database())SqliteAssets.copySource(work);
             if(!NativePlatform.windows())NativeToolchain.run(work,List.of(opt,"-passes=verify","-disable-output","program.ll"));
-            NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,debug?"-O0":"-O2","-Xclang","-llvm-verify-each","-c","program.ll","-o","program.o"))));
+            // Clang verifies its input IR; POSIX builds also run opt's verifier above.
+            // Re-verifying the whole module after every optimization pass makes the
+            // generated async state machines exceed the tool deadline unnecessarily.
+            NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,debug?"-O0":"-O2","-c","program.ll","-o","program.o"))));
             var runtimeCommand=new ArrayList<>(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"));
             if(core.database())runtimeCommand.add("-DBHASH_SQLITE=1");
             if(core.networking())runtimeCommand.add("-DBHASH_NETWORKING=1");
