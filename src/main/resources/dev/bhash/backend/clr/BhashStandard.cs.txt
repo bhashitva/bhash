@@ -707,7 +707,14 @@ internal static class BhashStandard {
         try{if(!p.Socket.Poll(250000,System.Net.Sockets.SelectMode.SelectRead))return 0;var s=p.Socket.Accept();s.Blocking=false;long key=++serverNext;serverSockets.Add(key,new ServerSocketState{Socket=s,Deadline=serverClock()+10000});return key;}
         catch(System.Net.Sockets.SocketException){throw failure("HTTP संबंध असफल।");}
     }
-    private static void serverWait(ServerSocketState s,bool write){long remaining=s.Deadline-serverClock();if(remaining<=0||!s.Socket.Poll((int)Math.Min(remaining*1000,int.MaxValue),write?System.Net.Sockets.SelectMode.SelectWrite:System.Net.Sockets.SelectMode.SelectRead))throw failure("HTTP संबंध का समय समाप्त।");}
+    private static void serverWait(ServerSocketState s,bool write){
+        long remaining=s.Deadline-serverClock();
+        if(remaining<=0||!s.Socket.Poll((int)Math.Min(remaining*1000,int.MaxValue),write?System.Net.Sockets.SelectMode.SelectWrite:System.Net.Sockets.SelectMode.SelectRead)){
+            // Poll and the millisecond clock can round differently on Windows.
+            // Once a wait times out, error handling must not write a late response.
+            s.Deadline=0;throw failure("HTTP संबंध का समय समाप्त।");
+        }
+    }
     internal static BhashRuntime.BBuffer srvRead(long id){var s=serverState(id);if(s.Listener)throw failure("अमान्य HTTP संबंध।");
         try{serverWait(s,false);byte[] bytes=new byte[8192];int n=s.Socket.Receive(bytes);var b=new BhashRuntime.BBuffer(n);for(int i=0;i<n;i++)b.set(i,bytes[i]);return b;}
         catch(System.Net.Sockets.SocketException){throw failure("HTTP संबंध असफल।");}
