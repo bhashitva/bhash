@@ -64,7 +64,7 @@ public final class ProjectResolver {
         for(var source:dev.bhash.stdlib.StandardLibrary.implementations(referenced)) {
             var implementation=source.parse();
             if(!implementation.valid())throw new IllegalStateException("Invalid bundled implementation: "+implementation.diagnostics());
-            all.add(implementation.tree());
+            all.add(AsyncSignatures.normalize(implementation.tree()));
         }
         var tree = resolver.resolveProgram(all);
         var names = new HashMap<String,String>();

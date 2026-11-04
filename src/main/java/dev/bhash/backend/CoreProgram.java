@@ -544,6 +544,11 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 if(op<0)throw unsupported(at);database=true;postgresql=true;ensureStructuredTypes(at);
                 return new DatabaseCall(type(f.result,at),100+op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             }
+            if(f.intrinsic!=null && f.intrinsic.startsWith("dbAsync")) {
+                int op=List.of("dbAsyncStart","dbAsyncPoll","dbAsyncAbort","dbAsyncResult","dbAsyncRelease","dbAsyncRows","dbAsyncColumns","dbAsyncName","dbAsyncKind","dbAsyncNull","dbAsyncInteger","dbAsyncReal","dbAsyncText","dbAsyncBytes","dbAsyncParameters","dbAsyncLive","dbAsyncDispatched").indexOf(f.intrinsic);
+                if(op<0)throw unsupported(at);database=true;postgresql=true;ensureStructuredTypes(at);
+                return new DatabaseCall(type(f.result,at),200+op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
+            }
             if(f.intrinsic!=null && f.intrinsic.startsWith("db")) {
                 int op=List.of("dbOpen","dbClose","dbPrepare","dbFinalize","dbBindInt","dbBindReal","dbBindBytes","dbBindNull","dbExecute","dbNext","dbReset","dbClear","dbColumns","dbName","dbType","dbInteger","dbReal","dbBytes","dbTransaction","dbVersion","dbParameterCount").indexOf(f.intrinsic);
                 if(op<0)throw unsupported(at);database=true;ensureStructuredTypes(at);
@@ -555,7 +560,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 return new ServerCall(type(f.result,at),op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             }
             if(f.intrinsic!=null && f.intrinsic.startsWith("net")) {
-                int op=List.of("netSend","netStatus","netHeaders","netBody","netClose","netClock").indexOf(f.intrinsic);
+                int op=List.of("netSend","netStatus","netHeaders","netBody","netClose","netClock","netStart","netPoll","netAbort","netLive").indexOf(f.intrinsic);
                 if(op<0)throw unsupported(at);networking=true;ensureStructuredTypes(at);
                 return new NetworkCall(type(f.result,at),op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             }
