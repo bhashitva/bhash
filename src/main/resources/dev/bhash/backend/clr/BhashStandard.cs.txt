@@ -367,7 +367,7 @@ internal static class BhashStandard {
         try {
             var uri=new Uri(url,UriKind.Absolute);
             if((uri.Scheme!="http"&&uri.Scheme!="https")||uri.UserInfo.Length!=0)throw new NetTransportException("अमान्य HTTP पता।");
-            
+
             using var request=new System.Net.Http.HttpRequestMessage(new System.Net.Http.HttpMethod(method),uri) {
                 Version=System.Net.HttpVersion.Version11,VersionPolicy=System.Net.Http.HttpVersionPolicy.RequestVersionExact,
                 Content=new System.Net.Http.ByteArrayContent(bytes)
@@ -949,7 +949,7 @@ internal static class BhashStandard {
 #endif
     // END PostgreSQL provider
 #if !BHASH_BROWSER
-    private sealed class AdError : Exception {internal AdError(string message):base(message){}}
+    private sealed class AdError : Exception {internal readonly int Code;internal AdError(string message,int code=0):base(message){Code=code;}}
     private sealed class AdConnection {
         internal IntPtr Db;internal bool Postgres,Closed,Busy,Transaction,Failed;
         internal readonly List<AdStatement> Statements=new();
@@ -978,7 +978,7 @@ internal static class BhashStandard {
     }
     private static byte[] adUtf8(string value)=>new UTF8Encoding(false,true).GetBytes(value+"\0");
     private static string adString(IntPtr value)=>System.Runtime.InteropServices.Marshal.PtrToStringUTF8(value)??"";
-    private static void adCheck(int code){if(code!=0)throw new AdError((code&255) switch{5 or 6=>"SQLite डेटाबेस व्यस्त है।",19=>"SQLite बाधा का उल्लंघन।",8=>"SQLite डेटाबेस केवल पढ़ने योग्य है।",11 or 26=>"अमान्य SQLite डेटाबेस।",18=>"डेटा परिणाम की सीमा पार हो गई।",10 or 14=>"SQLite फ़ाइल तक पहुँच असफल।",_=>"SQLite कथन असफल।"});}
+    private static void adCheck(int code){if(code!=0)throw new AdError((code&255) switch{5 or 6=>"SQLite डेटाबेस व्यस्त है।",19=>"SQLite बाधा का उल्लंघन।",8=>"SQLite डेटाबेस केवल पढ़ने योग्य है।",11 or 26=>"अमान्य SQLite डेटाबेस।",18=>"डेटा परिणाम की सीमा पार हो गई।",10 or 14=>"SQLite फ़ाइल तक पहुँच असफल।",_=>"SQLite कथन असफल।"},code);}
     private static void adExec(AdConnection c,string sql){int code=SqlNative.sqlite3_exec(c.Db,adUtf8(sql),IntPtr.Zero,IntPtr.Zero,out IntPtr error);if(error!=IntPtr.Zero)SqlNative.sqlite3_free(error);adCheck(code);}
     private static void adClose(AdConnection c){
         if(c==null||c.Closed)return;
@@ -1036,7 +1036,8 @@ internal static class BhashStandard {
                 case 3:case 4:adSqliteQuery(j);break;
                 case 5:if(j.Statement.Query!=IntPtr.Zero)SqlNative.sqlite3_finalize(j.Statement.Query);j.Statement.Query=IntPtr.Zero;j.Statement.Closed=true;break;
                 case 6:if(c.Transaction)throw new AdError("डेटालेनदेन पहले सक्रिय है।");adExec(c,"BEGIN DEFERRED");c.Transaction=true;c.Failed=false;break;
-                case 7:if(c.Failed)throw new AdError("डेटालेनदेन असफल है; वापस लें।");if(!c.Transaction)throw new AdError("डेटालेनदेन सक्रिय नहीं है।");adExec(c,"COMMIT");c.Transaction=false;break;
+                case 7:if(c.Failed)throw new AdError("डेटालेनदेन असफल है; वापस लें।");if(!c.Transaction)throw new AdError("डेटालेनदेन सक्रिय नहीं है।");try{adExec(c,"COMMIT");c.Transaction=false;}
+                    catch(AdError error) when((error.Code&255)==10||(error.Code&255)==11||(error.Code&255)==26){adClose(c);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");}break;
                 case 8:if(c.Transaction&&AdSql.sqlite3_get_autocommit(c.Db)==0)adExec(c,"ROLLBACK");c.Transaction=false;c.Failed=false;break;
                 case 9:adClose(c);break;
             }
@@ -1073,7 +1074,7 @@ internal static class BhashStandard {
                     if(kind==1){v=SqlNative.sqlite3_column_int64(s.Query,i);bytes+=8;}
                     else if(kind==2){double real=SqlNative.sqlite3_column_double(s.Query,i);if(!double.IsFinite(real))throw new AdError("डेटाकथन में सीमित दशमलव मान दें।");v=real;bytes+=8;}
                     else if(kind==3||kind==4){
-                        IntPtr data=kind==3?SqlNative.sqlite3_column_blob(s.Query,i):SqlNative.sqlite3_column_blob(s.Query,i);
+                        IntPtr data=SqlNative.sqlite3_column_blob(s.Query,i);
                         int length=SqlNative.sqlite3_column_bytes(s.Query,i);if(length<0||length>DB_LIMIT-bytes)throw new AdError("डेटा परिणाम की सीमा १०२४ पंक्तियाँ / ८३८८६०८ बाइट है।");
                         byte[] value=new byte[length];if(length!=0)System.Runtime.InteropServices.Marshal.Copy(data,value,0,length);v=kind==3?new UTF8Encoding(false,true).GetString(value):value;bytes+=length;
                     }else bytes+=8;
@@ -1101,7 +1102,8 @@ internal static class BhashStandard {
         bool absent=op>=2&&(connection==null||connection.Closed||statement?.Closed==true);
         if(absent&&op!=5&&op!=8&&op!=9)throw failure("असमकालिक डेटासंबंध बंद है।");
         if(connection?.Busy==true)throw failure("असमकालिक डेटासंबंध व्यस्त है।");
-        if(op<2&&adConnections.Count>=32||op==2&&adStatements.Count>=128)throw failure("असमकालिक डेटा क्षमता समाप्त।");
+        int opening=0,preparing=0;foreach(var pending in adJobs.Values)if(!pending.Claimed){if(pending.Operation<2)opening++;if(pending.Operation==2)preparing++;}
+        if(op<2&&adConnections.Count+opening>=32||op==2&&adStatements.Count+preparing>=128)throw failure("असमकालिक डेटा क्षमता समाप्त।");
         long reserve=op==4?DB_LIMIT:0,size=0;
         for(int i=0;i<values.size();i++){
             object v=values.get(i);long n=v is BhashRuntime.BBuffer buffer?buffer.size():v is string value?Encoding.UTF8.GetByteCount(value):0;
@@ -1234,7 +1236,7 @@ internal static class BhashStandard {
                 if(!retained)PgNative.PQclear(result);
             }else await System.Threading.Tasks.Task.Delay(1).ConfigureAwait(false);
         }
-        if(error!=null){if(c.Transaction)c.Failed=true;throw new AdError(error);}
+        if(error!=null){if(c.Transaction)c.Failed=true;if(j.Operation==7&&(error.Contains("[08",StringComparison.Ordinal)||error.Contains("[XXXXX]",StringComparison.Ordinal))){adClose(c);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");}throw new AdError(error);}
     }
     private static async System.Threading.Tasks.Task adPostgres(AdJob j){
         lock(adLoader){PgNative.Load();}
@@ -1305,7 +1307,7 @@ internal static class BhashStandard {
         if(j.Rows.Count>=1024)throw new AdError("डेटा परिणाम की सीमा १०२४ पंक्तियाँ / ८३८८६०८ बाइट है।");
         var row=new AdCell[columns];
         for(int i=0;i<columns;i++){
-            if(PgNative.PQgetisnull(result,0,i)!=0){row[i]=new AdCell("रिक्त",null);continue;}
+            if(PgNative.PQgetisnull(result,0,i)!=0){total+=8;if(total>DB_LIMIT)throw new AdError("डेटा परिणाम की सीमा १०२४ पंक्तियाँ / ८३८८६०८ बाइट है।");row[i]=new AdCell("रिक्त",null);continue;}
             string kind=pgKind(PgNative.PQftype(result,i));int length=PgNative.PQgetlength(result,0,i);
             long bytes=kind=="बाइटबफ़र"?(length-2)/2:kind=="पूर्णांक"||kind=="दशमलव"||kind=="तार्किक"?8:length;
             if(bytes<0||bytes>DB_LIMIT-total)throw new AdError("डेटा परिणाम की सीमा १०२४ पंक्तियाँ / ८३८८६०८ बाइट है।");total+=bytes;
