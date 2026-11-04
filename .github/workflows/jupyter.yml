@@ -1,0 +1,33 @@
+name: Bhash Jupyter kernel
+on:
+  push:
+    paths:
+      - 'editors/jupyter/**'
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/jupyter.yml'
+  pull_request:
+    paths:
+      - 'editors/jupyter/**'
+      - 'src/**'
+      - 'pom.xml'
+      - '.github/workflows/jupyter.yml'
+permissions:
+  contents: read
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - run: python -m pip install ./editors/jupyter
+      - run: python editors/jupyter/test_kernel.py target/bhash-compiler-0.1.0-SNAPSHOT.jar
