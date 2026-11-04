@@ -59,7 +59,7 @@ public final class ClrCompiler {
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
         String code = ManagedEmitter.emit(sources, Target.CLR);
         boolean sqlite=code.contains("BhashStandard.db");
-        boolean postgres=code.contains("BhashStandard.pg");
+        boolean postgres=(code.contains("BhashStandard.pg")||code.contains("BhashStandard.dbAsyncStart"));
         Path destination = output.toAbsolutePath().normalize();
         validateDestination(destination);
         Files.createDirectories(destination.getParent());
