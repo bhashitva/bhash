@@ -21,7 +21,7 @@ _Static_assert(sizeof(double) == 8 && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
 #include <io.h>
 #include <fcntl.h>
 #define WIN32_LEAN_AND_MEAN
-#ifdef BHASH_SERVER
+#if defined(BHASH_SERVER) || defined(BHASH_SQLITE)
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #endif
@@ -309,8 +309,8 @@ int64_t bh_remainder(int64_t a, int64_t b, const void *location) {
     return a == INT64_MIN && b == -1 ? 0 : a % b;
 }
 
-_Static_assert(BHASH_NATIVE_ABI_VERSION==16,"Compiler/runtime ABI mismatch");
-void bh_runtime_abi_v16(void) {}
+_Static_assert(BHASH_NATIVE_ABI_VERSION==17,"Compiler/runtime ABI mismatch");
+void bh_runtime_abi_v17(void) {}
 int bh_print_build_info_if_requested(int argc,char **argv,const char *info){
     if(argc!=2 || strcmp(argv[1],"--bhash-build-info"))return 0;
     fputs(info,stdout);fputc('\n',stdout);return 1;

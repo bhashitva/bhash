@@ -30,7 +30,8 @@ static void db_end_connection(db_connection *c){
     for(size_t i=0;i<128;i++)if(db_statements[i].id&&db_statements[i].owner==c)db_end_statement(&db_statements[i]);
     sqlite3_close_v2(c->db);memset(c,0,sizeof *c);
 }
-static void db_shutdown(void){for(size_t i=0;i<32;i++)if(db_connections[i].id)db_end_connection(&db_connections[i]);sqlite3_shutdown();}
+static void ad_shutdown(void);
+static void db_shutdown(void){ad_shutdown();for(size_t i=0;i<32;i++)if(db_connections[i].id)db_end_connection(&db_connections[i]);sqlite3_shutdown();}
 static void db_initialize(const void *location){static int initialized;
     if(!initialized){db_check(sqlite3_initialize(),location);if(atexit(db_shutdown))runtime_error(location,"SQLite रनटाइम उपलब्ध नहीं है।");initialized=1;}
     if(strcmp(sqlite3_libversion(),"3.54.1"))runtime_error(location,"SQLite रनटाइम संस्करण मेल नहीं खाता।");
@@ -62,7 +63,9 @@ static uint64_t db_text(const char *value,const void *location){
     size_t n=strlen(value);if(!valid_utf8((const unsigned char *)value,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
     void *result=new_text(n,location);memcpy(text_data(result),value,n);return pointer_bits(result);
 }
+#include "bhash_async_database.inc"
 uint64_t bh_database_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,const bh_collection_info *info,const void *location){
+    if(op>=200){db_initialize(location);return ad_call(op-200,a,b,c,d,info,location);}
     if(op>=100)return pg_call(op-100,a,b,c,d,info,location);
     db_initialize(location);
     if(op==19)return db_text(sqlite3_libversion(),location);
