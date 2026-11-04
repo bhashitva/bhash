@@ -11,13 +11,22 @@ from jupyter_client.kernelspec import KernelSpecManager
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--compiler", required=True, type=Path, help="Path to the built Bhash compiler JAR")
+    parser.add_argument("--compiler", type=Path, help="Override the bundled Bhash compiler JAR")
     parser.add_argument("--java", default="java", help="Java executable from a full JDK 17 or newer")
+    parser.add_argument("--notebook", type=Path, help="Copy the Hindi starter notebook to this new file")
     args = parser.parse_args()
-    compiler = args.compiler.resolve()
+    assets = Path(__file__).resolve().parent / "assets"
+    compiler = (args.compiler or assets / "bhash-compiler.jar").resolve()
     java = shutil.which(args.java)
     if not compiler.is_file() or java is None:
         parser.error("A readable compiler JAR and a Java executable are required")
+    if args.notebook:
+        try:
+            notebook = (assets / "starter.ipynb").read_bytes()
+            with args.notebook.open("xb") as destination:
+                destination.write(notebook)
+        except OSError as error:
+            parser.error(str(error))
     spec = {
         "argv": [sys.executable, "-m", "bhash_jupyter.kernel", "-f", "{connection_file}",
                  "--BhashKernel.compiler=" + str(compiler), "--BhashKernel.java=" + str(Path(java).resolve())],
