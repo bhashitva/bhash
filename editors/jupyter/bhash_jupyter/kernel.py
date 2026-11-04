@@ -118,7 +118,7 @@ class BhashKernel(Kernel):
         return {"status": "ok", "matches": reply.get("matches", []),
                 "cursor_start": start, "cursor_end": cursor_pos, "metadata": {}}
 
-    def do_inspect(self, code, cursor_pos, detail_level=0, **kwargs):
+    def do_inspect(self, code, cursor_pos, detail_level=0, omit_sections=(), **kwargs):
         start = self.identifier_start(code, cursor_pos)
         end = cursor_pos
         while end < len(code) and self.identifier_char(code[end]):
