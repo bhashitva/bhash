@@ -7,6 +7,7 @@
 #include <errno.h>
 typedef struct pg_conn PGconn;
 typedef struct pg_result PGresult;
+typedef struct pg_cancel PGcancel;
 #define PG_API_LIST(X) \
  X(PGconn*,PQconnectdbParams,(const char *const*,const char *const*,int)) \
  X(int,PQstatus,(const PGconn*)) X(void,PQfinish,(PGconn*)) \
@@ -20,7 +21,17 @@ typedef struct pg_result PGresult;
  X(int,PQnfields,(const PGresult*)) X(int,PQntuples,(const PGresult*)) \
  X(char*,PQfname,(const PGresult*,int)) X(unsigned int,PQftype,(const PGresult*,int)) \
  X(int,PQgetisnull,(const PGresult*,int,int)) X(int,PQgetlength,(const PGresult*,int,int)) \
- X(char*,PQgetvalue,(const PGresult*,int,int)) X(char*,PQcmdTuples,(PGresult*))
+ X(char*,PQgetvalue,(const PGresult*,int,int)) X(char*,PQcmdTuples,(PGresult*)) \
+ X(PGconn*,PQconnectStartParams,(const char *const*,const char *const*,int)) \
+ X(int,PQconnectPoll,(PGconn*)) X(int,PQsocket,(const PGconn*)) \
+ X(int,PQsetnonblocking,(PGconn*,int)) X(int,PQflush,(PGconn*)) \
+ X(int,PQconsumeInput,(PGconn*)) X(int,PQisBusy,(PGconn*)) X(PGresult*,PQgetResult,(PGconn*)) \
+ X(int,PQsendQuery,(PGconn*,const char*)) \
+ X(int,PQsendPrepare,(PGconn*,const char*,const char*,int,const unsigned int*)) \
+ X(int,PQsendDescribePrepared,(PGconn*,const char*)) \
+ X(int,PQsendQueryParams,(PGconn*,const char*,int,const unsigned int*,const char *const*,const int*,const int*,int)) \
+ X(int,PQsetSingleRowMode,(PGconn*)) X(int,PQtransactionStatus,(const PGconn*)) \
+ X(PGcancel*,PQgetCancel,(PGconn*)) X(int,PQcancel,(PGcancel*,char*,int)) X(void,PQfreeCancel,(PGcancel*))
 #define PG_DECLARE(ret,name,args) static ret (*pg_##name)args;
 PG_API_LIST(PG_DECLARE)
 #undef PG_DECLARE

@@ -20,3 +20,5 @@
 ## PostgreSQL and migrations / डेटाबेस माइग्रेशन
 
 See the [shared database providers and migration guide](database-providers/README.md) for SQLite/PostgreSQL, parameterized SQL, transactions, deployment requirements and Hindi examples.
+
+- [असमकालिक HTTP और डेटाबेस (Async I/O)](async-io/README.md): नेटवर्क अनुरोध, मापदंडयुक्त SQL, लेनदेन और निरस्तीकरण।

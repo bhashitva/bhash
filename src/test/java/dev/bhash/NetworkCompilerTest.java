@@ -35,6 +35,16 @@ abstract class NetworkCompilerTest {
         finally {child.destroyForcibly();}
     }
     @Test void portableUrlsHeadersAndEncoding()throws Exception {execute(NetworkCoreTest.PURE);}
+    @Test void asyncHttpSnapshotsValidationBeforeQueuedStart()throws Exception {execute(AsyncHttpFixtures.VALIDATION);}
+    @Test void asyncHttpOverlapsAndDrainsCancellation()throws Exception {
+        try(var fixture=new NetworkFixture()){execute(AsyncHttpFixtures.requests(fixture.base()));}
+    }
+    @Test void asyncHttpRetainsRedirectAndResponsePolicies()throws Exception {
+        try(var fixture=new NetworkFixture()){execute(AsyncHttpFixtures.policies(fixture.base()));assertEquals(0,fixture.replayedBodies.get());}
+    }
+    @Test void asyncHttpRejectsUntrustedTls()throws Exception {
+        try(var fixture=new NetworkFixture()){execute(AsyncHttpFixtures.untrusted(fixture.untrustedTls()));}
+    }
     @Test void httpRequestsResponsesRedirectsAndOpaqueHandleCleanup()throws Exception {
         try(var fixture=new NetworkFixture()){execute(fixture.functional());assertEquals(0,fixture.replayedBodies.get());}
     }

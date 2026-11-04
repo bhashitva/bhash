@@ -11,6 +11,7 @@ typedef struct net_response {
     size_t size,capacity,header_size,field_count;
     char *fields[512];
     int error,headers_done;
+    void *pending;
 } net_response;
 static net_response *net_responses[32];
 static uint64_t net_next;
@@ -202,6 +203,115 @@ done:
     if(c){if(c->event)net_windows_release(c);else {free(c->upload);free(c);}}
     free(address);free(verb);free(host);free(path);free(fields);free(raw);return error;
 }
+typedef struct net_async {HINTERNET session,connection,request;net_windows *callback;uint64_t deadline;int phase,closing;} net_async;
+static void net_windows_close(net_async *p){
+    if(p->closing)return;p->closing=1;
+    if(p->request)WinHttpCloseHandle(p->request);
+    if(p->connection)WinHttpCloseHandle(p->connection);
+    if(p->session)WinHttpCloseHandle(p->session);
+}
+static int net_windows_headers(net_response *r,HINTERNET request){
+    int error=NET_ERROR;wchar_t *raw=NULL;
+    DWORD status=0,bytes=sizeof status;
+    error=NET_ERROR;
+    if(!WinHttpQueryHeaders(request,WINHTTP_QUERY_STATUS_CODE|WINHTTP_QUERY_FLAG_NUMBER,NULL,&status,&bytes,NULL))goto done;
+    r->status=(long)status;bytes=0;
+    WinHttpQueryHeaders(request,WINHTTP_QUERY_RAW_HEADERS_CRLF,NULL,NULL,&bytes,NULL);
+    if(GetLastError()!=ERROR_INSUFFICIENT_BUFFER)goto done;
+    if(bytes>NET_HEADER_LIMIT*2+1024){error=NET_HEADER_SIZE;goto done;}
+    raw=malloc(bytes);if(!raw)goto done;
+    if(!WinHttpQueryHeaders(request,WINHTTP_QUERY_RAW_HEADERS_CRLF,NULL,raw,&bytes,NULL))goto done;
+    size_t count=wcslen(raw);char *latin=malloc(count+1);if(!latin)goto done;
+    for(size_t i=0;i<count;i++){if(raw[i]>255){free(latin);goto done;}latin[i]=(char)raw[i];}latin[count]=0;
+    char *line=latin,*end;
+    while((end=strstr(line,"\r\n"))!=NULL){size_t n=(size_t)(end-line)+2;if(!net_header_append(r,line,n)){free(latin);error=r->error;goto done;}line=end+2;}
+    free(latin);free(raw);return 0;
+done:free(raw);return error;
+}
+static int net_start(net_response *r,const char *method,const char *url,const bh_collection *headers,const bh_collection *body,uint64_t timeout){
+    int error=NET_ERROR;net_async *pending=calloc(1,sizeof *pending);if(!pending)return NET_ERROR;HINTERNET session=NULL,connection=NULL,request=NULL;
+    ULONGLONG deadline=GetTickCount64()+timeout;
+    wchar_t *address=net_wide(url),*verb=net_wide(method),*host=NULL,*path=NULL,*fields=NULL,*raw=NULL;
+    net_windows *c=calloc(1,sizeof *c);
+    if(!c||!address||!verb)goto done;
+    c->references=1;c->event=CreateEventW(NULL,TRUE,FALSE,NULL);if(!c->event)goto done;
+    if(body->size){c->upload=malloc((size_t)body->size);if(!c->upload)goto done;memcpy(c->upload,body->data,(size_t)body->size);}
+    URL_COMPONENTS parts;memset(&parts,0,sizeof parts);parts.dwStructSize=sizeof parts;
+    parts.dwSchemeLength=(DWORD)-1;parts.dwHostNameLength=(DWORD)-1;parts.dwUrlPathLength=(DWORD)-1;parts.dwExtraInfoLength=(DWORD)-1;
+    if(!WinHttpCrackUrl(address,0,0,&parts)||(parts.nScheme!=INTERNET_SCHEME_HTTP&&parts.nScheme!=INTERNET_SCHEME_HTTPS))goto done;
+    host=calloc((size_t)parts.dwHostNameLength+1,sizeof *host);path=calloc((size_t)parts.dwUrlPathLength+parts.dwExtraInfoLength+2,sizeof *path);
+    if(!host||!path)goto done;
+    memcpy(host,parts.lpszHostName,(size_t)parts.dwHostNameLength*sizeof *host);
+    if(parts.dwUrlPathLength)memcpy(path,parts.lpszUrlPath,(size_t)parts.dwUrlPathLength*sizeof *path);else path[0]=L'/';
+    if(parts.dwExtraInfoLength)memcpy(path+(parts.dwUrlPathLength?parts.dwUrlPathLength:1),parts.lpszExtraInfo,(size_t)parts.dwExtraInfoLength*sizeof *path);
+    session=WinHttpOpen(NULL,WINHTTP_ACCESS_TYPE_NO_PROXY,NULL,NULL,WINHTTP_FLAG_ASYNC);if(!session)goto done;
+    DWORD protocols=WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;
+#ifdef WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3
+    protocols|=WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+#endif
+    if(!WinHttpSetOption(session,WINHTTP_OPTION_SECURE_PROTOCOLS,&protocols,sizeof protocols)){
+        protocols=WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;if(!WinHttpSetOption(session,WINHTTP_OPTION_SECURE_PROTOCOLS,&protocols,sizeof protocols))goto done;
+    }
+    if(!WinHttpSetTimeouts(session,(int)timeout,(int)timeout,(int)timeout,(int)timeout))goto done;
+    connection=WinHttpConnect(session,host,parts.nPort,0);if(!connection)goto done;
+    request=WinHttpOpenRequest(connection,verb,path,L"HTTP/1.1",NULL,NULL,parts.nScheme==INTERNET_SCHEME_HTTPS?WINHTTP_FLAG_SECURE:0);if(!request)goto done;
+    DWORD disabled=WINHTTP_DISABLE_COOKIES|WINHTTP_DISABLE_REDIRECTS|WINHTTP_DISABLE_AUTHENTICATION;
+    DWORD max_headers=NET_HEADER_LIMIT;
+    if(!WinHttpSetOption(request,WINHTTP_OPTION_DISABLE_FEATURE,&disabled,sizeof disabled)||!WinHttpSetOption(request,WINHTTP_OPTION_MAX_RESPONSE_HEADER_SIZE,&max_headers,sizeof max_headers))goto done;
+    if(WinHttpSetStatusCallback(request,net_windows_status,WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS|WINHTTP_CALLBACK_FLAG_HANDLES|WINHTTP_CALLBACK_FLAG_SECURE_FAILURE,0)==WINHTTP_INVALID_STATUS_CALLBACK)goto done;
+    DWORD_PTR context=(DWORD_PTR)c;
+    if(!WinHttpSetOption(request,WINHTTP_OPTION_CONTEXT_VALUE,&context,sizeof context))goto done;
+    InterlockedIncrement(&c->references);
+    size_t field_size=0;for(uint64_t i=0;i<headers->size;i++)field_size+=(size_t)text_length((void *)(uintptr_t)headers->data[i])+2;
+    fields=calloc(field_size+1,sizeof *fields);if(!fields)goto done;
+    size_t at=0;
+    for(uint64_t i=0;i<headers->size;i+=2){
+        for(uint64_t j=0;j<2;j++){
+            const void *value=(void *)(uintptr_t)headers->data[i+j];for(uint64_t k=0;k<text_length(value);k++)fields[at++]=text_data(value)[k];
+            if(!j){fields[at++]=L':';fields[at++]=L' ';}else {fields[at++]=L'\r';fields[at++]=L'\n';}
+        }
+    }
+    if(at&&!WinHttpAddRequestHeaders(request,fields,(DWORD)at,WINHTTP_ADDREQ_FLAG_ADD))goto done;
+    pending->session=session;pending->connection=connection;pending->request=request;pending->callback=c;pending->deadline=deadline;
+    r->pending=pending;
+    if(!WinHttpSendRequest(request,NULL,0,c->upload,(DWORD)body->size,(DWORD)body->size,(DWORD_PTR)c)&&GetLastError()!=ERROR_IO_PENDING){
+        r->error=net_windows_error(GetLastError(),(int)c->tls);net_windows_close(pending);
+    }
+    free(address);free(verb);free(host);free(path);free(fields);return 0;
+done:
+    pending->session=session;pending->connection=connection;pending->request=request;pending->callback=c;
+    r->pending=pending;r->error=error;net_windows_close(pending);
+    free(address);free(verb);free(host);free(path);free(fields);free(raw);return 0;
+}
+static int net_poll(net_response *r){
+    net_async *p=r->pending;if(!p)return 1;net_windows *c=p->callback;
+    if(!p->closing){
+        if(net_clock()>=p->deadline){r->error=NET_TIMEOUT;net_windows_close(p);}
+        else {
+            DWORD status=(DWORD)InterlockedCompareExchange(&c->status,0,0);
+            if(status==WINHTTP_CALLBACK_STATUS_REQUEST_ERROR){r->error=net_windows_error(c->error,(int)c->tls);net_windows_close(p);}
+            else if(status){
+                InterlockedExchange(&c->status,0);BOOL initiated=TRUE;
+                if(p->phase==0&&status==WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE){p->phase=1;initiated=WinHttpReceiveResponse(p->request,NULL);}
+                else if(p->phase==1&&status==WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE){
+                    r->error=net_windows_headers(r,p->request);
+                    if(r->error)net_windows_close(p);
+                    else {p->phase=2;initiated=WinHttpReadData(p->request,c->buffer,(DWORD)sizeof c->buffer,NULL);}
+                }else if(p->phase==2&&status==WINHTTP_CALLBACK_STATUS_READ_COMPLETE){
+                    if(!c->used||!net_body_append(r,c->buffer,c->used))net_windows_close(p);
+                    else initiated=WinHttpReadData(p->request,c->buffer,(DWORD)sizeof c->buffer,NULL);
+                }else {r->error=NET_ERROR;net_windows_close(p);}
+                if(!initiated&&GetLastError()!=ERROR_IO_PENDING){r->error=net_windows_error(GetLastError(),(int)c->tls);net_windows_close(p);}
+            }
+        }
+    }
+    if(p->closing&&(!c||InterlockedCompareExchange(&c->references,0,0)<=1)){
+        if(c){if(c->event)net_windows_release(c);else {free(c->upload);free(c);}}
+        free(p);r->pending=NULL;return 1;
+    }
+    return 0;
+}
+static void net_abort(net_response *r){net_async *p=r->pending;if(p){r->error=NET_ERROR;net_windows_close(p);}}
 static uint64_t net_clock(void){return GetTickCount64();}
 #else
 #include <dlfcn.h>
@@ -229,6 +339,11 @@ static int (*net_curl_getinfo)(void *,int,...);
 static void (*net_curl_cleanup)(void *);
 static void *(*net_curl_slist_append)(void *,const char *);
 static void (*net_curl_slist_free)(void *);
+typedef struct net_curl_message {int message;void *easy;union {void *pointer;int result;} data;} net_curl_message;
+static void *(*net_multi_init)(void);
+static int (*net_multi_add)(void *,void *),(*net_multi_remove)(void *,void *),(*net_multi_perform)(void *,int *),(*net_multi_cleanup)(void *);
+static net_curl_message *(*net_multi_info)(void *,int *);
+typedef struct net_async {void *easy,*multi,*fields;unsigned char *upload;} net_async;
 static int net_curl_ready(void){
     if(net_curl_library)return 1;
 #ifdef __APPLE__
@@ -248,6 +363,13 @@ static int net_curl_ready(void){
     net_curl_slist_append=(void *(*)(void *,const char *))dlsym(library,"curl_slist_append");
     net_curl_slist_free=(void (*)(void *))dlsym(library,"curl_slist_free_all");
     if(!initialize||!net_curl_global_free||!version||!net_curl_init||!net_curl_setopt||!net_curl_perform||!net_curl_getinfo||!net_curl_cleanup||!net_curl_slist_append||!net_curl_slist_free){dlclose(library);return 0;}
+    net_multi_init=(void *(*)(void))dlsym(library,"curl_multi_init");
+    net_multi_add=(int (*)(void *,void *))dlsym(library,"curl_multi_add_handle");
+    net_multi_remove=(int (*)(void *,void *))dlsym(library,"curl_multi_remove_handle");
+    net_multi_perform=(int (*)(void *,int *))dlsym(library,"curl_multi_perform");
+    net_multi_cleanup=(int (*)(void *))dlsym(library,"curl_multi_cleanup");
+    net_multi_info=(net_curl_message *(*)(void *,int *))dlsym(library,"curl_multi_info_read");
+    if(!net_multi_init||!net_multi_add||!net_multi_remove||!net_multi_perform||!net_multi_cleanup||!net_multi_info){dlclose(library);return 0;}
     net_curl_version *v=version(0);
     if(!v||v->version_num<0x074400||!(v->features&4)||!(v->features&128)||initialize(3)){dlclose(library);return 0;}
     if(atexit(net_curl_shutdown)){net_curl_global_free();dlclose(library);return 0;}
@@ -297,12 +419,89 @@ done:
     free(line);free(upload);if(fields)net_curl_slist_free(fields);net_curl_cleanup(curl);return error;
 #undef NET_OPT
 }
+static int net_start(net_response *r,const char *method,const char *url,const bh_collection *headers,const bh_collection *body,uint64_t timeout){
+    uint64_t deadline=net_clock()+timeout;
+    if(!net_curl_ready())return NET_UNAVAILABLE;
+    void *curl=net_curl_init(),*fields=NULL;char *line=NULL;unsigned char *upload=NULL;int error=NET_ERROR;
+    if(!curl)return NET_ERROR;
+    if(body->size){upload=malloc((size_t)body->size);if(!upload){net_curl_cleanup(curl);return NET_ERROR;}memcpy(upload,body->data,(size_t)body->size);}
+#define NET_OPT(option,value) do { if(net_curl_setopt(curl,(option),(value)))goto done; } while(0)
+    NET_OPT(BH_CURL_URL,url);NET_OPT(BH_CURL_PROXY,"");NET_OPT(BH_CURL_PROTOCOLS,3L);NET_OPT(BH_CURL_REDIR_PROTOCOLS,3L);
+    NET_OPT(BH_CURL_FOLLOWLOCATION,0L);NET_OPT(BH_CURL_NOSIGNAL,1L);NET_OPT(BH_CURL_TIMEOUT_MS,(long)timeout);NET_OPT(BH_CURL_CONNECTTIMEOUT_MS,(long)timeout);
+    NET_OPT(BH_CURL_HTTP_CONTENT_DECODING,0L);
+    NET_OPT(BH_CURL_SSL_VERIFYPEER,1L);NET_OPT(BH_CURL_SSL_VERIFYHOST,2L);NET_OPT(BH_CURL_SSLVERSION,6L);NET_OPT(BH_CURL_HTTP_VERSION,2L);
+    const char *ca=getenv("SSL_CERT_FILE");if(ca&&*ca)NET_OPT(BH_CURL_CAINFO,ca);
+    NET_OPT(BH_CURL_WRITEFUNCTION,net_curl_body);NET_OPT(BH_CURL_WRITEDATA,r);NET_OPT(BH_CURL_HEADERFUNCTION,net_curl_header);NET_OPT(BH_CURL_HEADERDATA,r);
+    fields=net_curl_slist_append(NULL,"Expect:");if(!fields)goto done;
+    int content_type=0;
+    for(uint64_t i=0;i<headers->size;i+=2){
+        const void *key=(void *)(uintptr_t)headers->data[i],*value=(void *)(uintptr_t)headers->data[i+1];
+        size_t a=(size_t)text_length(key),b=(size_t)text_length(value);
+        line=malloc(a+b+3);if(!line)goto done;memcpy(line,text_data(key),a);if(b){line[a]=':';line[a+1]=' ';memcpy(line+a+2,text_data(value),b);line[a+b+2]=0;}else {line[a]=';';line[a+1]=0;}
+        if(a==12){const char *wanted="content-type";int matches=1;for(size_t j=0;j<a;j++){unsigned char c=(unsigned char)line[j];if((c>='A'&&c<='Z'?c+32:c)!=(unsigned char)wanted[j])matches=0;}if(matches)content_type=1;}
+        void *next=net_curl_slist_append(fields,line);free(line);line=NULL;if(!next)goto done;fields=next;
+    }
+    if(!content_type){void *next=net_curl_slist_append(fields,"Content-Type:");if(!next)goto done;fields=next;}
+    NET_OPT(BH_CURL_HTTPHEADER,fields);
+    if(body->size||(!strcmp(method,"POST")||!strcmp(method,"PUT")||!strcmp(method,"PATCH"))){NET_OPT(BH_CURL_POSTFIELDS,body->size?(const void *)upload:(const void *)"");NET_OPT(BH_CURL_POSTFIELDSIZE,(long)body->size);}
+    if(!strcmp(method,"HEAD"))NET_OPT(BH_CURL_NOBODY,1L);
+    NET_OPT(BH_CURL_CUSTOMREQUEST,method);
+    uint64_t now=net_clock();if(now>=deadline){error=NET_TIMEOUT;goto done;}
+    NET_OPT(BH_CURL_TIMEOUT_MS,(long)(deadline-now));NET_OPT(BH_CURL_CONNECTTIMEOUT_MS,(long)(deadline-now));
+    net_async *pending=calloc(1,sizeof *pending);if(!pending)goto done;
+    pending->easy=curl;pending->fields=fields;pending->upload=upload;pending->multi=net_multi_init();
+    if(!pending->multi||net_multi_add(pending->multi,curl)){
+        if(pending->multi)net_multi_cleanup(pending->multi);free(pending);goto done;
+    }
+    r->pending=pending;return 0;
+done:
+    free(line);free(upload);if(fields)net_curl_slist_free(fields);net_curl_cleanup(curl);return error;
+#undef NET_OPT
+}
+static void net_finish(net_response *r){
+    net_async *p=r->pending;if(!p)return;
+    net_multi_remove(p->multi,p->easy);net_curl_cleanup(p->easy);net_multi_cleanup(p->multi);
+    if(p->fields)net_curl_slist_free(p->fields);free(p->upload);free(p);r->pending=NULL;
+}
+static int net_poll(net_response *r){
+    net_async *p=r->pending;if(!p)return 1;
+    int running=0,result;do{result=net_multi_perform(p->multi,&running);}while(result==-1);
+    if(result){r->error=NET_ERROR;net_finish(r);return 1;}
+    int remaining;net_curl_message *message;
+    while((message=net_multi_info(p->multi,&remaining))!=NULL){
+        if(message->message!=1||message->easy!=p->easy)continue;
+        result=message->data.result;
+        if(!r->error){
+            if(result==28)r->error=NET_TIMEOUT;
+            else if(result==35||result==60||result==77||result==83)r->error=NET_TLS;
+            else if(result||net_curl_getinfo(p->easy,BH_CURL_RESPONSE_CODE,&r->status))r->error=NET_ERROR;
+        }
+        net_finish(r);return 1;
+    }
+    return 0;
+}
+static void net_abort(net_response *r){if(r->pending){r->error=NET_ERROR;net_finish(r);}}
 static uint64_t net_clock(void){struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now))return 0;return (uint64_t)now.tv_sec*1000+(uint64_t)now.tv_nsec/1000000;}
 #endif
 
+static void net_shutdown(void){
+    for(size_t i=0;i<32;i++)if(net_responses[i])net_abort(net_responses[i]);
+    for(size_t i=0;i<32;i++)if(net_responses[i]){
+        while(!net_poll(net_responses[i])){
+#ifdef _WIN32
+            Sleep(1);
+#else
+            struct timespec pause={0,1000000};nanosleep(&pause,NULL);
+#endif
+        }
+        net_dispose(net_responses[i]);net_responses[i]=NULL;
+    }
+}
+
 uint64_t bh_network_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,uint64_t e,const bh_collection_info *info,const void *location){
     if(op==5)return net_clock();
-    if(op==0){
+    if(op==9){uint64_t n=0;for(size_t i=0;i<32;i++)if(net_responses[i])n++;return n;}
+    if(op==0||op==6){
         size_t slot=0;while(slot<32&&net_responses[slot])slot++;
         if(slot==32)runtime_error(location,"बहुत अधिक खुले HTTP उत्तर।");
         const void *verb=(void *)(uintptr_t)a,*address=(void *)(uintptr_t)b;
@@ -316,17 +515,26 @@ uint64_t bh_network_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d
         cleanups=method_cleanup.previous;
         if(strncmp(url,"http://",7)&&strncmp(url,"https://",8)){free(method);free(url);runtime_error(location,"अमान्य HTTP पता।");}
         net_response *r=calloc(1,sizeof *r);if(!r){free(method);free(url);runtime_error(location,"HTTP अनुरोध असफल।");}
-        int error=net_transport(r,method,url,headers,body,e);free(method);free(url);
+        int error=op==6?net_start(r,method,url,headers,body,e):net_transport(r,method,url,headers,body,e);free(method);free(url);
         if(error){net_dispose(r);runtime_error(location,net_message(error));}
+        /* Register after transport initialization so this drains before curl's
+         * process-wide cleanup in reverse atexit order. */
+        static int registered=0;if(!registered){
+            if(atexit(net_shutdown)){net_responses[slot]=r;net_shutdown();runtime_error(location,"HTTP अनुरोध असफल।");}registered=1;
+        }
         r->id=++net_next;net_responses[slot]=r;return r->id;
     }
     size_t slot=0;while(slot<32&&(!net_responses[slot]||net_responses[slot]->id!=a))slot++;
     if(op==4){
         if(!a||a>net_next)runtime_error(location,"अमान्य HTTP उत्तर पहचान।");
-        if(slot<32){net_dispose(net_responses[slot]);net_responses[slot]=NULL;}return 0;
+        if(slot<32){if(net_responses[slot]->pending)runtime_error(location,"HTTP उत्तर अभी तैयार नहीं है।");net_dispose(net_responses[slot]);net_responses[slot]=NULL;}return 0;
     }
     if(slot==32)runtime_error(location,"HTTP उत्तर बंद है।");
     net_response *r=net_responses[slot];
+    if(op==7)return (uint64_t)net_poll(r);
+    if(op==8){net_abort(r);return 0;}
+    if(r->pending)runtime_error(location,"HTTP उत्तर अभी तैयार नहीं है।");
+    if(r->error)runtime_error(location,net_message(r->error));
     if(op==1)return (uint64_t)r->status;
     if(op==3){bh_collection *buffer=bh_collection_new(info,(int64_t)r->size,location);if(r->size)memcpy(buffer->data,r->body,r->size);return (uint64_t)(uintptr_t)buffer;}
     if(op==2){

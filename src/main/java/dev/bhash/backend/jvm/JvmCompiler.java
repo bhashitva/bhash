@@ -25,7 +25,7 @@ public final class JvmCompiler {
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
         String java = ManagedEmitter.emit(sources, Target.JVM);
         boolean sqlite=java.contains("BhashStandard.db");
-        boolean postgres=java.contains("BhashStandard.pg");
+        boolean postgres=java.contains("BhashStandard.pg")||java.contains("BhashStandard.dbAsyncStart");
         var compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) throw new CompilationException("JVM compilation requires a full JDK 17 or newer (not a JRE).");
         Path temporary = Files.createTempDirectory("bhash-jvm-");
@@ -42,7 +42,7 @@ public final class JvmCompiler {
             try(var resource=JvmCompiler.class.getResourceAsStream("BhashStandard.java.txt")) {
                 if(resource==null)throw new CompilationException("Missing JVM standard library runtime.");
                 String text=new String(resource.readAllBytes(),StandardCharsets.UTF_8);
-                try(var pg=JvmCompiler.class.getResourceAsStream("Postgres.java.inc")) {
+                for(String helper:List.of("Postgres.java.inc","AsyncDatabase.java.inc"))try(var pg=JvmCompiler.class.getResourceAsStream(helper)) {
                     if(pg==null)throw new CompilationException("Missing PostgreSQL runtime source.");
                     int end=text.lastIndexOf('}');
                     text=text.substring(0,end)+new String(pg.readAllBytes(),StandardCharsets.UTF_8)+text.substring(end);

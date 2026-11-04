@@ -18,6 +18,7 @@ final class NetworkFixture implements AutoCloseable {
     private final HttpServer server,other;
     private final Map<String,HttpsServer> tlsServers=new HashMap<>();
     final AtomicInteger replayedBodies=new AtomicInteger();
+    private final CountDownLatch overlapping=new CountDownLatch(2);
     NetworkFixture()throws IOException {
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         other=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
@@ -47,7 +48,11 @@ final class NetworkFixture implements AutoCloseable {
         try(exchange){
             String path=exchange.getRequestURI().getPath();byte[] input=exchange.getRequestBody().readNBytes(8388609);
             exchange.getResponseHeaders().add("X-Duplicate","one");exchange.getResponseHeaders().add("X-Duplicate","two");
-            if(path.equals("/downgrade")){
+            if(path.equals("/overlap")){
+                overlapping.countDown();
+                boolean together=overlapping.await(10,TimeUnit.SECONDS);
+                reply(exchange,together?200:500,new byte[]{1});
+            }else if(path.equals("/downgrade")){
                 exchange.getResponseHeaders().add("Location",base()+"/");reply(exchange,302,new byte[0]);
             }else if(path.equals("/redirect")){
                 int status=Integer.parseInt(exchange.getRequestURI().getQuery());exchange.getResponseHeaders().add("Location","/method");reply(exchange,status,new byte[0]);

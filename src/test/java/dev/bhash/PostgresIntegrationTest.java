@@ -14,7 +14,13 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 class PostgresIntegrationTest {
     @TempDir Path temp;
-    static String source()throws Exception {return Files.readString(Path.of("src/test/resources/postgresql/integration.bhash"));}
+    static String source()throws Exception {
+        String sync=Files.readString(Path.of("src/test/resources/postgresql/integration.bhash")).replace("फलन मुख्य()", "फलन तुल्यकालिकजाँच()");
+        String async=Files.readString(Path.of("src/test/resources/postgresql/async-integration.bhash"));
+        String imports=async.lines().filter(line->line.startsWith("आयात ")).collect(java.util.stream.Collectors.joining("\n"));
+        String body=async.lines().filter(line->!line.startsWith("आयात ")).collect(java.util.stream.Collectors.joining("\n"));
+        return imports+"\n"+sync+"\n"+body;
+    }
     @Test void fixtureCompilesAndPackagesVerifiedJdbc()throws Exception {
         Path jar=temp.resolve("postgres.jar");new JvmCompiler().compile("postgres.bhash",source(),jar);
         try(var zip=new java.util.zip.ZipFile(jar.toFile())) {

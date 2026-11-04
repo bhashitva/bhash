@@ -19,7 +19,7 @@ public final class StandardLibrary {
         var owners=new LinkedHashMap<String,List<String[]>>();
         try {
             var catalog=new StringBuilder();
-            for(String name:List.of("api.txt","foundation-api.txt","network-api.txt","sqlite-api.txt","postgres-api.txt","server-api.txt","auth-api.txt"))try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+name)) {
+            for(String name:List.of("api.txt","foundation-api.txt","network-api.txt","sqlite-api.txt","postgres-api.txt","server-api.txt","auth-api.txt","async-database-api.txt"))try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+name)) {
                 if(input==null)throw new IOException("Missing standard library signature catalog: "+name);
                 catalog.append(new String(input.readAllBytes(),StandardCharsets.UTF_8)).append('\n');
             }
@@ -44,7 +44,7 @@ public final class StandardLibrary {
         return new Catalog(String.join("\n",lines)+"\n",Map.copyOf(natives));
     }
     public static boolean owns(String full) {
-        return (CATALOG.source+FOUNDATIONS.text()+NETWORKING.text()+SQLITE.text()+DATABASE.text()+MIGRATIONS.text()+WEB.text()+AUTH.text()+TASKS.text()).lines().anyMatch(line->{
+        return (CATALOG.source+FOUNDATIONS.text()+NETWORKING.text()+SQLITE.text()+DATABASE.text()+MIGRATIONS.text()+WEB.text()+AUTH.text()+TASKS.text()+ASYNC_DATABASE.text()).lines().anyMatch(line->{
             for(String prefix:List.of("सार्वजनिक वर्ग ","सार्वजनिक अनुबंध ","सार्वजनिक अभिलेख "))
                 if(line.startsWith(prefix)&&full.equals("मानक."+Identifiers.key(line.substring(prefix.length()).split("[ <{(]",2)[0])))return true;
             return false;
@@ -57,7 +57,8 @@ public final class StandardLibrary {
     public static final String AUTH_NAME="__bhash_auth__.bhash";
     public static final String WEB_NAME="__bhash_web__.bhash";
     public static final String TASKS_NAME="__bhash_tasks__.bhash";
-    public static boolean reserved(String name) {return name.equals(TASKS_NAME)||name.equals(DATABASE_NAME)||name.equals(MIGRATIONS_NAME)||name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME)||name.equals(NETWORKING_NAME)||name.equals(SQLITE_NAME)||name.equals(WEB_NAME)||name.equals(AUTH_NAME);}
+    public static final String ASYNC_DATABASE_NAME="__bhash_async_database__.bhash";
+    public static boolean reserved(String name) {return name.equals(ASYNC_DATABASE_NAME)||name.equals(TASKS_NAME)||name.equals(DATABASE_NAME)||name.equals(MIGRATIONS_NAME)||name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME)||name.equals(NETWORKING_NAME)||name.equals(SQLITE_NAME)||name.equals(WEB_NAME)||name.equals(AUTH_NAME);}
     private static final SourceFile FOUNDATIONS=loadImplementation("foundations.bhash",FOUNDATIONS_NAME);
     private static final SourceFile NETWORKING=loadImplementation("networking.bhash",NETWORKING_NAME);
     private static final SourceFile SQLITE=loadImplementation("sqlite.bhash",SQLITE_NAME);
@@ -66,7 +67,8 @@ public final class StandardLibrary {
     private static final SourceFile WEB=loadImplementation("web.bhash",WEB_NAME);
     private static final SourceFile AUTH=loadImplementation("authentication.bhash",AUTH_NAME);
     private static final SourceFile TASKS=loadImplementation("tasks.bhash",TASKS_NAME);
-    private static final List<SourceFile> IMPLEMENTATIONS=List.of(FOUNDATIONS,NETWORKING,SQLITE,DATABASE,MIGRATIONS,WEB,AUTH,TASKS);
+    private static final SourceFile ASYNC_DATABASE=loadImplementation("async-database.bhash",ASYNC_DATABASE_NAME);
+    private static final List<SourceFile> IMPLEMENTATIONS=List.of(FOUNDATIONS,NETWORKING,SQLITE,DATABASE,MIGRATIONS,WEB,AUTH,TASKS,ASYNC_DATABASE);
     public static SourceFile foundations() {return FOUNDATIONS;}
     private static SourceFile loadImplementation(String resource,String name) {
         try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+resource)) {
@@ -92,7 +94,11 @@ public final class StandardLibrary {
                 var declaration=entry.getValue().tree();
                 String original=declaration.start.getInputStream().getText(org.antlr.v4.runtime.misc.Interval.of(declaration.start.getStartIndex(),declaration.stop.getStopIndex()));
                 var lexer=new dev.bhash.parser.BhashLexer(org.antlr.v4.runtime.CharStreams.fromString(original));
-                for(var token:lexer.getAllTokens())if(token.getType()==dev.bhash.parser.BhashLexer.IDENTIFIER)needed.add(Identifiers.key(token.getText()));
+                for(var token:lexer.getAllTokens()) {
+                    if(token.getType()==dev.bhash.parser.BhashLexer.IDENTIFIER)needed.add(Identifiers.key(token.getText()));
+                    if(token.getType()==dev.bhash.parser.BhashLexer.ASYNC)
+                        needed.addAll(List.of("कार्यफल","कार्यशून्य","कार्यतंत्र","कार्य","कार्यसीमा","असमकालिकबंदनीय"));
+                }
             }
             changed=needed.size()!=size;
         }while(changed);

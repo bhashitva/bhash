@@ -10,7 +10,7 @@ import java.util.*;
 
 /** Versioned, path/timestamp-free identity shared by code generation and deployment tools. */
 public final class NativeBuildInfo {
-    public static final int ABI=16, FORMAT=1;
+    public static final int ABI=17, FORMAT=1;
     public static final String TARGET=NativePlatform.target(), GUARD="bh_runtime_abi_v"+ABI;
     public static final Gson JSON=new GsonBuilder().disableHtmlEscaping().create();
     private NativeBuildInfo(){}
@@ -29,8 +29,10 @@ public final class NativeBuildInfo {
         var info=new LinkedHashMap<String,Object>();info.put("format",FORMAT);info.put("target",TARGET);info.put("runtime_abi",ABI);
         byte[] http=resource("/dev/bhash/backend/native/bhash_http.inc");
         byte[] sqliteSource=resource("/dev/bhash/backend/native/bhash_sqlite.inc"),postgres=resource("/dev/bhash/backend/native/bhash_postgres.inc");
-        byte[] sqlite=Arrays.copyOf(sqliteSource,sqliteSource.length+postgres.length);
+        byte[] asyncDatabase=resource("/dev/bhash/backend/native/bhash_async_database.inc");
+        byte[] sqlite=Arrays.copyOf(sqliteSource,sqliteSource.length+postgres.length+asyncDatabase.length);
         System.arraycopy(postgres,0,sqlite,sqliteSource.length,postgres.length);
+        System.arraycopy(asyncDatabase,0,sqlite,sqliteSource.length+postgres.length,asyncDatabase.length);
         byte[] server=resource("/dev/bhash/backend/native/bhash_server.inc");
         byte[] auth=resource("/dev/bhash/backend/native/bhash_auth.inc");
         byte[] runtime=java.util.Arrays.copyOf(source,source.length+http.length+sqlite.length+server.length+auth.length);
