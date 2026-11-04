@@ -169,6 +169,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     public record NotebookCell(String storage, List<String> initializers) {}
 
+    private ClassInfo notebookStorageClass() {
+        return notebook == null || notebook.storage() == null ? null : classes.get(Identifiers.key(notebook.storage()));
+    }
+
     public static String emitNotebook(List<SourceFile> sources, NotebookCell cell) throws CompilationException {
         var resolution = ProjectResolver.resolve(sources);
         String name = sources.get(sources.size()-1).name();
@@ -303,11 +307,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     .append(" BhashRuntime.report(f.getMessage()); System.exit(1); } }\n");
             output.append("private static Throwable bhashFailure(Throwable e) { while(e instanceof ExceptionInInitializerError && e.getCause()!=null) e=e.getCause(); return e; }\n");
             if (notebook != null) {
-                var storage = classes.get(Identifiers.key(notebook.storage()));
-                output.append("public static Class<?> notebookStorage() { ").append(storage.java)
-                        .append(".bhashInitialize(); return ").append(storage.java).append(".class; }\n");
+                var storage = notebookStorageClass();
+                output.append("public static Class<?> notebookStorage() { ");
+                if (storage == null) output.append("return Object.class; }\n");
+                else output.append(storage.java).append(".bhashInitialize(); return ")
+                        .append(storage.java).append(".class; }\n");
                 output.append("public static String[] notebookFields() { return new String[]{");
-                for (var field : storage.fields.values()) output.append('"').append(field.java).append("\",");
+                if (storage != null)
+                    for (var field : storage.fields.values()) output.append('"').append(field.java).append("\",");
                 output.append("}; }\npublic static Object notebookResult;\n")
                         .append("public static final java.util.Set<String> notebookInitialized = new java.util.HashSet<>();\n")
                         .append("public static void notebookRun() { ").append(main.java).append("(); }\n");
@@ -458,7 +465,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     if (definition.fields.containsKey(name) || definition.methods.containsKey(name)
                             || field(definition.parent, name) != null || !methods(definition.parent, name).isEmpty())
                         throw error(member, "Duplicate or hidden member: " + declaration.IDENTIFIER().getText());
-                    if (declaration.CONST() != null && declaration.expression() == null)
+                    // Notebook slots are initialized by the worker after prior cell values are restored.
+                    boolean notebookSlot = shared && definition == notebookStorageClass();
+                    if (declaration.CONST() != null && declaration.expression() == null && !notebookSlot)
                         throw error(declaration, "An immutable field requires an initializer.");
                     definition.fields.put(name, new Field("p" + fieldId++, type(declaration.valueType()),
                             declaration.LET() != null, access, definition, declaration,shared));
@@ -661,7 +670,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         for(var initializer:staticInitializers.entrySet())output.append(initializer.getKey().java).append('=').append(initializer.getValue()).append(";\n");
         output.append("bhashInitState=2; return true; } catch(BhashRuntime.BException failure){bhashInitFailure=failure; bhashInitState=3; throw failure;} }\n");
         for(var field:staticInitializers.keySet()){
-            String notebookGuard = notebook != null && definition == classes.get(Identifiers.key(notebook.storage()))
+            String notebookGuard = definition == notebookStorageClass()
                     ? "if(!notebookInitialized.contains(\"" + field.java
                         + "\")) throw new BhashRuntime.Failure(\"Notebook binding used before initialization.\");"
                     : "";
@@ -1587,8 +1596,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 }
                 var member=field(currentClass,name);
                 if (member!=null) return readField(ctx,member.shared?classReceiver(currentClass):self(ctx,false),name);
-                if (notebook != null) {
-                    var storage = classes.get(Identifiers.key(notebook.storage()));
+                var storage = notebookStorageClass();
+                if (storage != null) {
                     if (field(storage,name)!=null) return readField(ctx,classReceiver(storage),name);
                 }
                 var definition=classes.get(Identifiers.key(name));

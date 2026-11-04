@@ -4,10 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bhash-jupyter"
-version = "0.1.0"
+version = "0.1.1"
 description = "Bhash language kernel for Jupyter"
 requires-python = ">=3.8"
 dependencies = ["ipykernel>=5.1", "jupyter-client>=6"]
+
+[project.optional-dependencies]
+lab = ["jupyterlab>=4"]
+
+[tool.setuptools.package-data]
+bhash_jupyter = ["assets/*"]
 
 [project.scripts]
 bhash-jupyter-install = "bhash_jupyter.install:main"

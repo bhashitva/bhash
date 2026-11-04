@@ -30,6 +30,7 @@ public final class NotebookWorker {
     private final DataOutputStream output = new DataOutputStream(System.out);
     private final Map<String, Slot> slots = new LinkedHashMap<>();
     private final Map<String, Definition> functions = new LinkedHashMap<>();
+    private final Map<String, String> types = new LinkedHashMap<>();
     private final Set<String> imports = new LinkedHashSet<>();
     private int cellNumber;
 
@@ -77,6 +78,7 @@ public final class NotebookWorker {
                     var matches = new TreeSet<String>();
                     slots.values().forEach(slot -> matches.add(slot.name));
                     functions.values().forEach(function -> matches.add(function.name));
+                    matches.addAll(types.keySet());
                     send(Map.of("kind", "names", "matches", matches.stream()
                             .filter(name -> Identifiers.key(name).startsWith(Identifiers.key(source))).toList()));
                 } else if (kind.equals("inspect")) {
@@ -140,26 +142,46 @@ public final class NotebookWorker {
 
     private void evaluate(String code, boolean allowStdin) throws Exception {
         var cell = parse(code);
+        boolean fullProgram = cell.packageDecl() != null || cell.notebookDeclaration().stream()
+                .map(BhashParser.NotebookDeclarationContext::functionDecl)
+                .filter(Objects::nonNull).anyMatch(f -> Identifiers.key(f.IDENTIFIER().getText()).equals("मुख्य"));
+        if (fullProgram) {
+            compileAndRun(code, new ManagedEmitter.NotebookCell(null, List.of()),
+                    Map.of(), Map.of(), Map.of(), Set.of(), List.of(), allowStdin);
+            return;
+        }
         var nextImports = new LinkedHashSet<>(imports);
         var nextFunctions = new LinkedHashMap<>(functions);
+        var nextTypes = new LinkedHashMap<>(types);
         var nextSlots = new LinkedHashMap<>(slots);
         var initializations = new ArrayList<Initialization>();
+        var locals = new ArrayList<BhashParser.VariableDeclContext>();
         var declared = new HashSet<String>();
         for (var statement : cell.statement())
             if (statement.variableDecl() != null)
                 throw new IllegalArgumentException("Place notebook bindings before executable statements.");
         for (var declaration : cell.importDecl()) nextImports.add(source(declaration));
-        for (var declaration : cell.functionDecl()) {
+        for (var item : cell.notebookDeclaration()) {
+            var declaration = item.functionDecl();
+            if (declaration == null) {
+                String name = Identifiers.key(item.classDecl() != null ? item.classDecl().IDENTIFIER().getText()
+                        : item.interfaceDecl() != null ? item.interfaceDecl().IDENTIFIER().getText()
+                        : item.enumDecl().IDENTIFIER().getText());
+                if (!declared.add(name)) throw new IllegalArgumentException("Duplicate declaration: " + name);
+                String typeSource = source(item);
+                String previous = nextTypes.putIfAbsent(name, typeSource);
+                if (previous != null && !previous.equals(typeSource))
+                    throw new IllegalArgumentException("Restart the kernel to change type " + name);
+                continue;
+            }
             String name = Identifiers.key(declaration.IDENTIFIER().getText());
-            if (name.equals("मुख्य")) throw new IllegalArgumentException("Notebook cells do not declare मुख्य.");
-            if (declaration.typeParameters() != null)
-                throw new IllegalArgumentException("Notebook function declarations do not yet support type parameters.");
             String parameters = declaration.parameters() == null ? "" : String.join(",",
                     declaration.parameters().parameter().stream().map(p -> Identifiers.key(p.valueType().getText())).toList());
-            String key = name + "(" + parameters + ")";
+            String generic = declaration.typeParameters() == null ? "" : declaration.typeParameters().getText();
+            String key = name + generic + "(" + parameters + ")";
             if (!declared.add(key)) throw new IllegalArgumentException("Duplicate function: " + name);
             var definition = new Definition(name, declaration.returnType().getText(),
-                    declaration.ASYNC() != null, source(declaration));
+                    declaration.ASYNC() != null, source(item));
             var previous = functions.get(key);
             if (previous != null && (!previous.result.equals(definition.result) || previous.async != definition.async))
                 throw new IllegalArgumentException("Restart the kernel to change the signature of " + name);
@@ -170,8 +192,11 @@ public final class NotebookWorker {
             String key = Identifiers.key(name);
             String type = declaration.valueType().getText();
             boolean mutable = declaration.LET() != null;
-            if (!TYPES.contains(type)) throw new IllegalArgumentException("Persistent notebook bindings require a scalar or पाठ: " + name);
             if (!declared.add(key)) throw new IllegalArgumentException("Duplicate binding: " + name);
+            if (!TYPES.contains(type) || !locals.isEmpty() || hasAsync(declaration)) {
+                locals.add(declaration);
+                continue;
+            }
             Slot previous = slots.get(key);
             if (previous != null && (!previous.type.equals(type) || previous.mutable != mutable))
                 throw new IllegalArgumentException("Restart the kernel to change the type or mutability of " + name);
@@ -179,8 +204,9 @@ public final class NotebookWorker {
                     previous == null ? null : previous.value));
             initializations.add(new Initialization(key, PREFIX + "आरम्भ" + initializations.size(), source(declaration.expression())));
         }
-        if (nextSlots.size() + nextFunctions.size() + nextImports.size() > 512
-                || nextFunctions.values().stream().mapToInt(f -> f.source.length()).sum() > 262144)
+        if (nextSlots.size() + nextFunctions.size() + nextTypes.size() + nextImports.size() > 512
+                || nextFunctions.values().stream().mapToInt(f -> f.source.length()).sum()
+                + nextTypes.values().stream().mapToInt(String::length).sum() > 262144)
             throw new IllegalArgumentException("Notebook session limit reached. Restart the kernel.");
         var program = new StringBuilder();
         nextImports.forEach(line -> program.append(line).append('\n'));
@@ -188,6 +214,7 @@ public final class NotebookWorker {
         nextSlots.values().forEach(slot -> program.append("सार्वजनिक साझा ")
                 .append(slot.mutable ? "मान " : "स्थिर ").append(slot.name).append(": ").append(slot.type).append(";\n"));
         program.append("}\n");
+        nextTypes.values().forEach(type -> program.append(type).append('\n'));
         nextFunctions.values().forEach(function -> program.append(function.source).append('\n'));
         for (var init : initializations) program.append("फलन ").append(init.function).append("() -> ")
                 .append(nextSlots.get(init.key).type).append(" { लौटाओ ").append(init.expression).append("; }\n");
@@ -195,19 +222,29 @@ public final class NotebookWorker {
             program.append("फलन ").append(PREFIX).append("फल(मूल्य:").append(type)
                     .append(") -> शून्य { लिखो(मूल्य); }\n");
         }
-        boolean async = cell.statement().stream().anyMatch(s -> hasAsync(s))
+        boolean async = locals.stream().anyMatch(NotebookWorker::hasAsync)
+                || cell.statement().stream().anyMatch(NotebookWorker::hasAsync)
                 || cell.expression() != null && hasAsync(cell.expression());
         if (async) program.append("असमकालिक ");
         program.append("फलन मुख्य() -> शून्य {\n");
+        locals.forEach(declaration -> program.append(source(declaration)).append('\n'));
         cell.statement().forEach(s -> program.append(source(s)).append('\n'));
         if (cell.expression() != null) program.append(PREFIX).append("फल(").append(source(cell.expression())).append(");\n");
         program.append("}\n");
+        compileAndRun(program.toString(),
+                new ManagedEmitter.NotebookCell(STORAGE, initializations.stream().map(Initialization::function).toList()),
+                nextSlots, nextFunctions, nextTypes, nextImports, initializations, allowStdin);
+    }
+
+    private void compileAndRun(String program, ManagedEmitter.NotebookCell configuration,
+            Map<String, Slot> nextSlots, Map<String, Definition> nextFunctions, Map<String, String> nextTypes,
+            Set<String> nextImports, List<Initialization> initializations, boolean allowStdin) throws Exception {
         Path directory = Files.createTempDirectory("bhash-cell-");
         Path jar = directory.resolve("cell.jar");
         try {
-            new JvmCompiler().compileNotebook(List.of(new SourceFile("cell-" + (++cellNumber) + ".bhash", program.toString())),
-                    new ManagedEmitter.NotebookCell(STORAGE, initializations.stream().map(Initialization::function).toList()), jar);
-            run(jar, nextSlots, nextFunctions, nextImports, initializations, allowStdin);
+            new JvmCompiler().compileNotebook(List.of(new SourceFile("cell-" + (++cellNumber) + ".bhash", program)),
+                    configuration, jar);
+            run(jar, nextSlots, nextFunctions, nextTypes, nextImports, initializations, allowStdin);
         } finally {
             try {
                 Files.deleteIfExists(jar);
@@ -227,7 +264,8 @@ public final class NotebookWorker {
     }
 
     private void run(Path jar, Map<String, Slot> nextSlots, Map<String, Definition> nextFunctions,
-            Set<String> nextImports, List<Initialization> initializations, boolean allowStdin) throws Exception {
+            Map<String, String> nextTypes, Set<String> nextImports, List<Initialization> initializations,
+            boolean allowStdin) throws Exception {
         var oldOut = System.out;
         var oldErr = System.err;
         var oldIn = System.in;
@@ -287,6 +325,7 @@ public final class NotebookWorker {
                 }
             }
             functions.putAll(nextFunctions);
+            types.putAll(nextTypes);
             imports.addAll(nextImports);
             Object result = entry.getField("notebookResult").get(null);
             System.out.flush();

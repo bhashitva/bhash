@@ -6,6 +6,8 @@ worker and speaks the standard Jupyter kernel protocol.
 
 ## Install
 
+For the prebuilt compiler and notebook, follow the [0.1.1 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.1). The source build below is for development.
+
 Build the compiler with a full JDK 17 or newer and Maven. In the Python environment
 that runs Jupyter, install the adapter and register its kernelspec.
 
@@ -48,19 +50,29 @@ kernelspec. To use a terminal, run `jupyter console --kernel bhash`.
 
 ## Cell behavior
 
-Place imports first, then named functions, then persistent declarations, then
-statements and an optional final scalar expression. Blocks may contain local
-bindings. Compatible redeclarations reinitialize a slot. Replacing a function
+Place imports first, then named functions and type declarations, then variable
+declarations, statements, and an optional final scalar expression. A type
+declared with `वर्ग`, `अभिलेख`, `अनुबंध`, or `परिगणना` is available to later
+cells. Rerun an identical declaration freely. Restart the kernel to edit a
+previously declared type or clear the session.
+
+Scalar bindings before the first cell-local declaration persist across cells.
+Object, array, collection, function-value, and awaited declarations are
+cell-local, as are any declarations that follow them in the same cell.
+Compatible scalar redeclarations reinitialize a slot. Replacing a function
 with the same parameter and return types affects calls in later cells.
-Restart the kernel to clear the session.
 
-A compile error runs nothing. A runtime error leaves changes already made to
-existing variables and external resources in place, while new declarations and
-imports from that cell are discarded. Earlier executable cells never replay.
+A cell containing `मुख्य` or `संकुल` runs as a standalone, single-file Bhash
+program. Include its imports and declarations in that cell. It has its own
+scope, and its output appears in the notebook.
 
-The initial kernel recompiles the declarations for each cell and copies scalar
-state into the new cell class loader. Persistent objects, collections, closures
-and provider handles require a shared runtime and stable type identities, as
+A compile error runs nothing. A runtime error preserves updates already made
+to existing scalar bindings and external resources. New declarations and imports
+from that cell are discarded. Earlier executable cells never replay.
+
+The kernel recompiles declarations for each cell and copies scalar state into
+a fresh class loader. Class static state starts fresh in each cell. Persistent
+objects, collections, closures, and provider handles require the shared runtime
 described in the design. Diagnostics currently refer to generated cell source
 lines. Interrupting the worker clears the session. Completion and inspection
 cover committed session names and scalar values.

@@ -16,7 +16,11 @@ permissions:
   contents: read
 jobs:
   kernel:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -30,4 +34,4 @@ jobs:
           python-version: '3.12'
       - run: mvn --batch-mode --no-transfer-progress package -DskipTests
       - run: python -m pip install ./editors/jupyter
-      - run: python editors/jupyter/test_kernel.py target/bhash-compiler-0.1.0-SNAPSHOT.jar
+      - run: python editors/jupyter/test_kernel.py target/bhash-compiler-0.1.0-SNAPSHOT.jar --notebook editors/jupyter/पहली-नोटबुक.ipynb

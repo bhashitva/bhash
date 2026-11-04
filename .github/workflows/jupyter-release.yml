@@ -1,0 +1,42 @@
+name: Release Bhash Jupyter kernel
+on:
+  push:
+    branches: [release/jupyter-0.1.1]
+    paths: ['.github/workflows/jupyter-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - run: python -m pip install build
+      - run: python scripts/package_jupyter.py
+      - name: Test wheel in a clean environment
+        run: |
+          python -m venv target/jupyter-clean
+          target/jupyter-clean/bin/python -m pip install target/jupyter-dist/*.whl
+          export JUPYTER_DATA_DIR="$PWD/target/jupyter-user"
+          target/jupyter-clean/bin/bhash-jupyter-install --notebook target/hindi-starter.ipynb
+          cmp target/hindi-starter.ipynb editors/jupyter/पहली-नोटबुक.ipynb
+          target/jupyter-clean/bin/python editors/jupyter/test_kernel.py --installed --notebook target/hindi-starter.ipynb
+      - name: Publish versioned release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd target/jupyter-dist
+          sha256sum *.whl > SHA256SUMS
+          gh release create jupyter-0.1.1 --target "$GITHUB_SHA" --latest=false --title "Bhash Jupyter kernel 0.1.1" --notes-file ../../editors/jupyter/RELEASE.md *.whl SHA256SUMS ../hindi-starter.ipynb
