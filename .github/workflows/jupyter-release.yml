@@ -1,7 +1,7 @@
 name: Release Bhash Jupyter kernel
 on:
   push:
-    branches: [release/jupyter-0.1.0]
+    branches: [release/jupyter-0.1.1]
     paths: ['.github/workflows/jupyter-release.yml']
   workflow_dispatch:
 permissions:
@@ -39,4 +39,4 @@ jobs:
         run: |
           cd target/jupyter-dist
           sha256sum *.whl > SHA256SUMS
-          gh release create jupyter-0.1.0 --target "$GITHUB_SHA" --latest=false --title "Bhash Jupyter kernel 0.1.0" --notes-file ../../editors/jupyter/RELEASE.md *.whl SHA256SUMS ../hindi-starter.ipynb
+          gh release create jupyter-0.1.1 --target "$GITHUB_SHA" --latest=false --title "Bhash Jupyter kernel 0.1.1" --notes-file ../../editors/jupyter/RELEASE.md *.whl SHA256SUMS ../hindi-starter.ipynb
