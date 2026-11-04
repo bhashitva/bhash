@@ -149,7 +149,7 @@ schema ही cache होती है और executable/exit events पर cac
 
 Automatic Watch evaluation bundled parser से चलती है; user expression को GDB/C parser या Python eval में नहीं भेजा जाता। Inferior function calls disabled हैं। Debug Console और conditional breakpoints अभी advanced GDB/C syntax उपयोग करते हैं। Manual debugger commands program बदल सकती हैं। Software breakpoints के लिए GDB की code-memory writes चालू रहती हैं।
 
-Debug-only immutable schema version 1, runtime ABI 16 तथा retained reference typedefs
+Debug-only immutable schema version 1, runtime ABI 17 तथा retained reference typedefs
 field layouts पहचानते हैं। Normal release executables में यह schema नहीं है। Allocation
 layout, collector policy, runtime fingerprint और application ownership contract नहीं
 बदलते। Custom `bhash.compilerPath` को इस debug schema वाला compiler चाहिए।
