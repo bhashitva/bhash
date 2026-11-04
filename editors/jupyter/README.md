@@ -50,17 +50,21 @@ kernelspec. To use a terminal, run `jupyter console --kernel bhash`.
 
 ## Cell behavior
 
-Place imports first, then named functions and type declarations, then variable
-declarations, statements, and an optional final scalar expression. A type
-declared with `वर्ग`, `अभिलेख`, `अनुबंध`, or `परिगणना` is available to later
+Place imports first, then named functions and type declarations. After those,
+write declarations and statements in execution order, followed by an optional
+final scalar expression. A type declared with `वर्ग`, `अभिलेख`, `अनुबंध`,
+or `परिगणना` is available to later
 cells. Rerun an identical declaration freely. Restart the kernel to edit a
 previously declared type or clear the session.
 
-Scalar bindings before the first cell-local declaration persist across cells.
-Object, array, collection, function-value, and awaited declarations are
-cell-local, as are any declarations that follow them in the same cell.
-Compatible scalar redeclarations reinitialize a slot. Replacing a function
-with the same parameter and return types affects calls in later cells.
+Top-level scalar bindings persist across cells, including declarations after
+statements and declarations with awaited initializers. Initializers execute in
+source order. An early return skips any later declarations and preserves the
+previous value of any skipped redeclaration. Declarations inside blocks follow
+normal block scope. Object, array, collection, and function-value bindings
+remain cell-local. Compatible scalar redeclarations reinitialize a slot.
+Replacing a function with the same parameter and return types affects calls
+in later cells.
 
 A cell containing `मुख्य` or `संकुल` runs as a standalone, single-file Bhash
 program. Include its imports and declarations in that cell. It has its own

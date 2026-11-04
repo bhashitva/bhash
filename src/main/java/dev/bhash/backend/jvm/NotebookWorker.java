@@ -36,7 +36,6 @@ public final class NotebookWorker {
 
     private record Slot(String name, String type, boolean mutable, Object value) {}
     private record Definition(String name, String result, boolean async, String source) {}
-    private record Initialization(String key, String function, String expression) {}
 
     public static void main(String[] args) throws IOException {
         ProcessHandle.current().parent().ifPresent(parent ->
@@ -146,20 +145,17 @@ public final class NotebookWorker {
                 .map(BhashParser.NotebookDeclarationContext::functionDecl)
                 .filter(Objects::nonNull).anyMatch(f -> Identifiers.key(f.IDENTIFIER().getText()).equals("मुख्य"));
         if (fullProgram) {
-            compileAndRun(code, new ManagedEmitter.NotebookCell(null, List.of()),
-                    Map.of(), Map.of(), Map.of(), Set.of(), List.of(), allowStdin);
+            compileAndRun(code, new ManagedEmitter.NotebookCell(null, Map.of()),
+                    Map.of(), Map.of(), Map.of(), Set.of(), allowStdin);
             return;
         }
         var nextImports = new LinkedHashSet<>(imports);
         var nextFunctions = new LinkedHashMap<>(functions);
         var nextTypes = new LinkedHashMap<>(types);
         var nextSlots = new LinkedHashMap<>(slots);
-        var initializations = new ArrayList<Initialization>();
-        var locals = new ArrayList<BhashParser.VariableDeclContext>();
+        var initializers = new LinkedHashMap<String, String>();
+        var body = new StringBuilder();
         var declared = new HashSet<String>();
-        for (var statement : cell.statement())
-            if (statement.variableDecl() != null)
-                throw new IllegalArgumentException("Place notebook bindings before executable statements.");
         for (var declaration : cell.importDecl()) nextImports.add(source(declaration));
         for (var item : cell.notebookDeclaration()) {
             var declaration = item.functionDecl();
@@ -187,14 +183,22 @@ public final class NotebookWorker {
                 throw new IllegalArgumentException("Restart the kernel to change the signature of " + name);
             nextFunctions.put(key, definition);
         }
-        for (var declaration : cell.variableDecl()) {
+        var statements = new ArrayList<ParserRuleContext>(cell.variableDecl());
+        statements.addAll(cell.statement());
+        for (var item : statements) {
+            var declaration = item instanceof BhashParser.VariableDeclContext binding ? binding
+                    : ((BhashParser.StatementContext) item).variableDecl();
+            if (declaration == null) {
+                body.append(source(item)).append('\n');
+                continue;
+            }
             String name = declaration.IDENTIFIER().getText();
             String key = Identifiers.key(name);
             String type = declaration.valueType().getText();
             boolean mutable = declaration.LET() != null;
             if (!declared.add(key)) throw new IllegalArgumentException("Duplicate binding: " + name);
-            if (!TYPES.contains(type) || !locals.isEmpty() || hasAsync(declaration)) {
-                locals.add(declaration);
+            if (!TYPES.contains(type)) {
+                body.append(source(declaration)).append('\n');
                 continue;
             }
             Slot previous = slots.get(key);
@@ -202,7 +206,9 @@ public final class NotebookWorker {
                 throw new IllegalArgumentException("Restart the kernel to change the type or mutability of " + name);
             nextSlots.put(key, new Slot(previous == null ? name : previous.name, type, mutable,
                     previous == null ? null : previous.value));
-            initializations.add(new Initialization(key, PREFIX + "आरम्भ" + initializations.size(), source(declaration.expression())));
+            String initializer = PREFIX + "आरम्भ" + initializers.size();
+            initializers.put(initializer, name);
+            body.append(initializer).append('(').append(source(declaration.expression())).append(");\n");
         }
         if (nextSlots.size() + nextFunctions.size() + nextTypes.size() + nextImports.size() > 512
                 || nextFunctions.values().stream().mapToInt(f -> f.source.length()).sum()
@@ -216,35 +222,33 @@ public final class NotebookWorker {
         program.append("}\n");
         nextTypes.values().forEach(type -> program.append(type).append('\n'));
         nextFunctions.values().forEach(function -> program.append(function.source).append('\n'));
-        for (var init : initializations) program.append("फलन ").append(init.function).append("() -> ")
-                .append(nextSlots.get(init.key).type).append(" { लौटाओ ").append(init.expression).append("; }\n");
+        initializers.forEach((initializer, binding) -> program.append("फलन ").append(initializer)
+                .append("(मूल्य:").append(nextSlots.get(Identifiers.key(binding)).type).append(") -> शून्य {}\n"));
         if (cell.expression() != null) for (String type : TYPES) {
             program.append("फलन ").append(PREFIX).append("फल(मूल्य:").append(type)
                     .append(") -> शून्य { लिखो(मूल्य); }\n");
         }
-        boolean async = locals.stream().anyMatch(NotebookWorker::hasAsync)
-                || cell.statement().stream().anyMatch(NotebookWorker::hasAsync)
+        boolean async = statements.stream().anyMatch(NotebookWorker::hasAsync)
                 || cell.expression() != null && hasAsync(cell.expression());
         if (async) program.append("असमकालिक ");
         program.append("फलन मुख्य() -> शून्य {\n");
-        locals.forEach(declaration -> program.append(source(declaration)).append('\n'));
-        cell.statement().forEach(s -> program.append(source(s)).append('\n'));
+        program.append(body);
         if (cell.expression() != null) program.append(PREFIX).append("फल(").append(source(cell.expression())).append(");\n");
         program.append("}\n");
         compileAndRun(program.toString(),
-                new ManagedEmitter.NotebookCell(STORAGE, initializations.stream().map(Initialization::function).toList()),
-                nextSlots, nextFunctions, nextTypes, nextImports, initializations, allowStdin);
+                new ManagedEmitter.NotebookCell(STORAGE, initializers),
+                nextSlots, nextFunctions, nextTypes, nextImports, allowStdin);
     }
 
     private void compileAndRun(String program, ManagedEmitter.NotebookCell configuration,
             Map<String, Slot> nextSlots, Map<String, Definition> nextFunctions, Map<String, String> nextTypes,
-            Set<String> nextImports, List<Initialization> initializations, boolean allowStdin) throws Exception {
+            Set<String> nextImports, boolean allowStdin) throws Exception {
         Path directory = Files.createTempDirectory("bhash-cell-");
         Path jar = directory.resolve("cell.jar");
         try {
             new JvmCompiler().compileNotebook(List.of(new SourceFile("cell-" + (++cellNumber) + ".bhash", program)),
                     configuration, jar);
-            run(jar, nextSlots, nextFunctions, nextTypes, nextImports, initializations, allowStdin);
+            run(jar, nextSlots, nextFunctions, nextTypes, nextImports, allowStdin);
         } finally {
             try {
                 Files.deleteIfExists(jar);
@@ -264,7 +268,7 @@ public final class NotebookWorker {
     }
 
     private void run(Path jar, Map<String, Slot> nextSlots, Map<String, Definition> nextFunctions,
-            Map<String, String> nextTypes, Set<String> nextImports, List<Initialization> initializations,
+            Map<String, String> nextTypes, Set<String> nextImports,
             boolean allowStdin) throws Exception {
         var oldOut = System.out;
         var oldErr = System.err;
@@ -310,18 +314,15 @@ public final class NotebookWorker {
             }
             boolean success = false;
             try {
-                for (int i=0; i<initializations.size(); i++) {
-                    var field = fields.get(initializations.get(i).key);
-                    field.set(null, entry.getMethod("notebookInit" + i).invoke(null));
-                    initialized.add(field.getName());
-                }
                 entry.getMethod("notebookRun").invoke(null);
                 success = true;
             } finally {
                 for (var item : nextSlots.entrySet()) {
                     if (!success && !slots.containsKey(item.getKey())) continue;
                     var slot = item.getValue();
-                    slots.put(item.getKey(), new Slot(slot.name, slot.type, slot.mutable, fields.get(item.getKey()).get(null)));
+                    var field = fields.get(item.getKey());
+                    if (initialized.contains(field.getName()))
+                        slots.put(item.getKey(), new Slot(slot.name, slot.type, slot.mutable, field.get(null)));
                 }
             }
             functions.putAll(nextFunctions);
