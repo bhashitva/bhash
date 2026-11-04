@@ -484,6 +484,20 @@ static void net_abort(net_response *r){if(r->pending){r->error=NET_ERROR;net_fin
 static uint64_t net_clock(void){struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now))return 0;return (uint64_t)now.tv_sec*1000+(uint64_t)now.tv_nsec/1000000;}
 #endif
 
+static void net_shutdown(void){
+    for(size_t i=0;i<32;i++)if(net_responses[i])net_abort(net_responses[i]);
+    for(size_t i=0;i<32;i++)if(net_responses[i]){
+        while(!net_poll(net_responses[i])){
+#ifdef _WIN32
+            Sleep(1);
+#else
+            struct timespec pause={0,1000000};nanosleep(&pause,NULL);
+#endif
+        }
+        net_dispose(net_responses[i]);net_responses[i]=NULL;
+    }
+}
+
 uint64_t bh_network_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,uint64_t e,const bh_collection_info *info,const void *location){
     if(op==5)return net_clock();
     if(op==9){uint64_t n=0;for(size_t i=0;i<32;i++)if(net_responses[i])n++;return n;}
@@ -503,6 +517,11 @@ uint64_t bh_network_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d
         net_response *r=calloc(1,sizeof *r);if(!r){free(method);free(url);runtime_error(location,"HTTP अनुरोध असफल।");}
         int error=op==6?net_start(r,method,url,headers,body,e):net_transport(r,method,url,headers,body,e);free(method);free(url);
         if(error){net_dispose(r);runtime_error(location,net_message(error));}
+        /* Register after transport initialization so this drains before curl's
+         * process-wide cleanup in reverse atexit order. */
+        static int registered=0;if(!registered){
+            if(atexit(net_shutdown)){net_responses[slot]=r;net_shutdown();runtime_error(location,"HTTP अनुरोध असफल।");}registered=1;
+        }
         r->id=++net_next;net_responses[slot]=r;return r->id;
     }
     size_t slot=0;while(slot<32&&(!net_responses[slot]||net_responses[slot]->id!=a))slot++;
