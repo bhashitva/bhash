@@ -29,13 +29,13 @@ class NativeReleaseTest {
         var identity=NativeBuildInfo.identity();assertEquals(16,identity.get("runtime_abi"));
         String source="फलन मुख्य() -> शून्य { लिखो(१); }";
         String ir=LlvmEmitter.emit(ManagedEmitter.core(List.of(new SourceFile("hello.bhash",source))));
-        assertTrue(ir.contains("call void @bh_runtime_abi_v16()"));assertTrue(ir.contains("section \""+(NativePlatform.macos()?"__DATA,__bhash_build":NativePlatform.windows()?".bhash":".bhash.build")+"\""));assertTrue(ir.contains("@llvm.used"));
+        assertTrue(ir.contains("call void @bh_runtime_abi_v17()"));assertTrue(ir.contains("section \""+(NativePlatform.macos()?"__DATA,__bhash_build":NativePlatform.windows()?".bhash":".bhash.build")+"\""));assertTrue(ir.contains("@llvm.used"));
         assertEquals(identity,NativeBuildInfo.identity());
     }
     @Test void inspectionEnforcesAbiDependenciesMetadataAndFingerprints()throws Exception{
         var report=NativeCompatibility.parse(elf(),metadata(),true);assertEquals("2.34",report.minimumGlibc());assertTrue(report.runtimeMatchesCompiler());
         for(String changed:List.of(elf().replace("libm.so.6","libjvm.so"),elf().replace("ld-linux-x86-64.so.2","ld-musl-x86_64.so.1"),elf()+" GLIBC_PRIVATE",elf()+" GLIBC_ABI_DT_RELR",elf()+" (RUNPATH) Library runpath: [/tmp]",elf().replace("GLIBC_","OTHER_")))assertThrows(CompilationException.class,()->NativeCompatibility.parse(changed,metadata(),false));
-        for(String changed:List.of(metadata().replace("\"runtime_abi\":16","\"runtime_abi\":14"),metadata().replace("\"runtime_abi\":16","\"runtime_abi\":16.5"),metadata().replace("\"sanitized\":false","\"sanitized\":true"),"", " [ 0] {bad}"))assertThrows(CompilationException.class,()->NativeCompatibility.parse(elf(),changed,false));
+        for(String changed:List.of(metadata().replace("\"runtime_abi\":17","\"runtime_abi\":14"),metadata().replace("\"runtime_abi\":17","\"runtime_abi\":17.5"),metadata().replace("\"sanitized\":false","\"sanitized\":true"),"", " [ 0] {bad}"))assertThrows(CompilationException.class,()->NativeCompatibility.parse(elf(),changed,false));
         var json=NativeBuildInfo.JSON.fromJson(NativeBuildInfo.describe(false,false,"18.1.8"),com.google.gson.JsonObject.class);json.addProperty("runtime_sha256","0".repeat(64));json.addProperty("target",NativePlatform.LINUX_TARGET);String altered=" [ 0] "+json;
         assertFalse(NativeCompatibility.parse(elf(),altered,false).runtimeMatchesCompiler());assertThrows(CompilationException.class,()->NativeCompatibility.parse(elf(),altered,true));
         Path bad=temporary.resolve("bad");Files.writeString(bad,"not ELF");assertThrows(CompilationException.class,()->NativeCompatibility.inspect(bad,false));
