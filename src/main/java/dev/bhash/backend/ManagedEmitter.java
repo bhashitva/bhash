@@ -458,7 +458,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     if (definition.fields.containsKey(name) || definition.methods.containsKey(name)
                             || field(definition.parent, name) != null || !methods(definition.parent, name).isEmpty())
                         throw error(member, "Duplicate or hidden member: " + declaration.IDENTIFIER().getText());
-                    if (declaration.CONST() != null && declaration.expression() == null)
+                    // Notebook slots are initialized by the worker after prior cell values are restored.
+                    boolean notebookSlot = notebook != null && shared
+                            && definition == classes.get(Identifiers.key(notebook.storage()));
+                    if (declaration.CONST() != null && declaration.expression() == null && !notebookSlot)
                         throw error(declaration, "An immutable field requires an initializer.");
                     definition.fields.put(name, new Field("p" + fieldId++, type(declaration.valueType()),
                             declaration.LET() != null, access, definition, declaration,shared));
