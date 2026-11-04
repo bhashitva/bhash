@@ -246,4 +246,4 @@ trace ownership and unwindable logical frames without changing user object paylo
 
 ## Deployment/runtime contract update
 
-The current internal native ABI is 15. A versioned link guard rejects mismatched runtime objects; embedded build metadata and static compatibility inspection support distribution. See [native releases](native-releases.md) for source-root mapping, reproducibility boundaries and glibc requirements.
+The current internal native ABI is 16. A versioned link guard rejects mismatched runtime objects; embedded build metadata and static compatibility inspection support distribution. See [native releases](native-releases.md) for source-root mapping, reproducibility boundaries and glibc requirements.

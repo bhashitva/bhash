@@ -51,7 +51,7 @@ class PrebuiltBrowserHostTest {
         assertEquals(id,PrebuiltBrowserHost.open(root).id());
     }
     @org.junit.jupiter.api.RepeatedTest(5) void interruptStopsCompilerAndItsDescendantsBeforeReturning() throws Exception {
-        Path processDirectory=directory.resolve("process");Files.createDirectories(processDirectory);
+        Path processDirectory=directory.resolve("process").toAbsolutePath();Files.createDirectories(processDirectory);
         String javaExecutable=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"java.exe":"java").toString();
         String classes=Path.of(BrowserCompilerProcessFixture.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString();
         var failure=new java.util.concurrent.atomic.AtomicReference<Throwable>();

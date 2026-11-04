@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Read-only Bhash ABI 15 inspection. Loaded explicitly, never by ELF auto-load.
+"""Read-only Bhash ABI 16 inspection. Loaded explicitly, never by ELF auto-load.
 
 No inferior calls, writes, allocations or retained managed addresses. Printers are
 rebuilt by GDB for each value update; only immutable executable metadata is cached.
@@ -39,7 +39,7 @@ def schema():
         if not 0 < length <= MAX_SCHEMA:
             raise ValueError('invalid Bhash debug schema length')
         data = json.loads(memory(address + 8, length).decode('utf-8'))
-        if data.get('version') != 1 or data.get('abi') != 15:
+        if data.get('version') != 1 or data.get('abi') != 16:
             raise ValueError('unsupported Bhash debug schema/runtime ABI')
         _schemas[key] = data
     return _schemas[key]

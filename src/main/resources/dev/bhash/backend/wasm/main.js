@@ -6,7 +6,10 @@ const output = document.querySelector('#output');
 const errors = document.querySelector('#errors');
 const status = document.querySelector('#status');
 let worker;
+let stopping;
 function finish(message) {
+    clearTimeout(stopping);
+    stopping=undefined;
     worker?.terminate();
     worker = undefined;
     run.disabled = false;
@@ -24,9 +27,10 @@ form.addEventListener('submit', event => {
     try {
         worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
         worker.onmessage = ({ data }) => {
+            if(data.type==='running')return;
             output.textContent = data.output;
             errors.textContent = data.errors;
-            finish(`Finished (exit ${data.exitCode})`);
+            finish(stopping?'Stopped':`Finished (exit ${data.exitCode})`);
         };
         worker.onerror = event => {
             errors.textContent = event.message || 'Unable to load the WebAssembly runtime.';
@@ -38,4 +42,10 @@ form.addEventListener('submit', event => {
         finish('Failed');
     }
 });
-stop.addEventListener('click', () => finish('Stopped'));
+stop.addEventListener('click', () => {
+    if(!worker)return;
+    stop.disabled=true;
+    status.textContent='Stopping…';
+    worker.postMessage({type:'cancel'});
+    stopping=setTimeout(()=>finish('Stopped'),1000);
+});

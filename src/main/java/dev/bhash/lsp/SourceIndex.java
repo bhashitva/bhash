@@ -71,7 +71,7 @@ final class SourceIndex {
         else if (context instanceof InterfaceDeclContext c) { id=c.IDENTIFIER();kind=SymbolKind.Interface;detail="अनुबंध"; }
         else if (context instanceof EnumDeclContext c) { id=c.IDENTIFIER();kind=SymbolKind.Enum;detail="परिगणना"; }
         else if (context instanceof EnumMemberContext c) { id=c.IDENTIFIER();kind=SymbolKind.EnumMember; }
-        else if (context instanceof FunctionDeclContext c) { id=c.IDENTIFIER();kind=global?SymbolKind.Function:SymbolKind.Method;detail="फलन " + c.IDENTIFIER() + (c.typeParameters()==null?"":c.typeParameters().getText()) + "(" + (c.parameters()==null?"":c.parameters().getText()) + ") -> " + (c.returnType()==null?"?":c.returnType().getText()); }
+        else if (context instanceof FunctionDeclContext c) { id=c.IDENTIFIER();kind=global?SymbolKind.Function:SymbolKind.Method;detail=(c.ASYNC()==null?"फलन ":"असमकालिक फलन ") + c.IDENTIFIER() + (c.typeParameters()==null?"":c.typeParameters().getText()) + "(" + (c.parameters()==null?"":c.parameters().getText()) + ") -> " + (c.returnType()==null?"?":c.ASYNC()==null?c.returnType().getText():"कार्यफल<"+c.returnType().getText()+">"); }
         else if (context instanceof FieldDeclContext c) { id=c.IDENTIFIER();kind=c.CONST()==null?SymbolKind.Field:SymbolKind.Constant;detail=c.valueType()==null?"":c.valueType().getText(); }
         else if (context instanceof ConstructorDeclContext c) { id=c.CONSTRUCTOR();kind=SymbolKind.Constructor;detail="निर्माता("+(c.parameters()==null?"":c.parameters().getText())+")"; }
         else if (context instanceof VariableDeclContext c) { id=c.IDENTIFIER();kind=c.CONST()==null?SymbolKind.Variable:SymbolKind.Constant;detail=c.valueType()==null?"":c.valueType().getText(); }

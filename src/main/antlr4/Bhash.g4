@@ -43,18 +43,18 @@ enumDecl : ENUM IDENTIFIER LBRACE enumMember (COMMA enumMember)* COMMA? RBRACE ;
 enumMember : IDENTIFIER (ASSIGN (PLUS | MINUS)? INTEGER_LITERAL)? ;
 interfaceDecl : INTERFACE IDENTIFIER typeParameters? (EXTENDS typeList)? LBRACE functionDecl* RBRACE ;
 typeParameters : LT IDENTIFIER (COMMA IDENTIFIER)* GT ;
-typeArguments : LT valueType (COMMA valueType)* GT ;
+typeArguments : LT (valueType | VOID) (COMMA (valueType | VOID))* GT ;
 typeList : valueType (COMMA valueType)* ;
 classMember : visibility? STATIC? (fieldDecl | constructorDecl | OVERRIDE? functionDecl) ;
 visibility : PUBLIC | PRIVATE | PROTECTED ;
 fieldDecl : (LET | CONST) IDENTIFIER COLON valueType (ASSIGN expression)? SEMI ;
 constructorDecl : CONSTRUCTOR LPAREN parameters? RPAREN (COLON BASE LPAREN arguments? RPAREN)? block ;
-functionDecl : FUNCTION IDENTIFIER typeParameters? LPAREN parameters? RPAREN ARROW returnType (block | SEMI) ;
+functionDecl : ASYNC? FUNCTION IDENTIFIER typeParameters? LPAREN parameters? RPAREN ARROW returnType (block | SEMI) ;
 parameters : parameter (COMMA parameter)* ;
 parameter : IDENTIFIER COLON valueType ;
 returnType : valueType | VOID ;
 functionType : FUNCTION LPAREN (valueType (COMMA valueType)*)? RPAREN ARROW returnType ;
-lambdaExpression : FUNCTION LPAREN parameters? RPAREN ARROW returnType block ;
+lambdaExpression : ASYNC? FUNCTION LPAREN parameters? RPAREN ARROW returnType block ;
 valueType : (functionType | LPAREN functionType RPAREN | INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | BYTE_TYPE | INT32_TYPE | OBJECT_TYPE | BUFFER_TYPE | IDENTIFIER typeQualifier* typeArguments?) arraySuffix* ;
 arraySuffix : LBRACK RBRACK ;
 arrayDimension : LBRACK expression RBRACK ;
@@ -79,7 +79,7 @@ statement
     | expression SEMI
     | block
     ;
-resourceStatement : RESOURCE LPAREN parameter ASSIGN expression RPAREN block ;
+resourceStatement : ASYNC? RESOURCE LPAREN parameter ASSIGN expression RPAREN block ;
 tryStatement : TRY block (catchClause+ (FINALLY block)? | FINALLY block) ;
 catchClause : CATCH LPAREN parameter RPAREN block ;
 variableDecl : (LET | CONST) IDENTIFIER COLON valueType ASSIGN expression SEMI ;
@@ -109,7 +109,7 @@ shiftOperator
     ;
 additive : multiplicative ((PLUS | MINUS) multiplicative)* ;
 multiplicative : unary ((STAR | SLASH | PERCENT) unary)* ;
-unary : (NOT | BIT_NOT | MINUS | PLUS) unary | postfix ;
+unary : (NOT | BIT_NOT | MINUS | PLUS | AWAIT) unary | postfix ;
 postfix : primary postfixPart* ;
 postfixPart : DOT IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)? | LBRACK expression RBRACK | LPAREN arguments? RPAREN ;
 primary
@@ -133,6 +133,8 @@ PACKAGE : 'संकुल' ;
 IMPORT : 'आयात' ;
 AS : 'उपनाम' ;
 FUNCTION : 'फलन' ;
+ASYNC : 'असमकालिक' ;
+AWAIT : 'प्रतीक्षा' ;
 CLASS : 'वर्ग' ;
 RECORD : 'अभिलेख' ;
 ENUM : 'परिगणना' ;

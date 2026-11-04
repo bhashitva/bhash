@@ -153,6 +153,8 @@ final class BhashRuntime {
         abstract T get(long index);
         abstract void set(long index,T value);
         long version() { return 0; }
+        boolean asyncCheck(long expected,long index){collectionVersion(expected,version());return index<size();}
+        T asyncKey(long index){return get(index);}
         boolean empty() { return size()==0; }
         boolean contains(T value) { for (T item:this) if (collectionSame(item,value)) return true; return false; }
         @Override public java.util.Iterator<T> iterator() {
@@ -193,6 +195,10 @@ final class BhashRuntime {
         BEntry(K key,V value) { this.key=key; this.value=value; }
     }
     static final class BMap<K,V> extends BTyped implements Iterable<K> {
+        long version(){return stamp;}
+        boolean asyncCheck(long expected,long index){collectionVersion(expected,stamp);return index<size();}
+        K asyncKey(long index){return keys().get(index);}
+        V asyncValue(long index){return values().get(index);}
         private final java.util.LinkedHashMap<BKey<K>,V> items=new java.util.LinkedHashMap<>();
         private long stamp;
         long size() { return items.size(); }

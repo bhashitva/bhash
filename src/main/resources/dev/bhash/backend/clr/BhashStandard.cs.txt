@@ -668,6 +668,8 @@ internal static class BhashStandard {
         finally{System.Security.Cryptography.CryptographicOperations.ZeroMemory(x);System.Security.Cryptography.CryptographicOperations.ZeroMemory(y);}
     }
     internal static long appMonotonic(){authGuard();return Environment.TickCount64;}
+    internal static long appTaskClock(){return Environment.TickCount64;}
+    internal static void appTaskSleep(){if(OperatingSystem.IsBrowser())throw failure("ब्राउज़र में अवरोधक कार्यप्रेषण उपलब्ध नहीं है।");System.Threading.Thread.Sleep(1);}
 
     // BEGIN PostgreSQL provider (generated declarations; implementation below).
 #if !BHASH_BROWSER

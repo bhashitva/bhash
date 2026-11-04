@@ -309,8 +309,8 @@ int64_t bh_remainder(int64_t a, int64_t b, const void *location) {
     return a == INT64_MIN && b == -1 ? 0 : a % b;
 }
 
-_Static_assert(BHASH_NATIVE_ABI_VERSION==15,"Compiler/runtime ABI mismatch");
-void bh_runtime_abi_v15(void) {}
+_Static_assert(BHASH_NATIVE_ABI_VERSION==16,"Compiler/runtime ABI mismatch");
+void bh_runtime_abi_v16(void) {}
 int bh_print_build_info_if_requested(int argc,char **argv,const char *info){
     if(argc!=2 || strcmp(argv[1],"--bhash-build-info"))return 0;
     fputs(info,stdout);fputc('\n',stdout);return 1;
@@ -1767,6 +1767,22 @@ static void app_entry(void **slots,const char *name,const void *location){
 #include "bhash_auth.inc"
 #endif
 uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_info *info,const void *location){
+    if(op==19){
+#ifdef _WIN32
+        return GetTickCount64();
+#else
+        struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now))runtime_error(location,"कार्य घड़ी उपलब्ध नहीं है।");
+        return (uint64_t)now.tv_sec*1000+(uint64_t)now.tv_nsec/1000000;
+#endif
+    }
+    if(op==20){
+#ifdef _WIN32
+        Sleep(1);
+#else
+        struct timespec delay={0,1000000};while(nanosleep(&delay,&delay)&&errno==EINTR){}
+#endif
+        return 0;
+    }
     if(op>=14){
 #ifdef BHASH_AUTHENTICATION
         return auth_call(op,a,b,location);

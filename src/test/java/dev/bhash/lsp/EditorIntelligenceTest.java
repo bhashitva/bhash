@@ -9,6 +9,10 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EditorIntelligenceTest {
+    @Test void asyncSymbolsShowEffectiveTaskResults() {
+        var index=source("async-editor.bhash","असमकालिक फलन उत्तर()->पूर्णांक {लौटाओ ४२;}");
+        assertEquals("असमकालिक फलन उत्तर() -> कार्यफल<पूर्णांक>",index.outline.get(0).getDetail());
+    }
     @Test void collectionFirstBindingsDoNotShadowTheSourceExpression() {
         var index=source("iteration-editor.bhash","फलन मुख्य() -> शून्य { स्थिर अंक: पूर्णांक[] = नया पूर्णांक[]{१}; प्रत्येक (अंक में अंक: पूर्णांक) { लिखो(अंक); } लिखो(अंक); }");
         var collection=index.resolve(after(index,"प्रत्येक (अं"),List.of(index));

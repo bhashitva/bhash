@@ -36,7 +36,7 @@ def digest(path):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     doctor = json.loads(cli('native', 'doctor', '--json'))
-    assert doctor['version'].startswith('18.') and doctor['runtimeAbi'] == 15
+    assert doctor['version'].startswith('18.') and doctor['runtimeAbi'] == 16
     (OUT/'doctor.json').write_text(json.dumps(doctor, indent=2)+'\n')
     roots = [OUT/'first workspace', OUT/'दूसरा बहुत अलग स्थान']
     for root in roots:
@@ -50,7 +50,7 @@ def main():
             cli('compile', root/'hello.bhash', '--target', 'native', '--source-root', root, '-o', binary, *flags)
             binaries.append(binary)
             report = json.loads(cli('native', 'inspect', binary, '--json', '--require-runtime-match'))
-            assert report['runtimeMatchesCompiler'] and report['buildInfo']['runtime_abi'] == 15
+            assert report['runtimeMatchesCompiler'] and report['buildInfo']['runtime_abi'] == 16
             assert json.loads(run([binary, '--bhash-build-info'])) == report['buildInfo']
             assert run([binary]) == 'नमस्ते 😀\n'
             archive = root / ('hello-debug.tar.gz' if debug else 'hello.tar.gz')
@@ -102,10 +102,10 @@ class Emit { public static void main(String[] args)throws Exception { Path p=Pat
     ir = OUT/'guard.ll'
     run([JAVA, '-cp', JAR, probe, roots[0]/'hello.bhash', ir])
     runtime = OUT/'bhash_runtime.c';header = OUT/'bhash_runtime.h'
-    runtime.write_bytes((ROOT/'src/main/resources/dev/bhash/backend/native/bhash_runtime.c').read_bytes().replace(b'bh_runtime_abi_v15', b'bh_runtime_abi_v14'))
+    runtime.write_bytes((ROOT/'src/main/resources/dev/bhash/backend/native/bhash_runtime.c').read_bytes().replace(b'bh_runtime_abi_v16', b'bh_runtime_abi_v14'))
     shutil.copyfile(ROOT/'src/main/resources/dev/bhash/backend/native/bhash_runtime.h', header)
     error = run([real_clang, ir, runtime, '-lm', '-o', OUT/'bad-abi'], ok=False)
-    assert 'bh_runtime_abi_v15' in error
+    assert 'bh_runtime_abi_v16' in error
     print('Native release/toolchain/compatibility checks passed')
 
 

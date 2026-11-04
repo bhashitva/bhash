@@ -109,6 +109,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private Type returnType;
     private ClassInfo currentClass;
     private boolean fieldInitializer, baseArguments, constructorBody, currentStatic;
+    private boolean asyncBody;
     private int variableId, loopDepth, methodId, fieldId, switchId, constructorId;
     private static final class BreakTarget {
         final String label;
@@ -150,7 +151,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var emitter = new ManagedEmitter("project", Target.JVM);
             emitter.analysis = new Analysis();
             emitter.analysis.exceptionClass=emitter.exceptionClass;
-            var tree = ClosureExpander.expand("project", GenericExpander.expand("project", resolution.tree()),emitter.callableTypes);
+            var tree = prepare("project",resolution,emitter,true);
             // Validate concrete specializations, just as the managed targets check them.
             CoreProgram.validateProfile(tree);
             emitter.program(tree, true);
@@ -184,10 +185,19 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private static String emitResolved(String sourceName, ProjectResolver.Resolution resolution, Target target, boolean requireEntry) throws CompilationException {
         try {
             var emitter=new ManagedEmitter(sourceName,target);
-            return emitter.program(ClosureExpander.expand(sourceName,GenericExpander.expand(sourceName,resolution.tree()),emitter.callableTypes),requireEntry);
+            return emitter.program(prepare(sourceName,resolution,emitter,requireEntry),requireEntry);
         }
         catch (Invalid error) { throw new CompilationException(resolution.describe(error.getMessage())); }
         catch (CompilationException error) { throw new CompilationException(resolution.describe(error.getMessage())); }
+    }
+
+    private static ProgramContext prepare(String source,ProjectResolver.Resolution resolution,ManagedEmitter emitter,boolean requireEntry)throws CompilationException {
+        var tree=ClosureExpander.expand(source,GenericExpander.expand(source,resolution.tree()),emitter.callableTypes);
+        if(!AsyncSourceLowering.needed(tree))return tree;
+        var checker=new ManagedEmitter(source,Target.JVM);checker.callableTypes.addAll(emitter.callableTypes);
+        checker.analysis=new Analysis();checker.analysis.exceptionClass=checker.exceptionClass;
+        checker.program(tree,requireEntry);
+        return AsyncSourceLowering.lower(tree,checker.analysis,resolution.names());
     }
 
     private Invalid error(ParserRuleContext at, String message) {
@@ -256,7 +266,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             addFunction(functions, name, function, declaration);
         }
         var entries = functions.get(Identifiers.key("मुख्य"));
-        if (entries == null && requireEntry || entries != null && (entries.size()!=1 || entries.get(0).result != Type.VOID || !entries.get(0).parameters.isEmpty()))
+        if (entries == null && requireEntry || entries != null && (entries.size()!=1 ||
+            (entries.get(0).result != Type.VOID && !(entries.get(0).declaration.ASYNC()!=null && taskPayload(entries.get(0).result)==Type.VOID)) || !entries.get(0).parameters.isEmpty()))
             throw error(program, "Executable requires exactly one फलन मुख्य() -> शून्य.");
         var main=entries == null ? null : entries.get(0);
         if (target == Target.JVM) {
@@ -273,6 +284,13 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     .append("(); return 0; } catch (Exception e) when (bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException) {")
                     .append(" BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n");
             output.append("private static Exception bhashFailure(Exception e) { while(e is TypeInitializationException && e.InnerException!=null) e=e.InnerException; return e; }\n");
+            var asyncStart=functions.get(AsyncSourceLowering.START);
+            if(asyncStart!=null) {
+                output.append("public static async System.Threading.Tasks.Task<int> MainAsync(string[] args) { try { BhashStandard.appSetArguments(args); ")
+                    .append(asyncStart.get(0).java).append("(); while(").append(functions.get(AsyncSourceLowering.STEP).get(0).java)
+                    .append("()) await System.Threading.Tasks.Task.Delay(1); return 0; } catch(Exception e) when(bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException) { BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n")
+                    .append("public static void CancelAsync() { ").append(functions.get(AsyncSourceLowering.CANCEL).get(0).java).append("(); }\n");
+            }else output.append("public static System.Threading.Tasks.Task<int> MainAsync(string[] args) => System.Threading.Tasks.Task.FromResult(Main(args)); public static void CancelAsync() {}\n");
         }
         for (var overloads : functions.values()) for (var function : overloads) if (function.declaration!=null) recover(() -> emitFunction(function));
         for (ClassInfo definition : classOrder) recover(() -> emitClass(definition));
@@ -287,7 +305,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         var declaration = function.declaration;
         currentClass = function.owner;
         currentStatic = function.shared;
-        returnType = function.result;
+        asyncBody=declaration.ASYNC()!=null;
+        returnType = asyncBody?taskPayload(function.result):function.result;
+        if(asyncBody && returnType==null)throw error(declaration,"असमकालिक फलन के लिए कार्यफल प्रकार चाहिए।");
         scopes.push(new HashMap<>());
         if (function.owner == null) output.append("static ");
         else {
@@ -308,6 +328,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         scopes.pop();
         currentClass = null;
         currentStatic = false;
+        asyncBody=false;
     }
 
     private List<Type> parameters(ParametersContext parameters) {
@@ -751,7 +772,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             scopes.push(new HashMap<>());
             var binding=declare(parameter,parameter.IDENTIFIER().getText(),declared,false);
             var close=callMethod(resource,new Expr(declared,binding.java),"बंदकरो",List.of());
-            require(resource,Type.VOID,close.type);
+            if(resource.ASYNC()!=null) {
+                if(!asyncBody || taskPayload(close.type)!=Type.VOID)throw error(resource,"असमकालिक संसाधन के बंदकरो() का परिणाम कार्यफल<शून्य> होना चाहिए।");
+            }else require(resource,Type.VOID,close.type);
             output.append("{ ").append(typeName(declared)).append(' ').append(binding.java).append("=BhashRuntime.instance((").append(typeName(declared)).append(")(").append(value.java).append(")); try ");
             var flow=block(resource.block());
             output.append(" finally { ").append(close.java).append("; } }\n");
@@ -826,6 +849,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         } else {
             var value = visit(statement.expression());
             if (!value.call) throw error(statement, "Only a function call may be used as an expression statement.");
+            if(taskPayload(value.type)!=null)throw error(statement,"कार्यफल को संग्रहित करें या प्रतीक्षा करें; कार्य का परिणाम अनदेखा नहीं कर सकते।");
             output.append(value.type == Type.VOID ? value.java : "BhashRuntime.discard(" + value.java + ")").append(";\n");
         }
         return EnumSet.of(Flow.NORMAL);
@@ -1167,6 +1191,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         else if (name.equals(Identifiers.key("साफ़")) && (map || list)) { method="clear"; result=Type.VOID; signature=List.of(); }
         else if (name.equals(Identifiers.key("कुंजियाँ")) && map) { method="keys"; result=collection(CollectionKind.LIST,List.of(key)); signature=List.of(); }
         else if (name.equals(Identifiers.key("मूल्य")) && map) { method="values"; result=collection(CollectionKind.LIST,List.of(element)); signature=List.of(); }
+        else if(name.equals("आंतरिकसंस्करण")){method="version";result=Type.INT;signature=List.of();}
+        else if(name.equals("आंतरिकजाँच")){method="asyncCheck";result=Type.BOOL;signature=List.of(Type.INT,Type.INT);}
+        else if(name.equals("आंतरिककुंजी")){method="asyncKey";result=map?key:element;signature=List.of(Type.INT);}
+        else if(name.equals("आंतरिकमान")&&map){method="asyncValue";result=element;signature=List.of(Type.INT);}
         else throw error(at,"Undefined collection method: "+spelling);
         checkArguments(at,args,signature,spelling);
         return tagged(new Expr(result,"BhashRuntime.instance("+source.java+")."+method+"("+constructorArguments(args,signature)+")",true));
@@ -1354,6 +1382,12 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     @Override public Expr visitUnary(UnaryContext ctx) {
         if (ctx.postfix() != null) return visit(ctx.postfix());
+        if(ctx.AWAIT()!=null) {
+            if(!asyncBody)throw error(ctx,"प्रतीक्षा केवल असमकालिक फलन में उपलब्ध है।");
+            var task=visit(ctx.unary());var payload=taskPayload(task.type);
+            if(payload==null)throw error(ctx,"प्रतीक्षा के लिए कार्यफल चाहिए।");
+            return new Expr(payload,"async_pending",true);
+        }
         String op = ctx.getChild(0).getText();
         // Accept the minimum signed literal, including parenthesized magnitude.
         String magnitude = ctx.unary().getText().replace("(", "").replace(")", "");
@@ -1365,6 +1399,22 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         String code = "(" + op + "(" + value.java + "))";
         if (target == Target.CLR && value.type == Type.INT) code = "unchecked(" + code + ")";
         return new Expr(value.type, code);
+    }
+
+    static Type taskPayload(Type type) {
+        for(var c=type.object;c!=null;c=c.parent) {
+            if(c.declaration==null || !dev.bhash.stdlib.StandardLibrary.TASKS_NAME.equals(LocatedToken.source(c.declaration.start,"")))continue;
+            var field=c.fields.get(Identifiers.key("आंतरिकमूल्य"));
+            if(field!=null && c.parent!=null && c.parent.fields.containsKey(Identifiers.key("आंतरिकस्थिति"))) {
+                var result=field.type();
+                if(result.object!=null && result.object.declaration!=null) {
+                    var token=result.object.declaration.IDENTIFIER().getSymbol();
+                    if(token instanceof LocatedToken located && located.originalText().equals("कार्यशून्य") && dev.bhash.stdlib.StandardLibrary.TASKS_NAME.equals(LocatedToken.source(token,"")))return Type.VOID;
+                }
+                return result;
+            }
+        }
+        return null;
     }
 
     private Expr self(ParserRuleContext at, boolean base) {

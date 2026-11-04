@@ -205,7 +205,7 @@ final class ClosureExpander {
             for(var l:ordered)if(c.IDENTIFIER().getText().equals(l.lexicalClass)) {
                 var params=new ArrayList<String>();
                 for(var e:l.captures.entrySet())params.add(e.getValue()+":"+(e.getKey().cell!=null?e.getKey().cell:e.getKey().type));
-                append("सार्वजनिक साझा फलन "+l.bridge+"("+String.join(",",params),l.tree.start);
+                append("सार्वजनिक साझा "+(l.tree.ASYNC()!=null?"असमकालिक ":"")+"फलन "+l.bridge+"("+String.join(",",params),l.tree.start);
                 if(l.tree.parameters()!=null){if(!params.isEmpty())append(",",l.tree.start);render(l.tree.parameters());}
                 append(")->"+result(l.tree.returnType()),l.tree.start);
                 current=l;inBridge=true;render(l.tree.block());current=null;inBridge=false;
@@ -271,7 +271,7 @@ final class ClosureExpander {
                 var b=e.getKey();String type=b.cell!=null?b.cell:b.type;String arg="अ_"+i++;
                 append("निजी मान "+e.getValue()+":"+type+";",l.start);params.add(arg+":"+type);assigns.append("यह.").append(e.getValue()).append('=').append(arg).append(';');
             }
-            append("निर्माता("+String.join(",",params)+"){"+assigns+"} सार्वजनिक फलन "+INVOKE+"(",l.start);
+            append("निर्माता("+String.join(",",params)+"){"+assigns+"} सार्वजनिक "+(l.ASYNC()!=null && lambda.bridge==null?"असमकालिक ":"")+"फलन "+INVOKE+"(",l.start);
             if(l.parameters()!=null)render(l.parameters());append(")->"+result(l.returnType()),l.start);
             if(lambda.bridge==null){current=lambda;render(l.block());current=null;}
             else {

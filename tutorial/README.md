@@ -4,6 +4,7 @@
 
 | ट्यूटोरियल | क्या मिलेगा |
 | --- | --- |
+| [असमकालिक कार्य (Async tasks)](async/README.md) | प्रतीक्षा, विलंब, निरस्तीकरण, समयसीमा, संसाधन-सफ़ाई और browser व्यवहार |
 | [फलन मान और संवृतियाँ (Function values and closures)](functions/README.md) | Typed callbacks, lambdas, साझा captures, संग्रह और GC lifetime |
 | [प्रमाणीकरण और सत्र (Authentication and sessions)](authentication/README.md) | कूटशब्द हैश, सुरक्षित cookie, सत्र, CSRF, अनुमति और login उदाहरण |
 | [वेब अनुप्रयोग (Web Applications)](web-applications/README.md) | HTTP सर्वर, routing, JSON, SQLite कार्य-सूची, परीक्षण और deployment |

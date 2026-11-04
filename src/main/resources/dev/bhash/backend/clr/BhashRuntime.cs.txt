@@ -235,6 +235,8 @@ internal static class BhashRuntime {
         internal abstract T get(long index);
         internal abstract void set(long index,T value);
         internal virtual long version() => 0;
+        internal bool asyncCheck(long expected,long index){collectionVersion(expected,version());return index<size();}
+        internal T asyncKey(long index){return get(index);}
         internal bool empty() => size()==0;
         internal bool contains(T value) { foreach (T item in this) if (collectionSame(item,value)) return true; return false; }
         public System.Collections.Generic.IEnumerator<T> GetEnumerator() {
@@ -275,6 +277,10 @@ internal static class BhashRuntime {
         internal BEntry(K key,V value) { this.key=key; this.value=value; }
     }
     internal sealed class BMap<K,V> : BTyped, System.Collections.Generic.IEnumerable<K>, BhashStandard.JsonObject {
+        internal long version(){return stamp;}
+        internal bool asyncCheck(long expected,long index){collectionVersion(expected,stamp);return index<size();}
+        internal K asyncKey(long index){return keys().get(index);}
+        internal V asyncValue(long index){return values().get(index);}
         System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<object,object>> BhashStandard.JsonObject.jsonEntries() { foreach(var entry in entries())yield return new System.Collections.Generic.KeyValuePair<object,object>(entry.key,entry.value); }
         private sealed class Cell {
             internal V value; internal readonly System.Collections.Generic.LinkedListNode<BKey<K>> node;

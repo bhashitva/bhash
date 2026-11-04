@@ -5,12 +5,13 @@ using System.Runtime.Versioning;
 [SupportedOSPlatform("browser")]
 public static partial class BhashBrowser {
     [JSExport]
-    public static int Run(string input) {
+    public static System.Threading.Tasks.Task<int> Run(string input) {
         BhashRuntime.reset(input);
-        return BhashProgram.Main(System.Array.Empty<string>());
+        return BhashProgram.MainAsync(System.Array.Empty<string>());
     }
     [JSExport]
     public static string Output() => BhashRuntime.output();
     [JSExport]
     public static string Errors() => BhashRuntime.errors();
+    [JSExport] public static void Cancel() => BhashProgram.CancelAsync();
 }

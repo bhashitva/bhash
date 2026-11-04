@@ -11,17 +11,20 @@ using System.Runtime.Versioning;
 public static partial class BhashBrowser {
     public static void Main() { }
     private static bool started;
-    private static Func<string[], int> entryPoint;
+    private static Func<string[], System.Threading.Tasks.Task<int>> entryPoint;
+    private static Action cancel;
     [JSExport]
     public static void Load(string assembly) {
         if (started || entryPoint != null) throw new InvalidOperationException("Start a fresh worker for each program.");
         var program = Assembly.Load(Convert.FromBase64String(assembly));
         if (program.GetName().Name != "BhashProgram") throw new InvalidOperationException("Invalid program assembly.");
-        var entry = program.GetType("BhashProgram", true).GetMethod("Main", BindingFlags.Public | BindingFlags.Static);
-        entryPoint = (Func<string[], int>)entry.CreateDelegate(typeof(Func<string[], int>));
+        var type=program.GetType("BhashProgram", true);
+        var entry = type.GetMethod("MainAsync", BindingFlags.Public | BindingFlags.Static);
+        entryPoint = (Func<string[], System.Threading.Tasks.Task<int>>)entry.CreateDelegate(typeof(Func<string[], System.Threading.Tasks.Task<int>>));
+        cancel=(Action)type.GetMethod("CancelAsync",BindingFlags.Public|BindingFlags.Static).CreateDelegate(typeof(Action));
     }
     [JSExport]
-    public static int Run(string input) {
+    public static System.Threading.Tasks.Task<int> Run(string input) {
         // A worker is single-use. Even an accidental second message cannot reuse static state.
         if (started || entryPoint == null) throw new InvalidOperationException("Start a fresh worker for each program.");
         started = true;
@@ -30,4 +33,5 @@ public static partial class BhashBrowser {
     }
     [JSExport] public static string Output() => BhashRuntime.output();
     [JSExport] public static string Errors() => BhashRuntime.errors();
+    [JSExport] public static void Cancel() { if(started)cancel?.Invoke(); }
 }
