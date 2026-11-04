@@ -86,6 +86,7 @@ def main():
             if args.notebook:
                 notebook = json.loads(args.notebook.read_text(encoding="utf-8"))
                 code = ["".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"]
+                code = [source for source in code if source.strip()]
                 assert len(code) == 4
                 for source, expected in zip(code, [None, "२", None, "४"]):
                     execute(client, source, expected=expected)
