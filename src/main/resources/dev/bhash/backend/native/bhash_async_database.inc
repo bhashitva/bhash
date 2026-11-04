@@ -140,7 +140,11 @@ static void ad_sqlite_run(ad_job *j){
     else if(j->operation==7){
         if(c->failed)ad_error(j,"डेटालेनदेन असफल है; वापस लें।");
         else if(!c->transaction)ad_error(j,"डेटालेनदेन सक्रिय नहीं है।");
-        else if(ad_sqlite_exec(j,"COMMIT"))c->transaction=0;
+        else {int code=sqlite3_exec(c->sqlite,"COMMIT",NULL,NULL,NULL);
+            if(code==SQLITE_OK)c->transaction=0;
+            else if((code&255)==SQLITE_IOERR||(code&255)==SQLITE_CORRUPT||(code&255)==SQLITE_NOTADB){ad_error(j,"लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");ad_connection_close(c);}
+            else ad_sqlite_check(j,code);
+        }
     }else if(j->operation==8){if(c->transaction&&!sqlite3_get_autocommit(c->sqlite))ad_sqlite_exec(j,"ROLLBACK");c->transaction=0;c->failed=0;}
     else if(j->operation==9)ad_connection_close(c);
 done:
@@ -319,7 +323,7 @@ static uint64_t ad_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
 static void ad_pg_error(ad_job *j,PGresult *r){
     const char *state=r?pg_PQresultErrorField(r,'C'):NULL;char code[6]="XXXXX";
     if(state&&strlen(state)==5){int valid=1;for(int i=0;i<5;i++)if(!((state[i]>='A'&&state[i]<='Z')||(state[i]>='0'&&state[i]<='9')))valid=0;if(valid)memcpy(code,state,5);}
-    if(j->operation==7&&(!strcmp(code,"XXXXX")||!strncmp(code,"08",2)))ad_error(j,"लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");
+    if(j->operation==7&&(!strcmp(code,"XXXXX")||!strncmp(code,"08",2)||!strcmp(code,"40003")||!strcmp(code,"57P01")||!strcmp(code,"57P02")||!strcmp(code,"57P03")))ad_error(j,"लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");
     else {char message[100];snprintf(message,sizeof message,"PostgreSQL त्रुटि [%s]।",code);ad_error(j,message);}
     if(j->connection&&j->connection->transaction)j->connection->failed=1;
 }
@@ -353,6 +357,7 @@ static void ad_pg_cancel_worker(ad_job *j){
     atomic_store_explicit(&j->control_done,1,memory_order_release);
 }
 static void ad_pg_finish(ad_job *j,int discard){
+    if(j->operation==7&&!strcmp(j->error,"लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।"))discard=1;
     if(discard){
         ad_connection_close(j->connection);
         if(j->opened){ad_connection_close(j->opened);free(j->opened);j->opened=NULL;}
@@ -427,7 +432,7 @@ static int ad_pg_row(ad_job *j,PGresult *r){
     ad_value *row=cells+j->rows*j->columns;memset(row,0,j->columns*sizeof *row);j->rows++;
     for(int i=0;i<columns;i++){
         ad_value *v=&row[i];unsigned oid=pg_PQftype(r,i);v->kind=oid==20||oid==21||oid==23?AD_INTEGER:oid==700||oid==701?AD_REAL:oid==16?AD_BOOL:oid==17?AD_BYTES:oid==1700?AD_DECIMAL:!strcmp(pg_kind(oid),"समय")?AD_TIME:!strcmp(pg_kind(oid),"पाठ")?AD_TEXT:AD_UNSUPPORTED;
-        v->isnull=pg_PQgetisnull(r,0,i);if(v->isnull){v->kind=AD_NULL;continue;}
+        v->isnull=pg_PQgetisnull(r,0,i);if(v->isnull){v->kind=AD_NULL;j->bytes+=8;if(j->bytes>DB_LIMIT){ad_error(j,"डेटा परिणाम की सीमा १०२४ पंक्तियाँ / ८३८८६०८ बाइट है।");return 0;}continue;}
         const char *text=pg_PQgetvalue(r,0,i);size_t size=(size_t)pg_PQgetlength(r,0,i);char *end;
         if(v->kind==AD_INTEGER){errno=0;int64_t n=(int64_t)strtoll(text,&end,10);if(errno||*end)return 0;memcpy(&v->bits,&n,8);j->bytes+=8;}
         else if(v->kind==AD_REAL){double n=strtod(text,&end);if(*end||!isfinite(n))return 0;memcpy(&v->bits,&n,8);j->bytes+=8;}
