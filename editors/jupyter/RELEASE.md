@@ -1,7 +1,7 @@
 Install the Bhash Jupyter kernel and Hindi starter notebook with a full JDK 17 or newer and Python 3.8 or newer. The wheel includes the Bhash compiler. Maven and a source checkout are unnecessary.
 
 ```sh
-python -m pip install "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.0/bhash_jupyter-0.1.0-py3-none-any.whl"
+python -m pip install "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.1/bhash_jupyter-0.1.1-py3-none-any.whl"
 python -m bhash_jupyter.install --notebook Hindi-Starter.ipynb
 python -m jupyterlab Hindi-Starter.ipynb
 ```

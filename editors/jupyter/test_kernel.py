@@ -69,6 +69,11 @@ def main():
             execute(client, "दुगुना(कुल)", expected="८")
             execute(client, "फलन दुगुना(अ:पूर्णांक)->पूर्णांक { लौटाओ अ+अ+१; }")
             execute(client, "दुगुना(कुल)", expected="९")
+            execute(client, "स्थिर सीमा: पूर्णांक = ५; मान गिनती: पूर्णांक = १; "
+                            "जबतक (गिनती <= सीमा) { लिखो(गिनती, दुगुना(गिनती)); गिनती = गिनती + १; }",
+                    streams="१ ३\n२ ५\n३ ७\n४ ९\n५ ११\n")
+            execute(client, "सीमा = ६;", status="error")
+            execute(client, "सीमा", expected="५")
             execute(client, 'मान नया_मान: पूर्णांक = १; कुल = ९; त्रुटि("रुको");', status="error")
             execute(client, "कुल", expected="९")
             execute(client, "नया_मान", status="error")
