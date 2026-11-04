@@ -22,16 +22,23 @@ def shell_reply(client, request, timeout):
             return reply["content"]
 
 
-def execute(client, source, expected=None, status="ok", streams=None, stdin=None):
+def execute(client, source, expected=None, status="ok", streams=None, stdin=None, before_stdin=None):
     request = client.execute(source, allow_stdin=stdin is not None)
+    output = []
     if stdin is not None:
         prompt = client.get_stdin_msg(timeout=60)
         assert prompt["parent_header"]["msg_id"] == request
+        if before_stdin is not None:
+            while len("".join(output)) < len(before_stdin):
+                message = client.get_iopub_msg(timeout=20)
+                if (message["parent_header"].get("msg_id") == request
+                        and message["msg_type"] == "stream"):
+                    output.append(message["content"]["text"])
+            assert "".join(output).replace("\r\n", "\n") == before_stdin, output
         client.input(stdin)
     reply = shell_reply(client, request, timeout=90)
     assert reply["status"] == status, reply
     values = []
-    output = []
     while True:
         message = client.get_iopub_msg(timeout=20)
         if message["parent_header"].get("msg_id") != request:
@@ -77,7 +84,8 @@ def test_language(execute_case):
         }
     }""")
     run('स्थिर ग: गणक = नया गणक(४); ग.बढ़ाओ()', expected="५")
-    run('स्थिर ग: गणक = नया गणक(९); स्थिर न: पूर्णांक = ग.बढ़ाओ(); न', expected="१०")
+    run('स्थिर ग: गणक = नया गणक(९); स्थिर बढ़ीसंख्या: पूर्णांक = ग.बढ़ाओ(); बढ़ीसंख्या', expected="१०")
+    run("बढ़ीसंख्या", expected="१०")
     run("ग", status="error")
     run("वर्ग गणक {}", status="error")
     run("नया गणक(०).बढ़ाओ()", expected="१")
@@ -136,6 +144,38 @@ def test_language(execute_case):
     assert_keyword_coverage(successful_sources)
 
 
+def test_ordered_bindings(run):
+    console_cell = """लिखो("० से २० तक एक पूर्णांक लिखें:");
+        स्थिर संख्या: पूर्णांक = पढ़ो();
+        यदि (संख्या < ० || संख्या > २०) {
+            लिखो("कृपया ० से २० तक की संख्या दें।");
+            लौटाओ;
+        }
+        स्थिर गणना: गणक = नया गणक(संख्या);
+        स्थिर परिणाम: पूर्णांक = गणना.बढ़ाओ();
+        लिखो("परिणाम:", परिणाम);
+    """
+    prompt = "० से २० तक एक पूर्णांक लिखें:\n"
+    run(console_cell, stdin="२१", before_stdin=prompt,
+            streams=prompt + "कृपया ० से २० तक की संख्या दें।\n")
+    run("संख्या", expected="२१")
+    run("परिणाम", status="error")
+    run(console_cell, stdin="५", before_stdin=prompt, streams=prompt + "परिणाम: ६\n")
+    run("संख्या + परिणाम", expected="११")
+    run(console_cell, stdin="२१", before_stdin=prompt,
+            streams=prompt + "कृपया ० से २० तक की संख्या दें।\n")
+    run("परिणाम", expected="६")
+    run("{ स्थिर परिणाम: पूर्णांक = ८; स्थिर अंदर: पूर्णांक = परिणाम; लिखो(अंदर); }",
+            streams="८\n")
+    run("अंदर", status="error")
+    run("परिणाम", expected="६")
+    run("असमकालिक फलन बादमें() -> पूर्णांक { "
+                    "प्रतीक्षा मानक.कार्य.विलंब(१); लौटाओ ७; }")
+    run('लिखो("प्रतीक्षा"); स्थिर मिला: पूर्णांक = प्रतीक्षा बादमें(); मिला',
+            streams="प्रतीक्षा\n", expected="७")
+    run("मिला", expected="७")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("compiler", type=Path, nargs="?")
@@ -182,6 +222,7 @@ def main():
                             'अंततः { लिखो("सफ़ाई"); } कुल', expected="१०", streams="सफ़ाई\n")
             execute(client, "पाठपढ़ो()", expected="भारत😀", stdin="भारत😀")
             test_language(lambda source, **expected: execute(client, source, **expected))
+            test_ordered_bindings(lambda source, **expected: execute(client, source, **expected))
             request = client.complete("😀 कु", cursor_pos=4)
             completion = shell_reply(client, request, timeout=20)
             assert completion["matches"] == ["कुल"] and completion["cursor_start"] == 2, completion
