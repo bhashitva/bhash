@@ -66,10 +66,9 @@ A cell containing `मुख्य` or `संकुल` runs as a standalone, s
 program. Include its imports and declarations in that cell. It has its own
 scope, and its output appears in the notebook.
 
-A compile error runs nothing. After a runtime error, existing scalar bindings
-retain their values from before the cell, and new declarations and imports are
-discarded. Changes to external resources take effect when they occur. Earlier
-executable cells never replay.
+A compile error runs nothing. A runtime error preserves updates already made
+to existing scalar bindings and external resources. New declarations and imports
+from that cell are discarded. Earlier executable cells never replay.
 
 The kernel recompiles declarations for each cell and copies scalar state into
 a fresh class loader. Class static state starts fresh in each cell. Persistent
