@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.0
+
+- Bundle the compiler with async/await, task cancellation, timers and awaited resource cleanup.
+- Add asynchronous HTTP, SQLite and PostgreSQL on JVM, .NET and native targets.
+- Update the native debugger to support runtime ABI 17.
+
 ## 0.16.0
 
 - Bundle the merged PR #63 compiler with typed function values, lambdas and lexical closures on JVM, CLR/WASM and native targets.
