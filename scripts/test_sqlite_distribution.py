@@ -38,6 +38,12 @@ def main():
             assert 'live=0' in result.stderr,result.stderr
             binaries.append(hashlib.sha256(executable.read_bytes()).hexdigest())
         assert binaries[0]==binaries[1],f'Non-reproducible SQLite executable, debug={debug}'
-    print('PASS standalone statically linked SQLite, forced GC, metadata and relocated reproducible debug/release builds')
+    async_work=OUT/'async runtime only';async_work.mkdir(exist_ok=True)
+    async_binary=async_work/'async-database'
+    run([JAVA,'-jar',JAR,'compile',ROOT/'tutorial/async-io/sqlite.bhash','--target','native','-o',async_binary])
+    result=run([async_binary],cwd=async_work,env={**os.environ,'BHASH_GC_STRESS':'1','BHASH_GC_STATS':'1','PATH':'/usr/bin:/bin'})
+    assert result.stdout=='नमस्ते, भारत😀\n',result.stdout
+    assert 'live=0' in result.stderr,result.stderr
+    print('PASS standalone SQLite, async workers, forced GC, metadata and relocated reproducible debug/release builds')
 
 if __name__=='__main__':main()
