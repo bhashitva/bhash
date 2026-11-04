@@ -126,7 +126,7 @@
                     try{j.connection.db.commit();j.connection.db.setAutoCommit(true);j.connection.transaction=false;}
                     catch(java.sql.SQLException error){
                         String state=error.getSQLState();int code=error.getErrorCode()&255;
-                        if(j.connection.postgres&&state!=null&&!state.startsWith("08")||!j.connection.postgres&&code!=10&&code!=11&&code!=26)throw error;
+                        if(j.connection.postgres&&state!=null&&!state.startsWith("08")&&!state.equals("40003")&&!state.equals("57P01")&&!state.equals("57P02")&&!state.equals("57P03")||!j.connection.postgres&&code!=10&&code!=11&&code!=26)throw error;
                         adClose(j.connection);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");
                     }
                 }
