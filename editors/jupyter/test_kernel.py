@@ -4,9 +4,21 @@ import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
+from time import monotonic
 
 from jupyter_client import KernelManager
 from jupyter_client.kernelspec import KernelSpecManager
+
+
+def shell_reply(client, request, timeout):
+    deadline = monotonic() + timeout
+    while True:
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise TimeoutError("No shell reply for " + request)
+        reply = client.get_shell_msg(timeout=remaining)
+        if reply["parent_header"].get("msg_id") == request:
+            return reply["content"]
 
 
 def execute(client, source, expected=None, status="ok", streams=None, stdin=None):
@@ -15,9 +27,8 @@ def execute(client, source, expected=None, status="ok", streams=None, stdin=None
         prompt = client.get_stdin_msg(timeout=60)
         assert prompt["parent_header"]["msg_id"] == request
         client.input(stdin)
-    reply = client.get_shell_msg(timeout=90)
-    assert reply["parent_header"]["msg_id"] == request
-    assert reply["content"]["status"] == status, reply["content"]
+    reply = shell_reply(client, request, timeout=90)
+    assert reply["status"] == status, reply
     values = []
     output = []
     while True:
@@ -149,11 +160,11 @@ def main():
                             'अंततः { लिखो("सफ़ाई"); } कुल', expected="१०", streams="सफ़ाई\n")
             execute(client, "पाठपढ़ो()", expected="भारत😀", stdin="भारत😀")
             test_language(lambda source, **expected: execute(client, source, **expected))
-            client.complete("😀 कु", cursor_pos=4)
-            completion = client.get_shell_msg(timeout=20)["content"]
+            request = client.complete("😀 कु", cursor_pos=4)
+            completion = shell_reply(client, request, timeout=20)
             assert completion["matches"] == ["कुल"] and completion["cursor_start"] == 2, completion
-            client.inspect("कुल", cursor_pos=3)
-            assert client.get_shell_msg(timeout=20)["content"]["found"]
+            request = client.inspect("कुल", cursor_pos=3)
+            assert shell_reply(client, request, timeout=20)["found"]
             manager.restart_kernel()
             client.wait_for_ready(timeout=30)
             execute(client, "कुल", status="error")
