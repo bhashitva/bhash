@@ -23,7 +23,15 @@ public final class JvmCompiler {
     }
 
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
-        String java = ManagedEmitter.emit(sources, Target.JVM);
+        compileJava(ManagedEmitter.emit(sources, Target.JVM), output, false);
+    }
+
+    public void compileNotebook(List<SourceFile> sources, ManagedEmitter.NotebookCell cell, Path output)
+            throws IOException, CompilationException {
+        compileJava(ManagedEmitter.emitNotebook(sources, cell), output, true);
+    }
+
+    private void compileJava(String java, Path output, boolean disposable) throws IOException, CompilationException {
         boolean sqlite=java.contains("BhashStandard.db");
         boolean postgres=java.contains("BhashStandard.pg")||java.contains("BhashStandard.dbAsyncStart");
         var compiler = ToolProvider.getSystemJavaCompiler();
@@ -66,7 +74,7 @@ public final class JvmCompiler {
             Path destination = output.toAbsolutePath();
             Files.createDirectories(destination.getParent());
             // Stage beside the destination so successful compilation replaces it atomically when supported.
-            stagedJar = Files.createTempFile(destination.getParent(), ".bhash-", ".jar");
+            stagedJar = disposable ? Files.createFile(destination) : Files.createTempFile(destination.getParent(), ".bhash-", ".jar");
             var manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
             manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, "BhashProgram");
@@ -84,8 +92,11 @@ public final class JvmCompiler {
                     jar.closeEntry();
                 }
             }
-            try { Files.move(stagedJar, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
-            catch (AtomicMoveNotSupportedException ignored) { Files.move(stagedJar, destination, StandardCopyOption.REPLACE_EXISTING); }
+            if (!disposable) {
+                try { Files.move(stagedJar, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
+                catch (AtomicMoveNotSupportedException ignored) { Files.move(stagedJar, destination, StandardCopyOption.REPLACE_EXISTING); }
+            }
+            stagedJar = null;
         } finally {
             if (stagedJar != null) Files.deleteIfExists(stagedJar);
             try (var paths = Files.walk(temporary)) {
