@@ -17,6 +17,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void unicodeIdentifiersPreserveNamesAndLiteralTextUnderForcedGc() throws Exception {
+        requireTools();
+        var result = nativeOnlyRun(List.of(new SourceFile("unicode.bhash", UnicodeIdentifierFixtures.SOURCE)), GC_STRESS);
+        assertEquals(0, result.exit(), result.err());
+        assertEquals(UnicodeIdentifierFixtures.OUTPUT, result.out());
+        assertEquals(0L, stats(result).get("live"));
+    }
     @Test void nativeAsyncSqliteTransactionsAndRowsSurviveForcedGc()throws Exception {
         requireTools();var result=nativeOnlyRun(List.of(new SourceFile("async-db.bhash",AsyncDatabaseTest.BASIC)),GC_STRESS);
         assertEquals(0,result.exit(),result.err());assertEquals("",result.out());assertEquals(0L,stats(result).get("live"));
