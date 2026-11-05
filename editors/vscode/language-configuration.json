@@ -3,7 +3,7 @@
   "brackets": [["{", "}"], ["[", "]"], ["(", ")"]],
   "autoClosingPairs": [{"open": "{", "close": "}"}, {"open": "[", "close": "]"}, {"open": "(", "close": ")"}, {"open": "\"", "close": "\"", "notIn": ["string", "comment"]}],
   "surroundingPairs": [["{", "}"], ["[", "]"], ["(", ")"], ["\"", "\""]],
-  "wordPattern": "(?:[\\u0030-\\u0039\\u005f\\u02bc\\u0900-\\u0963\\u0966-\\u096f\\u0971-\\u097f\\u1cd0-\\u1cd2\\u1cd4-\\u1cf4\\u1cf8-\\u1cf9\\u20f0\\ua8e0-\\ua8f7\\ua8fb\\ua8fd-\\ua8ff\\u200c\\u200d]|\\uD802\\uDF0A)+",
+  "wordPattern": "(?:[\\u0030-\\u0039\\u005f\\u02bc\\u0900-\\u0963\\u0966-\\u096f\\u0971-\\u097f\\u1cd0-\\u1cd2\\u1cd4-\\u1cf4\\u1cf8-\\u1cf9\\u20f0\\ua8e0-\\ua8f7\\ua8fb\\ua8fd-\\ua8ff\\u200c\\u200d\\u0041-\\u005a\\u0061-\\u007a]|\\ud806\\udf0a)+",
   "indentationRules": {"increaseIndentPattern": "^.*\\{[^}\"]*$", "decreaseIndentPattern": "^\\s*\\}"},
   "folding": {"markers": {"start": "^\\s*//\\s*#region\\b", "end": "^\\s*//\\s*#endregion\\b"}}
 }
