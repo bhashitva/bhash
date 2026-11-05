@@ -65,6 +65,8 @@ jobs:
           $active=Get-Content "$env:BHASH_TOOLCHAIN_HOME/active.json" | ConvertFrom-Json
           $sdk=Join-Path "$env:BHASH_TOOLCHAIN_HOME/installations" $active.directory
           "BHASH_CLANG=$sdk/bin/clang.exe" >> $env:GITHUB_ENV
+      - name: Test the typed API over HTTP under forced GC
+        run: python examples/typed-api/verify.py --target native
       - name: Windows integrated terminal UTF-8 input and output on all targets
         shell: pwsh
         run: |
