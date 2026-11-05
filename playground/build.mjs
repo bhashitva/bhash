@@ -2,7 +2,7 @@
 import {build} from 'esbuild';
 import {readFile, mkdir, cp, rm, writeFile} from 'node:fs/promises';
 const grammar = await readFile('../src/main/antlr4/Bhash.g4', 'utf8');
-const words = [...grammar.matchAll(/^([A-Z_]+)\s*:\s*'([^']+)'/gm)]
+const words = [...grammar.matchAll(/^([A-Z][A-Z_0-9]*)\s*:\s*'([^']+)'/gm)]
   .filter(([, , value]) => /\p{L}/u.test(value)).map(([, token, value]) => ({token, value}));
 await rm('dist', {recursive: true, force: true});
 await mkdir('dist', {recursive: true});
