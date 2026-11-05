@@ -22,12 +22,16 @@ def watch_integer(value):
     return (value + (1 << 63)) % (1 << 64) - (1 << 63)
 
 
+def _watch_key(name):
+    return unicodedata.normalize('NFC', name.replace('\u200c', '').replace('\u200d', ''))
+
+
 def _watch_letter(c):
-    return '\u0904' <= c <= '\u0939' or '\u0958' <= c <= '\u0961' or '\u0971' <= c <= '\u097f'
+    return any(a <= ord(c) <= b for a, b in ((700, 700), (2308, 2361), (2365, 2365), (2384, 2384), (2392, 2401), (2417, 2431), (7401, 7404), (7406, 7411), (43250, 43255), (43259, 43259), (43261, 43262), (72458, 72458)))
 
 
 def _watch_mark(c):
-    return '\u0900' <= c <= '\u0903' or '\u093a' <= c <= '\u094f' or '\u0951' <= c <= '\u0957' or '\u0962' <= c <= '\u0963'
+    return any(a <= ord(c) <= b for a, b in ((48, 57), (95, 95), (700, 700), (2304, 2403), (2406, 2415), (2417, 2431), (7376, 7378), (7380, 7412), (7416, 7417), (8204, 8205), (8432, 8432), (43232, 43255), (43259, 43259), (43261, 43263), (72458, 72458)))
 
 
 def _watch_digit(c):
@@ -59,7 +63,16 @@ class WatchParser:
                 i += 1
                 while i < len(source) and (_watch_letter(source[i]) or _watch_mark(source[i]) or _watch_digit(source[i]) or source[i] == '_'):
                     i += 1
-                tokens.append(('name', unicodedata.normalize('NFC', source[start:i])))
+                name = source[start:i]
+                for at, char in enumerate(name):
+                    if char in ('\u200c', '\u200d'):
+                        before = at - 2
+                        if before >= 0 and name[before] == '\u093c':
+                            before -= 1
+                        if not (before >= 0 and name[at - 1] == '\u094d' and _watch_letter(name[before])
+                                and at + 1 < len(name) and _watch_letter(name[at + 1])):
+                            raise WatchError('नाम में अदृश्य चिह्न का स्थान अमान्य है।')
+                tokens.append(('name', _watch_key(name)))
             elif _watch_digit(c):
                 i += 1
                 while i < len(source) and _watch_digit(source[i]):
