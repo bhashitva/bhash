@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.18.0
+
+- Bundle the Unicode 18 identifier profile from [PR #72](https://github.com/bhashitva/bhash/pull/72), with canonical name matching and contextual ZWJ/ZWNJ handling.
+- Highlight invalid joiners at their source location and offer a quick fix. Completion and native Watch expressions use the same identifier rules.
+- Read the [Hindi identifier guide and runnable example](https://github.com/bhashitva/bhash/tree/main/tutorial/unicode-identifiers).
+
 ## 0.17.0
 
 - Bundle the compiler with async/await, task cancellation, timers and awaited resource cleanup.
