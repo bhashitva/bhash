@@ -1,0 +1,4 @@
+name=typed-task-app
+sources=src
+dependency.service.path=../service
+dependency.service.version=1.0.0
