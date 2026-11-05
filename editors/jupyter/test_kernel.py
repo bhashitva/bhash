@@ -1,5 +1,6 @@
 """Exercise the installed-kernel protocol with a real Jupyter client."""
 import argparse
+from importlib.metadata import version
 import json
 from pathlib import Path
 import re
@@ -52,6 +53,7 @@ def execute(client, source, expected=None, status="ok", streams=None, stdin=None
             break
     assert values == ([] if expected is None else [expected]), values
     assert "".join(output).replace("\r\n", "\n") == (streams or ""), output
+    return reply
 
 
 def assert_keyword_coverage(sources):
@@ -203,6 +205,8 @@ def main():
         client.start_channels()
         try:
             client.wait_for_ready(timeout=30)
+            info = shell_reply(client, client.kernel_info(), timeout=20)
+            assert info["implementation_version"] == version("bhash-jupyter"), info
             execute(client, 'मान कुल: पूर्णांक = ०; लिखो("एक बार");', streams="एक बार\n")
             execute(client, "कुल = कुल + २; कुल", expected="२")
             execute(client, "कुल = कुल + २; कुल", expected="४")
@@ -229,6 +233,8 @@ def main():
             execute(client, example.read_text(encoding="utf-8"), streams="५ ५ ५ ६ ७ ८ ९ ६\n३.०\n६\nक्‍ष असत्य\n")
             execute(client, "क्‌षमा = ९;", status="error")
             execute(client, "क्षमा", expected="७")
+            bad_joiner = execute(client, "स्थिर अ\u200dब: पूर्णांक = १;", status="error")
+            assert "BH1003" in bad_joiner["evalue"], bad_joiner
             request = client.complete("क्‌ष", cursor_pos=4)
             matches = shell_reply(client, request, timeout=20)["matches"]
             assert "क्‍षमा" in matches, matches
