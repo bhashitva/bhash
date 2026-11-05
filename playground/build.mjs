@@ -22,4 +22,4 @@ for (const [directory, info] of Object.entries(lock.packages)) {
   licenses.push(`${directory.slice(13)} ${info.version}\n${license}`);
 }
 await writeFile('dist/THIRD_PARTY_LICENSES.txt', licenses.join('\n\n'));
-for (const file of ['LICENSE', 'NOTICE', 'LICENSING.md']) await cp(`../${file}`, `dist/${file}`);
+for (const file of ['LICENSE', 'NOTICE', 'LICENSING.md', 'THIRD_PARTY_NOTICES.md']) await cp(`../${file}`, `dist/${file}`);
