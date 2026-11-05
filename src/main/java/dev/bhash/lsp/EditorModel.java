@@ -366,7 +366,7 @@ final class EditorModel {
         return null;
     }
     private static boolean identifierPart(int cp) {
-        return Character.isLetterOrDigit(cp)||Character.getType(cp)==Character.NON_SPACING_MARK||Character.getType(cp)==Character.COMBINING_SPACING_MARK||cp=='_';
+        return dev.bhash.frontend.IdentifierProfile.cursorPart(cp);
     }
     private int wordStart(int offset) {
         while(offset>0&&identifierPart(index.text.codePointBefore(offset)))offset-=Character.charCount(index.text.codePointBefore(offset));
@@ -479,7 +479,7 @@ final class EditorModel {
         int pathStart=nameEnd;
         while(pathStart>=2 && tokens.get(pathStart-1).getText().equals(".") && tokens.get(pathStart-2).getType()==BhashLexer.IDENTIFIER)pathStart-=2;
         int callableEnd=index.coordinates.fromCodePoint(tokens.get(open-1).getStopIndex()+1+(index.text.startsWith("\uFEFF")?1:0));
-        if(pathStart>0&&tokens.get(pathStart-1).getText().equals("नया"))
+        if(pathStart>0&&tokens.get(pathStart-1).getType()==BhashLexer.NEW)
             candidates=constructors(type(slice(tokens.get(pathStart),callableEnd),index,Map.of()),position);
         else if(dot>=0) {
             var target=receiver(dot,position);

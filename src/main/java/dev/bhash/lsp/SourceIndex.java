@@ -40,7 +40,7 @@ final class SourceIndex {
         boolean exported = false;
         for (int i = 0; i < tree.getChildCount(); i++) {
             ParseTree child = tree.getChild(i);
-            if (child instanceof TerminalNode node && node.getText().equals("सार्वजनिक")) { exported = true; continue; }
+            if (child instanceof TerminalNode node && node.getSymbol().getType() == dev.bhash.parser.BhashLexer.PUBLIC) { exported = true; continue; }
             if (child instanceof ParserRuleContext context) {
                 collect(context,outline,exported,true,0,text.codePointCount(0,text.length()));
                 exported = false;
@@ -156,8 +156,11 @@ final class SourceIndex {
         var members=importing?null:model.memberCompletions(position);
         if(members!=null)return members;
         var result=new ArrayList<CompletionItem>();
-        while(start>0) { int cp=text.codePointBefore(start);if(!Character.isLetterOrDigit(cp)&&Character.getType(cp)!=Character.NON_SPACING_MARK&&Character.getType(cp)!=Character.COMBINING_SPACING_MARK&&cp!='_')break;start-=Character.charCount(cp); }
-        var replace=new Range(coordinates.position(start),position);
+        while(start>0) { int cp=text.codePointBefore(start);if(!IdentifierProfile.cursorPart(cp))break;start-=Character.charCount(cp); }
+        int wordEnd = offset;
+        while (wordEnd < text.length() && IdentifierProfile.cursorPart(text.codePointAt(wordEnd)))
+            wordEnd += Character.charCount(text.codePointAt(wordEnd));
+        var replace=new Range(coordinates.position(start),coordinates.position(wordEnd));
         for(int type=1;type<=dev.bhash.parser.BhashLexer.VOCABULARY.getMaxTokenType();type++) {
             String literal=dev.bhash.parser.BhashLexer.VOCABULARY.getLiteralName(type);
             if(literal==null)continue;
@@ -183,6 +186,14 @@ final class SourceIndex {
         }
         for(var s:visibleLexical(position)){var item=new CompletionItem(s.name);item.setKind(CompletionItemKind.Variable);item.setDetail(s.detail);result.add(item);}
         if(!importing)result.addAll(model.autoImports(position));
+        if (!importing) for (var item : result) {
+            if (item.getTextEdit() == null)
+                item.setTextEdit(org.eclipse.lsp4j.jsonrpc.messages.Either.forLeft(new TextEdit(replace,item.getLabel())));
+            String prefix = text.substring(start, offset);
+            String canonical = key(prefix), label = key(item.getLabel());
+            if (!prefix.equals(canonical) && label.startsWith(canonical))
+                item.setFilterText(prefix + label.substring(canonical.length()));
+        }
         return result;
     }
 }
