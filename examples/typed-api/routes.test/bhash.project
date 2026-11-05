@@ -1,0 +1,4 @@
+name=typed-task-route-tests
+sources=src
+dependency.service.path=../service
+dependency.service.version=1.0.0
