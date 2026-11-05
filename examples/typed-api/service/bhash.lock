@@ -1,0 +1,18 @@
+{
+  "lockVersion": 1,
+  "root": {
+    "manifestSha256": "3d794b2aa6279abbced146cbe967a59f9761fb1f5e155755887fadae7d6939b4"
+  },
+  "packages": [
+    {
+      "name": "typed-task-contract",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "../contract"
+      },
+      "manifestSha256": "898d2201b2194378a4457594b1d26d8bbeb05af3e6d772bff803c970a5be5aac",
+      "sourcesSha256": "3f8b0b552a6826195b26cb67bcc4da39bc17082903f77bc9405f7f170f2a28bf"
+    }
+  ]
+}
