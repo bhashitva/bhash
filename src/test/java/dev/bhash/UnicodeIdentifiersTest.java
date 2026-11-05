@@ -61,10 +61,15 @@ class UnicodeIdentifiersTest {
     }
 
     @Test void keywordVariantsAreReservedAndOffsetsKeepOriginalSource() {
+        int keywords = 0;
         for (int type = 1; type <= BhashLexer.VOCABULARY.getMaxTokenType(); type++) {
             String literal = BhashLexer.VOCABULARY.getLiteralName(type);
-            if (literal == null || !literal.contains("्")) continue;
+            if (literal == null) continue;
             String word = literal.substring(1, literal.length() - 1);
+            word = java.util.regex.Pattern.compile("\\\\u([0-9a-fA-F]{4})").matcher(word)
+                    .replaceAll(m -> Character.toString((char) Integer.parseInt(m.group(1),16)));
+            if (word.isEmpty() || !IdentifierProfile.start(word.codePointAt(0))) continue;
+            keywords++;
             String shaped = word.replace("्", "्\u200D");
             var lexer = new BhashLexer(CharStreams.fromString(shaped));
             Token token = lexer.nextToken();
@@ -72,6 +77,7 @@ class UnicodeIdentifiersTest {
             assertEquals(shaped, token.getText());
             assertEquals(shaped.codePointCount(0, shaped.length()) - 1, token.getStopIndex());
         }
+        assertEquals(55, keywords);
         assertEquals(Identifiers.key("क्षेत्र"), Identifiers.key("क्\u200Cषेत्र"));
         assertEquals(Identifiers.key("क़दम"), Identifiers.key("क़दम"));
         assertIdentifier("यदिसंख्या");
