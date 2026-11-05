@@ -1,5 +1,6 @@
 """Translate Jupyter requests to the private Bhash notebook worker protocol."""
 import atexit
+from importlib.metadata import PackageNotFoundError, version
 import json
 import struct
 import subprocess
@@ -65,7 +66,10 @@ class Worker:
 
 class BhashKernel(Kernel):
     implementation = "bhash"
-    implementation_version = "0.1.0"
+    try:
+        implementation_version = version("bhash-jupyter")
+    except PackageNotFoundError:
+        implementation_version = "development"
     language = "bhash"
     language_version = "0.1"
     language_info = {"name": "bhash", "mimetype": "text/plain", "file_extension": ".bhash"}
