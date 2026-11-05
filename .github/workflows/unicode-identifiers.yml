@@ -39,6 +39,6 @@ jobs:
           PY
           python scripts/generate_identifier_profile.py --data-dir target/unicode-18-audit --check
           python scripts/audit_unicode_identifiers.py --data-dir target/unicode-18-audit --output target/unicode-review.md
-          cmp docs/unicode-identifiers-repertoire-review.md target/unicode-review.md
+          python -c "from pathlib import Path; assert Path('docs/unicode-identifiers-repertoire-review.md').read_text(encoding='utf-8') == Path('target/unicode-review.md').read_text(encoding='utf-8')"
       - name: Check repertoire, normalization, diagnostics and editor ranges
         run: mvn --batch-mode --no-transfer-progress '-Dtest=FrontendTest,UnicodeIdentifiersTest,EditorAnalysisTest,ProjectLoaderTest#equivalentPhysicalSourceNamesAreRejectedBeforeResolution' test
