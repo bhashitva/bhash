@@ -12,6 +12,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ProjectLoaderTest {
     @TempDir Path directory;
+    @Test void equivalentPhysicalSourceNamesAreRejectedBeforeResolution() throws Exception {
+        project("sources=src");
+        Path first = write("src/क्षेत्र.bhash", "वर्ग एक {}");
+        Path second = write("src/क्‍षेत्र.bhash", "वर्ग दूसरा {}");
+        org.junit.jupiter.api.Assumptions.assumeFalse(Files.isSameFile(first, second), "Filesystem already equates the spellings");
+        var error = assertThrows(IOException.class, () -> ProjectLoader.load(directory));
+        assertTrue(error.getMessage().contains("BH6002"), error.getMessage());
+        assertTrue(error.getMessage().contains(first.toString()));
+        assertTrue(error.getMessage().contains(second.toString()));
+    }
     private Path write(String name, String text) throws IOException {
         Path path = directory.resolve(name);
         Files.createDirectories(path.getParent()); Files.writeString(path,text); return path;

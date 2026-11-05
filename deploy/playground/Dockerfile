@@ -6,7 +6,7 @@ RUN npm ci --no-audit --no-fund
 COPY playground/ ./
 COPY deploy/analytics/ /src/deploy/analytics/
 COPY src/main/antlr4/Bhash.g4 /src/src/main/antlr4/Bhash.g4
-COPY LICENSE NOTICE LICENSING.md /src/
+COPY LICENSE NOTICE LICENSING.md THIRD_PARTY_NOTICES.md /src/
 RUN npm run build
 
 FROM maven:3.9-eclipse-temurin-17 AS compiler

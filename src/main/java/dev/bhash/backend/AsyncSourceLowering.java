@@ -245,7 +245,7 @@ final class AsyncSourceLowering {
             return expression(loop.expression(),collection,init,flow);
         }
         String factory() {
-            String original=tree.IDENTIFIER().getText();if(original.equals("मुख्य")){original=fresh();root=original;}
+            String original=tree.IDENTIFIER().getText();if(dev.bhash.frontend.Identifiers.key(original).equals("मुख्य")){original=fresh();root=original;}
             var b=new StringBuilder("फलन ").append(original).append('(').append(tree.parameters()==null?"":plain(tree.parameters())).append(")->").append(resultType).append("{ स्थिर ").append(arg).append(':').append(name).append("=नया ").append(name).append("();");
             if(owner!=null&&!shared)b.append(ref(receiver)).append("=यह;");
             if(tree.parameters()!=null)for(var p:tree.parameters().parameter())b.append(ref(binding(analysis.bindings.get(p)))).append('=').append(p.IDENTIFIER().getText()).append(';');

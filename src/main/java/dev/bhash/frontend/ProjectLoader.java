@@ -91,7 +91,14 @@ public final class ProjectLoader {
         }
         if (files.isEmpty()) throw new IOException(input + ": Project contains no .bhash source files.");
         var sources = new ArrayList<SourceFile>();
-        for (Path path : files) sources.add(new SourceFile(path.toString(),read(path,overlays)));
+        var logicalPaths = new HashMap<String, Path>();
+        for (Path path : files) {
+            String logical = Identifiers.key(root.relativize(path).toString().replace('\\', '/'));
+            Path previous = logicalPaths.putIfAbsent(logical, path);
+            if (previous != null)
+                throw new IOException("[BH6002] इन स्रोत फ़ाइलों के नाम एक ही पहचान दर्शाते हैं। — " + previous + " / " + path);
+            sources.add(new SourceFile(path.toString(),read(path,overlays)));
+        }
         return new Project(input,root,name,List.copyOf(roots),List.copyOf(files),List.copyOf(sources),metadata.version(),metadata.library(),List.of(input,root.resolve(SourcePackages.LOCK)));
     }
     private static String read(Path path, Map<Path,String> overlays) throws IOException {

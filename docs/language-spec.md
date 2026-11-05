@@ -19,11 +19,18 @@ See [Hindi syntax and migration examples](hindi-syntax.md).
 
 - UTF-8 source files; `.bhash` extension. The CLI accepts one optional leading BOM.
 - Keywords and identifiers are case-sensitive and use Devanagari. No English keyword aliases.
-- Identifiers start with a Devanagari letter. Later characters may also be
-  Devanagari marks (including vowel signs, nukta and virama), digits or `_`.
-  ASCII letters, leading digits, isolated leading marks, danda punctuation,
-  ZWJ/ZWNJ and bidi controls are not accepted in identifiers. This initial profile
-  covers the explicit ranges in the grammar, not every Indic Unicode extension.
+- Identifiers use the pinned Unicode 18.0.0 `bhash-devanagari-1` profile with
+  102 starting characters, 205 unconditional continuation characters, and two
+  contextual joiners. ASCII digits, Devanagari digits and underscore continue
+  names. U+0953/U+0954 remain explicit continuation exceptions.
+- ZWJ/ZWNJ are valid only after a virama preceded by an accepted letter and
+  optional nukta, and immediately before an accepted letter. Valid joiners are
+  removed from identifier comparison spelling before NFC. Bidi controls and
+  other default-ignorables are rejected in names. Canonical keyword spellings
+  retain their keyword token type and original source spelling.
+  See the [identifier decisions](unicode-identifiers-decisions.md),
+  [exact generated ranges](identifier-profile.json), and
+  [Hindi guide](../tutorial/unicode-identifiers/README.md).
 - Symbol tables must use NFC-normalized identifier keys via `Identifiers.key`.
   Canonically equivalent names refer to the same symbol and duplicate definitions
   are rejected. The parser preserves original token spelling;

@@ -223,6 +223,17 @@ def main():
             execute(client, "पाठपढ़ो()", expected="भारत😀", stdin="भारत😀")
             test_language(lambda source, **expected: execute(client, source, **expected))
             test_ordered_bindings(lambda source, **expected: execute(client, source, **expected))
+            execute(client, 'लिखो("आरम्भ"); स्‍थिर क्‍षमा: पूर्‍णांक = ७;', streams="आरम्भ\n")
+            execute(client, "क्षमा", expected="७")
+            example = Path(__file__).resolve().parents[2] / "tutorial/unicode-identifiers/identifiers.bhash"
+            execute(client, example.read_text(encoding="utf-8"), streams="५ ५ ५ ६ ७ ८ ९ ६\n३.०\n६\nक्‍ष असत्य\n")
+            execute(client, "क्‌षमा = ९;", status="error")
+            execute(client, "क्षमा", expected="७")
+            request = client.complete("क्‌ष", cursor_pos=4)
+            matches = shell_reply(client, request, timeout=20)["matches"]
+            assert "क्‍षमा" in matches, matches
+            request = client.inspect("क्‌षमा", cursor_pos=6)
+            assert shell_reply(client, request, timeout=20)["found"]
             request = client.complete("😀 कु", cursor_pos=4)
             completion = shell_reply(client, request, timeout=20)
             assert completion["matches"] == ["कुल"] and completion["cursor_start"] == 2, completion

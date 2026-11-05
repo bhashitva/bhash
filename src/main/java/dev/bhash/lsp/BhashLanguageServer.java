@@ -219,11 +219,29 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
             var actions=new ArrayList<Either<Command,CodeAction>>();
             for(var diagnostic:params.getContext().getDiagnostics()) {
                 String code=diagnostic.getCode()==null||!diagnostic.getCode().isLeft()?"":diagnostic.getCode().getLeft();
+                if (code.equals("BH1003")) {
+                    int at = index.coordinates.offset(diagnostic.getRange().getStart());
+                    if (at >= index.text.length() || !Set.of(0x200C,0x200D).contains(index.text.codePointAt(at))) continue;
+                    int start = at, stop = at + 1;
+                    while (start > 0 && IdentifierProfile.cursorPart(index.text.codePointBefore(start)))
+                        start -= Character.charCount(index.text.codePointBefore(start));
+                    while (stop < index.text.length() && IdentifierProfile.cursorPart(index.text.codePointAt(stop)))
+                        stop += Character.charCount(index.text.codePointAt(stop));
+                    String name = Identifiers.key(index.text.substring(start,stop));
+                    long definitions = index.symbols.stream().filter(s -> Identifiers.key(s.name()).equals(name)).count();
+                    if (definitions > 1) continue;
+                    var action = new CodeAction("अमान्य अदृश्य चिह्न हटाएँ");
+                    action.setKind(CodeActionKind.QuickFix);
+                    action.setDiagnostics(List.of(diagnostic));
+                    action.setEdit(new WorkspaceEdit(Map.of(index.uri,List.of(new TextEdit(diagnostic.getRange(),"")))));
+                    actions.add(Either.forRight(action));
+                    continue;
+                }
                 if(!Set.of("BH2001","BH2002","BH2004").contains(code))continue;
                 int end=index.coordinates.offset(diagnostic.getRange().getStart());
                 while(end<index.text.length()) {
                     int cp=index.text.codePointAt(end);
-                    if(!Character.isLetterOrDigit(cp)&&Character.getType(cp)!=Character.NON_SPACING_MARK&&Character.getType(cp)!=Character.COMBINING_SPACING_MARK&&cp!='_')break;
+                    if(!IdentifierProfile.cursorPart(cp))break;
                     end+=Character.charCount(cp);
                 }
                 for(var item:new EditorModel(index,project.indexes.values()).autoImports(index.coordinates.position(end))) {

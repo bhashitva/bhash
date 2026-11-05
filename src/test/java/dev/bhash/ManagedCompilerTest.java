@@ -383,6 +383,10 @@ abstract class ManagedCompilerTest {
         reject("फलन क़दम() -> शून्य {} फलन क़दम() -> शून्य {} फलन मुख्य() -> शून्य {}", "Duplicate");
     }
 
+    @Test void unicodeProfileJoinersAndLiteralTextAgreeAcrossManagedTargets() throws Exception {
+        assertEquals(UnicodeIdentifierFixtures.OUTPUT, run(compile(UnicodeIdentifierFixtures.SOURCE), "").output);
+    }
+
     private void reject(String source, String message) {
         var error = assertThrows(CompilationException.class, () -> compile(source), source);
         assertTrue(error.getMessage().contains(message), error.getMessage());

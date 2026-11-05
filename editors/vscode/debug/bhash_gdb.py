@@ -238,7 +238,20 @@ class WatchReader:
         return WatchValue(kind, bits)
 
     def local(self, name):
-        original = self.frame.read_var(name)
+        block = self.frame.block()
+        symbol = None
+        while block and not block.is_global and not block.is_static:
+            matches = [item for item in block if (item.is_argument or item.is_variable)
+                       and _watch_key(item.name or '') == name]
+            if len(matches) > 1:
+                raise WatchError('इस नाम से एक से अधिक variables मिले।')
+            if matches:
+                symbol = matches[0]
+                break
+            block = block.superblock
+        if symbol is None:
+            raise WatchError('यह variable इस frame में उपलब्ध नहीं है।')
+        original = self.frame.read_var(symbol)
         if original.is_optimized_out:
             raise WatchError('यह variable इस frame में उपलब्ध नहीं है।')
         kind = {'पूर्णांक': 'INT', 'लघुपूर्णांक': 'INT32', 'बाइट': 'BYTE',
@@ -270,7 +283,7 @@ class WatchReader:
         item = self.unbox(item)
         _, identity, _, _ = self.info(item)
         fields = schema()['classes'].get(str(identity), {}).get('fields', [])
-        matches = [field for field in fields if field['name'] == name]
+        matches = [field for field in fields if _watch_key(field['name']) == name]
         if len(matches) != 1:
             raise WatchError('सदस्य अनुपलब्ध या अस्पष्ट है: ' + name)
         field = matches[0]

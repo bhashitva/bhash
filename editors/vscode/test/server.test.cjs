@@ -149,3 +149,34 @@ test('stdio LSP: locked library navigation and lock-change diagnostics', {timeou
     await lsp.wait(m=>m.method==='textDocument/publishDiagnostics'&&sameUri(m.params.uri,uri(main))&&m.params.diagnostics.length===0);
     await lsp.request('shutdown',null);lsp.send('exit');lsp.process.stdin.end();
 });
+
+test('stdio LSP: invalid joiner quick fix uses original UTF-16 coordinates', {timeout:90000}, async t => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bhash-unicode-'));
+    t.after(() => fs.rm(root, {recursive:true, force:true}));
+    const main = path.join(root, 'main.bhash'), uri = pathToFileURL(main).href;
+    const source = '// 😀\nफलन मुख्य()->शून्य { मान 𑬊:पूर्णांक=१; मान क‍ख:पूर्णांक=२; लिखो(कख); }';
+    await fs.writeFile(main, source);
+    const lsp = transport();
+    t.after(() => lsp.process.kill());
+    await lsp.request('initialize', {workspaceFolders:[{uri:pathToFileURL(root).href, name:'unicode'}], capabilities:{}});
+    lsp.send('initialized', {});
+    lsp.send('textDocument/didOpen', {textDocument:{uri, languageId:'bhash', version:1, text:source}});
+    const message = await lsp.wait(m => m.method === 'textDocument/publishDiagnostics'
+        && sameUri(m.params.uri, uri) && m.params.version === 1
+        && m.params.diagnostics.some(d => d.code === 'BH1003'));
+    const diagnostic = message.params.diagnostics.find(d => d.code === 'BH1003');
+    assert.deepEqual(diagnostic.range.start, position(source, '‍'));
+    assert.equal(diagnostic.range.end.character, diagnostic.range.start.character + 1);
+    const actions = await lsp.request('textDocument/codeAction', {textDocument:{uri},
+        range:diagnostic.range, context:{diagnostics:[diagnostic]}});
+    assert.equal(actions.length, 1);
+    const edits = Object.values(actions[0].edit.changes).flat();
+    assert.deepEqual(edits, [{range:diagnostic.range, newText:''}]);
+    const fixed = source.replace('क‍ख', 'कख');
+    lsp.send('textDocument/didChange', {textDocument:{uri, version:2}, contentChanges:[{text:fixed}]});
+    await lsp.wait(m => m.method === 'textDocument/publishDiagnostics' && sameUri(m.params.uri, uri)
+        && m.params.version === 2 && m.params.diagnostics.length === 0);
+    await lsp.request('shutdown', null);
+    lsp.send('exit');
+    lsp.process.stdin.end();
+});

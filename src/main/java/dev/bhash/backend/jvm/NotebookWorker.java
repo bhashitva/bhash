@@ -176,7 +176,7 @@ public final class NotebookWorker {
             String generic = declaration.typeParameters() == null ? "" : declaration.typeParameters().getText();
             String key = name + generic + "(" + parameters + ")";
             if (!declared.add(key)) throw new IllegalArgumentException("Duplicate function: " + name);
-            var definition = new Definition(name, declaration.returnType().getText(),
+            var definition = new Definition(name, Identifiers.key(declaration.returnType().getText()),
                     declaration.ASYNC() != null, source(item));
             var previous = functions.get(key);
             if (previous != null && (!previous.result.equals(definition.result) || previous.async != definition.async))
@@ -194,7 +194,7 @@ public final class NotebookWorker {
             }
             String name = declaration.IDENTIFIER().getText();
             String key = Identifiers.key(name);
-            String type = declaration.valueType().getText();
+            String type = Identifiers.key(declaration.valueType().getText());
             boolean mutable = declaration.LET() != null;
             if (!declared.add(key)) throw new IllegalArgumentException("Duplicate binding: " + name);
             if (!TYPES.contains(type)) {

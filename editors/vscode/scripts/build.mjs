@@ -18,9 +18,23 @@ const compiler = new URL('target/bhash-compiler-0.1.0-SNAPSHOT.jar', root);
 const sanity = spawnSync('java', ['-Dfile.encoding=UTF-8', '-jar', fileURLToPath(compiler), 'targets'], {encoding: 'utf8'});
 if (sanity.status !== 0) throw new Error(`Build the compiler with mvn package before packaging the extension. ${sanity.stderr || sanity.error || ''}`);
 const grammar = await readFile(new URL('src/main/antlr4/Bhash.g4',root),'utf8');
-const words = [...grammar.matchAll(/^([A-Z_]+)\s*:\s*'([^']+)'/gm)].filter(([, ,value])=>/\p{L}/u.test(value));
-const identifier = '[\\u0900-\\u094F\\u0951-\\u0963\\u0966-\\u097F0-9_]';
-const bounded = list => `(?<!${identifier})(?:${list.join('|')})(?!${identifier})`;
+const words = [...grammar.matchAll(/^([A-Z][A-Z_0-9]*)\s*:\s*'([^']+)'/gm)].filter(([, ,value])=>/\p{L}/u.test(value));
+const profile = JSON.parse(await readFile(new URL('docs/identifier-profile.json', root), 'utf8'));
+const cursorRanges = [...profile.continue, ...profile.contextual.map(point => [point, point]), [65,90], [97,122]];
+const identifier = '[' + cursorRanges.map(([a,b]) => `\\x{${a.toString(16)}}` + (a === b ? '' : `-\\x{${b.toString(16)}}`)).join('') + ']';
+const spelling = word => word.normalize('NFD').replace(/([\u0915-\u0939])\u093c/g, pair => {
+    const composed = pair.normalize('NFC');
+    const legacy = {'क़':'क़','ख़':'ख़','ग़':'ग़','ज़':'ज़','ड़':'ड़','ढ़':'ढ़','फ़':'फ़','य़':'य़'}[pair];
+    return legacy ? `(?:${pair}|${legacy})` : composed;
+}).replace(/\u094d(?=[\u0904-\u0939])/gu, '\u094d[\u200c\u200d]?');
+const bounded = list => `(?<!${identifier})(?:${list.map(spelling).join('|')})(?!${identifier})`;
+const supplementary = cursorRanges.filter(([a]) => a > 0xffff).flatMap(([a,b]) =>
+    Array.from({length:b-a+1}, (_, offset) => String.fromCodePoint(a+offset).split('').map(unit =>
+        `\\u${unit.charCodeAt(0).toString(16).padStart(4,'0')}`).join('')));
+const wordPart = '(?:[' + cursorRanges.filter(([a]) => a <= 0xffff).map(([a,b]) => `\\u${a.toString(16).padStart(4,'0')}` + (a === b ? '' : `-\\u${b.toString(16).padStart(4,'0')}`)).join('') + ']|' + supplementary.join('|') + ')';
+const languageConfig = await readFile('language-configuration.json','utf8');
+await writeFile('language-configuration.json', languageConfig.replace(/("wordPattern"\s*:\s*)"(?:\\.|[^"\\])*"/,
+    (_, prefix) => prefix + JSON.stringify(wordPart + '+')));
 const syntax = {name:'Bhash',scopeName:'source.bhash',patterns:[
     {name:'comment.line.double-slash.bhash',begin:'//',end:'$'},
     {name:'comment.block.bhash',begin:'/\\*',end:'\\*/'},
