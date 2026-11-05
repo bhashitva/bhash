@@ -60,7 +60,7 @@ final class GitPackage {
                 int tab=entry.indexOf('\t');if(tab<0)throw error("Malformed Git tree entry.");
                 String[] object=entry.substring(0,tab).split(" ");String name=entry.substring(tab+1);safePath(name);
                 if(object.length!=3||!Set.of("100644","100755").contains(object[0])||!object[1].equals("blob"))throw error("Symlinks and submodules are not supported: "+name);
-                String folded=name.toLowerCase(Locale.ROOT);if(!paths.add(folded))throw error("Case-colliding Git paths are not portable: "+name);
+                String folded=Identifiers.key(name).toLowerCase(Locale.ROOT);if(!paths.add(folded))throw error("Case- or Unicode-colliding Git paths are not portable: "+name);
                 for(int slash=folded.indexOf('/');slash>=0;slash=folded.indexOf('/',slash+1))if(paths.contains(folded.substring(0,slash)))throw error("Conflicting file and directory paths: "+name);
                 long size=Long.parseLong(text(git(repository,empty,List.of("cat-file","-s",object[2]),4096)).strip());
                 if(size>MAX_FILE||size<0||total+size>MAX_TOTAL)throw error("Git source snapshot exceeds file or total size limits.");

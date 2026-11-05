@@ -140,7 +140,7 @@ public final class SourcePackages {
         var hash=digest();var paths=new TreeMap<String,String>();var folded=new HashSet<String>();long total=0;
         for(int i=0;i<project.sourcePaths().size();i++){
             String name=project.root().relativize(project.sourcePaths().get(i)).toString().replace('\\','/');GitPackage.safePath(name);
-            if(!folded.add(name.toLowerCase(Locale.ROOT)))throw graphError("Case-colliding source paths: "+name);
+            if(!folded.add(Identifiers.key(name).toLowerCase(Locale.ROOT)))throw graphError("Case- or Unicode-colliding source paths: "+name);
             String text=project.sources().get(i).text();if(text.startsWith("\uFEFF"))text=text.substring(1);text=text.replace("\r\n","\n").replace('\r','\n');
             total+=text.getBytes(StandardCharsets.UTF_8).length;if(total>64*1024*1024||paths.size()>=10000)throw graphError("Package source inventory exceeds 64 MiB or 10000 files.");paths.put(name,text);
         }
