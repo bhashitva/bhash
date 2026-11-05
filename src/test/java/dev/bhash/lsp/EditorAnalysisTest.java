@@ -11,6 +11,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class EditorAnalysisTest {
     @TempDir Path root;
+    @Test void joinersAndSupplementaryNamesKeepCompletionAndDiagnosticRanges() {
+        String text = "फलन मुख्य()->शून्य { मान क्षेत्र:पूर्णांक=१; लिखो(क्‍षे); }";
+        var index = new SourceIndex(new SourceFile(root.resolve("unicode.bhash").toString(), text));
+        int end = text.indexOf("क्‍षे") + "क्‍षे".length();
+        var items = index.completions(index.coordinates.position(end), List.of(index));
+        var completion = items.stream().filter(item -> item.getLabel().equals("क्षेत्र")).findFirst().orElseThrow();
+        assertEquals(index.coordinates.position(text.indexOf("क्‍षे")), completion.getTextEdit().getLeft().getRange().getStart());
+        var parsed = Frontend.parse("unicode.bhash", "// 😀\nफलन मुख्य()->शून्य { मान क्‍षेत्र:पूर्णांक=१; }");
+        assertTrue(parsed.valid(), parsed.diagnostics().toString());
+    }
     @Test void lambdaParametersAreVisibleOnlyInsideTheirLexicalScope() {
         String source="फलन मुख्य()->शून्य { स्थिर क: फलन(पूर्णांक)->पूर्णांक=फलन(अंक: पूर्णांक)->पूर्णांक { लौटाओ अंक; }; लिखो(१); }";
         var index=new SourceIndex(new SourceFile(root.resolve("lambda.bhash").toString(),source));
