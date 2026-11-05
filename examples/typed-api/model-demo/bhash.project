@@ -1,0 +1,4 @@
+name=typed-task-model-demo
+sources=src
+dependency.contract.path=../contract
+dependency.contract.version=1.0.0
