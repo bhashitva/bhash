@@ -21,6 +21,13 @@ class Reader:
 
 
 class WatchTests(unittest.TestCase):
+    def test_unicode_identifier_keys_and_joiner_validation(self):
+        self.assertEqual(watch.WatchParser('क्‍षेत्र').parse(), watch.WatchParser('क्षेत्र').parse())
+        self.assertEqual(watch.WatchParser('क्‌षेत्र').parse(), watch.WatchParser('क्षेत्र').parse())
+        self.assertEqual(watch.WatchParser('क़दम').parse(), watch.WatchParser('क़दम').parse())
+        self.assertEqual(watch.WatchParser('𑬊').parse()[0], 'local')
+        with self.assertRaises(watch.WatchError):
+            watch.WatchParser('क‍ख').parse()
     def result(self, source):
         return watch.WatchEvaluator(Reader()).evaluate(source).data
 
