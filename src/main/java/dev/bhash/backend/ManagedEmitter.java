@@ -9,6 +9,7 @@ import dev.bhash.parser.BhashParser.*;
 import java.math.BigInteger;
 import java.util.*;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.Token;
 
 /** Shared semantic checking and source lowering for JVM and CLR. User names are mangled. */
 public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> {
@@ -163,6 +164,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     private ManagedEmitter(String sourceName, Target target) { this.sourceName = sourceName; this.target = target; }
     private final Set<String> callableTypes=new HashSet<>();
+    private record BindingOrigin(String spelling, Token token) {}
+    private final Map<Binding, BindingOrigin> bindingOrigins = new HashMap<>();
     private NotebookCell notebook;
     private boolean notebookDisplay;
     private String notebookDisplayFunction;
@@ -239,8 +242,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (!(at instanceof ValueTypeContext value)) throw error(at,"Expected a value type.");
         Type result;
         if (value.IDENTIFIER()==null) {
-            String spelling=value.getChild(0).getText();
-            result=Arrays.stream(Type.values()).filter(t->t.bhash.equals(spelling)).findFirst().orElseThrow();
+            String spelling=Identifiers.key(value.getChild(0).getText());
+            result=Arrays.stream(Type.values()).filter(t->Identifiers.key(t.bhash).equals(spelling)).findFirst().orElseThrow();
         } else {
             String name=Identifiers.key(value.IDENTIFIER().getText());
             if (CollectionTypes.builtin(name)) {
@@ -731,8 +734,15 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     private Binding declare(ParserRuleContext at, String spelling, Type type, boolean mutable) {
         var binding = new Binding("v" + variableId++, type, mutable);
-        if (scopes.peek().putIfAbsent(Identifiers.key(spelling), binding) != null)
-            throw error(at, "Duplicate binding: " + spelling);
+        var previous = scopes.peek().putIfAbsent(Identifiers.key(spelling), binding);
+        if (previous != null) {
+            var origin = bindingOrigins.get(previous);
+            String detail = origin == null ? "" : " matches " + Identifiers.describe(origin.spelling())
+                    + " at " + LocatedToken.source(origin.token(),sourceName) + ":" + origin.token().getLine()
+                    + ":" + (origin.token().getCharPositionInLine()+1);
+            throw error(at, "Duplicate binding: " + Identifiers.describe(spelling) + detail);
+        }
+        bindingOrigins.put(binding, new BindingOrigin(spelling, at.start));
         if (analysis != null) analysis.bindings.put(at, binding);
         return binding;
     }

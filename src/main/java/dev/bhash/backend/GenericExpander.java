@@ -101,7 +101,7 @@ final class GenericExpander {
             var f=type.functionType(); var args=new ArrayList<String>();
             for(var a:f.valueType()) args.add(type(a,subst));
             result="फलन("+String.join(",",args)+") -> "+(f.returnType().VOID()!=null?"शून्य":type(f.returnType().valueType(),subst));
-        } else if (type.IDENTIFIER()==null) result=type.getChild(0).getText();
+        } else if (type.IDENTIFIER()==null) result=Identifiers.key(type.getChild(0).getText());
         else {
             String name=Identifiers.key(type.IDENTIFIER().getText());
             if (subst.containsKey(name)) {

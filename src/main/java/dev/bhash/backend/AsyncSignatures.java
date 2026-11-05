@@ -2,6 +2,7 @@
 package dev.bhash.backend;
 
 import dev.bhash.frontend.Frontend;
+import dev.bhash.frontend.Identifiers;
 import dev.bhash.parser.BhashParser.*;
 import java.util.*;
 import org.antlr.v4.runtime.*;
@@ -17,7 +18,7 @@ final class AsyncSignatures {
     static ProgramContext normalize(ProgramContext tree)throws CompilationException {
         if(!required(tree))return tree;
         var p=new AsyncSignatures();
-        for(var i:tree.importDecl())if(i.qualifiedName().getText().equals("मानक.कार्यफल") && i.IDENTIFIER()!=null)p.taskNames.add(i.IDENTIFIER().getText());
+        for(var i:tree.importDecl())if(Identifiers.key(i.qualifiedName().getText()).equals("मानक.कार्यफल") && i.IDENTIFIER()!=null)p.taskNames.add(Identifiers.key(i.IDENTIFIER().getText()));
         p.render(tree);
         var result=Frontend.parse("async-signatures",p.text.toString());
         if(!result.valid())throw new CompilationException(result.diagnostics().toString());
@@ -36,7 +37,8 @@ final class AsyncSignatures {
             String owner=t.getParent() instanceof ValueTypeContext v && v.IDENTIFIER()!=null?v.IDENTIFIER().getText():"";
             if(t.getParent() instanceof PrimaryContext p && p.IDENTIFIER()!=null)owner=p.IDENTIFIER().getText();
             if(t.getParent() instanceof PostfixPartContext p && p.IDENTIFIER()!=null)owner=p.IDENTIFIER().getText();
-            if(!taskNames.contains(owner) && !(owner.equals("मानक") && t.getParent().getText().startsWith("मानक.कार्यफल<")))
+            owner=Identifiers.key(owner);
+            if(!taskNames.contains(owner) && !(owner.equals("मानक") && Identifiers.key(t.getParent().getText()).startsWith("मानक.कार्यफल<")))
                 throw new CompilationException("शून्य केवल कार्यफल<शून्य> में प्रकार तर्क हो सकता है।");
             if(t.getChildCount()!=3)throw new CompilationException("कार्यफल के लिए एक प्रकार तर्क चाहिए।");
             add("<मानक.कार्यशून्य>",t.start);return;

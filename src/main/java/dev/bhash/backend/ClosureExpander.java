@@ -83,7 +83,7 @@ final class ClosureExpander {
             for(var q:t.typeQualifier())base+=q.getText();
             if(t.typeArguments()!=null)base+="<"+String.join(",",t.typeArguments().valueType().stream().map(this::type).toList())+">";
         }
-        return base+"[]".repeat(t.arraySuffix().size());
+        return key(base+"[]".repeat(t.arraySuffix().size()));
     }
     private String result(ReturnTypeContext r){return r.VOID()!=null?"शून्य":type(r.valueType());}
     private String signature(List<String> args,String result,Token origin) {
@@ -283,7 +283,7 @@ final class ClosureExpander {
         }
         for(var e:wrappers.entrySet()) {
             var f=e.getKey();var args=parameterTypes(f.parameters());var r=result(f.returnType());var contract=signature(args,r,f.start);
-            append("वर्ग "+e.getValue()+" पालन "+contract+" { सार्वजनिक फलन "+INVOKE+"("+parameters(args)+")->"+r+" { "+(r.equals("शून्य")?"":"लौटाओ ")+f.IDENTIFIER().getText()+"("+arguments(args.size())+"); } }",f.start);
+            append("वर्ग "+e.getValue()+" पालन "+contract+" { सार्वजनिक फलन "+INVOKE+"("+parameters(args)+")->"+r+" { "+(Identifiers.key(r).equals("शून्य")?"":"लौटाओ ")+f.IDENTIFIER().getText()+"("+arguments(args.size())+"); } }",f.start);
         }
         for(var s:signatures.values())append("अनुबंध "+s.name+" { फलन "+INVOKE+"("+parameters(s.arguments)+")->"+s.result+"; }",s.origin);
         if(signatures.isEmpty())return program;

@@ -131,7 +131,12 @@ public final class ProjectResolver {
         if (old != null && kind == Kind.TYPE) {
             boolean plainClasses = old.declaration instanceof ClassDeclContext a && a.typeParameters()==null
                     && declaration instanceof ClassDeclContext b && b.typeParameters()==null;
-            throw error(name, (plainClasses ? "Duplicate class: " : "Duplicate type declaration: ") + full);
+            Token previous = old.declaration instanceof ClassDeclContext c ? c.IDENTIFIER().getSymbol()
+                    : old.declaration instanceof EnumDeclContext e ? e.IDENTIFIER().getSymbol()
+                    : ((InterfaceDeclContext) old.declaration).IDENTIFIER().getSymbol();
+            throw error(name, (plainClasses ? "Duplicate class: " : "Duplicate type declaration: ") + full
+                    + " — " + Identifiers.describe(name.getText()) + " matches " + Identifiers.describe(previous.getText())
+                    + " at " + LocatedToken.source(previous,"project") + ":" + previous.getLine() + ":" + (previous.getCharPositionInLine()+1));
         }
         if (old != null && old.exported != exported) throw error(name, "Overloads must have identical package visibility: " + full);
         String lowered;
