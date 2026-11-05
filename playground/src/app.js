@@ -4,10 +4,11 @@ import {StreamLanguage} from '@codemirror/language';
 import {autocompletion, snippetCompletion} from '@codemirror/autocomplete';
 import {setDiagnostics, lintGutter} from '@codemirror/lint';
 import {compilerDiagnostics} from './diagnostics.mjs';
+import {identifierWord, identifierKey} from './identifier-profile.js';
 const $ = id => document.getElementById(id);
 const track = (name, values) => window.bhashAnalytics?.(name, values);
 const keywordData = BHASH_KEYWORDS;
-const words = new Map(keywordData.map(({token, value}) => [value, token]));
+const words = new Map(keywordData.map(({token, value}) => [identifierKey(value), token]));
 const language = StreamLanguage.define({
   startState: () => ({block: false}),
   token(stream, state) {
@@ -17,8 +18,8 @@ const language = StreamLanguage.define({
     if (stream.match('/*')) { state.block = true; return 'comment'; }
     if (stream.eat('"')) { let escaped = false, next; while ((next = stream.next()) !== undefined) { if (next === '"' && !escaped) break; escaped = next === '\\' && !escaped; } return 'string'; }
     if (stream.match(/^[0-9०-९]+(?:\.[0-9०-९]+)?/u)) return 'number';
-    const name = stream.match(/^[\p{L}\p{M}][\p{L}\p{M}\p{N}_]*/u);
-    if (name) { const kind = words.get(name[0].normalize('NFC')); return kind ? kind.endsWith('_TYPE') ? 'typeName' : 'keyword' : 'variableName'; }
+    const name = stream.match(new RegExp('^' + identifierWord.source, 'u'));
+    if (name) { const kind = words.get(identifierKey(name[0])); return kind ? kind.endsWith('_TYPE') ? 'typeName' : 'keyword' : 'variableName'; }
     stream.next(); return 'operator';
   }, languageData: {commentTokens: {line: '//', block: {open: '/*', close: '*/'}}}
 });
@@ -81,7 +82,7 @@ try {
 function validDraft(draft) { return draft && typeof draft.source === 'string' && draft.source.length <= 32768 && ['scratch', 'program'].includes(draft.mode) && typeof draft.input === 'string' && draft.input.length <= 16384; }
 $('mode').value = initial.mode; $('stdin').value = initial.input;
 const editor = new EditorView({doc: initial.source, parent: $('editor'), extensions: [basicSetup, language, lintGutter(), EditorView.lineWrapping,
-  autocompletion({override: [context => { const word = context.matchBefore(/[\p{L}\p{M}\p{N}_]+/u); return word || context.explicit ? {from: word?.from ?? context.pos, options: completionOptions} : null; }]}),
+  autocompletion({override: [context => { const word = context.matchBefore(identifierWord); return word || context.explicit ? {from: word?.from ?? context.pos, options: completionOptions} : null; }]}),
   EditorView.contentAttributes.of({'aria-label': 'Bhash source code', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off'}),
   EditorView.updateListener.of(update => { if (update.docChanged) { save(); queueMicrotask(clearCompilerErrors); } if (update.selectionSet || update.docChanged) { const pos = update.state.selection.main.head, line = update.state.doc.lineAt(pos); $('position').textContent = `Ln ${line.number}, Col ${pos - line.from + 1}`; } })
 ]});
