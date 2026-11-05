@@ -32,6 +32,11 @@ The separate [tutorial references](tutorial/README.md) explain individual topics
 with familiar English names, runnable examples, expected output and API limits.
 Start with the [complete standard-library tutorials](tutorial/standard-library/README.md).
 
+See the [Hindi identifier and keyboard guide](tutorial/unicode-identifiers/README.md)
+for Unicode spellings, nukta, conjunct joiners, and editor diagnostics. The
+[design](docs/unicode-identifiers-design.md), [approved decisions](docs/unicode-identifiers-decisions.md),
+and [exact repertoire review](docs/unicode-identifiers-repertoire-review.md) are available with the user documentation.
+
 ## Try the interactive factorial program
 
 Install **JDK 17+** and **Maven 3.9+**, then run these commands from a UTF-8
