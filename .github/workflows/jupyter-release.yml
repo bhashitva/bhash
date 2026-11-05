@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: jupyter-release-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   package:
     runs-on: ubuntu-latest
@@ -59,7 +62,14 @@ jobs:
         env:
           JUPYTER_DATA_DIR: ${{ github.workspace }}/target/jupyter-user
         run: |
-          (cd target/jupyter-dist && sha256sum -c SHA256SUMS)
+          (
+            cd target/jupyter-dist
+            if [[ "$RUNNER_OS" == macOS ]]; then
+              shasum -a 256 -c SHA256SUMS
+            else
+              sha256sum -c SHA256SUMS
+            fi
+          )
           python -m pip install target/jupyter-dist/bhash_jupyter-0.1.4-py3-none-any.whl
           python -m bhash_jupyter.install --notebook target/hindi-starter.ipynb
           cmp target/hindi-starter.ipynb target/jupyter-dist/hindi-starter.ipynb
