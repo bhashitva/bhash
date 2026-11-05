@@ -51,6 +51,16 @@ jobs:
         run: mvn --batch-mode --no-transfer-progress -Dtest=DatabaseProviderTest,PostgresIntegrationTest test
       - name: Build distributable compiler
         run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Test the typed API with PostgreSQL on all desktop targets
+        env:
+          BHASH_TYPED_API_TEST_PROVIDER: postgresql
+        run: |
+          container=$(docker ps --filter ancestor=postgres:17 --format '{{.ID}}')
+          for target in jvm clr native; do
+            database=bhash_typed_api_$target
+            docker exec "$container" createdb -U bhash "$database"
+            BHASH_PG_DATABASE="$database" python3 examples/typed-api/verify.py --target "$target" --routes-only
+          done
       - name: Build standalone PostgreSQL application
         run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar native package src/test/resources/postgresql/integration.bhash -o target/postgres-1-linux.tar.gz --name postgres --version 1 --max-glibc 2.39
       - name: Validate runtime-only deployment
