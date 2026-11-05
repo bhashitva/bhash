@@ -4,6 +4,12 @@
 // पढ़ो() is a predeclared zero-argument function returning पूर्णांक, not a keyword.
 grammar Bhash;
 
+@lexer::members {
+    @Override public Token nextToken() {
+        return dev.bhash.frontend.Identifiers.token(this, super.nextToken(), IDENTIFIER);
+    }
+}
+
 @parser::members {
     // Keep angle brackets separate for nested generics, but require contiguous shift characters.
     private boolean adjacentShift(int count) {
@@ -209,9 +215,11 @@ fragment DEV_DIGIT : [\u0966-\u096F] ;
 
 // Letters start a name; vowel signs, nukta and virama are continuation marks.
 // Danda, digits and isolated combining marks cannot start identifiers.
-IDENTIFIER : DEV_LETTER (DEV_LETTER | DEV_MARK | ASCII_DIGIT | DEV_DIGIT | '_')* ;
-fragment DEV_LETTER : [\u0904-\u0939\u0958-\u0961\u0971-\u097F] ;
-fragment DEV_MARK : [\u0900-\u0903\u093A-\u094F\u0951-\u0957\u0962-\u0963] ;
+// Scan a complete candidate, then validate against the pinned profile in Identifiers.
+// Include malformed starts and controls so diagnostics identify the actual character.
+IDENTIFIER : ID_CANDIDATE_START (ID_CANDIDATE_START | [\p{N}])* ;
+fragment ID_CANDIDATE_START : [\p{L}\p{M}_] | '\u{11B0A}' | ID_IGNORABLE ;
+fragment ID_IGNORABLE : [\u00AD\u034F\u061C\u115F-\u1160\u17B4-\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFF8\u{1BCA0}-\u{1BCA3}\u{1D173}-\u{1D17A}\u{E0000}-\u{E0FFF}] ;
 
 LINE_COMMENT : '//' ~[\r\n]* -> skip ;
 BLOCK_COMMENT : '/*' .*? '*/' -> skip ;
