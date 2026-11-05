@@ -24,6 +24,8 @@ Project source discovery preserves physical paths and rejects equivalent relativ
 
 Generated frontend, browser, Jupyter, and debugger data use the pinned profile. Syntax highlighting is an editor aid. Compilation through the shared frontend determines validity. LSP fixes for invalid joiners are conservative when equivalent declarations are present.
 
+Editor word-boundary helpers also recognize ASCII letters so existing English completion aliases replace the typed word correctly. Identifier validation continues to use the strict start and continuation tables.
+
 ## Validation and release
 
 The implementation PR must run frontend/profile tests, managed and native behavior fixtures, forced-GC tests, browser execution, and full Jupyter client tests on Linux, Windows, and macOS. Native macOS remains scheduled weekly with manual validation available. The profile generation and normalization checks run independently of the host JDK's Unicode identifier-property version.
