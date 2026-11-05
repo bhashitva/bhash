@@ -16,5 +16,8 @@ public final class IdentifierProfile {
     }
     public static boolean start(int point) { return contains(START, point); }
     public static boolean part(int point) { return contains(CONTINUE, point); }
-    public static boolean cursorPart(int point) { return part(point) || point == 0x200C || point == 0x200D; }
+    public static boolean cursorPart(int point) {
+        return part(point) || point == 0x200C || point == 0x200D
+                || point >= 'A' && point <= 'Z' || point >= 'a' && point <= 'z';
+    }
 }
