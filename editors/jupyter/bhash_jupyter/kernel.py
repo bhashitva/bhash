@@ -4,7 +4,7 @@ import json
 import struct
 import subprocess
 from tempfile import TemporaryDirectory
-import unicodedata
+from .identifier_profile import identifier_part
 
 from ipykernel.kernelapp import IPKernelApp
 from ipykernel.kernelbase import Kernel
@@ -92,7 +92,7 @@ class BhashKernel(Kernel):
 
     @staticmethod
     def identifier_char(char):
-        return char == "_" or unicodedata.category(char)[0] in "LMN"
+        return identifier_part(char)
 
     @staticmethod
     def identifier_start(code, cursor):
