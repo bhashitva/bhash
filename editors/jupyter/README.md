@@ -6,7 +6,9 @@ worker and speaks the standard Jupyter kernel protocol.
 
 ## Install
 
-For the prebuilt compiler and notebook, follow the [0.1.1 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.1). The source build below is for development.
+For the prebuilt compiler and notebook, follow the [0.1.4 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.4). The source build below is for development.
+
+For Devanagari name equivalence, joiner diagnostics, and examples, see the [Hindi identifier guide](../../tutorial/unicode-identifiers/README.md).
 
 Build the compiler with a full JDK 17 or newer and Maven. In the Python environment
 that runs Jupyter, install the adapter and register its kernelspec.
