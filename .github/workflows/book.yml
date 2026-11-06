@@ -7,11 +7,14 @@ on:
         description: Hindi book edition (MAJOR.MINOR.PATCH)
         required: true
         default: "1.1.0"
-  push:
-    paths:
+  pull_request:
+    paths: &book-paths
       - 'book/**'
       - 'scripts/build_book.py'
-      - '.github/workflows/book.yml'
+      - 'scripts/check_book.py'
+  push:
+    branches: [main]
+    paths: *book-paths
 
 permissions:
   contents: read

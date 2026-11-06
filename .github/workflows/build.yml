@@ -53,7 +53,6 @@ jobs:
       - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar test examples/web-tasks/tests --target jvm
       - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar test examples/web-tasks/tests --target clr
       - run: python examples/typed-api/verify.py --target jvm --target clr
-      - run: python scripts/check_book.py --target jvm --target clr
       - run: python -m unittest discover -s scripts -p "test_build_examples.py"
       - run: python scripts/smoke_test.py
       - run: python scripts/check_lessons.py --target jvm
