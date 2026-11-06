@@ -681,7 +681,7 @@ internal static class BhashStandard {
     }
 
 
-    private sealed class ServerSocketState { internal System.Net.Sockets.Socket Socket; internal bool Listener; internal long Deadline; }
+    private sealed class ServerSocketState { internal System.Net.Sockets.Socket Socket; internal bool Listener; internal long Deadline; internal byte[] Scratch; }
     private static readonly Dictionary<long,ServerSocketState> serverSockets=new();
     private static long serverNext;
     private static int serverStopping,serverActive;
@@ -703,10 +703,21 @@ internal static class BhashStandard {
             if(serverSockets.Count==0)System.Threading.Interlocked.Exchange(ref serverStopping,0);serverHooks();System.Threading.Interlocked.Increment(ref serverActive);long id=++serverNext;serverSockets.Add(id,new ServerSocketState{Socket=socket,Listener=true});return id;
         }catch(System.Net.Sockets.SocketException){socket.Dispose();throw failure("HTTP सर्वर खोला नहीं जा सका।");}
     }
-    internal static long srvAccept(long id){var p=serverState(id);if(!p.Listener)throw failure("अमान्य HTTP सर्वर।");if(serverSockets.Count>=32)throw failure("बहुत अधिक HTTP संबंध।");
-        try{if(!p.Socket.Poll(250000,System.Net.Sockets.SelectMode.SelectRead))return 0;var s=p.Socket.Accept();s.Blocking=false;long key=++serverNext;serverSockets.Add(key,new ServerSocketState{Socket=s,Deadline=serverClock()+10000});return key;}
-        catch(System.Net.Sockets.SocketException){throw failure("HTTP संबंध असफल।");}
+    internal static long srvAccept(long id)=>serverAccept(id,true);
+    internal static long srvTryAccept(long id)=>serverAccept(id,false);
+    private static long serverAccept(long id,bool wait){
+        var p=serverState(id);if(!p.Listener)throw failure("अमान्य HTTP सर्वर।");
+        if(serverSockets.Count>=32){if(!wait)return 0;throw failure("बहुत अधिक HTTP संबंध।");}
+        System.Net.Sockets.Socket socket=null;
+        try{
+            if(wait&&!p.Socket.Poll(250000,System.Net.Sockets.SelectMode.SelectRead))return 0;
+            socket=p.Socket.Accept();socket.Blocking=false;long key=++serverNext;
+            serverSockets.Add(key,new ServerSocketState{Socket=socket,Deadline=serverClock()+10000});return key;
+        }catch(System.Net.Sockets.SocketException e){
+            socket?.Dispose();if(!wait&&serverWouldBlock(e))return 0;throw failure("HTTP संबंध असफल।");
+        }
     }
+    private static bool serverWouldBlock(System.Net.Sockets.SocketException e)=>e.SocketErrorCode==System.Net.Sockets.SocketError.WouldBlock;
     private static void serverWait(ServerSocketState s,bool write){
         long remaining=s.Deadline-serverClock();
         if(remaining<=0||!s.Socket.Poll((int)Math.Min(remaining*1000,int.MaxValue),write?System.Net.Sockets.SelectMode.SelectWrite:System.Net.Sockets.SelectMode.SelectRead)){
@@ -723,6 +734,21 @@ internal static class BhashStandard {
         byte[] bytes=new byte[(int)body.size()];for(int i=0;i<bytes.Length;i++)bytes[i]=(byte)body.get(i);
         try{int at=0;while(at<bytes.Length){serverWait(s,true);int n=s.Socket.Send(bytes,at,bytes.Length-at,System.Net.Sockets.SocketFlags.None);if(n<=0)throw failure("HTTP संबंध असफल।");at+=n;}}
         catch(System.Net.Sockets.SocketException){throw failure("HTTP संबंध असफल।");}
+    }
+    internal static BhashRuntime.BBuffer srvTryRead(long id){
+        var s=serverState(id);if(s.Listener)throw failure("अमान्य HTTP संबंध।");
+        var bytes=s.Scratch??=new byte[8192];
+        try{
+            int n=s.Socket.Receive(bytes);var body=new BhashRuntime.BBuffer(n);
+            for(int i=0;i<n;i++)body.set(i,bytes[i]);return body;
+        }catch(System.Net.Sockets.SocketException e){if(serverWouldBlock(e))return null;throw failure("HTTP संबंध असफल।");}
+    }
+    internal static long srvTryWrite(long id,BhashRuntime.BBuffer body){
+        var s=serverState(id);if(s.Listener||body.size()>8192)throw failure("अमान्य HTTP संबंध या उत्तर।");
+        var bytes=s.Scratch??=new byte[8192];int size=(int)body.size();
+        for(int i=0;i<size;i++)bytes[i]=(byte)body.get(i);
+        try{return s.Socket.Send(bytes,0,size,System.Net.Sockets.SocketFlags.None);}
+        catch(System.Net.Sockets.SocketException e){if(serverWouldBlock(e))return 0;throw failure("HTTP संबंध असफल।");}
     }
     internal static void srvClose(long id){if(id<1||id>serverNext)throw failure("अमान्य HTTP संबंध पहचान।");if(serverSockets.Remove(id,out var s)){s.Socket.Dispose();if(s.Listener)System.Threading.Interlocked.Decrement(ref serverActive);}}
     internal static long srvPort(long id){var s=serverState(id);if(!s.Listener)throw failure("अमान्य HTTP सर्वर।");return ((System.Net.IPEndPoint)s.Socket.LocalEndPoint).Port;}
