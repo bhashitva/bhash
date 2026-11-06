@@ -91,7 +91,7 @@ x86-64/glibc 2.35+ extension hosts, including WSL Ubuntu 22.04+. It delegates
 installation to this same verified, atomic CLI installer and shares its cache.
 Task resolution and opening a workspace do not download tools. Java 17+ remains
 required for compilation; applications run without Java or LLVM.
-See the [extension guide](../editors/vscode/README.md#native-on-linux-and-wsl).
+See the [extension guide](../editors/vscode/README.md#native-on-windows-linux-and-wsl).
 
 **हिन्दी:** VS Code 0.5.2 में Linux x86-64/glibc 2.35+ और WSL Ubuntu 22.04+ पर native build/run और स्वतः setup है। वही जाँचा हुआ atomic CLI installer और cache साझा हैं। workspace खोलने या task खोजने से डाउनलोड नहीं होता। संकलन में Java 17+ चाहिए। बना ऐप Java और LLVM के बिना चलता है।
 
