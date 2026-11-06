@@ -2,7 +2,6 @@ name: Bhash Jupyter kernel
 on:
   pull_request:
     paths: &ci-paths
-      - '.github/workflows/jupyter.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

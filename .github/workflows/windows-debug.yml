@@ -2,7 +2,6 @@ name: Windows native debugging
 on:
   pull_request:
     paths:
-      - '.github/workflows/windows-debug.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

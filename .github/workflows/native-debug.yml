@@ -2,7 +2,6 @@ name: Bhash native VS Code debugging
 on:
   pull_request:
     paths:
-      - '.github/workflows/native-debug.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

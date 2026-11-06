@@ -2,7 +2,6 @@ name: Bhash experimental native LLVM checks
 on:
   pull_request:
     paths: &ci-paths
-      - '.github/workflows/native.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

@@ -2,7 +2,6 @@ name: Bhash managed target checks
 on:
   pull_request:
     paths: &ci-paths
-      - '.github/workflows/build.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

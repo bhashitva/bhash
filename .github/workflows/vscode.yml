@@ -2,7 +2,6 @@ name: Bhash VS Code extension
 on:
   pull_request:
     paths: &ci-paths
-      - '.github/workflows/vscode.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

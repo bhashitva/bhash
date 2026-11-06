@@ -2,7 +2,6 @@ name: Windows x64 native SDK and compiler
 on:
   pull_request:
     paths: &ci-paths
-      - '.github/workflows/windows-native.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

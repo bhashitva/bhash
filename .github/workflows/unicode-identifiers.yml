@@ -2,7 +2,6 @@ name: Unicode identifier profile
 on:
   pull_request:
     paths: &ci-paths
-      - '.github/workflows/unicode-identifiers.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

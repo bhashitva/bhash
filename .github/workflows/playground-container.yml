@@ -2,7 +2,6 @@ name: Bhash playground container checks
 on:
   pull_request:
     paths: &ci-paths
-      - '.github/workflows/playground-container.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'

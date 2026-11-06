@@ -2,7 +2,6 @@ name: PostgreSQL providers and migrations
 on:
   pull_request:
     paths: &ci-paths
-      - '.github/workflows/postgresql.yml'
       - 'src/main/**'
       - 'pom.xml'
       - 'docs/identifier-profile.json'
