@@ -51,3 +51,30 @@ python scripts/check_book.py --target clr --target native
 मिलाते हैं। इनके लिए बना compiler JAR और संबंधित लक्ष्य उपकरण चाहिए।
 रिपॉज़िटरी की managed CI में लिंक और JVM/CLR के नमूने जाँचे जाते हैं।
 विषयवार ट्यूटोरियल के अपने परीक्षण और बाहरी लिंक की समीक्षा भी करें।
+
+
+## ऑफ़लाइन संस्करण बनाना
+
+Git, Python 3.12 और Node.js की मदद से किसी प्रतिबद्ध Git संशोधन से PDF और
+ऑफ़लाइन ZIP बनाएँ। उदाहरण में संस्करण `1.0.0` है।
+
+```sh
+python -m pip install -r book/requirements.txt
+python -m playwright install chromium
+npm pack @fontsource/noto-sans-devanagari@5.3.0
+python scripts/check_book.py
+python scripts/build_book.py --version 1.0.0 --font-package fontsource-noto-sans-devanagari-5.3.0.tgz
+```
+
+Linux पर Chromium की सिस्टम निर्भरताओं के लिए `python -m playwright install --with-deps chromium`
+चलाएँ। किसी दूसरे प्रतिबद्ध संशोधन को पढ़ने के लिए `--revision` दें। परिणाम
+`target/book/` में मिलेंगे। PDF और ZIP पर स्रोत संशोधन अंकित होता है। PDF में
+निर्माण समय का मेटाडेटा बदल सकता है।
+
+GitHub Actions में **Hindi book exports** चलाकर उसी संशोधन और संस्करण की फ़ाइलें
+लें। प्रकाशित करने से पहले PDF के पृष्ठों में मात्राएँ, संयुक्ताक्षर, कोड और
+पृष्ठ संख्या देखें। विषय सूची से एक अध्याय और उदाहरण के परिशिष्ट तक जाएँ।
+ZIP निकालकर इंटरनेट बंद होने पर `index.html` से ट्यूटोरियल और उदाहरण खोलें।
+उसी संशोधन पर `book-hi-<संस्करण>` टैग से GitHub रिलीज़ बनाएँ और PDF, ZIP तथा
+`SHA256SUMS` जोड़ें। इसे नवीनतम कंपाइलर रिलीज़ के रूप में चिह्नित करने का विकल्प
+खाली रखें। नई पुस्तक प्रकाशित होने पर विषय सूची के दोनों डाउनलोड लिंक अद्यतन करें।

@@ -10,6 +10,15 @@
 दूसरी भाषा जानते हैं तो कोष्ठक में दिए अंग्रेज़ी नामों से परिचित अवधारणाएँ
 पहचान सकते हैं। अभ्यास के उत्तर देखने से पहले अपने दो परीक्षण लिखें।
 
+## ऑफ़लाइन संस्करण
+
+- [हिन्दी पुस्तक डाउनलोड करें (PDF)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.0.0/bhash-book-1.0.0-hi.pdf)
+- [ट्यूटोरियल, उदाहरण और नोटबुक डाउनलोड करें (ZIP)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.0.0/bhash-book-1.0.0-hi-offline.zip)
+
+ZIP की सभी फ़ाइलें निकालें और ब्राउज़र में `index.html` खोलें।
+
+## विषय सूची
+
 | अध्याय | आप क्या बना या समझ पाएँगे |
 | --- | --- |
 | [१. अपना पहला क्रमानुदेश](01-start.md) | Playground, VS Code, CLI और Jupyter में पहला परिणाम |
