@@ -46,4 +46,6 @@ HTTP/1.1 के एक ही श्रोता पर सामान्य �
 
 [स्मृति धारा उदाहरण](../examples/websocket/stream.bhash) इसी सत्र को बिना नेटवर्क के चलाता है। JVM, .NET और Native में वही भाष कार्यान्वयन चलता है। HTTP/1.1 में अंतर्निहित सॉकेट परिवहन उपलब्ध है। HTTP/2 Extended CONNECT, अंतर्निहित TLS और WebSocket extensions अलग कार्य हैं।
 
+[साझा कार्यपट का हिन्दी अभ्यास](../examples/live-task-board/README.md) में दो ब्राउज़र HTTPS और WSS पर एक ही कार्यपट के बदलाव देखते हैं।
+
 [RFC 6455](https://www.rfc-editor.org/rfc/rfc6455.html)

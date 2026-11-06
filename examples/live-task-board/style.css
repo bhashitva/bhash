@@ -1,0 +1,17 @@
+:root { font: 1rem/1.55 system-ui, sans-serif; color-scheme: light dark; }
+body { margin: 0; }
+main { max-width: 42rem; margin: 2rem auto; padding: 0 1.25rem; }
+h1, h2, p { margin-block: 0 .6rem; }
+header { margin-bottom: 1.5rem; }
+.eyebrow { font-weight: 700; }
+section { border: 1px solid GrayText; border-radius: .6rem; padding: 1rem; }
+form, label, li { display: flex; gap: .7rem; align-items: center; flex-wrap: wrap; }
+form { margin: .8rem 0; }
+input, button { font: inherit; padding: .35rem .6rem; }
+input[type="checkbox"] { min-width: 1rem; }
+button { cursor: pointer; }
+.board-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+#tasks { padding: 0; list-style: none; overflow-wrap: anywhere; }
+#tasks li { margin: .45rem 0; }
+#tasks label { flex-wrap: nowrap; }
+[hidden] { display: none; }
