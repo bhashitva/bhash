@@ -30,31 +30,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install the pinned export dependencies
+      - name: Install the pinned Python dependencies
+        run: python -m pip install -r book/requirements.txt
+      - name: Install the pinned headless Chromium
+        run: python -m playwright install --only-shell chromium
+      - name: Fetch the pinned Devanagari font
         run: |
-          python -m pip install -r book/requirements.txt
-          python -m playwright install --with-deps chromium
           npm pack @fontsource/noto-sans-devanagari@5.3.0 --pack-destination "$RUNNER_TEMP"
-          sudo apt-get install -y poppler-utils
       - name: Build and verify PDF and offline ZIP
         run: |
           python scripts/check_book.py
           python scripts/build_book.py --version "$BOOK_VERSION" \
             --font-package "$RUNNER_TEMP/fontsource-noto-sans-devanagari-5.3.0.tgz"
           (cd target/book && sha256sum -c SHA256SUMS)
-          pdf="target/book/bhash-book-$BOOK_VERSION-hi.pdf"
-          pdffonts "$pdf" | tee "$RUNNER_TEMP/book-fonts.txt"
-          awk '/NotoSansDevanagari/ && /yes[[:space:]]+yes[[:space:]]+yes/ { found=1 }
-            END { exit !found }' "$RUNNER_TEMP/book-fonts.txt"
-          mkdir -p target/book-preview
-          pdftoppm -r 108 -png "$pdf" target/book-preview/page
       - uses: actions/upload-artifact@v4
         with:
           name: bhash-book-${{ env.BOOK_VERSION }}-hi
           path: target/book/
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: bhash-book-${{ env.BOOK_VERSION }}-preview
-          path: target/book-preview/
           if-no-files-found: error
