@@ -1,15 +1,18 @@
 """Export the Hindi book and its offline companion from a committed revision."""
 
 import argparse
+import base64
 import hashlib
 import io
+import json
+import mimetypes
 import posixpath
 import re
 import subprocess
 import tarfile
 import tempfile
 import unicodedata
-from html import escape
+from html import escape, unescape
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote, unquote, urlsplit
@@ -25,6 +28,9 @@ TREES = ("book", "docs", "examples", "lessons", "tutorial", "editors/jupyter",
          "editors/vscode", "licenses")
 FILES = ("README.md", "SUPPORT.md", "LICENSING.md", "LICENSE", "NOTICE",
          "THIRD_PARTY_NOTICES.md")
+EXAMPLE_TREES = ("book/examples/", "examples/", "lessons/", "tutorial/")
+EXAMPLE_METADATA = ("coverage.json", "expected-keywords.txt")
+REPO_FILE = re.compile(r"^/bhashitva/bhash/(?:blob|tree|raw)/(.+)$")
 
 
 def git(*args):
@@ -32,7 +38,7 @@ def git(*args):
 
 
 def snapshot(revision):
-    archive = git("archive", "--format=zip", revision, "--", *TREES, *FILES)
+    archive = git("archive", "--format=zip", revision)
     with ZipFile(io.BytesIO(archive)) as source:
         return {name: source.read(name) for name in source.namelist()
                 if not name.endswith("/")}
@@ -43,7 +49,7 @@ def relative(start, end):
 
 
 def slug(text):
-    text = re.sub(r"<[^>]*>", "", text).lower()
+    text = unescape(re.sub(r"<[^>]*>", "", text)).lower()
     return "".join("-" if ch == " " else ch for ch in text
                    if ch in " -_" or unicodedata.category(ch)[0] in "LMN")
 
@@ -62,11 +68,33 @@ class Book:
         self.sections = {CONTENTS: "contents"}
         self.sections.update({f"book/{name}": PurePosixPath(name).stem
                               for name in self.chapters})
-        self.samples = sorted(name for name in files if name.startswith("book/examples/")
-                              and name.endswith(".bhash"))
-        self.sections.update({name: PurePosixPath(name).stem for name in self.samples})
-        self.sections.update({name[:-6] + ".expected.txt": PurePosixPath(name).stem + "-output"
-                              for name in self.samples})
+        self.directories = {str(parent) for name in files for parent in PurePosixPath(name).parents}
+        self.companion_paths = {name for name in files if name in FILES
+                                or name.startswith(tuple(tree + "/" for tree in TREES))}
+        self.references = {}
+
+    def destination(self, target):
+        if target in self.sections:
+            return self.sections[target]
+        return self.references.setdefault(target, "ref-" + hashlib.sha256(target.encode()).hexdigest()[:20])
+
+    def pdf_target(self, source, parsed):
+        if parsed.netloc.lower() == "github.com":
+            match = REPO_FILE.fullmatch(unquote(parsed.path))
+            if match:
+                parts = match[1].split("/")
+                if parts[:2] == ["refs", "heads"]:
+                    parts = parts[2:]
+                for index in range(1, len(parts)):
+                    target = "/".join(parts[index:])
+                    if target in self.files or target in self.directories:
+                        return target
+                raise ValueError(f"{source}: cannot find repository file {parsed.geturl()}")
+        if parsed.scheme or parsed.netloc:
+            return None
+        if not parsed.path:
+            return source
+        return posixpath.normpath(posixpath.join(posixpath.dirname(source), unquote(parsed.path)))
 
     def repository_url(self, target, fragment=""):
         kind = "tree" if any(name.startswith(target + "/") for name in self.files) else "blob"
@@ -74,20 +102,21 @@ class Book:
 
     def link(self, source, output, url, pdf):
         parsed = urlsplit(url)
-        if parsed.scheme or parsed.netloc:
+        target = self.pdf_target(source, parsed) if pdf else (
+            None if parsed.scheme or parsed.netloc else self.pdf_target(source, parsed))
+        if target is None:
             return url if parsed.scheme in ("https", "http", "mailto") else ""
-        target = posixpath.normpath(posixpath.join(
-            posixpath.dirname(source), unquote(parsed.path))) if parsed.path else source
         if target.startswith(("../", "/")) or target == "..":
             raise ValueError(f"{source}: link escapes the repository: {url}")
-        if target not in self.files and target + "/README.md" in self.files:
-            target += "/README.md"
+        readme = posixpath.normpath(posixpath.join(target, "README.md"))
+        if target not in self.files and readme in self.files:
+            target = readme
         fragment = "#" + quote(unquote(parsed.fragment)) if parsed.fragment else ""
         if pdf:
-            if target in self.sections:
-                return "#" + self.sections[target] + ("--" + fragment[1:] if fragment else "")
-            return self.repository_url(target, fragment)
-        if target in self.files:
+            if target not in self.files and target not in self.directories:
+                raise ValueError(f"{source}: missing PDF reference {url}")
+            return "#" + self.destination(target) + ("--" + fragment[1:] if fragment else "")
+        if target in self.companion_paths:
             if target.endswith(".md"):
                 target = target[:-3] + ".html"
             return relative(output, target) + fragment
@@ -95,9 +124,9 @@ class Book:
             raise ValueError(f"{source}: missing companion target {url}")
         return self.repository_url(target, fragment)
 
-    def render(self, source, output, pdf=False):
+    def render(self, source, output, pdf=False, text=None, shift_headings=0):
         book = self
-        prefix = self.sections[source] + "--" if pdf else ""
+        prefix = self.destination(source) + "--" if pdf else ""
 
         class Renderer(mistune.HTMLRenderer):
             def __init__(self):
@@ -112,7 +141,14 @@ class Book:
                     unique = f"{base}-{suffix}"
                     suffix += 1
                 self.ids.add(unique)
+                level = min(level + shift_headings, 6)
                 return f'<h{level} id="{escape(prefix + unique)}">{text}</h{level}>\n'
+
+            def block_html(self, html):
+                anchor = re.fullmatch(r'\s*<a id="([\w-]+)"></a>\s*', html)
+                if anchor:
+                    return f'<span id="{escape(prefix + anchor[1])}"></span>\n'
+                return super().block_html(html)
 
             def link(self, text, url, title=None):
                 href = book.link(source, output, url, pdf)
@@ -123,15 +159,48 @@ class Book:
             def image(self, text, url, title=None):
                 href = book.link(source, output, url, pdf)
                 # Reference pages may point at images hosted outside the companion.
-                if not href or href.startswith(("http:", "https:")):
+                if pdf or not href or href.startswith(("http:", "https:")):
                     return super().link(text or "चित्र", href, title)
                 return super().image(text, href, title)
 
         markdown = mistune.create_markdown(renderer=Renderer(), plugins=["table", "strikethrough"])
-        text = self.files[source].decode("utf-8-sig")
+        if text is None:
+            text = self.files[source].decode("utf-8-sig")
         if pdf and source == CONTENTS:
             text = re.sub(r"^## ऑफ़लाइन संस्करण\n.*?(?=^## )", "", text, flags=re.M | re.S)
         return markdown(text)
+
+    def reference_body(self, source):
+        if source not in self.files:
+            prefix = "" if source == "." else source + "/"
+            children = sorted({name[len(prefix):].split("/")[0]
+                               for name in self.files if name.startswith(prefix)})
+            return "<ul>" + "".join(
+                f'<li><a href="{self.link(source + "/index", "", quote(name), True)}">'
+                f'{escape(name)}</a></li>' for name in children) + "</ul>"
+        if source.endswith(".md"):
+            return self.render(source, "print.html", pdf=True, shift_headings=2)
+        if source.endswith(".ipynb"):
+            parts = []
+            for cell in json.loads(self.files[source])["cells"]:
+                text = "".join(cell["source"])
+                if cell["cell_type"] == "markdown":
+                    parts.append(self.render(source, "print.html", pdf=True, text=text, shift_headings=2))
+                else:
+                    parts.append(f'<pre><code>{escape(text)}</code></pre>')
+                    for output in cell.get("outputs", []):
+                        text = "".join(output.get("text", output.get("data", {}).get("text/plain", [])))
+                        if text:
+                            parts.append(f'<pre><code>{escape(text)}</code></pre>')
+            return "".join(parts)
+        media_type = mimetypes.guess_type(source)[0]
+        if media_type in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
+            data = base64.b64encode(self.files[source]).decode("ascii")
+            return f'<img src="data:{media_type};base64,{data}" alt="{escape(source)}">'
+        text = self.files[source].decode("utf-8-sig")
+        if "\0" in text:
+            raise ValueError(f"Cannot print binary reference {source}")
+        return f'<pre class="source-listing"><code>{escape(text)}</code></pre>'
 
     def document(self, body, output, title):
         css = relative(output, "assets/book.css")
@@ -145,24 +214,48 @@ class Book:
                 '<h1>भाष में प्रोग्रामिंग</h1><p class="subtitle">Programming with Bhash</p>'
                 '<p>पहले क्रमानुदेश से पूरी वेब सेवा तक</p>'
                 f'<p class="revision">स्रोत संशोधन <code>{self.revision}</code></p></header>'
-                '<p class="edition-note">अध्यायों और परिशिष्ट के लिंक इसी PDF में खुलते हैं। '
-                'ऑनलाइन चिह्नित संदर्भों की स्थानीय प्रतियाँ साथ की ZIP में हैं, जहाँ उपलब्ध हैं। '
-                'ZIP खोलकर <code>index.html</code> से पढ़ना शुरू करें।</p>')
+                '<p class="edition-note">अध्याय, संदर्भ और उदाहरण इसी PDF में खुलते हैं। '
+                '<a href="#reference-index">परिशिष्ट की सूची</a> से सीधे किसी फ़ाइल पर जाएँ। '
+                'केवल बाहरी वेबसाइट और सेवाएँ ऑनलाइन चिह्नित हैं।</p>')
         for source in (CONTENTS, *(f"book/{name}" for name in self.chapters)):
             body += (f'<section class="chapter" id="{self.sections[source]}">'
                      f'{self.render(source, "print.html", pdf=True)}</section>')
-        body += '<section class="chapter"><h1>परिशिष्ट · चलने वाले उदाहरण</h1>'
-        for name in self.samples:
-            output = name[:-6] + ".expected.txt"
-            body += (f'<h2 id="{self.sections[name]}">{PurePosixPath(name).name}</h2>'
-                     f'<pre><code>{escape(self.files[name].decode())}</code></pre>'
-                     f'<h3 id="{self.sections[output]}">अपेक्षित परिणाम</h3>'
-                     f'<pre><code>{escape(self.files[output].decode())}</code></pre>')
-        return self.document(body + "</section>", "print.html", "भाष में प्रोग्रामिंग")
+        for name in sorted(self.files):
+            if name.startswith(EXAMPLE_TREES) and posixpath.basename(name) not in EXAMPLE_METADATA:
+                self.destination(name)
+        rendered = {}
+        while pending := sorted(self.references.keys() - rendered.keys()):
+            for name in pending:
+                rendered[name] = self.reference_body(name)
+        groups = (
+            ("संदर्भ और ट्यूटोरियल", sorted(name for name in rendered if name.endswith((".md", ".ipynb")))),
+            ("स्रोत कोड, प्रोजेक्ट फ़ाइलें और अपेक्षित परिणाम",
+             sorted(name for name in rendered if not name.endswith((".md", ".ipynb")))),
+        )
+        body += ('<section class="chapter" id="reference-index"><h1>परिशिष्ट की सूची</h1>'
+                 '<p><a href="#contents">पुस्तक की विषय सूची</a></p>')
+        for label, names in groups:
+            body += f'<h2>{label}</h2><ul class="reference-index">'
+            body += "".join(f'<li><a href="#{self.references[name]}">{escape(name)}</a></li>'
+                            for name in names)
+            body += "</ul>"
+        body += "</section>"
+        for label, names in groups:
+            body += f'<section class="chapter"><h1>{label}</h1>'
+            for name in names:
+                kind = "reading" if name.endswith((".md", ".ipynb")) else "listing"
+                body += (f'<section class="reference {kind}" id="{self.references[name]}">'
+                         f'<h2>{escape(name)}</h2>'
+                         '<p class="reference-nav"><a href="#reference-index">परिशिष्ट की सूची</a>'
+                         ' · <a href="#contents">पुस्तक की विषय सूची</a></p>'
+                         f'{rendered[name]}</section>')
+            body += "</section>"
+        print(f"PDF appendix: {len(groups[0][1])} reading references and {len(groups[1][1])} source/support files")
+        return self.document(body, "print.html", "भाष में प्रोग्रामिंग")
 
     def companion(self):
-        result = dict(self.files)
-        for source in sorted(self.files):
+        result = {name: self.files[name] for name in self.companion_paths}
+        for source in sorted(self.companion_paths):
             if source.endswith(".md"):
                 output = source[:-3] + ".html"
                 result[output] = self.document(self.render(source, output), output,
@@ -244,6 +337,9 @@ def print_pdf(files, path):
             browser.close()
 
     reader = PdfReader(path)
+    expected = {unquote(link[1:]) for link in HtmlLinks(files["print.html"]).links
+                if link.startswith("#")}
+    destinations = {unquote(name.lstrip("/")): dest for name, dest in reader.named_destinations.items()}
     hindi_fonts = set()
     for page in reader.pages:
         for entry in page["/Resources"].get("/Font", {}).get_object().values():
@@ -262,9 +358,17 @@ def print_pdf(files, path):
              for annotation in page.get("/Annots", [])]
     jumps = [link for link in links if link.get("/Dest") or
              link.get("/A", {}).get("/S") == "/GoTo"]
+    linked = {unquote(str(link.get("/Dest") or link["/A"].get("/D")).lstrip("/"))
+              for link in jumps}
+    missing = expected - (destinations.keys() & linked)
+    if missing:
+        raise ValueError(f"PDF lost {len(missing)} internal destinations: {sorted(missing)[:8]}")
     web = [link["/A"]["/URI"] for link in links if link.get("/A", {}).get("/URI")]
     if not reader.outline or not jumps or not web or any(
-            not url.startswith(("https://", "http://", "mailto:")) for url in web):
+            not url.startswith(("https://", "http://", "mailto:")) or
+            (urlsplit(url).netloc.lower() == "github.com"
+             and REPO_FILE.fullmatch(unquote(urlsplit(url).path)))
+            for url in web):
         raise ValueError("PDF bookmarks, page jumps, or web link annotations are missing or invalid")
     print(f"PDF: {len(reader.pages)} pages, {len(jumps)} local jumps, {len(web)} web links, "
           f"embedded Hindi fonts: {', '.join(sorted(hindi_fonts))}")
@@ -283,7 +387,7 @@ def main():
     book = Book(snapshot(revision), revision, args.version)
     font_files = assets(args.font_package, book.files["book/print.css"])
     companion = book.companion() | font_files
-    pages = ["index.html", *(name[:-3] + ".html" for name in book.files if name.endswith(".md"))]
+    pages = ["index.html", *(name[:-3] + ".html" for name in book.companion_paths if name.endswith(".md"))]
     check_links(companion, pages)
     print_files = {"print.html": book.print_document()} | font_files
     check_links(print_files, ["print.html"])
