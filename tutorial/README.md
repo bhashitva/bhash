@@ -9,6 +9,7 @@
 | [फलन मान और संवृतियाँ (Function values and closures)](functions/README.md) | Typed callbacks, lambdas, साझा captures, संग्रह और GC lifetime |
 | [प्रमाणीकरण और सत्र (Authentication and sessions)](authentication/README.md) | कूटशब्द हैश, सुरक्षित cookie, सत्र, CSRF, अनुमति और login उदाहरण |
 | [वेब अनुप्रयोग (Web Applications)](web-applications/README.md) | HTTP सर्वर, routing, JSON, SQLite कार्य-सूची, परीक्षण और deployment |
+| [प्रकारयुक्त वेब API (Typed Web API)](typed-api/README.md) | अभिलेख, JSON सत्यापन, OpenAPI, SQLite/PostgreSQL और एकीकरण परीक्षण |
 | [HTTP और SQLite साथ में (HTTP + SQLite)](http-sqlite/README.md) | HTTP JSON से स्थानीय संग्रह, parameterized SQL, transactions, offline query और rollback |
 | [SQLite डेटाबेस (SQLite Database)](sqlite/README.md) | मापदंड, प्रकार, पंक्तियाँ, लेनदेन, सफाई और वितरण |
 | [HTTP / HTTPS नेटवर्किंग (Networking)](networking/README.md) | अनुरोध, उत्तर, शीर्ष, UTF-8 और binary सामग्री, समयसीमा, redirects और TLS |

@@ -1,0 +1,29 @@
+{
+  "title": "Bhash Task API",
+  "version": "1.0.0",
+  "records": {
+    "CreateTask": {
+      "name": "नयाकार्य",
+      "fields": [
+        {"key": "id", "name": "पहचान", "type": "integer", "minimum": 1, "maximum": 2147483647},
+        {"key": "title", "name": "शीर्षक", "type": "string", "minLength": 1, "maxLength": 200},
+        {"key": "priority", "name": "प्राथमिकता", "type": "integer", "minimum": 1, "maximum": 5}
+      ]
+    },
+    "Task": {
+      "name": "कार्यविवरण",
+      "fields": [
+        {"key": "id", "name": "पहचान", "type": "integer", "minimum": 1, "maximum": 2147483647},
+        {"key": "title", "name": "शीर्षक", "type": "string", "minLength": 1, "maxLength": 200},
+        {"key": "priority", "name": "प्राथमिकता", "type": "integer", "minimum": 1, "maximum": 5},
+        {"key": "done", "name": "पूर्ण", "type": "boolean"}
+      ]
+    }
+  },
+  "routes": [
+    {"method": "POST", "path": "/api/tasks", "operation": "createTask", "handler": "बनाओ",
+     "request": "CreateTask", "response": "Task", "status": 201, "errors": [400, 409, 415, 422, 500]},
+    {"method": "GET", "path": "/api/tasks/:id", "operation": "getTask", "handler": "पाओ",
+     "response": "Task", "status": 200, "errors": [400, 404, 500], "parameters": {"id": "Task.id"}}
+  ]
+}

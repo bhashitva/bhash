@@ -1,0 +1,6 @@
+name=typed-task-service
+kind=library
+version=1.0.0
+sources=src
+dependency.contract.path=../contract
+dependency.contract.version=1.0.0
