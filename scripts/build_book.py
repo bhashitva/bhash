@@ -241,6 +241,20 @@ def print_pdf(files, path):
             browser.close()
 
     reader = PdfReader(path)
+    hindi_fonts = set()
+    for page in reader.pages:
+        for entry in page["/Resources"].get("/Font", {}).get_object().values():
+            font = entry.get_object()
+            if "NotoSansDevanagari" not in font.get("/BaseFont", ""):
+                continue
+            descendants = font.get("/DescendantFonts", [])
+            descendant = descendants[0].get_object() if descendants else font
+            descriptor = descendant.get("/FontDescriptor")
+            if (descriptor and font.get("/ToUnicode") and
+                    any(key in descriptor.get_object() for key in ("/FontFile", "/FontFile2", "/FontFile3"))):
+                hindi_fonts.add(font["/BaseFont"])
+    if not hindi_fonts:
+        raise ValueError("The PDF is missing an embedded Devanagari font with a Unicode mapping")
     links = [annotation.get_object() for page in reader.pages
              for annotation in page.get("/Annots", [])]
     jumps = [link for link in links if link.get("/Dest") or
@@ -249,7 +263,8 @@ def print_pdf(files, path):
     if not reader.outline or not jumps or not web or any(
             not url.startswith(("https://", "http://", "mailto:")) for url in web):
         raise ValueError("PDF bookmarks, page jumps, or web link annotations are missing or invalid")
-    print(f"PDF: {len(reader.pages)} pages, {len(jumps)} local jumps, {len(web)} web links")
+    print(f"PDF: {len(reader.pages)} pages, {len(jumps)} local jumps, {len(web)} web links, "
+          f"embedded Hindi fonts: {', '.join(sorted(hindi_fonts))}")
 
 
 def main():
