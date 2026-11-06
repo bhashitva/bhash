@@ -623,6 +623,7 @@ final class BhashStandard {
     // All Bhash allocation/dispatch remains on the calling thread. Channels retain no Bhash values.
     private static final class ServerSocketState {
         java.nio.channels.ServerSocketChannel listener; java.nio.channels.SocketChannel socket; long deadline;
+        java.nio.ByteBuffer scratch;
     }
     private static final Map<Long,ServerSocketState> serverSockets=new HashMap<>();
     private static long serverNext;
@@ -646,13 +647,16 @@ final class BhashStandard {
             serverHook();var s=new ServerSocketState();s.listener=listener;long id=++serverNext;serverSockets.put(id,s);serverActive.incrementAndGet();return id;
         }catch(java.io.IOException e){if(listener!=null)try{listener.close();}catch(java.io.IOException ignored){}throw failure("HTTP सर्वर खोला नहीं जा सका।");}
     }
-    static long srvAccept(long id){
+    static long srvAccept(long id){return serverAccept(id,true);}
+    static long srvTryAccept(long id){return serverAccept(id,false);}
+    private static long serverAccept(long id,boolean wait){
         var parent=serverState(id);if(parent.listener==null)throw failure("अमान्य HTTP सर्वर।");
-        if(serverSockets.size()>=32)throw failure("बहुत अधिक HTTP संबंध।");
-        try{if(serverPoll(parent.listener,java.nio.channels.SelectionKey.OP_ACCEPT,System.nanoTime()+250000000L)==0)return 0;
-            var socket=parent.listener.accept();if(socket==null)return 0;socket.configureBlocking(false);
+        if(serverSockets.size()>=32){if(!wait)return 0;throw failure("बहुत अधिक HTTP संबंध।");}
+        java.nio.channels.SocketChannel socket=null;
+        try{if(wait&&serverPoll(parent.listener,java.nio.channels.SelectionKey.OP_ACCEPT,System.nanoTime()+250000000L)==0)return 0;
+            socket=parent.listener.accept();if(socket==null)return 0;socket.configureBlocking(false);
             var s=new ServerSocketState();s.socket=socket;s.deadline=System.nanoTime()+10000000000L;long key=++serverNext;serverSockets.put(key,s);return key;
-        }catch(java.io.IOException e){throw failure("HTTP संबंध असफल।");}
+        }catch(java.io.IOException e){if(socket!=null)try{socket.close();}catch(java.io.IOException ignored){}throw failure("HTTP संबंध असफल।");}
     }
     private static void serverReady(ServerSocketState s,int op)throws java.io.IOException{if(serverPoll(s.socket,op,s.deadline)==0)throw failure("HTTP संबंध का समय समाप्त।");}
     static BhashRuntime.BBuffer srvRead(long id){
@@ -666,6 +670,25 @@ final class BhashStandard {
         try{byte[] bytes=new byte[(int)body.size()];for(int i=0;i<bytes.length;i++)bytes[i]=(byte)(short)body.get(i);
             var buffer=java.nio.ByteBuffer.wrap(bytes);while(buffer.hasRemaining()){serverReady(s,java.nio.channels.SelectionKey.OP_WRITE);s.socket.write(buffer);}
         }catch(java.io.IOException e){throw failure("HTTP संबंध असफल।");}
+    }
+    static BhashRuntime.BBuffer srvTryRead(long id){
+        var s=serverState(id);if(s.socket==null)throw failure("अमान्य HTTP संबंध।");
+        if(s.scratch==null)s.scratch=java.nio.ByteBuffer.allocate(8192);
+        var bytes=s.scratch.clear();
+        try{
+            int n=s.socket.read(bytes);if(n==0)return null;
+            var body=new BhashRuntime.BBuffer(Math.max(0,n));
+            for(int i=0;i<n;i++)body.set(i,(short)(bytes.get(i)&255));
+            return body;
+        }catch(java.io.IOException e){throw failure("HTTP संबंध असफल।");}
+    }
+    static long srvTryWrite(long id,BhashRuntime.BBuffer body){
+        var s=serverState(id);if(s.socket==null||body.size()>8192)throw failure("अमान्य HTTP संबंध या उत्तर।");
+        if(s.scratch==null)s.scratch=java.nio.ByteBuffer.allocate(8192);
+        var bytes=s.scratch.clear();
+        for(int i=0;i<body.size();i++)bytes.put((byte)(short)body.get(i));
+        try{return s.socket.write(bytes.flip());}
+        catch(java.io.IOException e){throw failure("HTTP संबंध असफल।");}
     }
     static void srvClose(long id){if(id<1||id>serverNext)throw failure("अमान्य HTTP संबंध पहचान।");var s=serverSockets.remove(id);if(s!=null)try{if(s.listener!=null){s.listener.close();serverActive.decrementAndGet();}else s.socket.close();}catch(java.io.IOException ignored){}}
     static long srvPort(long id){var s=serverState(id);if(s.listener==null)throw failure("अमान्य HTTP सर्वर।");try{return ((java.net.InetSocketAddress)s.listener.getLocalAddress()).getPort();}catch(java.io.IOException e){throw failure("HTTP संबंध असफल।");}}

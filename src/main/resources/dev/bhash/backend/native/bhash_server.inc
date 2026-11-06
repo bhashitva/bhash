@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0
- * Bounded synchronous transport: no threads, callbacks, or retained Bhash heap pointers.
+ * Bounded socket transport: no threads, callbacks, or retained Bhash heap pointers.
  * HTTP grammar and application dispatch live in web.bhash on the mutator thread. */
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -90,6 +90,13 @@ static void srv_ready(srv_state *state,int write,const void *location){
     if(result==0)runtime_error(location,"HTTP संबंध का समय समाप्त।");
     if(result<0)runtime_error(location,"HTTP संबंध असफल।");
 }
+static int srv_would_block(void){
+#ifdef _WIN32
+    return WSAGetLastError()==WSAEWOULDBLOCK;
+#else
+    return errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR;
+#endif
+}
 uint64_t bh_server_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_info *info,const void *location){
     if(op==6)return (uint64_t)srv_stopping;
     if(op==0){
@@ -118,11 +125,17 @@ uint64_t bh_server_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_in
         srv_unhook();return 0;
     }
     srv_state *state=srv_find(a,location);
-    if(op==1){
+    if(op==1||op==7){
         if(!state->listener)runtime_error(location,"अमान्य HTTP सर्वर।");
-        srv_state *child=srv_slot(location);int result=srv_wait(state->socket,0,srv_clock()+250);
-        if(!result)return 0;if(result<0)runtime_error(location,"HTTP संबंध असफल।");
+        srv_state *child=NULL;
+        for(size_t i=0;i<32;i++)if(!srv_states[i].id){child=&srv_states[i];break;}
+        if(!child){if(op==7)return 0;runtime_error(location,"बहुत अधिक HTTP संबंध।");}
+        if(op==1){
+            int result=srv_wait(state->socket,0,srv_clock()+250);
+            if(!result)return 0;if(result<0)runtime_error(location,"HTTP संबंध असफल।");
+        }
         srv_socket socket_value=accept(state->socket,NULL,NULL);
+        if(socket_value==SRV_INVALID&&op==7&&srv_would_block())return 0;
         if(socket_value==SRV_INVALID)runtime_error(location,"HTTP संबंध असफल।");
 #ifndef _WIN32
         if(socket_value>=FD_SETSIZE){srv_close_socket(socket_value);runtime_error(location,"HTTP संबंध असफल।");}
@@ -140,21 +153,30 @@ uint64_t bh_server_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_in
         if(getsockname(state->socket,(struct sockaddr *)&addr,&length))runtime_error(location,"HTTP संबंध असफल।");return ntohs(addr.sin_port);
     }
     if(state->listener)runtime_error(location,"अमान्य HTTP संबंध।");
-    if(op==2){
-        unsigned char bytes[8192];srv_ready(state,0,location);int n=(int)recv(state->socket,(char *)bytes,sizeof bytes,0);
+    if(op==2||op==8){
+        unsigned char bytes[8192];
+        if(op==2)srv_ready(state,0,location);
+        int n=(int)recv(state->socket,(char *)bytes,sizeof bytes,0);
+        if(n<0&&op==8&&srv_would_block())return 0;
         if(n<0)runtime_error(location,"HTTP संबंध असफल।");
         bh_collection *buffer=bh_collection_new(info,(int64_t)n,location);if(n)memcpy(buffer->data,bytes,(size_t)n);return (uint64_t)(uintptr_t)buffer;
     }
-    if(op==3){
+    if(op==3||op==9){
         bh_collection *body=bh_instance((void *)(uintptr_t)b,location);
-        if(body->size>1114112)runtime_error(location,"अमान्य HTTP संबंध या उत्तर।");
-        size_t at=0;while(at<body->size){srv_ready(state,1,location);
+        if(body->size>(op==9?8192:1114112))runtime_error(location,"अमान्य HTTP संबंध या उत्तर।");
+        size_t at=0;while(at<body->size){
+            if(op==3)srv_ready(state,1,location);
 #ifdef MSG_NOSIGNAL
             int flags=MSG_NOSIGNAL;
 #else
             int flags=0;
 #endif
             int n=(int)send(state->socket,(const char *)body->data+at,(int)(body->size-at),flags);
+            if(op==9){
+                if(n<0&&srv_would_block())return 0;
+                if(n<=0)runtime_error(location,"HTTP संबंध असफल।");
+                return (uint64_t)n;
+            }
             if(n<=0)runtime_error(location,"HTTP संबंध असफल।");at+=(size_t)n;
         }return 0;
     }

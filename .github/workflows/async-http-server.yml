@@ -1,0 +1,71 @@
+name: Async HTTP server checks
+
+on:
+  pull_request:
+    paths: &async-http-paths
+      - 'src/main/resources/dev/bhash/stdlib/**'
+      - 'src/main/resources/dev/bhash/backend/**'
+      - 'src/main/java/dev/bhash/backend/Async*.java'
+      - 'src/main/java/dev/bhash/backend/CoreProgram.java'
+      - 'src/main/java/dev/bhash/stdlib/StandardLibrary.java'
+      - 'pom.xml'
+      - 'examples/async-web/*.bhash'
+      - 'examples/async-web/verify.py'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths: *async-http-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: async-http-server-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sockets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [jvm, clr, native]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        if: matrix.target == 'clr'
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install the native toolchain
+        if: matrix.target == 'native'
+        run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18 build-essential binutils
+      - name: Build the compiler
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Verify concurrent requests and cleanup
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          compiler=target/bhash-compiler-0.1.0-SNAPSHOT.jar
+          source=examples/async-web/server.bhash
+          case "$TARGET" in
+            jvm)
+              java -jar "$compiler" compile "$source" -o target/async-web.jar
+              python3 examples/async-web/verify.py java -Dfile.encoding=UTF-8 -jar target/async-web.jar
+              ;;
+            clr)
+              java -jar "$compiler" compile "$source" --target clr -o target/async-web-clr
+              python3 examples/async-web/verify.py dotnet target/async-web-clr/BhashProgram.dll
+              ;;
+            native)
+              java -jar "$compiler" compile "$source" --target native -o target/async-web
+              BHASH_GC_STRESS=1 python3 examples/async-web/verify.py target/async-web
+              ;;
+          esac
