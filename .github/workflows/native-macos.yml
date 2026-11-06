@@ -53,7 +53,7 @@ jobs:
       matrix:
         os: [macos-15, macos-26]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 75
     env:
       BHASH_NATIVE_TOOLCHAIN: managed
       BHASH_REQUIRE_NATIVE: 'true'
