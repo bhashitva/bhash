@@ -128,7 +128,10 @@ class Book:
                 return super().image(text, href, title)
 
         markdown = mistune.create_markdown(renderer=Renderer(), plugins=["table", "strikethrough"])
-        return markdown(self.files[source].decode("utf-8-sig"))
+        text = self.files[source].decode("utf-8-sig")
+        if pdf and source == CONTENTS:
+            text = re.sub(r"^## ऑफ़लाइन संस्करण\n.*?(?=^## )", "", text, flags=re.M | re.S)
+        return markdown(text)
 
     def document(self, body, output, title):
         css = relative(output, "assets/book.css")
