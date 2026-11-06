@@ -68,6 +68,8 @@ normalization. No filesystem path is derived from a route.
 
 **हिन्दी:** Transfer-Encoding, Expect/100-continue, upgrades, WebSocket, keep-alive, HTTP/2, streaming, multipart, TLS termination और async handlers इस सर्वर के बाहर हैं। chunked पर 501 और Expect पर 417 मिलता है। reverse proxy पहले पूरा अनुरोध तैयार करे। एक जैसे दो Content-Length भी अमान्य हैं। HTTP/1.1 में एक ही Host चाहिए। गलत शीर्ष, प्रतिशत escape, UTF-8, control वर्ण और encoded पथ slash अस्वीकार हैं। query में `+` खाली जगह बनता और दोहरे मान रहते हैं। पथ खंड केवल एक बार decode होते हैं और उनसे filesystem पथ नहीं बनता।
 
+**हिन्दी:** WebSocket वाले अनुप्रयोग इसी मार्ग और सत्र व्यवस्था के साथ असमकालिक HTTP/1.1 श्रोता का उपयोग कर सकते हैं। [WebSocket सर्वर की मार्गदर्शिका](websocket.md)
+
 HEAD preserves the response Content-Length without sending a body. 204/304 bodies
 are suppressed. 405 includes Allow. Header names/values are validated before any
 response bytes are sent; framing headers are transport-owned. Invalid handler results
