@@ -12,10 +12,12 @@
 
 ## ऑफ़लाइन संस्करण
 
-- [हिन्दी पुस्तक डाउनलोड करें (PDF)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.0.0/bhash-book-1.0.0-hi.pdf)
-- [ट्यूटोरियल, उदाहरण और नोटबुक डाउनलोड करें (ZIP)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.0.0/bhash-book-1.0.0-hi-offline.zip)
+- [हिन्दी पुस्तक डाउनलोड करें (PDF)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.1.0/bhash-book-1.1.0-hi.pdf)
+- [ट्यूटोरियल, उदाहरण और नोटबुक डाउनलोड करें (ZIP)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.1.0/bhash-book-1.1.0-hi-offline.zip)
 
-ZIP की सभी फ़ाइलें निकालें और ब्राउज़र में `index.html` खोलें।
+PDF में अध्यायों के साथ उनके संदर्भ, ट्यूटोरियल और पूरे कोड उदाहरण हैं।
+अध्यायों के लिंक सीधे परिशिष्ट में सही अनुभाग या फ़ाइल पर ले जाते हैं।
+चलाने के लिए मूल फ़ाइलें चाहिए तो ZIP निकालें और ब्राउज़र में `index.html` खोलें।
 
 ## विषय सूची
 

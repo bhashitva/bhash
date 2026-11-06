@@ -56,14 +56,14 @@ python scripts/check_book.py --target clr --target native
 ## ऑफ़लाइन संस्करण बनाना
 
 Git, Python 3.12 और Node.js की मदद से किसी प्रतिबद्ध Git संशोधन से PDF और
-ऑफ़लाइन ZIP बनाएँ। उदाहरण में संस्करण `1.0.0` है।
+ऑफ़लाइन ZIP बनाएँ। उदाहरण में संस्करण `1.1.0` है।
 
 ```sh
 python -m pip install -r book/requirements.txt
 python -m playwright install chromium
 npm pack @fontsource/noto-sans-devanagari@5.3.0
 python scripts/check_book.py
-python scripts/build_book.py --version 1.0.0 --font-package fontsource-noto-sans-devanagari-5.3.0.tgz
+python scripts/build_book.py --version 1.1.0 --font-package fontsource-noto-sans-devanagari-5.3.0.tgz
 ```
 
 Linux पर Chromium की सिस्टम निर्भरताओं के लिए `python -m playwright install --with-deps chromium`
@@ -73,7 +73,9 @@ Linux पर Chromium की सिस्टम निर्भरताओं �
 
 GitHub Actions में **Hindi book exports** चलाकर उसी संशोधन और संस्करण की फ़ाइलें
 लें। प्रकाशित करने से पहले PDF के पृष्ठों में मात्राएँ, संयुक्ताक्षर, कोड और
-पृष्ठ संख्या देखें। विषय सूची से एक अध्याय और उदाहरण के परिशिष्ट तक जाएँ।
+पृष्ठ संख्या देखें। PDF में विषय सूची से किसी अध्याय, वहाँ से किसी संदर्भ
+के अनुभाग और फिर पूरे स्रोत उदाहरण तक जाएँ। बिल्ड हर स्थानीय PDF लिंक
+की मंज़िल जाँचता है। बाहरी वेबसाइटों के लिंक ऑनलाइन चिह्नित होते हैं।
 ZIP निकालकर इंटरनेट बंद होने पर `index.html` से ट्यूटोरियल और उदाहरण खोलें।
 उसी संशोधन पर `book-hi-<संस्करण>` टैग से GitHub रिलीज़ बनाएँ और PDF, ZIP तथा
 `SHA256SUMS` जोड़ें। इसे नवीनतम कंपाइलर रिलीज़ के रूप में चिह्नित करने का विकल्प

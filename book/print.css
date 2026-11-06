@@ -43,6 +43,13 @@ p, li, td { overflow-wrap: anywhere; }
 .cover h1 { margin: 1.1em 0 0; font-size: 3.2em; }
 .subtitle { margin-top: 0; font-size: 1.35em; }
 .revision { margin-top: 3em; font-size: .86em; }
+.reference-nav { font-size: .83em; }
+.reference-index { columns: 2; overflow-wrap: anywhere; padding-inline-start: 1.35em; }
+.reference-index li { break-inside: avoid; }
+.reference > h2 { overflow-wrap: anywhere; }
+.reference.listing { border-top: 1px solid #cfd4e1; margin-top: 1em; }
+.reference.listing > h2 { margin-top: .65em; font-size: 1.15em; }
+.reference-nav { break-after: avoid; }
 
 @page {
   size: A4;
@@ -61,5 +68,8 @@ p, li, td { overflow-wrap: anywhere; }
   h1, h2, h3, h4 { break-after: avoid; }
   p, li { orphans: 2; widows: 2; }
   pre, tr { break-inside: avoid; }
+  .reference.reading + .reference.reading { break-before: page; }
+  .reference pre { break-inside: auto; }
+  .source-listing { line-height: 1.32; }
   thead { display: table-header-group; }
 }
