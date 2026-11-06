@@ -5,6 +5,8 @@ bundles the Bhash compiler and a Java language server. Source analysis stays on
 the extension host; it does not send code to the public playground or execute
 programs while you edit.
 
+**हिन्दी:** Windows, macOS, Linux, WSL और दूरस्थ VS Code होस्ट पर भाष लिखें। एक्सटेंशन में भाष संकलक और Java भाषा सर्वर है। संपादन का विश्लेषण उसी होस्ट पर होता है। कोड सार्वजनिक Playground पर नहीं भेजा जाता और संपादन के समय चलता नहीं है।
+
 ## 0.16.0: Function values, lambdas and closures / फलन मान और संवृतियाँ
 
 This release bundles the compiler from merged PR #63. Pass, return and store
@@ -12,14 +14,20 @@ This release bundles the compiler from merged PR #63. Pass, return and store
 bindings in nested or escaping closures. Mutable captures share storage;
 native closure environments are traced automatically by the collector.
 
+**हिन्दी:** इस रिलीज़ में PR #63 का संकलक है। `फलन(पूर्णांक) -> पूर्णांक` जैसे मान भेजें, लौटाएँ और सहेजें। प्रकारयुक्त लैम्ब्डा बनाएँ और nested या बाहर जाने वाली संवृतियों में आसपास के बंधन पकड़ें। बदलने वाले पकड़े बंधन भंडार साझा करते हैं। नेटिव GC उनका पता रखता है।
+
 Use the `lambda` / `लैम्ब्डा` and `callback` snippets to get started. See the
 [Hindi tutorial](../../tutorial/functions/README.md),
 [runnable callback example](../../tutorial/functions/callbacks.bhash), and
 [function-value contract](../../docs/function-values.md).
 
+**हिन्दी:** `lambda`/`लैम्ब्डा` और `callback` snippets से शुरू करें। [हिन्दी ट्यूटोरियल](../../tutorial/functions/README.md), [चलने वाला callback](../../tutorial/functions/callbacks.bhash) और [फलन मान के नियम](../../docs/function-values.md) देखें।
+
 The feature works on JVM, CLR, browser/WASM and native targets. Parameters and
 return types are explicit. Callbacks run synchronously; this release does not
 add async/await or implicit adapters for existing callback interfaces.
+
+**हिन्दी:** यह JVM, CLR, ब्राउज़र/WASM और native पर चलता है। मापदंड और परिणाम प्रकार स्पष्ट हैं। इस रिलीज़ में callbacks तुल्यकालिक थे। बाद की async API के लिए [असमकालिक ट्यूटोरियल](../../tutorial/async/README.md) देखें।
 
 ## 0.15.0: PostgreSQL and migrations / डेटाबेस माइग्रेशन
 
@@ -28,9 +36,13 @@ statement and transaction API for SQLite or PostgreSQL, with parameterized SQL,
 verified TLS, typed values and deterministic cleanup. Apply ordered schema
 migrations with SHA-256 history validation and atomic rollback on failure.
 
+**हिन्दी:** PR #61 के संकलक में SQLite और PostgreSQL के लिए साझा संबंध, कथन और लेनदेन API है। मापदंडयुक्त SQL, सत्यापित TLS, प्रकारयुक्त मान और समय पर सफ़ाई मिलते हैं। माइग्रेशन SHA-256 इतिहास जाँचते हैं और विफलता पर पूरा बैच वापस लेते हैं।
+
 Start with the [Hindi database-provider tutorial](../../tutorial/database-providers/README.md),
 [runnable migration example](../../tutorial/database-providers/migrations.bhash),
 and [provider/runtime contract](../../docs/database-providers.md).
+
+**हिन्दी:** [हिन्दी डेटाबेस ट्यूटोरियल](../../tutorial/database-providers/README.md), [चलने वाला माइग्रेशन](../../tutorial/database-providers/migrations.bhash) और [प्रदाता नियम](../../docs/database-providers.md) से शुरू करें।
 
 JVM applications include the verified PostgreSQL JDBC driver. CLR and native
 PostgreSQL applications require the **libpq 14+ client runtime** and its dependencies:
@@ -39,6 +51,8 @@ PostgreSQL applications require the **libpq 14+ client runtime** and its depende
 headers are required. Native applications still need neither JVM nor .NET.
 The server and libpq are not installed by this extension; SQLite remains bundled.
 Direct database access is unavailable in browser/WASM.
+
+**हिन्दी:** JVM ऐप में सत्यापित PostgreSQL JDBC driver है। CLR/native PostgreSQL ऐप को libpq 14+ और उसकी निर्भरताएँ चाहिए। Linux में `libpq5`, Windows/macOS में client distribution लें। जरूरत पर `BHASH_LIBPQ` में पूरा पथ दें। development headers नहीं चाहिए। SQLite साथ है। ब्राउज़र में सीधा डेटाबेस नहीं है।
 
 साझा डेटाबेस (Database provider) API से SQLite तथा PostgreSQL पर मापदंड वाले
 कथन और लेनदेन चलाएँ। माइग्रेशन (Migrations) से तालिका में क्रमबद्ध बदलाव करें;
@@ -49,6 +63,8 @@ Direct database access is unavailable in browser/WASM.
 
 Declare functions with **`फलन`**
 and write the collection first in **`प्रत्येक`** loops:
+
+**हिन्दी:** घोषणा में `फलन` और `प्रत्येक` में पहले संग्रह लिखें:
 
 ```bhash
 फलन मुख्य() -> शून्य {
@@ -63,6 +79,8 @@ and change `प्रत्येक (तत्व: प्रकार में
 The old declaration and loop forms are rejected. Update source dependencies too;
 regenerate their lockfiles through the normal dependency workflow when needed.
 
+**हिन्दी:** पुराना `कार्य` बदलकर `फलन` करें। चक्र में `प्रत्येक (संग्रह में तत्व: प्रकार)` लिखें। मानचित्र की कुंजी और मान दोनों `में` के बाद हैं। स्रोत निर्भरताएँ भी बदलें और ज़रूरत पर सामान्य प्रक्रिया से लॉकफ़ाइल फिर बनाएँ।
+
 फलन (Function) घोषित करने के लिए अब `फलन` लिखें। प्रत्येक (For-each) में पहले
 संग्रह, फिर `में`, फिर तत्व का नाम और प्रकार लिखें। पुराने स्रोत को बदलकर फिर
 संकलित करें। टिप्पणियों, संदेशों और साधारण हिन्दी गद्य में `कार्य` बदलना आवश्यक
@@ -71,6 +89,8 @@ regenerate their lockfiles through the normal dependency workflow when needed.
 See the [Hindi syntax and migration guide](../../docs/hindi-syntax.md).
 Highlighting, snippets, completion, project templates and the bundled compiler
 use the same syntax. Java 17+ and the existing target/toolchain requirements apply.
+
+**हिन्दी:** [हिन्दी वाक्यरचना और माइग्रेशन](../../docs/hindi-syntax.md) देखें। रंग, snippets, सुझाव, परियोजना templates और संकलक वही रूप उपयोग करते हैं। Java 17+ और लक्ष्य के उपकरण चाहिए।
 
 ## Community and support / समुदाय और सहायता
 
@@ -82,20 +102,32 @@ share projects, collaborate, and reach Bhashitva support for questions, issues o
 
 In VS Code, run **Bhash: Community & Support (Discord)** from the Command Palette.
 
+**हिन्दी:** Command Palette में **Bhash: Community & Support (Discord)** चलाएँ।
+
 ## Install
 
 1. Download the `.vsix` package from the **Bhash VS Code extension** GitHub
    Actions artifact for a successful main-branch build.
+
+   **हिन्दी:** मुख्य शाखा के सफल **Bhash VS Code extension** GitHub Actions artifact से `.vsix` लें।
 2. In VS Code choose **Extensions → … → Install from VSIX…** and select the file.
+
+   **हिन्दी:** VS Code में **Extensions → … → Install from VSIX…** चुनें और फ़ाइल दें।
 3. Install **Java 17 or later** on the computer running the extension host.
    A full JDK is needed for JVM build/run. In WSL, SSH, or Codespaces, install Java
    on that remote host and install the extension there.
+
+   **हिन्दी:** एक्सटेंशन जिस होस्ट पर चलता है वहाँ Java 17+ दें। JVM निर्माण/निष्पादन के लिए पूरा JDK चाहिए। WSL, SSH या Codespaces में वहीं Java और एक्सटेंशन स्थापित करें।
 4. Open a folder containing `bhash.project`, or open a standalone `.bhash` file.
    Trust the workspace to enable analysis and compiler tasks.
+
+   **हिन्दी:** `bhash.project` वाला फ़ोल्डर या स्वतंत्र `.bhash` फ़ाइल खोलें। विश्लेषण और संकलन tasks के लिए workspace पर भरोसा दें।
 
 No Maven or Node installation is needed to use the packaged extension. The extension is
 available on the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash).
 A locally packaged or Actions-built version can be installed before its Marketplace update is published.
+
+**हिन्दी:** पैकेज वाला एक्सटेंशन उपयोग करने के लिए Maven या Node नहीं चाहिए। [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash) से स्थापित करें। नया Marketplace अपडेट आने से पहले स्थानीय या Actions का VSIX लगा सकते हैं।
 
 ## Native debugging on Linux and WSL
 
@@ -105,45 +137,75 @@ with source debug information, then launch VS Code's GDB debugger. Install Micro
 host (`sudo apt install gdb` on Ubuntu). Java 17+ remains required for compilation;
 the ordinary managed native SDK supplies LLVM automatically.
 
+**हिन्दी:** **Bhash: Debug Native** सक्रिय प्रोजेक्ट सहेजता और debug जानकारी के साथ बनाकर VS Code का GDB शुरू करता है। Linux/WSL होस्ट पर Microsoft **C/C++** और Python 3 वाला **GDB 12+** चाहिए। Ubuntu पर `sudo apt install gdb` उपयोग करें। Java 17+ चाहिए और प्रबंधित SDK LLVM देता है।
+
 Source breakpoints, step into/over/out, Hindi call stacks and scalar/text/object/
 collection inspection are supported. Inspection reads memory without calling program
 functions or changing GC roots. Windows debugging is also available; macOS editor debugging remains pending. See the [Hindi debugging guide](../../docs/native-vscode-debug.md)
 for launch configurations, limits, GC safety and troubleshooting.
 
+**हिन्दी:** स्रोत breakpoint, step into/over/out, हिन्दी call stack और अदिश, पाठ, वस्तु व संग्रह निरीक्षण हैं। निरीक्षण प्रोग्राम फलन नहीं बुलाता और GC roots नहीं बदलता। Windows डिबगिंग भी है। macOS संपादक डिबगिंग अभी लंबित है। [हिन्दी डिबगिंग](../../docs/native-vscode-debug.md) में विन्यास और समस्या समाधान हैं।
+
 ## Features
 
 - Highlighting generated from the current ANTLR keyword definitions, with
   Devanagari-aware word boundaries, comments, strings, and both numeric scripts.
+
+  **हिन्दी:** ANTLR की वर्तमान कीवर्ड सूची से देवनागरी सीमाएँ, टिप्पणियाँ, पाठ और दोनों अंक लिपियों के रंग बनते हैं।
 - Brackets, indentation, comment toggling, folding, and English/Devanagari snippets:
   `main`, `class`, `interface`, `record`, `enum`, `foreach`, `try`, `switch`, etc.
+
+  **हिन्दी:** कोष्ठक, indentation, टिप्पणी बदलना, folding और अंग्रेज़ी/देवनागरी snippets उपलब्ध हैं।
 - Keyword completion with English search aliases, built-ins, lexical declarations,
   same-package types/functions, and explicitly imported names/aliases.
+
+  **हिन्दी:** अंग्रेज़ी खोज उपनाम, अंतर्निहित नाम, स्थानीय घोषणाएँ, उसी संकुल और आयात से सुझाव मिलते हैं।
 - Whole-project syntax and semantic diagnostics in Problems, including unsaved
   source/manifest buffers and newly created source buffers. Imports and types are
   checked using the same semantic checker as all three managed/browser targets.
+
+  **हिन्दी:** Problems में पूरे प्रोजेक्ट की वाक्यरचना और अर्थ त्रुटियाँ हैं। असहेजी और नई फ़ाइलें भी शामिल हैं। आयात/प्रकार साझा checker जाँचता है।
 - Typed member completion for declared receivers, inherited and generic members,
   records, enums, lists/maps/arrays and byte buffers. Private/protected visibility
   and instance/static receiver rules filter suggestions.
+
+  **हिन्दी:** घोषित receiver, विरासत, सामान्य सदस्य, अभिलेख, परिगणना, संग्रह और buffers के प्रकारयुक्त सुझाव हैं। पहुँच और instance/shared नियम छाँटते हैं।
 - Signature help on `(` and `,` for functions, overloads, methods and constructors,
   including parameter types and the active argument. Nested calls are tracked.
+
+  **हिन्दी:** `(` और `,` पर फलन, विधि, निर्माता और ओवरलोड का हस्ताक्षर, प्रकार और सक्रिय तर्क मिलता है। अंदर की कॉल अलग रहती हैं।
 - Completion of an unimported public type/function adds a file-local `आयात`.
   Existing aliases and name conflicts are respected; unresolved names also offer
   an import Quick Fix when a matching public declaration exists in the project.
+
+  **हिन्दी:** बिना आयात वाले सार्वजनिक प्रकार या फलन के सुझाव से उसी फ़ाइल का `आयात` जुड़ता है। उपनाम और नाम टकराव देखे जाते हैं। मेल मिलने पर अनसुलझे नाम का Quick Fix है।
 - Hover and F12 for lexical, top-level and resolved receiver members. Overloaded
   navigation lists declarations rather than choosing a call's resolved overload.
   Outline and workspace symbols include types, records, enums, interfaces, functions and members.
+
+  **हिन्दी:** Hover और F12 स्थानीय, ऊपरी तथा resolved सदस्यों पर हैं। ओवरलोड की घोषणाएँ सूची में आती हैं। Outline और workspace symbols में प्रकार और सदस्य हैं।
 - Coded diagnostics with Hindi guidance and English detail. Independent body errors
   are collected in one pass (up to 50); declaration/import/type-graph failures stop
   the semantic pass to avoid misleading follow-on errors.
+
+  **हिन्दी:** निदान में कोड, हिन्दी सलाह और अंग्रेज़ी विवरण हैं। अधिकतम ५० स्वतंत्र body त्रुटियाँ इकट्ठी होती हैं। घोषणा, आयात या प्रकार graph की विफलता गलत बाद के संदेश रोकती है।
 - Independent manifests and multi-root workspaces remain separate compilation
   units. Discovery ignores `.bhash`, `.git`, `node_modules`, `target`, `build`, and `dist`.
+
+  **हिन्दी:** हर manifest या workspace root की संकलन इकाई अलग है। ऊपर के build और cache फ़ोल्डर खोज से बाहर हैं।
 - Build JVM, CLR, Native, or browser WebAssembly; run JVM/CLR/Native in an integrated terminal
   with console input. File paths are passed as process arguments, never a shell
   command. Builds use saved files and prompt for the target.
+
+  **हिन्दी:** JVM, CLR, native या WebAssembly बनाएँ। पहले तीन में terminal इनपुट के साथ चला सकते हैं। फ़ाइल पथ प्रक्रिया के तर्क हैं। निर्माण सहेजी फ़ाइल और चुना लक्ष्य लेता है।
 - **Bhash: New Project**, **Bhash: Restart Language Server**, and
   **Bhash: Open Browser Playground** commands.
 
+  **हिन्दी:** नई परियोजना, भाषा सर्वर फिर शुरू करना और ब्राउज़र Playground खोलना Command Palette से करें।
+
 `स्थिर` means a constant binding. Static class members use **`साझा`**.
+
+**हिन्दी:** `स्थिर` अचल बंधन और `साझा` वर्ग का static सदस्य है।
 
 ## Native on Windows, Linux and WSL
 
@@ -155,41 +217,65 @@ in your user cache. Later builds reuse it, including offline. No separate LLVM,
 Maven or Node installation is required. Java 17+ is still required to run the compiler.
 On macOS, install Apple’s Command Line Tools separately for the local SDK and linker.
 
+**हिन्दी:** **Bhash: Build Project or File** या **Bhash: Run Project or File** में `native` चुनें। पहला काम SDK डाउनलोड कर SHA-256 और स्थापना जाँचता है तथा user cache में सक्रिय करता है। बाद के निर्माण offline भी उसका उपयोग करते हैं। Java 17+ चाहिए। macOS में Apple Command Line Tools अलग दें। LLVM, Maven और Node अलग स्थापित नहीं करने पड़ते।
+
 Supported hosts:
+
+**हिन्दी:** समर्थित होस्ट:
 
 - **Windows 10+ x64**: ordinary Windows VS Code, Java 17+, and Bhash are sufficient.
   WSL and Visual Studio are not required. The extension downloads the pinned
   [Windows SDK](https://github.com/bhashitva/bhash/releases/tag/native-sdk-windows-1.0.0)
   (71 MiB) and produces `.exe` applications using Windows UCRT.
+
+  **हिन्दी:** Windows 10+ x64 में सामान्य VS Code, Java 17+ और Bhash दें। WSL या Visual Studio की जरूरत नहीं। प्रबंधित Windows SDK से UCRT वाली `.exe` बनती है।
 - **Linux x86-64, glibc 2.35+**, including Ubuntu 22.04+ in WSL. Install Bhash and
   Java inside WSL when using a WSL workspace; its SDK runs inside that distribution.
+
+  **हिन्दी:** Linux x86-64/glibc 2.35+ में WSL Ubuntu 22.04+ भी है। WSL workspace में Java और Bhash उसी वितरण में स्थापित करें।
 
 - **macOS 14+ Apple Silicon ARM64**: use ARM64 VS Code, ARM64 Java 17+, and Apple’s
   Command Line Tools (`xcode-select --install`). Bhash downloads a pinned LLVM 18
   SDK; Apple’s SDK and linker are not redistributed. See [macOS setup and distribution](https://github.com/bhashitva/bhash/blob/main/docs/native-macos.md).
 
+  **हिन्दी:** Apple Silicon macOS 14+ में ARM64 VS Code, ARM64 Java 17+ और `xcode-select --install` दें। Bhash पिन किया LLVM 18 SDK लेता है। Apple SDK या linker साथ वितरित नहीं होते।
+
 Intel Macs, other ARM hosts, and musl/Alpine are not supported. Each SDK builds
 for its own host; this release does not add cross compilation. Generated applications
 need neither Java nor .NET nor LLVM. The compiler continues to require Java 17+.
 
+**हिन्दी:** समर्थन सूची में Intel Mac, अन्य ARM और musl/Alpine नहीं हैं। SDK अपने होस्ट के लिए बनाता है। बना ऐप JVM, .NET या LLVM के बिना चलता है। संकलक को Java 17+ चाहिए।
+
 - **Bhash: Set Up Native Tools** installs tools before the first build.
+
+  **हिन्दी:** **Bhash: Set Up Native Tools** पहले निर्माण से पहले उपकरण तैयार करता है।
 - **Bhash: Check Native Setup** diagnoses the current installation without downloading.
+
+  **हिन्दी:** **Bhash: Check Native Setup** डाउनलोड के बिना मौजूदा स्थापना देखता है।
 - **Bhash: Repair Native Tools** downloads and verifies a fresh copy; failed setup
   preserves the previously active SDK. Cancel through the task terminal.
+
+  **हिन्दी:** **Bhash: Repair Native Tools** नई प्रति जाँचकर स्थापित करता है। विफलता में पुरानी सक्रिय SDK बचती है। task terminal से रोक सकते हैं।
 - `bhash.native.toolchainHome` optionally chooses an absolute cache path on the extension host.
   Empty shares the CLI cache (`BHASH_TOOLCHAIN_HOME`, otherwise
   `%LOCALAPPDATA%\Bhash\toolchains` on Windows;
     `$XDG_CACHE_HOME/bhash/toolchains` or `~/.cache/bhash/toolchains` on Linux). Allow about
   1 GB of free disk space during installation; repairs retain previous generations.
+
+  **हिन्दी:** `bhash.native.toolchainHome` में होस्ट का पूरा cache पथ दें। खाली रखने पर CLI cache साझा है। स्थापना में लगभग 1 GB जगह रखें। मरम्मत पिछली प्रतियाँ रखती है।
 - `bhash.native.toolchainMode = system` opts into an existing LLVM 18 toolchain.
   On Windows, system mode requires LLVM-MinGW 18/UCRT, not an MSVC-only LLVM installation.
     In managed mode, ambient `BHASH_CLANG`, `BHASH_LLVM_OPT`, and `BHASH_READELF`
   overrides are ignored for these tasks so they cannot mix incompatible tools.
 
+  **हिन्दी:** `bhash.native.toolchainMode = system` से मौजूद LLVM 18 लें। Windows में LLVM-MinGW 18/UCRT चाहिए। managed task परिवेश के `BHASH_CLANG`, `BHASH_LLVM_OPT` और `BHASH_READELF` नहीं लेता।
+
 Native tasks support console input (`पाठपढ़ो()` and `पढ़ो()`) in the integrated
 terminal. No SDK download occurs while editing, discovering tasks, or in
 Restricted Mode. Dependencies still follow the ordinary lock/restore rules.
 Example `.vscode/tasks.json` entry:
+
+**हिन्दी:** native task integrated terminal में `पाठपढ़ो()` और `पढ़ो()` लेता है। संपादन, task खोज और Restricted Mode में SDK डाउनलोड नहीं होता। निर्भरताओं के सामान्य lock/restore नियम हैं। `.vscode/tasks.json` का उदाहरण:
 
 ```json
 {"type":"bhash","label":"Native build","command":"build","project":"bhash.project","target":"native"}
@@ -199,12 +285,16 @@ Version 0.5.2 replaces the Ubuntu 24.04 SDK shipped in 0.5.0/0.5.1 with a
 Jammy-built SDK for glibc 2.35+. Existing installs migrate through the normal
 checksum-verified installer; the earlier release assets remain available.
 
+**हिन्दी:** 0.5.2 में Ubuntu 24.04 की जगह glibc 2.35+ का Jammy SDK आया। checksum वाला installer पुराने cache को बदलता है। पहले के release assets उपलब्ध हैं।
+
 The SDK and corresponding third-party sources are GitHub **Release assets**,
 not files committed to Git. Copyright and redistribution notices are retained;
 see [managed toolchain details](../../docs/managed-native-toolchain.md).
 Generated Linux executables do not require Java or LLVM; their supported runtime
 still depends on the recorded Linux/glibc compatibility requirements. Debugger
 integration and native compilation of every language feature are separate work.
+
+**हिन्दी:** SDK और संबंधित स्रोत GitHub Releases में हैं। [प्रबंधित उपकरण](../../docs/managed-native-toolchain.md) में लाइसेंस व वितरण देखें। बनी Linux फ़ाइल को Java या LLVM नहीं चाहिए। उसकी Linux/glibc संगतता manifest पर निर्भर है।
 
 ### हिन्दी में शुरुआत
 
@@ -223,9 +313,13 @@ paths/directories, scoped resource cleanup (`संसाधन`), configuration
 a Bhash test runner, HTTP client/server networking, a small web application framework
 and SQLite database access, plus password hashing, authentication and sessions.
 
+**हिन्दी:** संकलक में पाठ, गणित, यादृच्छिक, JSON, समय, फ़ाइल, UTF-8/binary, संग्रह कलन, प्रवाह, पथ, सफ़ाई, विन्यास, लॉग, परीक्षण, HTTP client/server, SQLite, कूटशब्द hashing, प्रमाणीकरण और सत्र हैं।
+
 Use imports such as `आयात मानक.पाठ्य;` or `आयात मानक.एसक्यूलाइट;`, or fully
 qualified names. Completion, signature help and automatic imports use the same
 catalog as compiler checking; F12 opens a readable declaration document.
+
+**हिन्दी:** `आयात मानक.पाठ्य;`, `आयात मानक.एसक्यूलाइट;` या पूरा नाम दें। सुझाव, हस्ताक्षर, auto-import और संकलक एक सूची उपयोग करते हैं। F12 पढ़ने योग्य घोषणा खोलता है।
 
 SQLite supports parameterized SQL, typed values, transactions and deterministic
 cleanup on JVM, CLR and native. The compiler bundles the SQLite driver/source and
@@ -235,9 +329,13 @@ toolchain prerequisites still apply. Generated database applications can run
 offline. SQLite is unavailable in browser WASM; local file operations are also
 unavailable there, and browser networking follows browser security restrictions.
 
+**हिन्दी:** SQLite में JVM, CLR और native पर मापदंड, प्रकार, लेनदेन व सफ़ाई हैं। समर्थित होस्टों के driver, स्रोत और runtime साथ हैं। सामान्य उपकरण चाहिए। बना ऐप offline चल सकता है। WebAssembly में स्थानीय फ़ाइल/SQLite नहीं हैं। ब्राउज़र नेटवर्क ब्राउज़र नियम मानता है।
+
 See [the standard library guide](../../docs/standard-library.md) and the Hindi
 reference tutorials for [application foundations](../../tutorial/application-foundations/README.md),
 [networking](../../tutorial/networking/README.md) and [SQLite](../../tutorial/sqlite/README.md).
+
+**हिन्दी:** [मानक पुस्तकालय](../../docs/standard-library.md) और [आधार](../../tutorial/application-foundations/README.md), [नेटवर्क](../../tutorial/networking/README.md) तथा [SQLite](../../tutorial/sqlite/README.md) के हिन्दी उदाहरण देखें।
 
 ## HTTP servers and web applications
 
@@ -247,6 +345,8 @@ Use the existing build/run target choices; the same Bhash source provides routin
 path/query values, UTF-8 JSON, validation, logging, resource cleanup and cooperative
 shutdown. Completion, signature help, automatic imports and F12 include these APIs.
 
+**हिन्दी:** `मानक.वेब` और ऊपर के server प्रकार JVM, CLR व Linux/Windows x64 और macOS ARM64 native पर हैं। साझा स्रोत routing, URL मान, UTF-8 JSON, सत्यापन, लॉग, सफ़ाई और सहकारी shutdown देता है। संपादक सहायता में ये API शामिल हैं।
+
 Start with the [SQLite task-board example](../../examples/web-tasks/README.md)
 and its [step-by-step Hindi walkthrough](../../tutorial/web-applications/README.md).
 Open the example folder containing `bhash.project` and `index.html`, then build/run
@@ -254,14 +354,20 @@ with the desired target. The example serves <http://127.0.0.1:8080/> and keeps d
 in a local SQLite file. Running the compiled application from another directory
 requires an explicit `--page` path as documented in the example.
 
+**हिन्दी:** [SQLite कार्यसूची](../../examples/web-tasks/README.md) और [हिन्दी अभ्यास](../../tutorial/web-applications/README.md) से शुरू करें। `bhash.project` और `index.html` वाला फ़ोल्डर खोलें। लक्ष्य पर बनाकर चलाएँ। <http://127.0.0.1:8080/> खोलें। दूसरे फ़ोल्डर से लॉन्च पर `--page` का पथ दें।
+
 The initial server runs one handler at a time, accepts fixed-length bodies up to
 1 MiB, and closes each connection after its response. Use a reverse proxy for
 HTTPS; listening is unavailable in browser/WASM. The demo is a single-user
 teaching app; the supplied proxy template adds access control for deployment.
 See the [server contract and deployment limits](../../docs/web-applications.md).
 
+**हिन्दी:** server एक बार में एक handler चलाता है, तय लंबाई की 1 MiB तक body लेता है और उत्तर के बाद संबंध बंद करता है। HTTPS के लिए reverse proxy लगाएँ। यह एक उपयोगकर्ता का शिक्षण ऐप है। [नियम](../../docs/web-applications.md) देखें।
+
 A separate [HTTP and SQLite cache example](../../examples/http-sqlite/README.md)
 shows importing remote JSON into a transactional offline cache.
+
+**हिन्दी:** [HTTP और SQLite](../../examples/http-sqlite/README.md) दूर का JSON लेनदेन वाले offline cache में रखता है।
 
 ## Authentication and sessions
 
@@ -273,6 +379,8 @@ idle/absolute expiry, rotation and revocation, role authorization, CSRF protecti
 and login attempt limits. Completion, signature help, automatic imports and F12
 use the bundled library declarations.
 
+**हिन्दी:** ऊपर के प्रमाणीकरण प्रकार JVM, CLR और native में PBKDF2, सुरक्षित tokens और cookies, सीमित server sessions, expiry, rotation, revocation, भूमिका अनुमति, CSRF और login सीमा देते हैं। संपादक सार्वजनिक घोषणाओं से सहायता देता है।
+
 Start with the [Hindi authentication reference](../../tutorial/authentication/README.md)
 and [HTTP/SQLite login and notes application](../../examples/auth-sessions/README.md).
 The walkthrough explains explicit account provisioning, parameterized SQL,
@@ -280,12 +388,16 @@ transactions, resource cleanup and per-user data access. Build using the existin
 target choices, then run the generated application with the arguments documented
 in the example; build/run tasks do not forward application arguments.
 
+**हिन्दी:** [हिन्दी प्रमाणीकरण](../../tutorial/authentication/README.md) और [लॉगिन व नोट्स ऐप](../../examples/auth-sessions/README.md) में खाता बनाना, parameterized SQL, लेनदेन, सफ़ाई और प्रति उपयोगकर्ता डेटा देखें। ऐप बनाकर दिए तर्कों के साथ सीधे चलाएँ। VS Code tasks ऐप तर्क नहीं भेजते।
+
 Public deployments require an HTTPS reverse proxy. Sessions and login attempt
 counters are process-local; restarting signs users out. Plain HTTP is available
 only through the explicit loopback development mode. Windows uses OS CNG and
 macOS uses CommonCrypto; native Linux password operations require the OpenSSL 3
 `libcrypto.so.3` runtime (no development headers). Server authentication is
 unavailable in browser/WASM. See the [security and runtime contract](../../docs/authentication.md).
+
+**हिन्दी:** सार्वजनिक तैनाती में HTTPS reverse proxy चाहिए। सत्र और login गिनती प्रक्रिया की हैं। restart पर sign-out होता है। plain HTTP केवल स्पष्ट loopback mode में है। Windows CNG, macOS CommonCrypto और Linux native में OpenSSL 3 `libcrypto.so.3` है। WebAssembly में server प्रमाणीकरण नहीं है।
 
 ## Reusable source packages
 
@@ -301,6 +413,8 @@ and navigation. Add external local-library folders to the workspace to observe
 changes made outside the editor. See [the package guide](../../docs/source-packages.md)
 and [Hindi tutorial](../../tutorial/packages/README.md).
 
+**हिन्दी:** निर्भरता बदलने पर **Bhash: Update Dependencies Lock** चलाएँ। **Restore Dependencies** पिन किया Git स्रोत लाता है और lock नहीं बदलता। **Verify Dependencies** स्थानीय या cached स्रोत offline जाँचता है। इन्हें भरोसे वाला workspace चाहिए। सफल होने पर संपादक विश्लेषण फिर करता है। सामान्य build/run dependency नहीं लाते। `bhash.lock` बदलने पर निदान फिर आते हैं। बाहरी स्थानीय संकुल की फ़ाइलें देखने के लिए उसका फ़ोल्डर workspace में जोड़ें।
+
 ## Projects and tasks
 
 Run **Bhash: New Project** from the Command Palette. It creates a new directory
@@ -309,7 +423,11 @@ Opening a file beneath a manifest automatically selects the nearest containing
 project for analysis/build/run. Files outside the manifest's source roots are
 standalone compilation units.
 
+**हिन्दी:** **Bhash: New Project** से नया फ़ोल्डर, `bhash.project` और `src/main.bhash` बनते हैं। मौजूदा फ़ोल्डर नहीं बदलता। फ़ाइल खोलने पर सबसे पास की लागू परियोजना चुनी जाती है। स्रोत roots के बाहर फ़ाइल स्वतंत्र है।
+
 For a repeatable team build, add a VS Code task:
+
+**हिन्दी:** टीम में वही निर्माण फिर चलाने के लिए VS Code task जोड़ें:
 
 ```json
 {
@@ -333,6 +451,8 @@ and served over HTTP. CLR/browser builds require .NET 10; browser builds also
 require the `wasm-tools` workload. A library-only project can be analyzed without
 `मुख्य`; executable builds still require exactly one valid entry point.
 
+**हिन्दी:** `project` workspace के सापेक्ष है। `target` के चार मान ऊपर हैं। `command` में `build` या `run` है। ब्राउज़र ऐप HTTP से परोसें। CLR/browser को .NET 10 और browser को `wasm-tools` चाहिए। लाइब्रेरी में `मुख्य` जरूरी नहीं है, executable में ठीक एक चाहिए।
+
 ## Settings
 
 | Setting | Default | Purpose |
@@ -347,6 +467,8 @@ Restricted Mode; the server and tasks require workspace trust. Virtual file
 systems have syntax/snippets only. Unsaved untitled documents have syntax/snippets
 until saved to a `.bhash` path. No Java runtime is downloaded automatically.
 
+**हिन्दी:** Java और संकलक पथ machine settings हैं। Restricted Mode में रंग और snippets हैं, language server और tasks को भरोसा चाहिए। आभासी या बिना नाम फ़ाइल में पहले केवल रंग/snippets हैं। Java अपने आप नहीं आता।
+
 ## Current limits
 
 The editor resolves declared types and common expression chains conservatively;
@@ -357,16 +479,22 @@ Signature help lists overloads and selects a signature
 with enough parameters; it does not promise full overload selection while a call
 is incomplete. Generic member declarations remain a language limitation.
 
+**हिन्दी:** संपादक घोषित प्रकार और सामान्य chains पहचानता है। अज्ञात या अस्पष्ट receiver पर सदस्य सुझाव नहीं हैं। semantic rename/references, formatting और JVM/CLR स्रोत डिबगिंग लंबित हैं। हस्ताक्षर सहायता ओवरलोड सूची दिखाती है और अधूरी कॉल का अंतिम ओवरलोड नहीं तय करती।
+
 Syntax diagnostics are collected first. If syntax is invalid, semantic diagnostics
 wait until it is repaired; completion can still use recovered declarations.
 Declaration/import/generic-expansion failures can still stop at the first error.
 Independent statement, function, constructor and field-initializer errors are
 recovered without emitting an executable. See [diagnostic codes and behavior](../../docs/developer-experience.md).
 
+**हिन्दी:** पहले वाक्यरचना देखी जाती है। उसे ठीक करने पर अर्थ जाँचती है। मिले हुए declarations से सुझाव फिर भी हो सकते हैं। घोषणा, आयात या generic विस्तार पहले दोष पर रुक सकता है। अलग body त्रुटियाँ बिना executable बनाए इकट्ठी होती हैं।
+
 Unchanged project indexes are reused. Changed projects are analyzed as a whole;
 incremental semantic compilation is pending. Automatic imports search the current
 compilation project, not other workspace roots or external binary libraries.
 Builds use saved files. No code is executed during completion or diagnostics.
+
+**हिन्दी:** बिना बदले project index फिर उपयोग होते हैं। बदली परियोजना पूरी जाँची जाती है। auto-import वर्तमान परियोजना तक है। निर्माण सहेजी फ़ाइल उपयोग करता है। सुझाव और निदान कोड नहीं चलाते।
 
 ## Development
 
@@ -374,7 +502,11 @@ Use JDK 17+, Maven and Node.js 22 or later with its bundled npm. In WSL,
 use Linux installations of Java, Node and npm (check `command -v node` and
 `command -v npm`; they should not resolve under `/mnt/c/`).
 
+**हिन्दी:** JDK 17+, Maven और Node.js 22+ के साथ उसका npm लें। WSL में Linux Java, Node और npm उपयोग करें। `command -v node` और `command -v npm` का पथ `/mnt/c/` के नीचे न हो।
+
 From the repository root:
+
+**हिन्दी:** रिपॉज़िटरी की जड़ से:
 
 ```sh
 mvn package -DskipTests
@@ -391,20 +523,28 @@ Minimatch's `comment`/`empty` flags instead of the removed `makeRe()` API; match
 still uses the patched library. Keep this patch until the client supports
 minimatch 11 upstream. A failed patch stops installation.
 
+**हिन्दी:** GHSA-g3hv-75wg-m249 के लिए minimatch 11.0.1 पिन है। `npm ci` patch लगाता है, जिसमें हटे `makeRe()` की जगह `comment`/`empty` flags हैं। upstream client के समर्थन तक patch रखें। patch विफल हो तो स्थापना रुकती है।
+
 Linux integration tests need an X display (CI uses `xvfb-run -a`). The tests launch
 VS Code 1.95.3 by default, exercise the actual extension host and compiler task,
 and can target another version with `VSCODE_VERSION`. The Java stdio protocol tests
 also cover cross-file unsaved edits, aliases, multi-root isolation, diagnostic
 clearing, and UTF-16 positions after supplementary Unicode characters.
 
+**हिन्दी:** Linux परीक्षण को X display चाहिए। CI `xvfb-run -a` उपयोग करता है। डिफ़ॉल्ट VS Code 1.95.3 की जगह `VSCODE_VERSION` दे सकते हैं। वास्तविक extension host, task और stdio में असहेजे संपादन, aliases, workspace अलगाव और पूरक Unicode के बाद UTF-16 स्थान जाँचे जाते हैं।
+
 The VSIX includes Apache-2.0 Bhash code, ANTLR BSD-3-Clause notices, LSP4J's
 EDL-1.0/BSD-3-Clause license option, Gson/Error Prone Apache-2.0 notices, and
 Microsoft's MIT client-library notices. See the included license files.
+
+**हिन्दी:** VSIX में भाष, ANTLR, LSP4J, Gson/Error Prone और Microsoft client की वितरण सूचनाएँ हैं। शामिल लाइसेंस फ़ाइलें देखें।
 
 If `npm ci` says no lockfile exists, verify that
 `editors/vscode/package-lock.json` is present and readable in your checkout.
 The lockfile is committed; do not regenerate it just to bypass the error.
 Try installing directly from the extension directory:
+
+**हिन्दी:** यदि `npm ci` लॉकफ़ाइल नहीं पाता, तो `editors/vscode/package-lock.json` मौजूद और पढ़ने योग्य हो। त्रुटि छिपाने के लिए उसे फिर न बनाएँ। एक्सटेंशन फ़ोल्डर से प्रयास करें:
 
 ```sh
 cd editors/vscode
@@ -417,6 +557,8 @@ npm ci
 The lockfile version should be `3`. If the same error persists, inspect
 `type -a node npm` and the npm debug log for the underlying load error.
 
+**हिन्दी:** lockfile version `3` हो। समस्या रहने पर `type -a node npm` और npm debug log देखें।
+
 
 ## Native debugging on Windows x64
 
@@ -427,19 +569,27 @@ installs a separate checksum-pinned GDB/Python runtime; later launches reuse the
 verified cache offline. No WSL, MSYS2, Python, LLVM or C development installation is
 required. The existing managed compiler SDK is downloaded only if needed.
 
+**हिन्दी:** Windows 10 1903+ में Java 17+ और Microsoft C/C++ दें। `bhash.native.gdbPath` खाली छोड़कर **Bhash: Debug Native** चलाएँ। पहले रन पर checksum-पिन किया GDB/Python cache बनता है। WSL, MSYS2, Python, LLVM या C उपकरण अलग नहीं चाहिए।
+
 Click the gutter or press F9 on executable Bhash lines, then use F10/F11/Shift+F11
 for stepping. Hindi stacks and read-only scalar/text/object/collection inspection
 share the Linux implementation and GC safety contract. Windows/macOS build/run
 support is unchanged; macOS debugger integration remains pending. See the
 [Hindi debugger guide](../../docs/native-vscode-debug.md).
 
+**हिन्दी:** चलने वाली पंक्ति के पास क्लिक करें या F9 दें। F10/F11/Shift+F11 से step करें। हिन्दी stack और केवल पढ़ने वाला निरीक्षण Linux की GC सुरक्षा साझा करता है। [हिन्दी डिबगर](../../docs/native-vscode-debug.md) देखें।
+
 The Windows GDB process manifest enables UTF-8 for Hindi paths (Windows 10 1903+).
 The manifest patch script is retained with the corresponding sources; debugger
 instructions and other upstream binaries are unchanged.
 
+**हिन्दी:** Windows GDB manifest हिन्दी पथों के लिए UTF-8 चालू करता है। उसका patch script संबंधित स्रोतों के साथ है।
+
 ### Windows debug terminals
 
 Version 0.9.2 creates a dedicated integrated terminal for Bhash Windows debugging and starts Microsoft’s Windows debugger launcher directly. WSL, Git Bash, PowerShell, and custom default/automation profiles do not need to be changed. User and workspace terminal settings remain untouched. Existing `cppdbg` configurations with `bhashNative: true` automatically use this path on Windows; ordinary C/C++ sessions keep their existing adapters. Application output and interactive input remain in the integrated terminal.
+
+**हिन्दी:** 0.9.2 से Windows डिबगिंग अपना integrated terminal और Microsoft launcher सीधे शुरू करती है। WSL, Git Bash, PowerShell या custom profile बदलना जरूरी नहीं। `cppdbg` और `bhashNative: true` अपने आप इस रास्ते से जाते हैं। ऐप output और input integrated terminal में रहते हैं।
 
 
 ## Bhash Watch expressions on Windows and Linux/WSL
@@ -451,6 +601,8 @@ Fields, arrays/lists/maps/byte buffers, numeric and boolean operators, text equa
 `सत्य`/`असत्य`/`रिक्त`, ASCII/Devanagari literals and parentheses are supported.
 Reference results remain expandable. Values refresh in the selected stopped frame.
 
+**हिन्दी:** 0.10.0 से Watch और hover में भाष व्यंजक हैं। breakpoint पर रुकें, **+** दबाएँ और ऊपर के उदाहरण दें। क्षेत्र, संग्रह, संख्या, तार्किक संक्रिया, पाठ समानता, null, दोनों अंक लिपियाँ और कोष्ठक चलते हैं। संदर्भ परिणाम खोल सकते हैं। चुने frame के मान दिखते हैं।
+
 Evaluation reads the paused process and computes in the debugger. Calls, assignments,
 construction, casts, text concatenation, text indexing, static member access and
 structural comparisons of distinct records are rejected. There are limits of 4,096
@@ -460,7 +612,11 @@ The explicit **Debug Console** continues to accept advanced GDB/C syntax; it doe
 use the Bhash Watch grammar. Inferior calls remain disabled. Conditional breakpoints
 also retain GDB syntax.
 
+**हिन्दी:** Watch रुकी प्रक्रिया पढ़ता है। कॉल, assignment, नया आवंटन, cast, पाठ जोड़/अनुक्रमण, साझा सदस्य और अलग अभिलेख की संरचनात्मक तुलना अस्वीकार हैं। सीमा 4,096 UTF-8 bytes, 256 nodes, 48 nesting levels, 1 MiB heap और प्रति lookup 1,000 map entries हैं। Debug Console और conditional breakpoints में GDB वाक्यरचना रहती है।
+
 Linux/WSL Bhash sessions now use type `bhash-native`; Windows retains
 `bhash-native-windows`. Existing `cppdbg` configurations with `bhashNative: true` route
 automatically; no terminal settings need changing. See the
 [Hindi Watch reference](../../docs/native-vscode-debug.md#भाष-अभिव्यक्तियाँ-watch-expressions).
+
+**हिन्दी:** Linux/WSL में `bhash-native` और Windows में `bhash-native-windows` है। पुराने `cppdbg` + `bhashNative: true` विन्यास अपने आप सही रास्ता लेते हैं। [हिन्दी Watch संदर्भ](../../docs/native-vscode-debug.md#भाष-अभिव्यक्तियाँ-watch-expressions) देखें।
