@@ -96,6 +96,15 @@ jobs:
               out.write(str(cache/'installations'/active['directory']/'bin')+'\n')
           PYTHON
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
+      - name: Test native WebSocket wire behavior over HTTP/1.1 and HTTP/2 TLS
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        env:
+          BHASH_GC_STRESS: '1'
+        run: |
+          python3 -m pip install -r deploy/http2-websocket/requirements.txt
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/websocket/server.bhash --target native -o target/websocket-wire
+          python3 examples/websocket/verify.py target/websocket-wire
+          python3 examples/websocket/verify_http2.py target/websocket-wire
       - name: Validate collector, binary64 formatting and exception cleanup under sanitizers
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
