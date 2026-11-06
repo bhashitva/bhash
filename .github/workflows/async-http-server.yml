@@ -52,12 +52,13 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
+          set -euo pipefail
           compiler=target/bhash-compiler-0.1.0-SNAPSHOT.jar
           source=examples/async-web/server.bhash
           case "$TARGET" in
             jvm)
               java -jar "$compiler" compile "$source" -o target/async-web.jar
-              python3 examples/async-web/verify.py java -jar target/async-web.jar
+              python3 examples/async-web/verify.py java -Dfile.encoding=UTF-8 -jar target/async-web.jar
               ;;
             clr)
               java -jar "$compiler" compile "$source" --target clr -o target/async-web-clr
