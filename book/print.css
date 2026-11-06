@@ -1,0 +1,65 @@
+@font-face {
+  font-family: "Book Hindi";
+  src: url(noto-sans-devanagari-devanagari-400-normal.woff2) format("woff2");
+  font-weight: 400;
+  unicode-range: U+0900-097F, U+1CD0-1CFF, U+A8E0-A8FF, U+200C-200D;
+}
+@font-face {
+  font-family: "Book Hindi";
+  src: url(noto-sans-devanagari-devanagari-700-normal.woff2) format("woff2");
+  font-weight: 700;
+  unicode-range: U+0900-097F, U+1CD0-1CFF, U+A8E0-A8FF, U+200C-200D;
+}
+
+:root {
+  color: #24242e;
+  font: 16px/1.65 "Book Hindi", "Noto Sans", system-ui, sans-serif;
+}
+body { margin: 0; }
+main { max-width: 52rem; margin: auto; padding: 2rem 1.25rem; }
+h1, h2, h3, h4 { color: #29305d; line-height: 1.35; }
+h1 { font-size: 2em; }
+h2 { font-size: 1.37em; }
+h3 { font-size: 1.13em; }
+h1, h2, h3, h4 { margin: 1.15em 0 .36em; }
+p, ul, ol { margin: .55em 0 .85em; }
+a { color: #184d80; text-underline-offset: .16em; }
+table { width: 100%; border-collapse: collapse; margin: .8em 0; }
+th, td { border: 1px solid #cfd4e1; text-align: start; padding: .36em .65em; }
+th { background: #e9edf7; }
+img { max-width: 100%; }
+blockquote { margin-inline: 0; padding-inline-start: 1em; border-inline-start: .2em solid #cfd4e1; }
+code { font-family: "Book Hindi", "DejaVu Sans Mono", Consolas, monospace; font-size: .9em; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f1f3f8; padding: .7em 1em; }
+p, li, td { overflow-wrap: anywhere; }
+.online { color: #474e69; font-size: .8em; }
+.edition-note { color: #474e69; }
+.cover {
+  border-block-start: 5px solid #465293;
+  padding: 4em 1.6em 5em;
+  background: #eef1fb;
+  color: #29305d;
+}
+.cover h1 { margin: 1.1em 0 0; font-size: 3.2em; }
+.subtitle { margin-top: 0; font-size: 1.35em; }
+.revision { margin-top: 3em; font-size: .86em; }
+
+@page {
+  size: A4;
+  margin: 17mm 18mm 18mm;
+  @bottom-center {
+    content: counter(page);
+    color: #474e69;
+    font: 9pt sans-serif;
+  }
+}
+@media print {
+  :root { font-size: 11pt; line-height: 1.51; }
+  main { max-width: none; padding: 0; }
+  .cover { min-height: 197mm; break-after: page; }
+  .chapter + .chapter { break-before: page; }
+  h1, h2, h3, h4 { break-after: avoid; }
+  p, li { orphans: 2; widows: 2; }
+  pre, tr { break-inside: avoid; }
+  thead { display: table-header-group; }
+}
