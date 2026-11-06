@@ -44,7 +44,7 @@ public final class StandardLibrary {
         return new Catalog(String.join("\n",lines)+"\n",Map.copyOf(natives));
     }
     public static boolean owns(String full) {
-        return (CATALOG.source+FOUNDATIONS.text()+NETWORKING.text()+SQLITE.text()+DATABASE.text()+MIGRATIONS.text()+WEB.text()+AUTH.text()+TASKS.text()+ASYNC_DATABASE.text()).lines().anyMatch(line->{
+        return (CATALOG.source+FOUNDATIONS.text()+NETWORKING.text()+SQLITE.text()+DATABASE.text()+MIGRATIONS.text()+WEB.text()+AUTH.text()+TASKS.text()+ASYNC_DATABASE.text()+ASYNC_WEB.text()).lines().anyMatch(line->{
             for(String prefix:List.of("सार्वजनिक वर्ग ","सार्वजनिक अनुबंध ","सार्वजनिक अभिलेख "))
                 if(line.startsWith(prefix)&&full.equals("मानक."+Identifiers.key(line.substring(prefix.length()).split("[ <{(]",2)[0])))return true;
             return false;
@@ -58,7 +58,8 @@ public final class StandardLibrary {
     public static final String WEB_NAME="__bhash_web__.bhash";
     public static final String TASKS_NAME="__bhash_tasks__.bhash";
     public static final String ASYNC_DATABASE_NAME="__bhash_async_database__.bhash";
-    public static boolean reserved(String name) {return name.equals(ASYNC_DATABASE_NAME)||name.equals(TASKS_NAME)||name.equals(DATABASE_NAME)||name.equals(MIGRATIONS_NAME)||name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME)||name.equals(NETWORKING_NAME)||name.equals(SQLITE_NAME)||name.equals(WEB_NAME)||name.equals(AUTH_NAME);}
+    public static final String ASYNC_WEB_NAME="__bhash_async_web__.bhash";
+    public static boolean reserved(String name) {return name.equals(ASYNC_WEB_NAME)||name.equals(ASYNC_DATABASE_NAME)||name.equals(TASKS_NAME)||name.equals(DATABASE_NAME)||name.equals(MIGRATIONS_NAME)||name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME)||name.equals(NETWORKING_NAME)||name.equals(SQLITE_NAME)||name.equals(WEB_NAME)||name.equals(AUTH_NAME);}
     private static final SourceFile FOUNDATIONS=loadImplementation("foundations.bhash",FOUNDATIONS_NAME);
     private static final SourceFile NETWORKING=loadImplementation("networking.bhash",NETWORKING_NAME);
     private static final SourceFile SQLITE=loadImplementation("sqlite.bhash",SQLITE_NAME);
@@ -68,7 +69,8 @@ public final class StandardLibrary {
     private static final SourceFile AUTH=loadImplementation("authentication.bhash",AUTH_NAME);
     private static final SourceFile TASKS=loadImplementation("tasks.bhash",TASKS_NAME);
     private static final SourceFile ASYNC_DATABASE=loadImplementation("async-database.bhash",ASYNC_DATABASE_NAME);
-    private static final List<SourceFile> IMPLEMENTATIONS=List.of(FOUNDATIONS,NETWORKING,SQLITE,DATABASE,MIGRATIONS,WEB,AUTH,TASKS,ASYNC_DATABASE);
+    private static final SourceFile ASYNC_WEB=loadImplementation("async-web.bhash",ASYNC_WEB_NAME);
+    private static final List<SourceFile> IMPLEMENTATIONS=List.of(FOUNDATIONS,NETWORKING,SQLITE,DATABASE,MIGRATIONS,WEB,AUTH,TASKS,ASYNC_DATABASE,ASYNC_WEB);
     public static SourceFile foundations() {return FOUNDATIONS;}
     private static SourceFile loadImplementation(String resource,String name) {
         try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+resource)) {
