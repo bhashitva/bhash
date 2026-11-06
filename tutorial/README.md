@@ -1,5 +1,7 @@
 # भाष ट्यूटोरियल (Bhash Tutorials)
 
+विषयों को क्रम से सीखने के लिए [भाष में प्रोग्रामिंग पुस्तक](../book/README.md) पढ़ें।
+
 यह फ़ोल्डर विषयवार संदर्भ-उदाहरणों और उन्हें समझाने वाले हिन्दी विवरणों के लिए है। किसी विशेष काम के समय संबंधित पृष्ठ खोलें, उदाहरण चलाएँ और सीमाएँ समझें। यह क्रमबद्ध कक्षा-पाठ्यक्रम नहीं है; उसके लिए अलग [lessons/](../lessons/README.md) है।
 
 | ट्यूटोरियल | क्या मिलेगा |
@@ -22,5 +24,7 @@
 ## PostgreSQL and migrations / डेटाबेस माइग्रेशन
 
 See the [shared database providers and migration guide](database-providers/README.md) for SQLite/PostgreSQL, parameterized SQL, transactions, deployment requirements and Hindi examples.
+
+**हिन्दी:** SQLite/PostgreSQL, मापदंडयुक्त SQL, लेनदेन, तैनाती और हिन्दी उदाहरणों के लिए [साझा डेटाबेस प्रदाता और माइग्रेशन](database-providers/README.md) देखें।
 
 - [असमकालिक HTTP और डेटाबेस (Async I/O)](async-io/README.md): नेटवर्क अनुरोध, मापदंडयुक्त SQL, लेनदेन और निरस्तीकरण।

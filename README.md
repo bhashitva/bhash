@@ -19,6 +19,9 @@ See [SUPPORT.md](SUPPORT.md) for help and bug-report guidance.
 
 ## Learn and teach Bhash
 
+Read [भाष में प्रोग्रामिंग (Programming with Bhash)](book/README.md), a Hindi
+book that follows a task list from the first program to a tested web API.
+
 Functions now use `फलन`, and iteration uses `प्रत्येक (संग्रह में तत्व: प्रकार)`.
 See the [syntax update and source migration guide](docs/hindi-syntax.md) when
 rebuilding programs written with earlier compiler releases.

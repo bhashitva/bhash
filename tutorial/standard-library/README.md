@@ -84,52 +84,52 @@ Compiler का default पथ target/bhash-compiler-0.1.0-SNAPSHOT.jar है�
 
 | module | फ़ंक्शन (English) |
 | --- | --- |
-| मानक.पाठ्य | [लंबाई (Length)](01-text.md#length) |
-| मानक.पाठ्य | [अंश (Substring / Slice)](01-text.md#substring-slice) |
-| मानक.पाठ्य | [खोजो (Index Of / Find)](01-text.md#index-of-find) |
-| मानक.पाठ्य | [है (Contains)](01-text.md#contains) |
-| मानक.पाठ्य | [आरंभ (Starts With)](01-text.md#starts-with) |
-| मानक.पाठ्य | [अंत (Ends With)](01-text.md#ends-with) |
-| मानक.पाठ्य | [बदलो (Replace)](01-text.md#replace) |
-| मानक.पाठ्य | [बाँटो (Split)](01-text.md#split) |
-| मानक.पाठ्य | [जोड़ो (Join)](01-text.md#join) |
-| मानक.पाठ्य | [छाँटो (Trim)](01-text.md#trim) |
-| मानक.पाठ्य | [बड़ाअक्षर (To Upper Case)](01-text.md#to-upper-case) |
-| मानक.पाठ्य | [छोटाअक्षर (To Lower Case)](01-text.md#to-lower-case) |
-| मानक.पाठ्य | [दोहराओ (Repeat)](01-text.md#repeat) |
-| मानक.पाठ्य | [संख्यापाठ (Fixed Decimal Formatting / To Fixed)](01-text.md#fixed-decimal-formatting-to-fixed) |
-| मानक.पाठ्य | [अंकदेवनागरी (Convert Digits to Devanagari)](01-text.md#convert-digits-to-devanagari) |
-| मानक.पाठ्य | [यूटीएफ८ (Encode UTF-8)](01-text.md#encode-utf-8) |
-| मानक.पाठ्य | [यूटीएफ८पाठ (Decode UTF-8)](01-text.md#decode-utf-8) |
-| मानक.गणित | [निरपेक्ष (Absolute Value / Abs)](02-math.md#absolute-value-abs) |
-| मानक.गणित | [न्यूनतम (Minimum / Min)](02-math.md#minimum-min) |
-| मानक.गणित | [अधिकतम (Maximum / Max)](02-math.md#maximum-max) |
-| मानक.गणित | [वर्गमूल (Square Root / Sqrt)](02-math.md#square-root-sqrt) |
-| मानक.गणित | [घात (Power / Pow)](02-math.md#power-pow) |
-| मानक.गणित | [फर्श (Floor)](02-math.md#floor) |
-| मानक.गणित | [छत (Ceiling / Ceil)](02-math.md#ceiling-ceil) |
-| मानक.गणित | [निकटतम (Round to Nearest / Ties to Even)](02-math.md#round-to-nearest-ties-to-even) |
-| मानक.गणित | [ज्या (Sine / Sin)](02-math.md#sine-sin) |
-| मानक.गणित | [कोज्या (Cosine / Cos)](02-math.md#cosine-cos) |
-| मानक.गणित | [लघुगणक (Natural Logarithm / Log)](02-math.md#natural-logarithm-log) |
-| मानक.गणित | [घातांक (Exponential / Exp)](02-math.md#exponential-exp) |
-| मानक.गणित | [पाई (Pi)](02-math.md#pi) |
-| मानक.यादृच्छिक | [बीज (Seed)](03-random.md#seed) |
-| मानक.यादृच्छिक | [पूर्णांकचुनो (Random Integer / Next Int)](03-random.md#random-integer-next-int) |
-| मानक.यादृच्छिक | [अंश (Random Fraction / Next Double)](03-random.md#random-fraction-next-double) |
-| मानक.जेसन | [पढ़ो (Parse JSON)](04-json.md#parse-json) |
-| मानक.जेसन | [पाठबनाओ (Stringify JSON / Serialize)](04-json.md#stringify-json-serialize) |
-| मानक.समय | [अभी (Current Time / Now)](05-time.md#current-time-now) |
-| मानक.समय | [पढ़ो (Parse UTC Timestamp)](05-time.md#parse-utc-timestamp) |
-| मानक.समय | [पाठबनाओ (Format UTC Timestamp)](05-time.md#format-utc-timestamp) |
-| मानक.समय | [वर्ष (Year)](05-time.md#year) |
-| मानक.समय | [माह (Month)](05-time.md#month) |
-| मानक.समय | [दिन (Day of Month)](05-time.md#day-of-month) |
-| मानक.फ़ाइल | [समर्थित (File Capability / Is Supported)](06-files.md#file-capability-is-supported) |
-| मानक.फ़ाइल | [है (File Exists / Is Regular File)](06-files.md#file-exists-is-regular-file) |
-| मानक.फ़ाइल | [पाठपढ़ो (Read Text File)](06-files.md#read-text-file) |
-| मानक.फ़ाइल | [पाठलिखो (Write Text File)](06-files.md#write-text-file) |
-| मानक.फ़ाइल | [बाइटपढ़ो (Read Bytes)](06-files.md#read-bytes) |
-| मानक.फ़ाइल | [बाइटलिखो (Write Bytes)](06-files.md#write-bytes) |
+| मानक.पाठ्य | [लंबाई (Length)](01-text.md#लंबाई-length) |
+| मानक.पाठ्य | [अंश (Substring / Slice)](01-text.md#अंश-substring--slice) |
+| मानक.पाठ्य | [खोजो (Index Of / Find)](01-text.md#खोजो-index-of--find) |
+| मानक.पाठ्य | [है (Contains)](01-text.md#है-contains) |
+| मानक.पाठ्य | [आरंभ (Starts With)](01-text.md#आरंभ-starts-with) |
+| मानक.पाठ्य | [अंत (Ends With)](01-text.md#अंत-ends-with) |
+| मानक.पाठ्य | [बदलो (Replace)](01-text.md#बदलो-replace) |
+| मानक.पाठ्य | [बाँटो (Split)](01-text.md#बाँटो-split) |
+| मानक.पाठ्य | [जोड़ो (Join)](01-text.md#जोड़ो-join) |
+| मानक.पाठ्य | [छाँटो (Trim)](01-text.md#छाँटो-trim) |
+| मानक.पाठ्य | [बड़ाअक्षर (To Upper Case)](01-text.md#बड़ाअक्षर-to-upper-case) |
+| मानक.पाठ्य | [छोटाअक्षर (To Lower Case)](01-text.md#छोटाअक्षर-to-lower-case) |
+| मानक.पाठ्य | [दोहराओ (Repeat)](01-text.md#दोहराओ-repeat) |
+| मानक.पाठ्य | [संख्यापाठ (Fixed Decimal Formatting / To Fixed)](01-text.md#संख्यापाठ-fixed-decimal-formatting--to-fixed) |
+| मानक.पाठ्य | [अंकदेवनागरी (Convert Digits to Devanagari)](01-text.md#अंकदेवनागरी-convert-digits-to-devanagari) |
+| मानक.पाठ्य | [यूटीएफ८ (Encode UTF-8)](01-text.md#यूटीएफ८-encode-utf-8) |
+| मानक.पाठ्य | [यूटीएफ८पाठ (Decode UTF-8)](01-text.md#यूटीएफ८पाठ-decode-utf-8) |
+| मानक.गणित | [निरपेक्ष (Absolute Value / Abs)](02-math.md#निरपेक्ष-absolute-value--abs) |
+| मानक.गणित | [न्यूनतम (Minimum / Min)](02-math.md#न्यूनतम-minimum--min) |
+| मानक.गणित | [अधिकतम (Maximum / Max)](02-math.md#अधिकतम-maximum--max) |
+| मानक.गणित | [वर्गमूल (Square Root / Sqrt)](02-math.md#वर्गमूल-square-root--sqrt) |
+| मानक.गणित | [घात (Power / Pow)](02-math.md#घात-power--pow) |
+| मानक.गणित | [फर्श (Floor)](02-math.md#फर्श-floor) |
+| मानक.गणित | [छत (Ceiling / Ceil)](02-math.md#छत-ceiling--ceil) |
+| मानक.गणित | [निकटतम (Round to Nearest / Ties to Even)](02-math.md#निकटतम-round-to-nearest--ties-to-even) |
+| मानक.गणित | [ज्या (Sine / Sin)](02-math.md#ज्या-sine--sin) |
+| मानक.गणित | [कोज्या (Cosine / Cos)](02-math.md#कोज्या-cosine--cos) |
+| मानक.गणित | [लघुगणक (Natural Logarithm / Log)](02-math.md#लघुगणक-natural-logarithm--log) |
+| मानक.गणित | [घातांक (Exponential / Exp)](02-math.md#घातांक-exponential--exp) |
+| मानक.गणित | [पाई (Pi)](02-math.md#पाई-pi) |
+| मानक.यादृच्छिक | [बीज (Seed)](03-random.md#बीज-seed) |
+| मानक.यादृच्छिक | [पूर्णांकचुनो (Random Integer / Next Int)](03-random.md#पूर्णांकचुनो-random-integer--next-int) |
+| मानक.यादृच्छिक | [अंश (Random Fraction / Next Double)](03-random.md#अंश-random-fraction--next-double) |
+| मानक.जेसन | [पढ़ो (Parse JSON)](04-json.md#पढ़ो-parse-json) |
+| मानक.जेसन | [पाठबनाओ (Stringify JSON / Serialize)](04-json.md#पाठबनाओ-stringify-json--serialize) |
+| मानक.समय | [अभी (Current Time / Now)](05-time.md#अभी-current-time--now) |
+| मानक.समय | [पढ़ो (Parse UTC Timestamp)](05-time.md#पढ़ो-parse-utc-timestamp) |
+| मानक.समय | [पाठबनाओ (Format UTC Timestamp)](05-time.md#पाठबनाओ-format-utc-timestamp) |
+| मानक.समय | [वर्ष (Year)](05-time.md#वर्ष-year) |
+| मानक.समय | [माह (Month)](05-time.md#माह-month) |
+| मानक.समय | [दिन (Day of Month)](05-time.md#दिन-day-of-month) |
+| मानक.फ़ाइल | [समर्थित (File Capability / Is Supported)](06-files.md#समर्थित-file-capability--is-supported) |
+| मानक.फ़ाइल | [है (File Exists / Is Regular File)](06-files.md#है-file-exists--is-regular-file) |
+| मानक.फ़ाइल | [पाठपढ़ो (Read Text File)](06-files.md#पाठपढ़ो-read-text-file) |
+| मानक.फ़ाइल | [पाठलिखो (Write Text File)](06-files.md#पाठलिखो-write-text-file) |
+| मानक.फ़ाइल | [बाइटपढ़ो (Read Bytes)](06-files.md#बाइटपढ़ो-read-bytes) |
+| मानक.फ़ाइल | [बाइटलिखो (Write Bytes)](06-files.md#बाइटलिखो-write-bytes) |
 
 विस्तृत machine-level अनुबंध और मूल catalog के लिए [तकनीकी reference](../../docs/standard-library.md) देखें। ये ट्यूटोरियल उस reference की हिन्दी, उदाहरण-आधारित साथी सामग्री हैं।

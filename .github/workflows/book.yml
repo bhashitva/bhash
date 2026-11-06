@@ -1,0 +1,53 @@
+name: Hindi book exports
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Hindi book edition (MAJOR.MINOR.PATCH)
+        required: true
+        default: "1.1.0"
+  pull_request:
+    paths: &book-paths
+      - 'book/**'
+      - 'scripts/build_book.py'
+      - 'scripts/check_book.py'
+  push:
+    branches: [main]
+    paths: *book-paths
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      BOOK_VERSION: ${{ inputs.version || '1.1.0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the pinned Python dependencies
+        run: python -m pip install -r book/requirements.txt
+      - name: Install the pinned headless Chromium
+        run: python -m playwright install --only-shell chromium
+      - name: Fetch the pinned Devanagari font
+        run: |
+          npm pack @fontsource/noto-sans-devanagari@5.3.0 --pack-destination "$RUNNER_TEMP"
+      - name: Build and verify PDF and offline ZIP
+        run: |
+          python scripts/check_book.py
+          python scripts/build_book.py --version "$BOOK_VERSION" \
+            --font-package "$RUNNER_TEMP/fontsource-noto-sans-devanagari-5.3.0.tgz"
+          (cd target/book && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bhash-book-${{ env.BOOK_VERSION }}-hi
+          path: target/book/
+          if-no-files-found: error

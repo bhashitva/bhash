@@ -84,12 +84,16 @@ The binary archive exceeds GitHub's ordinary 100 MiB file limit and the sources
 are larger still, so these downloads belong in Releases rather than Git history.
 No VPS hosting is needed.
 
+**हिन्दी:** जाँचा हुआ Linux SDK [native-sdk-1.1.0](https://github.com/bhashitva/bhash/releases/tag/native-sdk-1.1.0) में है। ऊपर binary और स्रोत की SHA-256 दी गई हैं। दोनों archives और checksums GitHub Release assets हैं। Git में scripts, notices और catalog हैं। स्रोत और binary साथ रखें। प्रकाशित संस्करण न बदलें। दोनों GitHub की 100 MiB सामान्य फ़ाइल सीमा से बड़े हैं।
+
 VS Code extension 0.5.2 offers Native build/run and automatic setup on Linux
 x86-64/glibc 2.35+ extension hosts, including WSL Ubuntu 22.04+. It delegates
 installation to this same verified, atomic CLI installer and shares its cache.
 Task resolution and opening a workspace do not download tools. Java 17+ remains
 required for compilation; applications run without Java or LLVM.
-See the [extension guide](../editors/vscode/README.md#native-on-linux-and-wsl).
+See the [extension guide](../editors/vscode/README.md#native-on-windows-linux-and-wsl).
+
+**हिन्दी:** VS Code 0.5.2 में Linux x86-64/glibc 2.35+ और WSL Ubuntu 22.04+ पर native build/run और स्वतः setup है। वही जाँचा हुआ atomic CLI installer और cache साझा हैं। workspace खोलने या task खोजने से डाउनलोड नहीं होता। संकलन में Java 17+ चाहिए। बना ऐप Java और LLVM के बिना चलता है।
 
 The pinned publication workflow records the successful SDK build run and expected
 hashes. For a new SDK release, update its tested artifact provenance, hashes and
@@ -100,6 +104,8 @@ network access disabled. The Linux VS Code host suite also executes a configured
 Native task and its generated executable. WSL uses that Linux workspace extension;
 these CI checks do not claim to launch a Windows WSL distribution.
 
+**हिन्दी:** प्रकाशन workflow में सफल SDK build का स्रोत और hash दर्ज हैं। नए SDK में provenance, hash, tag और extension catalog साथ बदलें। प्रकाशित assets overwrite नहीं होते। CI कम अधिकार वाले Java/Node Linux container में HTTPS से स्थापना और फिर offline build/run जाँचता है। Linux VS Code वास्तविक task चलाता है। WSL उसी Linux एक्सटेंशन का उपयोग करता है।
+
 ## Ubuntu 22.04 / WSL compatibility
 
 The replacement SDK is built on Ubuntu 22.04 (Jammy), with glibc 2.35 and GCC 11
@@ -109,6 +115,8 @@ the official LLVM Jammy repository, with the complete Debian package version
 published LLVM signing-key fingerprint. Every host-side ELF in `libexec/` and
 `lib/` is inspected for GLIBC symbol versions above 2.35 before packaging.
 
+**हिन्दी:** बदला SDK Ubuntu 22.04 Jammy, glibc 2.35 और pinned snapshot के GCC 11 headers/startup files पर बनता है। LLVM 18.1.8 आधिकारिक Jammy repository से है। Debian package का पूरा संस्करण और epoch पिन हैं तथा repository signature जाँचा जाता है। पैकेज से पहले `libexec/` और `lib/` में GLIBC 2.35 से ऊपर के symbols खोजे जाते हैं।
+
 The toolchain format ID remains `bhash-linux-x86_64-llvm18-v1`; this identifies
 the compatible layout and LLVM major version, not the archive contents. The new
 release uses distinct `-jammy.zip` / `-jammy-sources.zip` asset names and a new
@@ -117,9 +125,13 @@ checksum-pinned installer. The original SDK 1.0.0 archives remain available and
 continue to require glibc 2.39. Changing an extension preflight check cannot make
 those original binaries compatible with an older host.
 
+**हिन्दी:** `bhash-linux-x86_64-llvm18-v1` संगत layout और LLVM major version बताता है। अलग Jammy archives के नाम और hash नए हैं। cache का बदलाव उसी atomic checksum installer से है। पुराने 1.0.0 को glibc 2.39 चाहिए। केवल extension check बदलने से पुराने binary नहीं चलेंगे।
+
 Clean-consumer and extension CI cover both Ubuntu 22.04 and 24.04. Source archives
 include the exact LLVM and Ubuntu sources recorded for the new payload. The host
 uses its own glibc/loader; the SDK does not replace or upgrade system libraries.
+
+**हिन्दी:** Ubuntu 22.04 और 24.04 दोनों पर clean-consumer और extension CI हैं। स्रोत archive ठीक वही LLVM और Ubuntu स्रोत रखता है। SDK सिस्टम का glibc या loader नहीं बदलता।
 
 The LLVM Jammy package records compiler command lines in DWARF producer strings
 by default. The managed clang wrapper disables command-line recording while
@@ -127,3 +139,5 @@ retaining source/line debug information and path-prefix mappings. This prevents
 private SDK cache paths and temporary build directories from changing executable
 bytes after relocation. CI compares complete debug executables across an ASCII
 cache and a cache containing spaces and Hindi characters.
+
+**हिन्दी:** LLVM Jammy सामान्यतः DWARF में build command लिखता है। managed wrapper उसे बंद रखता है, लेकिन स्रोत स्थान और path mappings रखता है। इससे निजी cache और अस्थायी पथ स्थान बदलने पर executable bytes नहीं बदलते। CI ASCII और हिन्दी cache पथों के परिणाम मिलाता है।
