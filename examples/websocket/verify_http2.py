@@ -215,15 +215,27 @@ def main():
         raise SystemExit("Usage: python verify_http2.py SERVER [SERVER ARGUMENTS ...]")
     with TemporaryDirectory(prefix="bhash-h2-") as tmp, ExitStack() as stack:
         cert, key = Path(tmp) / "cert.pem", Path(tmp) / "key.pem"
-        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
-                        "-subj", f"/CN={AUTHORITY}", "-addext", f"subjectAltName=DNS:{AUTHORITY}",
-                        "-keyout", str(key), "-out", str(cert)], check=True, capture_output=True)
+        # A config file works with both OpenSSL and the macOS system LibreSSL.
+        config = Path(tmp) / "openssl.cnf"
+        config.write_text(
+            "[req]\ndistinguished_name=dn\nprompt=no\nx509_extensions=extensions\n"
+            f"[dn]\nCN={AUTHORITY}\n[extensions]\nsubjectAltName=DNS:{AUTHORITY}\n",
+            encoding="ascii",
+        )
+        result = subprocess.run(
+            ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
+             "-config", str(config), "-keyout", str(key), "-out", str(cert)],
+            capture_output=True,
+        )
+        if result.returncode:
+            raise RuntimeError(result.stderr.decode(errors="replace"))
         bhash = stack.enter_context(process(sys.argv[1:], os.environ | {"BHASH_WS_TEST_ORIGIN": ORIGIN}))
         backend, token = int(bhash("PORT")), bhash("SESSION")
         gateway = stack.enter_context(process([sys.executable, "-u", str(GATEWAY), "--authority",
                                                AUTHORITY, "--backend-port", str(backend), "--port", "0",
                                                "--cert", str(cert), "--key", str(key)]))
-        context = ssl.create_default_context(cafile=str(cert))
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.load_verify_locations(cafile=str(cert))
         context.set_alpn_protocols(["h2"])
         with socket.create_connection(("127.0.0.1", int(gateway("READY"))), timeout=20) as tcp:
             with context.wrap_socket(tcp, server_hostname=AUTHORITY) as wire:
