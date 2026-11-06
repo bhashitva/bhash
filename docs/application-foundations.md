@@ -5,12 +5,16 @@ portable lexical paths, directory operations, scoped resource cleanup,
 configuration, structured logging and a process-isolated Bhash test runner.
 Hindi reference examples are in [the tutorial](../tutorial/application-foundations/README.md).
 
+**हिन्दी:** इस पुस्तकालय में संग्रह कलन, buffered binary प्रवाह, पथ, निर्देशिका, दायरे की संसाधन सफ़ाई, विन्यास, संरचित लॉग और अलग प्रक्रिया वाला परीक्षण चालक हैं। [हिन्दी उदाहरण](../tutorial/application-foundations/README.md) देखें।
+
 The public classes are bundled source in `मानक`. Imports, aliases and explicit
 generic arguments work like user-defined packages. Algorithms and application
 policies are written in Bhash; `foundation-api.txt` supplies the small compiler
 bindings used by `foundations.bhash`. `मानक.तंत्र` is that implementation layer;
 application code should use the public classes below instead of integer handles.
 Unused foundation declarations are omitted, including their static initialization.
+
+**हिन्दी:** सार्वजनिक वर्ग `मानक` में bundled स्रोत हैं। आयात, उपनाम और स्पष्ट प्रकार तर्क सामान्य संकुल जैसे हैं। ऐप नियम भाष में हैं और `foundation-api.txt` छोटी compiler bindings देता है। `मानक.तंत्र` अंदरूनी स्तर है। ऐप सार्वजनिक API उपयोग करे। अप्रयुक्त घोषणाएँ और उनका साझा आरंभ हटते हैं।
 
 ## Target contract
 
@@ -29,10 +33,14 @@ milestone does not deploy a new playground or publish a VS Code extension.
 Windows native argument decoding uses Windows-supplied Shell32, alongside the
 existing Kernel32/UCRT dependencies; no Java/.NET/LLVM runtime is introduced.
 
+**हिन्दी:** ब्राउज़र को host फ़ाइल या परिवेश की अनुमति नहीं मिलती। Windows native तर्क decode करने के लिए OS का Shell32 भी उपयोग करता है। निर्मित ऐप में JVM/.NET/LLVM रनटाइम नहीं जुड़ता।
+
 ## Collections
 
 All algorithms accept `सूची<T>` and use explicit type arguments. Callbacks use
 ordinary classes implementing interfaces; this does not require lambdas.
+
+**हिन्दी:** सभी कलन `सूची<T>` और स्पष्ट प्रकार तर्क लेते हैं। अनुबंध लागू करने वाला साधारण वर्ग callback दे सकता है।
 
 | API | Contract |
 | --- | --- |
@@ -60,6 +68,8 @@ comparators must supply a consistent ordering. Existing collection mutation
 checks and catchable callback errors apply. There are no new collection equality
 or hashing rules, implicit conversions or unchecked element accesses.
 
+**हिन्दी:** कलन स्रोत सूची जानबूझकर नहीं बदलते। प्रतियाँ अंदर के संदर्भ साझा करती हैं। callback चक्र में स्रोत न बदले और comparator सुसंगत क्रम दे। सामान्य बदलाव जाँच और catchable त्रुटियाँ लागू हैं।
+
 ## Resource scopes and streams
 
 `संसाधन (name: Type = expression) { ... }` evaluates the initializer once and
@@ -68,6 +78,8 @@ exists only inside the scope. `बंदनीय` is the shared interface for t
 structurally matching classes are also accepted. A null result fails before the
 body runs. Failed initialization does not invoke cleanup.
 
+**हिन्दी:** `संसाधन` का आरंभक एक बार चलता है और पहुँच योग्य instance `बंदकरो() -> शून्य` चाहिए। बंधन अचल और केवल ब्लॉक में है। `बंदनीय` साझा अनुबंध है, संगत विधि वाला वर्ग भी चलता है। null पर शरीर शुरू नहीं होता। असफल आरंभक पर सफ़ाई नहीं बुलती।
+
 The compiler lowers the body to the existing try/finally machinery. Cleanup runs
 on fallthrough, return, break, continue and Bhash exception unwinding. Nested
 scopes close in reverse acquisition order, including when a later acquisition
@@ -75,6 +87,8 @@ fails. Native bindings remain precise GC roots through cleanup and unwinding.
 As with existing `अंततः`, a cleanup exception replaces a pending body exception
 or return; suppressed-exception aggregation is not introduced. A process kill or
 fatal runtime/host failure cannot guarantee cleanup.
+
+**हिन्दी:** संकलक प्रयास/अंततः उपयोग करता है। सामान्य निकास, return, break, continue और अपवाद पर उलटे क्रम में सफ़ाई है। बाद का आरंभ असफल हो तो पहले खुले संसाधन बंद होते हैं। नेटिव roots सफ़ाई तक सुरक्षित हैं। सफ़ाई त्रुटि लंबित वापसी या अपवाद बदलती है। host failure या kill पर गारंटी नहीं है।
 
 | `प्रवाह` API | Contract |
 | --- | --- |
@@ -93,10 +107,14 @@ independently decode arbitrary chunks with `यूटीएफ८पाठ`. Thi
 provides binary streams and text writes, not a stateful text reader or seeking.
 Open-file sharing/locking follows the OS; do not rely on concurrent modification.
 
+**हिन्दी:** प्रवाह पर पूरी फ़ाइल helpers की 16 MiB सीमा नहीं है। बार-बार सीमित मात्रा पढ़ें। शून्य bytes का अर्थ EOF नहीं है। UTF-8 क्रम दो reads के बीच टूट सकता है, इसलिए मनमाने भाग अलग decode न करें। यहाँ binary streams और text writes हैं। stateful reader या seeking नहीं है। फ़ाइल sharing OS पर है।
+
 At most 1,024 streams may be open in one program. The runtime registry holds only
 OS resources/opaque integer identities, never managed object pointers. Explicit
 scopes provide deterministic close; GC finalization is not a substitute for them.
 Bindings release temporary directory enumeration handles during failures too.
+
+**हिन्दी:** प्रति ऐप अधिकतम १,०२४ खुले प्रवाह हैं। registry में OS संसाधन और opaque पहचान हैं। संसाधन दायरा समय पर बंद करता है। GC उसका विकल्प नहीं है। निर्देशिका enumeration के अस्थायी handles विफलता पर भी छूटते हैं।
 
 ## Paths and directories
 
@@ -119,11 +137,15 @@ resolution, symlink following or containment/security checks. In particular,
 preserving `..` avoids silently changing symlink traversal semantics. Do not
 accept untrusted paths using a string-prefix test.
 
+**हिन्दी:** lexical पथ सभी लक्ष्यों पर `/` लेते हैं। backslash, UNC/device, खाली और NUL पथ अमान्य हैं। raw stream/directory calls OS पथ लेती हैं। lexical सफ़ाई filesystem, symlink या सुरक्षा containment नहीं जाँचती। `..` बनाए रखने से symlink अर्थ नहीं बदलता। prefix से अविश्वसनीय पथ न स्वीकारें।
+
 Existence follows directory targets; deletion rejects symlink/reparse-point leaf
 entries. Creation requires exclusive use of the intended target name; the CLR's
 check/create sequence is not an atomic exclusivity guarantee under competing
 processes. Errors have portable catchable Hindi messages; OS error codes and
 permission details are not exposed in this edition.
+
+**हिन्दी:** मौजूदगी निर्देशिका लक्ष्य देखती है। हटाते समय अंतिम symlink/reparse point अस्वीकार है। बनाने के लिए नाम पर विशिष्ट अधिकार चाहिए। CLR check/create साथ चलती प्रक्रियाओं के बीच atomic नहीं है। त्रुटियाँ catchable हिन्दी संदेश हैं। OS code और permission विवरण नहीं दिए जाते।
 
 ## Configuration, logging and assertions
 
@@ -150,6 +172,8 @@ process-local and has no background writer, file rotation or multi-process
 ordering guarantee. JSON escaping keeps embedded newlines inside one record.
 These APIs do not add asynchronous/concurrent execution.
 
+**हिन्दी:** डिफ़ॉल्ट चुनें, मान पढ़ें और ऐप की प्राथमिकता से बदलें। implicit रूपांतरण और परिवेश interpolation नहीं है। गुप्त मान लॉग न करें। JSON मान और cycle नियम लागू हैं। लॉग तुल्यकालिक व प्रति प्रक्रिया है। rotation और अनेक प्रक्रियाओं का क्रम उपलब्ध नहीं है। escape से newline एक record में रहती है।
+
 ## Test runner
 
 ```sh
@@ -165,6 +189,8 @@ case is a complete Bhash program with its own `मुख्य`; a test project 
 ordinary package dependencies to exercise a shared library without copying it.
 There is no annotation-based method discovery or host JUnit dependency.
 
+**हिन्दी:** खोज क्रम से `*.test.bhash` और `*.test/bhash.project` लेती है। build, target, .git, .bhash और symlink traversal छोड़ती है। फ़ाइल या manifest सीधे दे सकते हैं। हर test का अपना `मुख्य` है। साझा लाइब्रेरी के लिए सामान्य संकुल निर्भरता दें।
+
 Each case is compiled, then runs in a separate process with empty stdin and its
 source/project directory as cwd. Exit zero passes; assertion failures, uncaught
 exceptions, compilation failures, nonzero exits and timeouts fail. Later cases
@@ -173,11 +199,15 @@ compiler/toolchain timeouts remain their existing contracts. Timeout cleanup
 terminates the test process and its observed descendants. This is process-state
 isolation, not a security sandbox or filesystem isolation.
 
+**हिन्दी:** हर test संकलित होकर अलग प्रक्रिया में खाली stdin और अपने स्रोत/परियोजना फ़ोल्डर से चलता है। exit 0 सफल है। assertion, अपवाद, compile failure, nonzero या timeout विफल हैं। बाद के test चलते हैं। रन समयसीमा ३० सेकंड है और १–६०० तक बदल सकती है। समय पूरा होने पर test प्रक्रिया और देखी गई संतानें बंद होती हैं। filesystem सुरक्षा अलग विषय है।
+
 Failed cases show captured stdout/stderr, capped at 64 KiB per stream when
 displayed; capture files can grow during the test. Passing output is suppressed.
 The summary counts programs/projects, not individual assertions. Exit status is
 0 when all pass, 1 for failed cases, 2 for invocation/discovery errors or no cases,
 and 130 for interruption. Build outputs are temporary and cleaned afterward.
+
+**हिन्दी:** विफल test का stdout/stderr प्रति stream 64 KiB तक दिखता है। capture फ़ाइल चलने के दौरान बढ़ सकती है। सफल test का आउटपुट नहीं दिखता। सारांश ऐप/परियोजना गिनता है। exit 0 सफलता, 1 test विफलता, 2 गलत invocation/खोज और 130 interruption है। अस्थायी निर्माण साफ़ होता है।
 
 ## Validation
 
@@ -187,3 +217,5 @@ forces collection and checks final root/heap cleanup. Arguments/logging have
 cross-target checks, including Unicode Windows native arguments. The CLI runner
 tests cover assertion/compiler failures, continued execution, timeout and fresh
 static state. Browser restrictions remain guarded in the CLR bindings.
+
+**हिन्दी:** JVM, CLR और native की fixtures कलन, विन्यास, सफ़ाई, UTF-8 प्रवाह और निर्देशिका जाँचती हैं। नेटिव में forced GC और शून्य बची वस्तुएँ देखी जाती हैं। तर्क और लॉग में Windows Unicode जाँच भी है। चालक विफलता, जारी परीक्षण, timeout और नई साझा अवस्था जाँचता है। CLR ब्राउज़र सीमाएँ लागू करता है।
