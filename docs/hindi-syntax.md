@@ -57,3 +57,5 @@ The shared parser accepts only `फलन` declarations and
 All backends receive the same checked loop representation; this change introduces
 no new runtime ABI or execution semantics. Rebuild the compiler, bundled library,
 editor tooling and browser host together when deploying the new syntax.
+
+**हिन्दी:** साझा parser केवल `फलन` और `प्रत्येक (संग्रह में बंधन: प्रकार[, मान: प्रकार])` स्वीकार करता है। सभी backend को एक ही जाँचा हुआ चक्र मिलता है। runtime ABI और निष्पादन नियम वही हैं। नई वाक्यरचना तैनात करते समय संकलक, bundled पुस्तकालय, संपादक और ब्राउज़र होस्ट साथ बनाएँ।
