@@ -1,5 +1,23 @@
 name: Windows native debugging
-on: [pull_request, workflow_dispatch]
+on:
+  pull_request:
+    paths:
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'examples/native/debugging.bhash'
+      - 'scripts/native_debug_support.py'
+      - 'scripts/test_native_debugger.py'
+      - 'scripts/test_native_inspection.py'
+      - 'editors/vscode/**'
+      - 'src/test/**/ManagedDebuggerTest.java'
+      - 'scripts/build_windows_debugger.py'
+      - 'scripts/test_windows_debug_clean.cjs'
+      - 'scripts/windows_gdb_manifest.py'
+      - 'scripts/windows-debugger-packages.lock.json'
+      - '!**/*.md'
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

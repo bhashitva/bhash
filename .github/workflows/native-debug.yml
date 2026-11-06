@@ -1,5 +1,18 @@
 name: Bhash native VS Code debugging
-on: [pull_request, workflow_dispatch]
+on:
+  pull_request:
+    paths:
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'examples/native/debugging.bhash'
+      - 'scripts/native_debug_support.py'
+      - 'scripts/test_native_debugger.py'
+      - 'scripts/test_native_inspection.py'
+      - 'editors/vscode/**'
+      - '!**/*.md'
+  workflow_dispatch:
 concurrency:
   group: native-debug-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

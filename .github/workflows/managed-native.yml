@@ -1,8 +1,30 @@
 name: Bhash managed native toolchain
 on:
+  pull_request:
+    paths: &ci-paths
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'licenses/**'
+      - 'src/test/**/ManagedToolchainTest.java'
+      - 'src/test/**/NativeReleaseTest.java'
+      - 'scripts/build_native_toolchain.py'
+      - 'scripts/native-toolchain*.Dockerfile'
+      - 'scripts/test_native_toolchain_builder.py'
+      - 'scripts/test_managed_toolchain_download.py'
+      - 'scripts/test_managed_native.sh'
+      - 'examples/factorial.bhash'
+      - 'examples/native/hello.bhash'
+      - '!**/*.md'
+      - 'LICENSING.md'
+      - 'THIRD_PARTY_NOTICES.md'
   push:
     branches: [main]
-  pull_request:
+    paths: *ci-paths
+  workflow_dispatch:
 concurrency:
   group: managed-native-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

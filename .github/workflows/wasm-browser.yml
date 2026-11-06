@@ -1,5 +1,33 @@
 name: Bhash browser WebAssembly checks
-on: [push, pull_request]
+on:
+  pull_request:
+    paths: &ci-paths
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'deploy/playground/**'
+      - 'deploy/analytics/**'
+      - '.dockerignore'
+      - 'compose.yaml'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'licenses/**'
+      - 'playground/**'
+      - 'examples/**'
+      - 'scripts/browser_smoke_test.cjs'
+      - 'scripts/playground_smoke_test.cjs'
+      - 'scripts/playground_performance.cjs'
+      - 'scripts/profile_browser_publish.py'
+      - 'scripts/analyze_playground_performance.py'
+      - 'benchmarks/playground-profiling/**'
+      - '!**/*.md'
+      - 'LICENSING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
