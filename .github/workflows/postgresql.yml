@@ -1,5 +1,20 @@
 name: PostgreSQL providers and migrations
-on: [push, pull_request]
+on:
+  pull_request:
+    paths: &ci-paths
+      - '.github/workflows/postgresql.yml'
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'src/test/**/DatabaseProviderTest.java'
+      - 'src/test/**/PostgresIntegrationTest.java'
+      - 'examples/typed-api/**'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

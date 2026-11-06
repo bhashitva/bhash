@@ -1,17 +1,18 @@
 name: Bhash Jupyter kernel
 on:
-  push:
-    paths:
-      - 'editors/jupyter/**'
-      - 'src/**'
-      - 'pom.xml'
-      - '.github/workflows/jupyter.yml'
   pull_request:
-    paths:
-      - 'editors/jupyter/**'
-      - 'src/**'
-      - 'pom.xml'
+    paths: &ci-paths
       - '.github/workflows/jupyter.yml'
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'editors/jupyter/**'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

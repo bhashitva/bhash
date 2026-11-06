@@ -1,5 +1,30 @@
 name: Bhash managed target checks
-on: [push, pull_request]
+on:
+  pull_request:
+    paths: &ci-paths
+      - '.github/workflows/build.yml'
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'examples/**'
+      - 'scripts/build_examples.py'
+      - 'scripts/test_build_examples.py'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'licenses/**'
+      - 'src/test/**'
+      - 'lessons/**'
+      - 'scripts/check_lessons.py'
+      - 'scripts/smoke_test.py'
+      - '.gitattributes'
+      - '!**/*.md'
+      - 'LICENSING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

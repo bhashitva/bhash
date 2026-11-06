@@ -1,5 +1,36 @@
 name: Windows x64 native SDK and compiler
-on: [push, pull_request]
+on:
+  pull_request:
+    paths: &ci-paths
+      - '.github/workflows/windows-native.yml'
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'examples/**'
+      - 'scripts/build_examples.py'
+      - 'scripts/test_build_examples.py'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'licenses/**'
+      - 'tests/native/**'
+      - 'editors/vscode/**'
+      - 'src/test/**/Native*Test.java'
+      - 'src/test/**/WindowsToolLaunchTest.java'
+      - 'src/test/**/ManagedToolchainTest.java'
+      - 'src/test/**/Utf8ArgumentsTest.java'
+      - 'scripts/build_windows_toolchain.py'
+      - 'scripts/test_native_runtime.py'
+      - 'scripts/test_native_fixed.py'
+      - 'scripts/test_windows_native_batches*.py'
+      - 'scripts/windows_network_tests.cmd'
+      - '!**/*.md'
+      - 'LICENSING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+  push:
+    branches: [main, feature/windows-native]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

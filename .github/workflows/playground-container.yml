@@ -1,5 +1,28 @@
 name: Bhash playground container checks
-on: [push, pull_request]
+on:
+  pull_request:
+    paths: &ci-paths
+      - '.github/workflows/playground-container.yml'
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'deploy/playground/**'
+      - 'deploy/analytics/**'
+      - '.dockerignore'
+      - 'compose.yaml'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'licenses/**'
+      - 'playground/**'
+      - 'scripts/analytics_test.cjs'
+      - '!**/*.md'
+      - 'LICENSING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

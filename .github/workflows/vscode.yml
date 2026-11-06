@@ -1,5 +1,24 @@
 name: Bhash VS Code extension
-on: [push, pull_request]
+on:
+  pull_request:
+    paths: &ci-paths
+      - '.github/workflows/vscode.yml'
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'licenses/**'
+      - 'editors/vscode/**'
+      - 'scripts/native-vscode-clean.Dockerfile'
+      - '!**/*.md'
+      - 'LICENSING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
