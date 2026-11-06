@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Exercise RFC 6455 over real HTTP/1.1 sockets using an independent wire peer."""
 from contextlib import contextmanager
-from http.client import HTTPConnection, RemoteDisconnected
+from http.client import HTTPConnection, IncompleteRead, RemoteDisconnected
 from queue import Queue
 import socket
 import struct
@@ -157,7 +157,8 @@ def verify(command):
                 pass
             try:
                 http("/stop", "POST")
-            except RemoteDisconnected:
+            # Stopping can close this request after its headers and before its body.
+            except (RemoteDisconnected, IncompleteRead):
                 pass
             assert process.wait(timeout=20) == 0
         except BaseException:
