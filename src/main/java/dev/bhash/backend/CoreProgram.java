@@ -555,7 +555,8 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
                 return new DatabaseCall(type(f.result,at),op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             }
             if(f.intrinsic!=null && f.intrinsic.startsWith("srv")) {
-                int op=List.of("srvListen","srvAccept","srvRead","srvWrite","srvClose","srvPort","srvStopping").indexOf(f.intrinsic);
+                int op=List.of("srvListen","srvAccept","srvRead","srvWrite","srvClose","srvPort","srvStopping",
+                        "srvTryAccept","srvTryRead","srvTryWrite").indexOf(f.intrinsic);
                 if(op<0)throw unsupported(at);server=true;ensureStructuredTypes(at);
                 return new ServerCall(type(f.result,at),op,arguments(args),f.result.collection!=null?collectionId(f.result,at):-1,source(at));
             }
