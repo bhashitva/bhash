@@ -150,6 +150,12 @@ class Book:
                     return f'<span id="{escape(prefix + anchor[1])}"></span>\n'
                 return super().block_html(html)
 
+            def paragraph(self, text):
+                anchor = re.fullmatch(r'<a id="([\w-]+)"></a>', unescape(text))
+                if anchor:
+                    return f'<span id="{escape(prefix + anchor[1])}"></span>\n'
+                return super().paragraph(text)
+
             def link(self, text, url, title=None):
                 href = book.link(source, output, url, pdf)
                 if pdf and href.startswith(("https:", "http:")):
@@ -186,7 +192,7 @@ class Book:
                 text = "".join(cell["source"])
                 if cell["cell_type"] == "markdown":
                     parts.append(self.render(source, "print.html", pdf=True, text=text, shift_headings=2))
-                else:
+                elif text.strip() or cell.get("outputs"):
                     parts.append(f'<pre><code>{escape(text)}</code></pre>')
                     for output in cell.get("outputs", []):
                         text = "".join(output.get("text", output.get("data", {}).get("text/plain", [])))
