@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>साझा कार्यपट · भाष</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">भाष · WebSocket उदाहरण</p>
+      <h1>साझा कार्यपट</h1>
+      <p>एक ही कार्यपट में किए गए बदलाव सभी जुड़े सदस्यों को दिखते हैं।</p>
+    </header>
+    <p id="error" role="alert" hidden></p>
+    <section id="login-panel">
+      <h2>प्रवेश</h2>
+      <form id="login">
+        <label>उपयोगकर्ता <input name="username" autocomplete="username" required></label>
+        <label>कूटशब्द <input name="password" type="password" autocomplete="current-password" required></label>
+        <button>प्रवेश करें</button>
+      </form>
+    </section>
+    <section id="board-panel" hidden>
+      <div class="board-header">
+        <div>
+          <h2 id="board-name"></h2>
+          <p id="connection" role="status" data-state="connecting">जुड़ रहे हैं…</p>
+        </div>
+        <button id="logout" type="button">बाहर निकलें</button>
+      </div>
+      <form id="add-task">
+        <label>नया कार्य <input name="title" maxlength="400" required></label>
+        <button>जोड़ें</button>
+      </form>
+      <p id="empty" hidden>इस कार्यपट में अभी कोई कार्य नहीं है।</p>
+      <ul id="tasks" aria-label="कार्य"></ul>
+    </section>
+  </main>
+</body>
+</html>
