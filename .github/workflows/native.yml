@@ -1,5 +1,34 @@
 name: Bhash experimental native LLVM checks
-on: [push, pull_request]
+on:
+  pull_request:
+    paths: &ci-paths
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'examples/**'
+      - 'scripts/build_examples.py'
+      - 'scripts/test_build_examples.py'
+      - 'examples/native/debugging.bhash'
+      - 'scripts/native_debug_support.py'
+      - 'scripts/test_native_debugger.py'
+      - 'scripts/test_native_inspection.py'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'licenses/**'
+      - 'src/test/**/Native*Test.java'
+      - 'tests/native/**'
+      - 'scripts/test_native_runtime.py'
+      - 'scripts/test_native_fixed.py'
+      - 'scripts/test_native_release.py'
+      - 'scripts/test_sqlite_distribution.py'
+      - '!**/*.md'
+      - 'LICENSING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

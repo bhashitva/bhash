@@ -1,9 +1,22 @@
 name: Unicode identifier profile
 on:
-  push:
-    paths: ['src/**', 'scripts/*unicode*', 'scripts/generate_identifier_profile.py', 'docs/identifier-profile*', '.github/workflows/unicode-identifiers.yml']
   pull_request:
-    paths: ['src/**', 'scripts/*unicode*', 'scripts/generate_identifier_profile.py', 'docs/identifier-profile*', '.github/workflows/unicode-identifiers.yml']
+    paths: &ci-paths
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - 'docs/identifier-profile-baseline.g4'
+      - 'src/test/**/FrontendTest.java'
+      - 'src/test/**/UnicodeIdentifier*.java'
+      - 'src/test/**/EditorAnalysisTest.java'
+      - 'src/test/**/ProjectLoaderTest.java'
+      - 'scripts/*unicode*.py'
+      - 'scripts/generate_identifier_profile.py'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

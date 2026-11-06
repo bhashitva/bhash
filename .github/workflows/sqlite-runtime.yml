@@ -1,15 +1,14 @@
 name: Pinned SQLite runtime builds
 on:
-  push:
-    paths:
-      - 'scripts/build_sqlite_runtime.py'
-      - 'src/main/resources/dev/bhash/sqlite/**'
-      - '.github/workflows/sqlite-runtime.yml'
   pull_request:
-    paths:
+    paths: &ci-paths
       - 'scripts/build_sqlite_runtime.py'
       - 'src/main/resources/dev/bhash/sqlite/**'
-      - '.github/workflows/sqlite-runtime.yml'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths: *ci-paths
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
