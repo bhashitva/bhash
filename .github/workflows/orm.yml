@@ -64,6 +64,9 @@ jobs:
       - name: Install native compiler and database runtime
         if: matrix.target == 'native'
         run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18 build-essential binutils libpq5
+      - name: Install PostgreSQL client runtime for CLR
+        if: matrix.target == 'clr' && matrix.provider == 'postgresql'
+        run: sudo apt-get update && sudo apt-get install -y libpq5
       - name: Enable verified PostgreSQL TLS
         if: matrix.provider == 'postgresql'
         run: |
