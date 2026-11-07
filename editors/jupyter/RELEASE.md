@@ -1,9 +1,9 @@
-Version 0.1.4 bundles the Unicode 18 identifier rules from [PR #72](https://github.com/bhashitva/bhash/pull/72). Equivalent Devanagari spellings and valid ZWJ/ZWNJ variants resolve to the same name across cells. Completion and inspection recognize those variants, and invalid joiners report their source location. See the [Hindi identifier guide and examples](https://github.com/bhashitva/bhash/tree/main/tutorial/unicode-identifiers).
+Version 0.1.5 bundles the current Bhash compiler with the asynchronous HTTP server and RFC 6455 WebSocket library. The installed kernel smoke test runs the [in-memory WebSocket example](https://github.com/bhashitva/bhash/blob/main/examples/websocket/stream.bhash) in a full program cell, including its cancellation and cleanup checks.
 
 Install or upgrade in the Python environment where you run Jupyter. The wheel includes the compiler and needs a full JDK 17 or newer.
 
 ```sh
-python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.4/bhash_jupyter-0.1.4-py3-none-any.whl"
+python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.5/bhash_jupyter-0.1.5-py3-none-any.whl"
 python -m bhash_jupyter.install
 python -m pip show bhash-jupyter
 ```
