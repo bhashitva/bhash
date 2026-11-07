@@ -7,6 +7,8 @@ on:
       - 'docs/identifier-profile.json'
       - 'docs/identifier-profile-baseline.g4'
       - 'examples/**'
+      - 'deploy/http2-websocket/**'
+      - '.github/workflows/windows-native.yml'
       - 'scripts/build_examples.py'
       - 'scripts/test_build_examples.py'
       - 'LICENSE'
@@ -95,6 +97,26 @@ jobs:
           $active=Get-Content "$env:BHASH_TOOLCHAIN_HOME/active.json" | ConvertFrom-Json
           $sdk=Join-Path "$env:BHASH_TOOLCHAIN_HOME/installations" $active.directory
           "BHASH_CLANG=$sdk/bin/clang.exe" >> $env:GITHUB_ENV
+      - name: Test native WebSocket wire behavior over HTTP/1.1 and HTTP/2 TLS
+        shell: pwsh
+        env:
+          BHASH_GC_STRESS: '1'
+        run: |
+          Remove-Item Env:BHASH_CLANG -ErrorAction SilentlyContinue
+          python -m pip install -r deploy/http2-websocket/requirements.txt
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile examples/websocket/server.bhash --target native -o target/websocket-wire.exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python examples/websocket/verify.py ./target/websocket-wire.exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if (-not (Get-Command openssl.exe -ErrorAction SilentlyContinue)) {
+            $gitRoot = Split-Path (Split-Path (Get-Command git.exe).Source)
+            $opensslBin = Join-Path $gitRoot 'mingw64/bin'
+            if (-not (Test-Path (Join-Path $opensslBin 'openssl.exe'))) { throw 'OpenSSL is required for the HTTP/2 wire test' }
+            $env:PATH = "$opensslBin;$env:PATH"
+          }
+          python examples/websocket/verify_http2.py ./target/websocket-wire.exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Test the typed API over HTTP under forced GC
         shell: pwsh
         run: |

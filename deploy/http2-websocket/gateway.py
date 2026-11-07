@@ -274,6 +274,8 @@ class Connection:
                 if not stream.ended:
                     self.h2.increment_flow_control_window(credit, stream_id=stream_id)
                     self.flush()
+                # More DATA can arrive while drain is suspended. Check the buffer before waiting.
+                continue
             if stream.ended:
                 upstream.write_eof()
                 return

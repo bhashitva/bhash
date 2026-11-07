@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 """Verify RFC 8441 through the gateway and the compiled Bhash echo fixture."""
+import asyncio
 from collections import defaultdict
 from contextlib import ExitStack, contextmanager
 import os
 from pathlib import Path
+import runpy
 import socket
 import ssl
 import struct
@@ -14,6 +16,7 @@ from tempfile import TemporaryDirectory
 from time import monotonic
 from queue import Queue
 from threading import Thread
+from types import SimpleNamespace
 
 from h2.config import H2Configuration
 from h2.connection import H2Connection
@@ -194,7 +197,8 @@ def verify(wire, token):
     greeting = "नमस्ते, HTTP/2 😀".encode()
     peer.send(active, frame(1, greeting[:2], final=False))
     peer.send(active, frame(9, b"ping") + frame(0, greeting[2:]))
-    assert peer.frame(active) == (10, True, b"ping")
+    pong = peer.frame(active)
+    assert pong == (10, True, b"ping"), pong
     assert peer.frame(active) == (1, True, greeting)
 
     peer.h2.reset_stream(stalled, error_code=ErrorCodes.CANCEL)
@@ -210,20 +214,71 @@ def verify(wire, token):
     peer.until(lambda: health in peer.end)
 
 
+async def verify_gateway_write_race():
+    """DATA arriving during drain must be forwarded without a third wakeup."""
+    gateway = runpy.run_path(str(GATEWAY))
+    stream = gateway["Stream"]("GET", "/echo/test", [], True, None)
+    stream.buffer.extend(b"first")
+    stream.credit = 5
+    credit = []
+
+    class Upstream:
+        def __init__(self):
+            self.writes = []
+            self.eof = False
+
+        def write(self, data):
+            self.writes.append(bytes(data))
+
+        async def drain(self):
+            await asyncio.sleep(0)
+            if len(self.writes) == 1:
+                stream.buffer.extend(b"second")
+                stream.credit += 6
+            else:
+                stream.ended = True
+            stream.wake.set()
+
+        def write_eof(self):
+            self.eof = True
+
+    upstream = Upstream()
+    connection = SimpleNamespace(
+        h2=SimpleNamespace(increment_flow_control_window=lambda count, stream_id: credit.append(count)),
+        flush=lambda: None,
+    )
+    await asyncio.wait_for(gateway["Connection"].to_upstream(connection, 1, stream, upstream), 2)
+    assert upstream.writes == [b"first", b"second"] and upstream.eof
+    assert credit == [5]
+
+
 def main():
     if len(sys.argv) < 2:
         raise SystemExit("Usage: python verify_http2.py SERVER [SERVER ARGUMENTS ...]")
+    asyncio.run(verify_gateway_write_race())
     with TemporaryDirectory(prefix="bhash-h2-") as tmp, ExitStack() as stack:
         cert, key = Path(tmp) / "cert.pem", Path(tmp) / "key.pem"
-        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
-                        "-subj", f"/CN={AUTHORITY}", "-addext", f"subjectAltName=DNS:{AUTHORITY}",
-                        "-keyout", str(key), "-out", str(cert)], check=True, capture_output=True)
+        # A config file works with both OpenSSL and the macOS system LibreSSL.
+        config = Path(tmp) / "openssl.cnf"
+        config.write_text(
+            "[req]\ndistinguished_name=dn\nprompt=no\nx509_extensions=extensions\n"
+            f"[dn]\nCN={AUTHORITY}\n[extensions]\nsubjectAltName=DNS:{AUTHORITY}\n",
+            encoding="ascii",
+        )
+        result = subprocess.run(
+            ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "2",
+             "-config", str(config), "-keyout", str(key), "-out", str(cert)],
+            capture_output=True,
+        )
+        if result.returncode:
+            raise RuntimeError(result.stderr.decode(errors="replace"))
         bhash = stack.enter_context(process(sys.argv[1:], os.environ | {"BHASH_WS_TEST_ORIGIN": ORIGIN}))
         backend, token = int(bhash("PORT")), bhash("SESSION")
         gateway = stack.enter_context(process([sys.executable, "-u", str(GATEWAY), "--authority",
                                                AUTHORITY, "--backend-port", str(backend), "--port", "0",
                                                "--cert", str(cert), "--key", str(key)]))
-        context = ssl.create_default_context(cafile=str(cert))
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.load_verify_locations(cafile=str(cert))
         context.set_alpn_protocols(["h2"])
         with socket.create_connection(("127.0.0.1", int(gateway("READY"))), timeout=20) as tcp:
             with context.wrap_socket(tcp, server_hostname=AUTHORITY) as wire:
