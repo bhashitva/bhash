@@ -69,6 +69,15 @@ class OrmGenerationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             GENERATOR.sql_parameters("SELECT 'bad\b'")
 
+    def test_reject_excessive_method_parameters(self):
+        query = self.schema["entities"][1]["queries"][0]
+        query["parameters"] = [
+            {"column": f"p{i}", "name": f"p{i}", "type": "integer"} for i in range(65)
+        ]
+        query["sql"] = "SELECT id FROM student WHERE id IN (" + ",".join("?" for _ in range(65)) + ")"
+        with self.assertRaises(ValueError):
+            GENERATOR.generate(self.schema)
+
     def test_duplicate_json_key(self):
         with self.assertRaises(ValueError):
             json.loads('{"package":"a","package":"b"}', object_pairs_hook=GENERATOR.unique)
@@ -83,6 +92,10 @@ class OrmGenerationTest(unittest.TestCase):
                        "--output", str(output)]
             subprocess.run(command, check=True, capture_output=True)
             original = output.read_bytes()
+            mapping_bytes = source.read_bytes()
+            same_file = command[:-1] + [str(source)]
+            self.assertNotEqual(0, subprocess.run(same_file, capture_output=True).returncode)
+            self.assertEqual(mapping_bytes, source.read_bytes())
             subprocess.run(command + ["--check"], check=True, capture_output=True)
             output.write_bytes(original + b"// drift\n")
             self.assertNotEqual(0, subprocess.run(command + ["--check"], capture_output=True).returncode)
