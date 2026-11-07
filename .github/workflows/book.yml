@@ -6,7 +6,7 @@ on:
       version:
         description: Hindi book edition (MAJOR.MINOR.PATCH)
         required: true
-        default: "1.1.0"
+        default: "1.2.0"
   pull_request:
     paths: &book-paths
       - 'book/**'
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      BOOK_VERSION: ${{ inputs.version || '1.1.0' }}
+      BOOK_VERSION: ${{ inputs.version || '1.2.0' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
