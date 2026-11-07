@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.0
+
+- Bundle the compiler with the asynchronous HTTP server and RFC 6455 WebSocket server library for JVM, .NET, and native applications.
+- Use the new server declarations through compiler-backed editor assistance. HTTP/2 Extended CONNECT is available through the separately deployed TLS gateway.
+- Try the [WebSocket examples](https://github.com/bhashitva/bhash/blob/main/docs/websocket.md) and the [Hindi ORM tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/orm/README.md) from the repository.
+
 ## 0.18.0
 
 - Bundle the Unicode 18 identifier profile from [PR #72](https://github.com/bhashitva/bhash/pull/72), with canonical name matching and contextual ZWJ/ZWNJ handling.
