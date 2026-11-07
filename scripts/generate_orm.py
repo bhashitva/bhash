@@ -179,7 +179,7 @@ def validate(schema):
                 raise ValueError("invalid named query")
             methods.add(name)
             params = query["parameters"]
-            if not isinstance(params, list) or len(params) > 900:
+            if not isinstance(params, list) or len(params) > 64:
                 raise ValueError("invalid query parameters")
             for param in params:
                 column(param)
@@ -365,6 +365,8 @@ def main():
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     try:
+        if args.mapping.resolve() == args.output.resolve():
+            raise ValueError("mapping and output must be different files")
         schema = json.loads(args.mapping.read_text(encoding="utf-8"), object_pairs_hook=unique)
         source = generate(schema)
         if args.check:
