@@ -1,0 +1,4 @@
+name=live-task-board-models
+kind=library
+version=1.0.0
+sources=src
