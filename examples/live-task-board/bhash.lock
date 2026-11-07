@@ -1,0 +1,18 @@
+{
+  "lockVersion": 1,
+  "root": {
+    "manifestSha256": "4a57489c10ab7425538692f6460415bc56718aaa2d3052c0198b0af1f0803fd2"
+  },
+  "packages": [
+    {
+      "name": "live-task-board-models",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "../live-task-board-models"
+      },
+      "manifestSha256": "95b5023bdab0c8136aa8fe30a9a40714d80048457c7aafbb4806aefc2e40bd2e",
+      "sourcesSha256": "773a82ae096e83302ddfae2f208d5bafc2b3a1e1672e1b033e72fdb2f28033a8"
+    }
+  ]
+}
