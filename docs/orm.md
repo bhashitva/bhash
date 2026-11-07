@@ -135,7 +135,7 @@ JOIN वाली named query या अलग bounded query चुनें; lo
 
 नामित query (Named query): `queries` में `name`, `sql`,
 `parameters` और `cardinality` (`one` या `many`) दें।
-parameters column-जैसे objects हैं। उनके क्रम से method arguments और
+अधिकतम ६४ parameters column-जैसे objects हैं। उनके क्रम से method arguments और
 `?` bindings बनते हैं। SQL में पूरी entity के columns सही नाम और
 क्रम में लौटाएँ। `sql` एक पाठ या `{"sqlite": "...", "postgresql": "..."}`
 हो सकता है। provider-specific SQL caller स्पष्ट लिखता है।
