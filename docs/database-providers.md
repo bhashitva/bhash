@@ -1,6 +1,6 @@
 # Database providers and migrations
 
-`मानक.डेटा` supplies `डेटासंबंध`, `डेटाकथन`, and `डेटालेनदेन` over SQLite and PostgreSQL. Existing SQLite APIs remain supported. This is a shared resource/type contract, not a SQL dialect translator or ORM.
+`मानक.डेटा` supplies `डेटासंबंध`, `डेटाकथन`, and `डेटालेनदेन` over SQLite and PostgreSQL. Existing SQLite APIs remain supported. This shared resource/type contract also underpins the [generated ORM layer](orm.md).
 
 ## PostgreSQL contract
 
@@ -22,7 +22,7 @@ An ordered immutable plan snapshots version/name/SQL lists. Versions must be pos
 
 All pending changes and history inserts commit in one transaction. Failure rolls back the entire pending batch. PostgreSQL takes a transaction advisory lock; SQLite takes a write lock before inspecting history. Status/validation also initialize history if absent, and therefore require write permission. Do not nest migration operations inside an application transaction. Take backups and test upgrades on a copy of production data.
 
-See [Hindi tutorial](../tutorial/database-providers/README.md). No database CLI, auto-discovery, down migrations or ORM is implied by this API.
+See [Hindi tutorial](../tutorial/database-providers/README.md). Schema migrations remain explicit. See the [generated ORM tutorial](../tutorial/orm/README.md) for typed records and repositories on top of this API.
 
 ## Validation
 
