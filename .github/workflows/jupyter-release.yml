@@ -1,7 +1,7 @@
 name: Release Bhash Jupyter kernel
 on:
   push:
-    branches: [release/jupyter-0.1.4]
+    branches: [release/jupyter-0.1.5]
     paths: ['.github/workflows/jupyter-release.yml']
   workflow_dispatch:
 permissions:
@@ -30,10 +30,10 @@ jobs:
         run: |
           cp editors/jupyter/पहली-नोटबुक.ipynb target/jupyter-dist/hindi-starter.ipynb
           cd target/jupyter-dist
-          sha256sum bhash_jupyter-0.1.4-py3-none-any.whl hindi-starter.ipynb > SHA256SUMS
+          sha256sum bhash_jupyter-0.1.5-py3-none-any.whl hindi-starter.ipynb > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
-          name: jupyter-0.1.4-release
+          name: jupyter-0.1.5-release
           path: target/jupyter-dist/
           if-no-files-found: error
   verify:
@@ -55,7 +55,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/download-artifact@v4
         with:
-          name: jupyter-0.1.4-release
+          name: jupyter-0.1.5-release
           path: target/jupyter-dist
       - name: Smoke test the installed wheel and Hindi starter notebook
         shell: bash
@@ -70,13 +70,13 @@ jobs:
               sha256sum -c SHA256SUMS
             fi
           )
-          python -m pip install target/jupyter-dist/bhash_jupyter-0.1.4-py3-none-any.whl
+          python -m pip install target/jupyter-dist/bhash_jupyter-0.1.5-py3-none-any.whl
           python -m bhash_jupyter.install --notebook target/hindi-starter.ipynb
           cmp target/hindi-starter.ipynb target/jupyter-dist/hindi-starter.ipynb
           python editors/jupyter/test_kernel.py --installed --notebook target/hindi-starter.ipynb
   publish:
     needs: verify
-    if: github.ref == 'refs/heads/release/jupyter-0.1.4'
+    if: github.ref == 'refs/heads/release/jupyter-0.1.5'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
-          name: jupyter-0.1.4-release
+          name: jupyter-0.1.5-release
           path: target/jupyter-dist
       - name: Publish versioned release assets
         env:
@@ -93,4 +93,4 @@ jobs:
         run: |
           cd target/jupyter-dist
           sha256sum -c SHA256SUMS
-          gh release create jupyter-0.1.4 --target "$GITHUB_SHA" --latest=false --title "Bhash Jupyter kernel 0.1.4" --notes-file ../../editors/jupyter/RELEASE.md *.whl SHA256SUMS hindi-starter.ipynb
+          gh release create jupyter-0.1.5 --target "$GITHUB_SHA" --latest=false --title "Bhash Jupyter kernel 0.1.5" --notes-file ../../editors/jupyter/RELEASE.md *.whl SHA256SUMS hindi-starter.ipynb

@@ -123,6 +123,8 @@ def test_language(execute_case):
     run((examples / "objects.bhash").read_text(encoding="utf-8"), streams="मनोज १५० १५ १६५\n")
     run((examples / "contracts-generics.bhash").read_text(encoding="utf-8"),
         streams="पूर्णांक: २१\nपाठ: नमस्ते\nपात्र ४२ ३.०\n१ १ १००\n")
+    websocket_stream = examples / "websocket" / "stream.bhash"
+    run(websocket_stream.read_text(encoding="utf-8"), streams="stream-ok\n")
     async_sqlite = examples.parent / "tutorial/async-io/sqlite.bhash"
     run(async_sqlite.read_text(encoding="utf-8"), streams="नमस्ते, भारत😀\n")
     run("""स्थिर ब: बाइटबफ़र = नया बाइटबफ़र{परिवर्तित<बाइट>(२५५)};
