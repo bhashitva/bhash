@@ -1,0 +1,4 @@
+name=orm-school-tests
+sources=src
+dependency.models.path=../models
+dependency.models.version=1.0.0
