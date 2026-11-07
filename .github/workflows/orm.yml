@@ -1,0 +1,87 @@
+name: Generated ORM
+on:
+  pull_request:
+    paths: &orm-paths
+      - 'scripts/generate_orm.py'
+      - 'scripts/test_generate_orm.py'
+      - 'examples/orm/**'
+      - 'examples/live-task-board/orm.json'
+      - 'examples/live-task-board-models/**'
+      - 'src/main/**'
+      - 'pom.xml'
+      - 'docs/identifier-profile.json'
+      - '.github/workflows/orm.yml'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths: *orm-paths
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: orm-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  mapping:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [jvm, clr, native]
+        provider: [sqlite, postgresql]
+    services:
+      postgres:
+        image: ${{ matrix.provider == 'postgresql' && 'postgres:17' || '' }}
+        env:
+          POSTGRES_DB: bhash_orm
+          POSTGRES_USER: bhash
+          POSTGRES_PASSWORD: ci-test-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bhash -d bhash_orm"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      BHASH_PG_HOST: localhost
+      BHASH_PG_DATABASE: bhash_orm
+      BHASH_PG_USER: bhash
+      BHASH_PG_PASSWORD: ci-test-only
+      BHASH_CLANG: clang-18
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        if: matrix.target == 'clr'
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install native compiler and database runtime
+        if: matrix.target == 'native'
+        run: sudo apt-get update && sudo apt-get install -y clang-18 llvm-18 build-essential binutils libpq5
+      - name: Enable verified PostgreSQL TLS
+        if: matrix.provider == 'postgresql'
+        run: |
+          mkdir -p target/pg-tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -keyout target/pg-tls/server.key -out target/pg-tls/server.crt -subj /CN=localhost -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'
+          container=$(docker ps --filter ancestor=postgres:17 --format '{{.ID}}')
+          docker cp target/pg-tls/server.key "$container:/var/lib/postgresql/data/server.key"
+          docker cp target/pg-tls/server.crt "$container:/var/lib/postgresql/data/server.crt"
+          docker exec -u root "$container" sh -c 'chown postgres:postgres /var/lib/postgresql/data/server.key /var/lib/postgresql/data/server.crt && chmod 600 /var/lib/postgresql/data/server.key'
+          docker exec -u postgres "$container" sh -c 'printf "\\nssl = on\\n" >> /var/lib/postgresql/data/postgresql.conf; pg_ctl reload -D /var/lib/postgresql/data'
+          echo "BHASH_PG_SSLMODE=verify-full" >> "$GITHUB_ENV"
+          echo "BHASH_PG_CA=$PWD/target/pg-tls/server.crt" >> "$GITHUB_ENV"
+      - name: Check mapping validation and reproducible generated sources
+        run: |
+          python scripts/test_generate_orm.py
+          python scripts/generate_orm.py examples/orm/mapping.json --output examples/orm/models/src/generated.bhash --check
+          python scripts/generate_orm.py examples/live-task-board/orm.json --output examples/live-task-board-models/src/generated.bhash --check
+      - name: Build compiler
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Test typed records, relationships, transactions, cancellation and forced GC
+        run: python examples/orm/verify.py --target "${{ matrix.target }}" --provider "${{ matrix.provider }}"
