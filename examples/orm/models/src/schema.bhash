@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: Apache-2.0
+संकुल विद्यालय;
+आयात मानक.माइग्रेशन;
+आयात मानक.माइग्रेशनयोजना;
+सार्वजनिक फलन योजनालो(पोस्ट: तार्किक) -> माइग्रेशनयोजना {
+    मान बाइनरी: पाठ="BLOB";
+    यदि (पोस्ट) { बाइनरी="BYTEA"; }
+    लौटाओ नया माइग्रेशनयोजना(नया सूची<माइग्रेशन>{
+        नया माइग्रेशन(१,"विद्यालय तालिकाएँ",नया सूची<पाठ>{
+            "CREATE TABLE gradelevel(id BIGINT PRIMARY KEY NOT NULL,name TEXT NOT NULL)",
+            "CREATE TABLE student(id BIGINT PRIMARY KEY NOT NULL,name TEXT NOT NULL,gradelevel_id BIGINT REFERENCES gradelevel(id) ON DELETE RESTRICT,active BOOLEAN NOT NULL,score DOUBLE PRECISION,note TEXT,version BIGINT NOT NULL CHECK(version>=0))",
+            "CREATE TABLE enrollment(student_id BIGINT NOT NULL REFERENCES student(id) ON DELETE RESTRICT,year BIGINT NOT NULL,fee TEXT NOT NULL,saved_at TEXT NOT NULL,document "+बाइनरी+",PRIMARY KEY(student_id,year))"
+        })
+    });
+}
+
+
