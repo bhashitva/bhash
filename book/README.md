@@ -12,8 +12,8 @@
 
 ## ऑफ़लाइन संस्करण
 
-- [हिन्दी पुस्तक डाउनलोड करें (PDF)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.1.0/bhash-book-1.1.0-hi.pdf)
-- [ट्यूटोरियल, उदाहरण और नोटबुक डाउनलोड करें (ZIP)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.1.0/bhash-book-1.1.0-hi-offline.zip)
+- [हिन्दी पुस्तक डाउनलोड करें (PDF)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.2.0/bhash-book-1.2.0-hi.pdf)
+- [ट्यूटोरियल, उदाहरण और नोटबुक डाउनलोड करें (ZIP)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.2.0/bhash-book-1.2.0-hi-offline.zip)
 
 PDF में अध्यायों के साथ उनके संदर्भ, ट्यूटोरियल और पूरे कोड उदाहरण हैं।
 अध्यायों के लिंक सीधे परिशिष्ट में सही अनुभाग या फ़ाइल पर ले जाते हैं।
@@ -30,7 +30,7 @@ PDF में अध्यायों के साथ उनके संद�
 | [५. पुस्तकालय और सुरक्षित संसाधन](05-libraries-and-resources.md) | पाठ, गणित, समय, JSON, बाइट, फ़ाइल, अपवाद और सफ़ाई |
 | [६. परियोजना, परीक्षण और डिबगिंग](06-projects-and-testing.md) | संकुल, लॉकफ़ाइल, विन्यास, स्वचालित परीक्षण और VS Code डिबगर |
 | [७. नेटवर्क, डेटाबेस और असमकालिक काम](07-io-and-async.md) | HTTP, SQL, माइग्रेशन, प्रतीक्षा, समयसीमा और निरस्तीकरण |
-| [८. पूरी वेब सेवा और वितरण](08-build-an-application.md) | प्रकारयुक्त API, OpenAPI, प्रमाणीकरण, एकीकरण परीक्षण और प्रकाशन |
+| [८. पूरी वेब सेवा और वितरण](08-build-an-application.md) | प्रकारयुक्त API, ORM, OpenAPI, प्रमाणीकरण, परीक्षण और प्रकाशन |
 
 पुस्तक अवधारणाओं को जोड़ती है। किसी फलन के सभी मापदंड या सीमाएँ जानने के
 लिए [विषयवार ट्यूटोरियल](../tutorial/README.md) खोलें। अधिक शुरुआती अभ्यास
