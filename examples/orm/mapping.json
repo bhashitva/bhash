@@ -1,0 +1,164 @@
+{
+  "package": "विद्यालय",
+  "entities": [
+    {
+      "table": "gradelevel",
+      "name": "कक्षास्तर",
+      "repository": "कक्षास्तरसंग्रह",
+      "columns": [
+        {
+          "column": "id",
+          "name": "पहचान",
+          "type": "integer"
+        },
+        {
+          "column": "name",
+          "name": "नाम",
+          "type": "text"
+        }
+      ],
+      "key": [
+        "id"
+      ]
+    },
+    {
+      "table": "student",
+      "name": "विद्यार्थी",
+      "repository": "विद्यार्थीसंग्रह",
+      "columns": [
+        {
+          "column": "id",
+          "name": "पहचान",
+          "type": "integer"
+        },
+        {
+          "column": "name",
+          "name": "नाम",
+          "type": "text"
+        },
+        {
+          "column": "gradelevel_id",
+          "name": "कक्षास्तरपहचान",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "column": "active",
+          "name": "सक्रिय",
+          "type": "boolean"
+        },
+        {
+          "column": "score",
+          "name": "अंक",
+          "type": "real",
+          "nullable": true
+        },
+        {
+          "column": "note",
+          "name": "टिप्पणी",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "column": "version",
+          "name": "संस्करण",
+          "type": "integer"
+        }
+      ],
+      "key": [
+        "id"
+      ],
+      "version": "version",
+      "relationships": [
+        {
+          "name": "कक्षास्तरलो",
+          "columns": [
+            "gradelevel_id"
+          ],
+          "target": "कक्षास्तर"
+        }
+      ],
+      "queries": [
+        {
+          "name": "कक्षाकेविद्यार्थीलो",
+          "sql": "SELECT id,name,gradelevel_id,active,score,note,version FROM student WHERE gradelevel_id=? ORDER BY id LIMIT 100",
+          "parameters": [
+            {
+              "column": "gradelevel_id",
+              "name": "कक्षा",
+              "type": "integer"
+            }
+          ],
+          "cardinality": "many"
+        },
+        {
+          "name": "नामसेपाओ",
+          "sql": {
+            "sqlite": "SELECT id,name,gradelevel_id,active,score,note,version FROM student WHERE name=?",
+            "postgresql": "SELECT id,name,gradelevel_id,active,score,note,version FROM student WHERE name=?::text"
+          },
+          "parameters": [
+            {
+              "column": "name",
+              "name": "नाम",
+              "type": "text"
+            }
+          ],
+          "cardinality": "one"
+        },
+        {
+          "name": "सभीलो",
+          "sql": "SELECT id,name,gradelevel_id,active,score,note,version FROM student ORDER BY id",
+          "parameters": [],
+          "cardinality": "many"
+        }
+      ]
+    },
+    {
+      "table": "enrollment",
+      "name": "दाखिला",
+      "repository": "दाखिलासंग्रह",
+      "columns": [
+        {
+          "column": "student_id",
+          "name": "विद्यार्थीपहचान",
+          "type": "integer"
+        },
+        {
+          "column": "year",
+          "name": "वर्ष",
+          "type": "integer"
+        },
+        {
+          "column": "fee",
+          "name": "शुल्क",
+          "type": "decimal"
+        },
+        {
+          "column": "saved_at",
+          "name": "समय",
+          "type": "datetime"
+        },
+        {
+          "column": "document",
+          "name": "दस्तावेज़",
+          "type": "bytes",
+          "nullable": true
+        }
+      ],
+      "key": [
+        "student_id",
+        "year"
+      ],
+      "relationships": [
+        {
+          "name": "विद्यार्थीलो",
+          "columns": [
+            "student_id"
+          ],
+          "target": "विद्यार्थी"
+        }
+      ]
+    }
+  ]
+}
