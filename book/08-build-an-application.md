@@ -35,6 +35,18 @@ java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar test examples/typed-api --tar
 चल सकता है। HTTP सर्वर और डेटाबेस वाली पूरी परियोजना desktop लक्ष्य
 चाहती है।
 
+## प्रकारयुक्त डेटाबेस और संबंध (ORM)
+
+[विद्यार्थी और कक्षास्तर का ट्यूटोरियल](../tutorial/orm/README.md)
+डेटाबेस पंक्ति को immutable अभिलेख में पढ़ता है। mapping से async
+CRUD संग्रह बनते हैं। foreign key दूसरे अभिलेख का संदर्भ है;
+उसका डेटा स्पष्ट lookup से पढ़ते हैं। transaction और version
+जाँच से संबंधित लेखन और समवर्ती बदलाव सँभालते हैं।
+[चलाने योग्य विद्यालय](../examples/orm/README.md) को SQLite पर चलाएँ,
+फिर उसके PostgreSQL और तीनों compiler लक्ष्यों के परीक्षण चलाएँ।
+schema का परिवर्तन अलग migration है। [विस्तृत अनुबंध](../docs/orm.md)
+में null, composite keys, query सीमाएँ और cancellation के नियम हैं।
+
 ## उपयोगकर्ता की पहचान और अधिकार (Authentication and authorization)
 
 कार्य API सीखने के लिए स्थानीय उदाहरण है। उपयोगकर्ता जोड़ने पर पहचान
