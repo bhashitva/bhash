@@ -1,0 +1,18 @@
+{
+  "lockVersion": 1,
+  "root": {
+    "manifestSha256": "87b395a2bd9b3e5674fcd7aea96ae136cb7cf1b5ad8cdaa5637f49ea629e79c0"
+  },
+  "packages": [
+    {
+      "name": "school-orm",
+      "version": "1.0.0",
+      "source": {
+        "type": "path",
+        "path": "../models"
+      },
+      "manifestSha256": "dcc8865fb8a307764c769264564e345ecb36c0ce456e65bd48fa857712b06cdf",
+      "sourcesSha256": "599c4eefe9ec8f5ba4db95cf5070fde4d069fd679a26249b497b63b41c086031"
+    }
+  ]
+}
