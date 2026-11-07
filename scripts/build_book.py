@@ -27,7 +27,8 @@ CONTENTS = "book/README.md"
 TREES = ("book", "docs", "examples", "lessons", "tutorial", "editors/jupyter",
          "editors/vscode", "licenses")
 FILES = ("README.md", "SUPPORT.md", "LICENSING.md", "LICENSE", "NOTICE",
-         "THIRD_PARTY_NOTICES.md")
+         "THIRD_PARTY_NOTICES.md", "scripts/generate_orm.py",
+         "scripts/test_generate_orm.py", "src/main/antlr4/Bhash.g4")
 EXAMPLE_TREES = ("book/examples/", "examples/", "lessons/", "tutorial/")
 EXAMPLE_METADATA = ("coverage.json", "expected-keywords.txt")
 REPO_FILE = re.compile(r"^/bhashitva/bhash/(?:blob|tree|raw)/(.+)$")
