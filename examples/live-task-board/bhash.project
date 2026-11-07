@@ -1,2 +1,4 @@
 name=live-task-board
 sources=src
+dependency.models.path=../live-task-board-models
+dependency.models.version=1.0.0

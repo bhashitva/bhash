@@ -3,6 +3,8 @@ on:
   pull_request:
     paths: &board-paths
       - 'examples/live-task-board/**'
+      - 'examples/live-task-board-models/**'
+      - 'scripts/generate_orm.py'
       - '.github/workflows/live-task-board.yml'
       - 'src/main/resources/dev/bhash/stdlib/websocket.bhash'
       - 'src/main/resources/dev/bhash/stdlib/async-web.bhash'

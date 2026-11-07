@@ -96,6 +96,8 @@ jobs:
               out.write(str(cache/'installations'/active['directory']/'bin')+'\n')
           PYTHON
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
+      - name: Verify generated ORM on SQLite with forced GC
+        run: python3 examples/orm/verify.py --target native
       - name: Test native WebSocket wire behavior over HTTP/1.1 and HTTP/2 TLS
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         env:

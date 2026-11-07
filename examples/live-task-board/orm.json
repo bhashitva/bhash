@@ -1,0 +1,36 @@
+{
+  "package": "पटआंकड़े",
+  "entities": [
+    {
+      "table": "live_tasks",
+      "name": "पटकार्य",
+      "repository": "पटकार्यसंग्रह",
+      "columns": [
+        {
+          "column": "board",
+          "name": "पट",
+          "type": "text"
+        },
+        {
+          "column": "id",
+          "name": "पहचान",
+          "type": "integer"
+        },
+        {
+          "column": "title",
+          "name": "शीर्षक",
+          "type": "text"
+        },
+        {
+          "column": "done",
+          "name": "पूरा",
+          "type": "boolean"
+        }
+      ],
+      "key": [
+        "board",
+        "id"
+      ]
+    }
+  ]
+}
