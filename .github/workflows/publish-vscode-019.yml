@@ -1,0 +1,42 @@
+name: Publish verified VS Code 0.19.0
+on:
+  push:
+    branches: [maintenance/publish-vscode-0.19.0]
+    paths: [.github/workflows/publish-vscode-019.yml]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bhash-vscode-Windows
+          run-id: 42422265432
+          github-token: ${{ github.token }}
+          path: release
+      - name: Verify and publish the tested VSIX
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          build=dc46aa2c777fad601eb86c1318377fc9eb80f7bf
+          test "$(gh run view 42422265432 --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)" = success
+          cd release
+          vsix=bhash-vscode-0.19.0.vsix
+          printf '%s  %s\n' 'd22c59742947386214820ce32536b2be19c1dde2d1232537cf6fa3dc6589a975' "$vsix" > "$vsix.sha256"
+          sha256sum -c "$vsix.sha256"
+          cat > release-notes.md <<'NOTES'
+          Version 0.19.0 bundles the Bhash compiler with the asynchronous HTTP server and RFC 6455 WebSocket server library for JVM, .NET, and native applications. HTTP/2 Extended CONNECT uses the separately deployed TLS gateway.
+
+          See the [WebSocket examples](https://github.com/bhashitva/bhash/blob/main/docs/websocket.md) and the [Hindi ORM tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/orm/README.md).
+
+          The universal VSIX passed the extension checks on Linux, Windows, and macOS.
+          NOTES
+          gh release create vscode-0.19.0 --repo "$GITHUB_REPOSITORY" --target "$build" --latest \
+            --title "Bhash VS Code extension 0.19.0" --notes-file release-notes.md "$vsix" "$vsix.sha256"
