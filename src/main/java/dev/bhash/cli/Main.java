@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 
 public final class Main {
     private Main() {}
@@ -113,7 +115,7 @@ public final class Main {
         err.println("Usage: java -jar bhash-compiler.jar check <file.bhash|project-directory|bhash.project>");
         err.println("       java -jar bhash-compiler.jar parse <file.bhash>");
         err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser|native] [--debug]");
-        err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr|native] [--debug]");
+        err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr|native] [--debug] [-- <program arguments...>]");
         err.println("       java -jar bhash-compiler.jar deps lock|restore|verify <project> [--offline]");
         err.println("       java -jar bhash-compiler.jar native toolchain status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
         err.println("       java -jar bhash-compiler.jar native doctor [--json]");
@@ -129,7 +131,7 @@ public final class Main {
         return 2;
     }
 
-    private record Options(Path source, Path output, Target target, boolean debug, Path sourceRoot) {}
+    private record Options(Path source, Path output, Target target, boolean debug, Path sourceRoot, List<String> arguments) {}
 
     private static Options options(String[] args, boolean allowOutput) throws IOException {
         Path source = Path.of(args[1]);
@@ -137,8 +139,12 @@ public final class Main {
         Path output = null, sourceRoot = null;
         Target target = Target.JVM;
         boolean targetSet = false, debug = false;
+        List<String> arguments = List.of();
         for (int i = 2; i < args.length; i++) {
-            if (args[i].equals("-o") && allowOutput && output == null && i + 1 < args.length) {
+            if (args[i].equals("--") && !allowOutput) {
+                arguments = List.copyOf(Arrays.asList(args).subList(i + 1, args.length));
+                break;
+            } else if (args[i].equals("-o") && allowOutput && output == null && i + 1 < args.length) {
                 output = Path.of(args[++i]);
             } else if (args[i].equals("--target") && !targetSet && i + 1 < args.length) {
                 targetSet = true;
@@ -162,7 +168,7 @@ public final class Main {
                     ? project.root().resolve("build").resolve(project.name() + suffix)
                     : source.resolveSibling(project.name() + suffix);
         }
-        return new Options(source, output, target, debug, sourceRoot);
+        return new Options(source, output, target, debug, sourceRoot, arguments);
     }
 
     private static void build(Options options) throws IOException, CompilationException {
@@ -224,7 +230,7 @@ public final class Main {
             }
             temporary = Files.createTempDirectory("bhash-run-");
             Path output = temporary.resolve(requested.target == Target.JVM ? "program.jar" : requested.target == Target.NATIVE ? "program"+dev.bhash.backend.llvm.NativePlatform.executableSuffix() : "clr");
-            var options = new Options(requested.source, output, requested.target, requested.debug, requested.sourceRoot);
+            var options = new Options(requested.source, output, requested.target, requested.debug, requested.sourceRoot, requested.arguments);
             build(options);
             ProcessBuilder builder;
             if (options.target == Target.JVM) {
@@ -233,6 +239,7 @@ public final class Main {
                 builder = new ProcessBuilder(java.toString(), "-jar", output.toString());
             } else if (options.target == Target.NATIVE) builder = new ProcessBuilder(output.toAbsolutePath().toString());
             else builder = new ProcessBuilder(ClrCompiler.executable(), output.resolve("BhashProgram.dll").toString());
+            builder.command().addAll(options.arguments);
             if(launchDirectory.get()!=null)builder.directory(launchDirectory.get().toFile());
             process = builder.inheritIO().start();
             return process.waitFor();
