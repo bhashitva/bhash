@@ -23,6 +23,7 @@ final class AsyncSourceLowering {
     private final NavigableMap<Integer,Token> origins=new TreeMap<>();
     private int next,offset;
     private String root;
+    private boolean rootAcceptsArguments;
     private AsyncSourceLowering(ManagedEmitter.Analysis analysis,Map<String,String> names){this.analysis=analysis;names.forEach((k,v)->this.names.put(v,k));}
     static boolean needed(ParseTree n){if(n instanceof FunctionDeclContext f && f.ASYNC()!=null || n instanceof UnaryContext u && u.AWAIT()!=null)return true;for(int i=0;i<n.getChildCount();i++)if(needed(n.getChild(i)))return true;return false;}
     static ProgramContext lower(ProgramContext tree,ManagedEmitter.Analysis analysis,Map<String,String> names)throws CompilationException {
@@ -52,11 +53,13 @@ final class AsyncSourceLowering {
     }
     private void entry(Token at) {
         String holder=fresh(),scheduler=standard("कार्यतंत्र"),base=standard("कार्यआधार");
+        String argument = rootAcceptsArguments ? fresh() : "";
+        String parameters = rootAcceptsArguments ? argument + ":पाठ[]" : "";
         append("वर्ग "+holder+" { सार्वजनिक साझा मान मूल:"+base+"; }",at);
-        append("फलन "+START+"()->शून्य { "+holder+".मूल="+root+"(); }",at);
+        append("फलन "+START+"("+parameters+")->शून्य { "+holder+".मूल="+root+"("+argument+"); }",at);
         append("फलन "+STEP+"()->तार्किक { मान ग:पूर्णांक=०; जबतक(ग<६४ && "+scheduler+".चरण()){ग=ग+१;} यदि("+holder+".मूल.समाप्तहै()){ "+holder+".मूल.आंतरिकपरिणामजाँचो(); "+holder+".मूल=रिक्त; लौटाओ असत्य;} लौटाओ सत्य; }",at);
         append("फलन "+CANCEL+"()->शून्य { यदि("+holder+".मूल!=रिक्त){"+holder+".मूल.आंतरिकचिह्न.निरस्तकरो();} }",at);
-        append("फलन मुख्य()->शून्य { "+START+"(); जबतक("+STEP+"()){ "+scheduler+".विश्राम(); } }",at);
+        append("फलन मुख्य("+parameters+")->शून्य { "+START+"("+argument+"); जबतक("+STEP+"()){ "+scheduler+".विश्राम(); } }",at);
     }
     private record Flow(int failed,int returned,int broken,int continued,String caught){}
     private record State(String code,int failure,Token origin){}
@@ -245,7 +248,10 @@ final class AsyncSourceLowering {
             return expression(loop.expression(),collection,init,flow);
         }
         String factory() {
-            String original=tree.IDENTIFIER().getText();if(dev.bhash.frontend.Identifiers.key(original).equals("मुख्य")){original=fresh();root=original;}
+            String original=tree.IDENTIFIER().getText();
+            if(owner==null && Identifiers.key(original).equals("मुख्य")) {
+                original=fresh();root=original;rootAcceptsArguments=tree.parameters()!=null;
+            }
             var b=new StringBuilder("फलन ").append(original).append('(').append(tree.parameters()==null?"":plain(tree.parameters())).append(")->").append(resultType).append("{ स्थिर ").append(arg).append(':').append(name).append("=नया ").append(name).append("();");
             if(owner!=null&&!shared)b.append(ref(receiver)).append("=यह;");
             if(tree.parameters()!=null)for(var p:tree.parameters().parameter())b.append(ref(binding(analysis.bindings.get(p)))).append('=').append(p.IDENTIFIER().getText()).append(';');

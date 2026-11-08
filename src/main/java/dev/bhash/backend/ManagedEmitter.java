@@ -276,6 +276,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return type.java;
     }
 
+    private String entryArgument(Function entry, String arguments) {
+        return entry.parameters.isEmpty() ? "" : "new " + typeName(entry.parameters.get(0)) + "(" + arguments + ")";
+    }
+
     private String program(ProgramContext program, boolean requireEntry) {
         collectClasses(program);
         functions.put(Identifiers.key("पढ़ो"), new ArrayList<>(List.of(new Function("BhashRuntime.readInteger", Type.INT, List.of(), null, Access.PUBLIC, false, null, true))));
@@ -299,14 +303,15 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         }
         var entries = functions.get(Identifiers.key("मुख्य"));
         if (entries == null && requireEntry || entries != null && (entries.size()!=1 ||
-            (entries.get(0).result != Type.VOID && !(entries.get(0).declaration.ASYNC()!=null && taskPayload(entries.get(0).result)==Type.VOID)) || !entries.get(0).parameters.isEmpty()))
-            throw error(program, "Executable requires exactly one फलन मुख्य() -> शून्य.");
+            (entries.get(0).result != Type.VOID && !(entries.get(0).declaration.ASYNC()!=null && taskPayload(entries.get(0).result)==Type.VOID)) ||
+            !(entries.get(0).parameters.isEmpty() || entries.get(0).parameters.equals(List.of(array(Type.TEXT))))))
+            throw error(program, "Executable requires exactly one फलन मुख्य() -> शून्य or फलन मुख्य(तर्क: पाठ[]) -> शून्य.");
         var main=entries == null ? null : entries.get(0);
         if (target == Target.JVM) {
             output.append("public final class BhashProgram {\n");
             if (main != null)
             output.append("public static void main(String[] args) { try { BhashStandard.appSetArguments(args); ").append(main.java)
-                    .append("(); } catch (RuntimeException | ExceptionInInitializerError e) { Throwable f=bhashFailure(e);")
+                    .append('(').append(entryArgument(main, "args")).append("); } catch (RuntimeException | ExceptionInInitializerError e) { Throwable f=bhashFailure(e);")
                     .append(" if (!(f instanceof BhashRuntime.BException || f instanceof ArithmeticException)) throw e;")
                     .append(" BhashRuntime.report(f.getMessage()); System.exit(1); } }\n");
             output.append("private static Throwable bhashFailure(Throwable e) { while(e instanceof ExceptionInInitializerError && e.getCause()!=null) e=e.getCause(); return e; }\n");
@@ -321,18 +326,20 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     for (var field : storage.fields.values()) output.append('"').append(field.java).append("\",");
                 output.append("}; }\npublic static Object notebookResult;\n")
                         .append("public static final java.util.Set<String> notebookInitialized = new java.util.HashSet<>();\n")
-                        .append("public static void notebookRun() { ").append(main.java).append("(); }\n");
+                        .append("public static void notebookRun() { ").append(main.java)
+                        .append('(').append(entryArgument(main, "new String[0]")).append("); }\n");
             }
         } else {
             output.append("using System;\ninternal static class BhashProgram {\n");
             output.append("public static int Main(string[] args) { try { BhashStandard.appSetArguments(args); ").append(main.java)
-                    .append("(); return 0; } catch (Exception e) when (bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException) {")
+                    .append('(').append(entryArgument(main, "args")).append("); return 0; } catch (Exception e) when (bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException) {")
                     .append(" BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n");
             output.append("private static Exception bhashFailure(Exception e) { while(e is TypeInitializationException && e.InnerException!=null) e=e.InnerException; return e; }\n");
             var asyncStart=functions.get(AsyncSourceLowering.START);
             if(asyncStart!=null) {
                 output.append("public static async System.Threading.Tasks.Task<int> MainAsync(string[] args) { try { BhashStandard.appSetArguments(args); ")
-                    .append(asyncStart.get(0).java).append("(); while(").append(functions.get(AsyncSourceLowering.STEP).get(0).java)
+                    .append(asyncStart.get(0).java).append('(').append(entryArgument(asyncStart.get(0), "args"))
+                    .append("); while(").append(functions.get(AsyncSourceLowering.STEP).get(0).java)
                     .append("()) await System.Threading.Tasks.Task.Delay(1); return 0; } catch(Exception e) when(bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException) { BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n")
                     .append("public static void CancelAsync() { ").append(functions.get(AsyncSourceLowering.CANCEL).get(0).java).append("(); }\n");
             }else output.append("public static System.Threading.Tasks.Task<int> MainAsync(string[] args) => System.Threading.Tasks.Task.FromResult(Main(args)); public static void CancelAsync() {}\n");

@@ -17,6 +17,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void entryArgumentsSurviveForcedGcAndAsyncSuspension() throws Exception {
+        requireTools();
+        var sources = List.of(new SourceFile("args.bhash", """
+            असमकालिक फलन मुख्य(तर्क: पाठ[]) -> शून्य {
+                प्रतीक्षा मानक.कार्य.विलंब(१);
+            """ + ManagedCompilerTest.ARGUMENT_ENTRY_BODY + "}"));
+        var result = nativeOnlyRun(sources, GC_STRESS, "--flag", "two words", "", "भारत😀");
+        assertEquals(0, result.exit(), result.err());
+        assertEquals("४\n[--flag]\n[two words]\n[]\n[भारत😀]\n", result.out());
+        assertTrue(stats(result).get("collections") > 0);
+        assertEquals(0L, stats(result).get("live"));
+    }
+
     @Test void unicodeIdentifiersPreserveNamesAndLiteralTextUnderForcedGc() throws Exception {
         requireTools();
         var result = nativeOnlyRun(List.of(new SourceFile("unicode.bhash", UnicodeIdentifierFixtures.SOURCE)), GC_STRESS);

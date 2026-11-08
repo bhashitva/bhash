@@ -117,8 +117,8 @@ def test_language(execute_case):
         आयात मानक.गणित उपनाम गण;
         सार्वजनिक फलन मुख्य() -> शून्य { लिखो(गण.वर्गमूल(९.०)); }
     """, streams="३.०\n")
-    run("असमकालिक फलन मुख्य() -> शून्य { प्रतीक्षा मानक.कार्य.विलंब(१); लिखो(७); }",
-        streams="७\n")
+    run("असमकालिक फलन मुख्य(तर्क: पाठ[]) -> शून्य { प्रतीक्षा मानक.कार्य.विलंब(१); लिखो(तर्क.आकार); }",
+        streams="०\n")
     examples = Path(__file__).resolve().parents[2] / "examples"
     run((examples / "objects.bhash").read_text(encoding="utf-8"), streams="मनोज १५० १५ १६५\n")
     run((examples / "contracts-generics.bhash").read_text(encoding="utf-8"),
