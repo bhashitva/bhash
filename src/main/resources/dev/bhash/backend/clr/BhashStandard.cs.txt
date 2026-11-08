@@ -682,6 +682,7 @@ internal static class BhashStandard {
 
 
     private sealed class ServerSocketState { internal System.Net.Sockets.Socket Socket; internal bool Listener; internal long Deadline; internal byte[] Scratch; }
+    private const int SERVER_SOCKET_LIMIT = 128;
     private static readonly Dictionary<long,ServerSocketState> serverSockets=new();
     private static long serverNext;
     private static int serverStopping,serverActive;
@@ -697,7 +698,7 @@ internal static class BhashStandard {
     internal static long srvListen(string address,long port){
         if(OperatingSystem.IsBrowser())throw failure("ब्राउज़र में HTTP सर्वर उपलब्ध नहीं है।");
         if((address!="127.0.0.1"&&address!="0.0.0.0")||port<0||port>65535)throw failure("अमान्य HTTP सुनने का पता या पोर्ट।");
-        if(serverSockets.Count>=32)throw failure("बहुत अधिक HTTP संबंध।");
+        if(serverSockets.Count>=SERVER_SOCKET_LIMIT)throw failure("बहुत अधिक HTTP संबंध।");
         var socket=new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,System.Net.Sockets.SocketType.Stream,System.Net.Sockets.ProtocolType.Tcp);
         try{socket.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Parse(address),(int)port));socket.Listen(16);socket.Blocking=false;
             if(serverSockets.Count==0)System.Threading.Interlocked.Exchange(ref serverStopping,0);serverHooks();System.Threading.Interlocked.Increment(ref serverActive);long id=++serverNext;serverSockets.Add(id,new ServerSocketState{Socket=socket,Listener=true});return id;
@@ -707,7 +708,7 @@ internal static class BhashStandard {
     internal static long srvTryAccept(long id)=>serverAccept(id,false);
     private static long serverAccept(long id,bool wait){
         var p=serverState(id);if(!p.Listener)throw failure("अमान्य HTTP सर्वर।");
-        if(serverSockets.Count>=32){if(!wait)return 0;throw failure("बहुत अधिक HTTP संबंध।");}
+        if(serverSockets.Count>=SERVER_SOCKET_LIMIT){if(!wait)return 0;throw failure("बहुत अधिक HTTP संबंध।");}
         System.Net.Sockets.Socket socket=null;
         try{
             if(wait&&!p.Socket.Poll(250000,System.Net.Sockets.SelectMode.SelectRead))return 0;
