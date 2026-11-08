@@ -103,6 +103,31 @@ class FrontendTest {
         assertFalse(parseBody("लिखो(१)").valid());
         assertFalse(Frontend.parse("bad", "फलन मुख्य() -> शून्य {} @").valid());
     }
+
+    @Test void reportsMissingSemicolonAtTheInsertionPoint() {
+        var result = Frontend.parse("playground.bhash", """
+                परिगणना स्थिति { लंबित, तैयार = ५ }
+                अभिलेख बिंदु(अ: पूर्णांक, ब: पूर्णांक);
+                फलन मुख्य() -> शून्य {
+                    स्थिर क: बिंदु = नया बिंदु(२,३)
+                    स्थिर मूल: सर्ववस्तु = क;
+                    लिखो(स्थिति.तैयार.नाम, क.अ, क.ब);
+                    लिखो(प्रकारहै<बिंदु>(मूल), क == नया बिंदु(२,३));
+                }
+                """);
+        assertEquals(1, result.diagnostics().size());
+        assertEquals("playground.bhash:4:36: [BH1001] अर्धविराम (;) यहाँ लगाएँ। — missing ';'",
+                result.diagnostics().get(0).toString());
+    }
+
+    @Test void placesMissingSemicolonBeforeTrailingTriviaUsingCodePointColumns() {
+        var result = Frontend.parse("unicode.bhash",
+                "फलन मुख्य() -> शून्य {\r\n    स्थिर नाम: पाठ = \"😀\"  // टिप्पणी\r\n\r\n}\r\n");
+        assertEquals(1, result.diagnostics().size());
+        assertEquals(2, result.diagnostics().get(0).line());
+        assertEquals(25, result.diagnostics().get(0).column());
+    }
+
     @Test void rejectsInvalidStringAndUnterminatedComment() {
         assertFalse(parseBody("लिखो(\"bad\\q\");").valid());
         assertFalse(parseBody("लिखो(\"bad\nline\");").valid());

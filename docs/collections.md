@@ -1,4 +1,4 @@
-# Arrays, lists, maps and iteration (v0.7)
+# Arrays, lists, maps, sets and iteration
 
 These features share one type checker and the same behavior on JVM, .NET CLR and
 browser .NET WebAssembly. The experimental Linux native target also supports
@@ -164,13 +164,27 @@ references to objects/collections. They are not live views of the map.
 
 **हिन्दी:** `कुंजियाँ()` और `मूल्य()` स्वतंत्र snapshots हैं। वस्तु/संग्रह के संदर्भ साझा रहते हैं। वे मानचित्र के साथ अपने आप नहीं बदलते।
 
+## Sets
+
+Import `मानक.समुच्चय` and construct a set with `नया समुच्चय<त>()`.
+It follows the map key equality rules above, including the error for `रिक्त`.
+`जोड़ो` and `हटाओ` report whether membership changed, and `है` tests
+membership. `आकार()`, `खाली()` and `साफ़()` query or clear the set.
+`संघ`, `प्रतिच्छेद` and `अंतर` return new sets of the same element type.
+`तत्व()` returns a new list in insertion order. A one-binding `प्रत्येक`
+over a set uses that same snapshot behavior.
+
+**हिन्दी:** `मानक.समुच्चय<त>` एक प्रकार के अद्वितीय सदस्य रखता है। जोड़ने,
+हटाने, क्रम से पढ़ने और दो समुच्चयों की तुलना करने के उदाहरण
+[समुच्चय की मार्गदर्शिका](../tutorial/standard-library/09-sets.md) में हैं।
+
 ## Collection iteration
 
-One binding iterates array/list elements or map keys. Two bindings iterate map
+One binding iterates array, list or set elements, or map keys. Two bindings iterate map
 keys and values. Binding types are explicit and must accept the corresponding
 source types; ordinary class/interface upcasts are permitted.
 
-**हिन्दी:** एक बंधन सरणी/सूची के तत्व या मानचित्र की कुंजी पढ़ता है। दो बंधन कुंजी और मान पढ़ते हैं। स्पष्ट प्रकार दें। संगत मूल वर्ग या अनुबंध प्रकार मान्य हैं।
+**हिन्दी:** एक बंधन सरणी, सूची या समुच्चय के तत्व या मानचित्र की कुंजी पढ़ता है। दो बंधन कुंजी और मान पढ़ते हैं। स्पष्ट प्रकार दें। संगत मूल वर्ग या अनुबंध प्रकार मान्य हैं।
 
 ```text
 प्रत्येक (नया पूर्णांक[]{१,२,३} में अंक: पूर्णांक) {
@@ -195,8 +209,10 @@ mutation when iteration advances: adding/removing elements or clearing a nonempt
 collection produces a Bhash diagnostic. Replacing a list element or updating the
 value of an existing map key is allowed and visible to subsequent iterations.
 Breaking/returning immediately does not advance the iterator again.
+Set iteration takes a shallow snapshot of the members at the start of the loop.
 
 **हिन्दी:** सरणी में वर्तमान तत्व दिखते हैं। सूची/मानचित्र iterator आगे बढ़ते समय जोड़ना, हटाना या गैर-खाली संग्रह साफ़ करना त्रुटि देता है। मौजूद मान बदल सकते हैं और अगली बारी उसे देखती है। तुरंत `विराम` या `लौटाओ` पर iterator फिर नहीं बढ़ता।
+समुच्चय में चक्र की शुरुआत में सदस्यों की अलग सूची बनती है।
 
 To remove map entries while iterating, iterate a key snapshot:
 

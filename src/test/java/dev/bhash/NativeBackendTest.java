@@ -17,6 +17,25 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void genericSetsSurviveForcedGc() throws Exception {
+        requireTools();
+        var source = StandardLibraryTest.SET_FIXTURE;
+        var result = nativeOnlyRun(List.of(new SourceFile(source.toString(), Files.readString(source))), GC_STRESS);
+        assertEquals(0, result.exit(), result.err());
+        assertEquals(StandardLibraryTest.SET_OUTPUT, result.out());
+        assertTrue(stats(result).get("collections") > 0);
+        assertEquals(0L, stats(result).get("live"));
+    }
+
+    @Test void textFormattingSurvivesForcedGc() throws Exception {
+        requireTools();
+        var source = StandardLibraryTest.FORMATTING_FIXTURE;
+        var result = nativeOnlyRun(List.of(new SourceFile(source.toString(), Files.readString(source))), GC_STRESS);
+        assertEquals(0, result.exit(), result.err());
+        assertEquals(StandardLibraryTest.FORMATTING_OUTPUT, result.out());
+        assertTrue(stats(result).get("collections") > 0);
+        assertEquals(0L, stats(result).get("live"));
+    }
     @Test void entryArgumentsSurviveForcedGcAndAsyncSuspension() throws Exception {
         requireTools();
         var sources = List.of(new SourceFile("args.bhash", """
