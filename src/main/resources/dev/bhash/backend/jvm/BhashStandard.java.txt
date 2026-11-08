@@ -625,6 +625,7 @@ final class BhashStandard {
         java.nio.channels.ServerSocketChannel listener; java.nio.channels.SocketChannel socket; long deadline;
         java.nio.ByteBuffer scratch;
     }
+    private static final int SERVER_SOCKET_LIMIT = 128;
     private static final Map<Long,ServerSocketState> serverSockets=new HashMap<>();
     private static long serverNext;
     private static final java.util.concurrent.atomic.AtomicBoolean serverStopping=new java.util.concurrent.atomic.AtomicBoolean();
@@ -641,7 +642,7 @@ final class BhashStandard {
     }
     static long srvListen(String address,long port){
         if(!List.of("127.0.0.1","0.0.0.0").contains(address)||port<0||port>65535)throw failure("अमान्य HTTP सुनने का पता या पोर्ट।");
-        if(serverSockets.size()>=32)throw failure("बहुत अधिक HTTP संबंध।");
+        if(serverSockets.size()>=SERVER_SOCKET_LIMIT)throw failure("बहुत अधिक HTTP संबंध।");
         java.nio.channels.ServerSocketChannel listener=null;
         try{listener=java.nio.channels.ServerSocketChannel.open();listener.bind(new java.net.InetSocketAddress(address,(int)port),16);listener.configureBlocking(false);
             serverHook();var s=new ServerSocketState();s.listener=listener;long id=++serverNext;serverSockets.put(id,s);serverActive.incrementAndGet();return id;
@@ -651,7 +652,7 @@ final class BhashStandard {
     static long srvTryAccept(long id){return serverAccept(id,false);}
     private static long serverAccept(long id,boolean wait){
         var parent=serverState(id);if(parent.listener==null)throw failure("अमान्य HTTP सर्वर।");
-        if(serverSockets.size()>=32){if(!wait)return 0;throw failure("बहुत अधिक HTTP संबंध।");}
+        if(serverSockets.size()>=SERVER_SOCKET_LIMIT){if(!wait)return 0;throw failure("बहुत अधिक HTTP संबंध।");}
         java.nio.channels.SocketChannel socket=null;
         try{if(wait&&serverPoll(parent.listener,java.nio.channels.SelectionKey.OP_ACCEPT,System.nanoTime()+250000000L)==0)return 0;
             socket=parent.listener.accept();if(socket==null)return 0;socket.configureBlocking(false);

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 """Exercise RFC 6455 over real HTTP/1.1 sockets using an independent wire peer."""
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from http.client import HTTPConnection, IncompleteRead, RemoteDisconnected
 from queue import Queue
+import os
 import socket
 import struct
 import subprocess
 import sys
 from threading import Thread
+from time import monotonic, sleep
 
 
 def frame(opcode, payload=b"", final=True, mask=True):
@@ -53,8 +55,37 @@ def code(wire):
     return struct.unpack("!H", payload[:2])[0]
 
 
-def verify(command):
-    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+def verify_capacity(connect, http, limit):
+    with ExitStack() as clients:
+        for _ in range(limit - 1):
+            clients.enter_context(connect())
+
+        with connect():
+            with connect(status=503):
+                pass
+            assert http("/health") == 200
+            # A failed handshake must still be rejected before capacity is allocated.
+            with connect(status=403, Origin="https://elsewhere.example"):
+                pass
+
+        # Closing the underlying TCP connection releases its slot without a Close frame.
+        # The asynchronous server can observe the disconnect after the next upgrade arrives.
+        deadline = monotonic() + 5
+        while True:
+            with connect(status=None) as (_, wire, status):
+                if status == 101:
+                    assert http("/revoke", "POST") == 200
+                    assert code(wire) == 1008
+                    break
+                assert status == 503 and monotonic() < deadline, status
+            sleep(0.02)
+    with connect(status=401):
+        pass
+
+
+def verify(command, expanded=False):
+    env = dict(os.environ, BHASH_WS_TEST_EXPANDED="1" if expanded else "0")
+    with subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                           encoding="utf-8", errors="replace") as process:
         events, transcript = Queue(), []
 
@@ -93,18 +124,19 @@ def verify(command):
                 with socket.create_connection(("127.0.0.1", port), timeout=20) as peer:
                     peer.sendall(request.encode("ascii") + early)
                     with peer.makefile("rb") as wire:
-                        assert int(wire.readline().split()[1]) == status
+                        actual = int(wire.readline().split()[1])
+                        assert status is None or actual == status, (status, actual)
                         response = {}
                         while (line := wire.readline()) != b"\r\n":
                             name, value = line.decode("ascii").split(":", 1)
                             response[name.lower()] = value.strip()
-                        if status == 101:
+                        if actual == 101:
                             assert response["sec-websocket-accept"] == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
                             assert response["sec-websocket-protocol"] == "bhash.echo"
-                        if status == 426:
+                        if actual == 426:
                             assert response["sec-websocket-version"] == "13"
                             assert response["upgrade"] == "websocket"
-                        yield peer, wire
+                        yield peer, wire, actual
 
             def http(path, method="GET"):
                 with_socket = HTTPConnection("127.0.0.1", port, timeout=15)
@@ -127,7 +159,7 @@ def verify(command):
                     pass
 
             text = "नमस्ते, भारत 😀".encode()
-            with connect(early=frame(1, text[:2], final=False)) as (peer, wire):
+            with connect(early=frame(1, text[:2], final=False)) as (peer, wire, _):
                 assert http("/health") == 200
                 peer.sendall(frame(9, b"ping") + frame(0, text[2:]))
                 assert receive(wire) == (10, True, b"ping")
@@ -147,14 +179,10 @@ def verify(command):
                 (frame(8, struct.pack("!H", 1006)), 1002),
                 (b"\x82\xff" + struct.pack("!Q", 262145) + b"mask", 1009),
             ):
-                with connect() as (peer, wire):
+                with connect() as (peer, wire, _):
                     peer.sendall(packet)
                     assert code(wire) == expected
-            with connect() as (_, wire):
-                assert http("/revoke", "POST") == 200
-                assert code(wire) == 1008
-            with connect(status=401):
-                pass
+            verify_capacity(connect, http, 32 if expanded else 8)
             try:
                 http("/stop", "POST")
             # Stopping can close this request after its headers and before its body.
@@ -167,8 +195,9 @@ def verify(command):
         finally:
             if process.poll() is None:
                 process.kill()
-    print("WebSocket handshakes, framing, close, cancellation and HTTP coexistence passed")
 
 
 if __name__ == "__main__":
     verify(sys.argv[1:])
+    verify(sys.argv[1:], expanded=True)
+    print("WebSocket wire checks passed at default and expanded connection limits")
