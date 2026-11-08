@@ -120,6 +120,15 @@ public final class LlvmEmitter {
         globals.append("@static_roots = private constant [").append(staticRoots.size()).append(" x ptr] [")
             .append(String.join(", ",staticRoots)).append("], align 8\n");
         for(var f:program.functions())function(f);
+        String entryArguments="", entryParameter="";
+        if(program.entryArguments()>=0) {
+            var entry=program.functions().stream().filter(f->f.id()==program.entry()).findFirst().orElseThrow();
+            entryArguments="  %arguments = call i64 @bh_foundation_call(i32 "+CoreProgram.APPLICATION_ARGUMENTS+
+                ", i64 0, i64 0, ptr "+collectionInfo(program.entryArguments())+", ptr "+text(entry.source().toString())+")\n"+
+                "  %argument_array = inttoptr i64 %arguments to ptr\n";
+            // No safepoint between returning the array and registering the callee's parameter roots.
+            entryParameter="ptr %argument_array";
+        }
         String license=text(notices);
         byte[] info=buildInfo.getBytes(StandardCharsets.UTF_8);globals.append("@bhash_build_info = private constant [").append(info.length+1).append(" x i8] c\"");
         for(byte b:info)globals.append(String.format(Locale.ROOT,"\\%02X",b&255));
@@ -138,7 +147,8 @@ public final class LlvmEmitter {
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
             "declare i64 @bh_database_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+
             "declare i64 @bh_server_call(i32, i64, i64, ptr, ptr)\ndeclare i64 @bh_network_call(i32, i64, i64, i64, i64, i64, ptr, ptr)\ndeclare void @bh_application_arguments(i32, ptr)\ndeclare i64 @bh_foundation_call(i32, i64, i64, ptr, ptr)\n"+textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_to_int32(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
-            "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n  call void @bfn"+program.entry()+"()\n  ret i64 0\n}\n"+
+            "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n"+entryArguments+
+            "  call void @bfn"+program.entry()+"("+entryParameter+")\n  ret i64 0\n}\n"+
             "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @"+NativeBuildInfo.GUARD+"()\n  call void @bh_runtime_init()\n  call void @bh_application_arguments(i32 %argc, ptr %argv)\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  call void @bh_static_roots_configure(ptr @static_roots, i64 "+staticRoots.size()+")\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %info = call i32 @bh_print_build_info_if_requested(i32 %argc, ptr %argv, ptr @bhash_build_info)\n  %handled = or i32 %shown, %info\n  %skip = icmp ne i32 %handled, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n"+(debug==null?"":debug.render());
     }
     private static String numericDeclarations(){
