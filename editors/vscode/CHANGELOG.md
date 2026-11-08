@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0
+
+- Bundle configurable async HTTP and WebSocket capacity from [PR #88](https://github.com/bhashitva/bhash/pull/88).
+- Keep the existing connection defaults. See the [configuration guide](https://github.com/bhashitva/bhash/blob/main/docs/websocket.md).
+- Refresh the Marketplace overview and link to the standalone command-line compiler.
+
 ## 0.19.0
 
 - Bundle the compiler with the asynchronous HTTP server and RFC 6455 WebSocket server library for JVM, .NET, and native applications.
