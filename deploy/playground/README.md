@@ -5,6 +5,13 @@ Deployment target: **unused Ubuntu 24.04 / AMD64 VPS, 2 vCPUs, 8 GB RAM,
 This package is ready for a first deployment; repository preparation does not
 install anything on the VPS or create DNS records.
 
+## Compiler release
+
+The Playground is built with the Bhash 0.20.0 compiler. The editor links to the
+[standalone compiler release](https://github.com/bhashitva/bhash/releases/tag/bhash-0.20.0)
+for local use. Use the JVM, .NET or native target for applications that listen
+for incoming HTTP or WebSocket connections.
+
 ## Components
 
 - CodeMirror mobile-friendly editor, keyword completion/snippets generated from
