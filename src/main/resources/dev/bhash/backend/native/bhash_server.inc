@@ -16,7 +16,8 @@ typedef SOCKET srv_socket;
 #define srv_close_socket closesocket
 #endif
 typedef struct {uint64_t id,deadline;srv_socket socket;int listener;} srv_state;
-static srv_state srv_states[32];
+enum { SRV_SOCKET_LIMIT = 128 };
+static srv_state srv_states[SRV_SOCKET_LIMIT];
 static uint64_t srv_next;
 #ifdef _WIN32
 static volatile LONG srv_stopping;
@@ -38,7 +39,7 @@ static void srv_hooks(void){if(srv_hooked)return;srv_stopping=0;
     srv_hooked=1;
 }
 static void srv_unhook(void){
-    for(size_t i=0;i<32;i++)if(srv_states[i].id)return;
+    for(size_t i=0;i<SRV_SOCKET_LIMIT;i++)if(srv_states[i].id)return;
     if(!srv_hooked)return;
 #ifdef _WIN32
     SetConsoleCtrlHandler(srv_signal,FALSE);
@@ -78,11 +79,11 @@ static int srv_wait(srv_socket socket,int write,uint64_t deadline){
     }
 }
 static srv_state *srv_find(uint64_t id,const void *location){
-    for(size_t i=0;i<32;i++)if(srv_states[i].id==id&&id)return &srv_states[i];
+    for(size_t i=0;i<SRV_SOCKET_LIMIT;i++)if(srv_states[i].id==id&&id)return &srv_states[i];
     runtime_error(location,"HTTP संबंध बंद है।");return NULL;
 }
 static srv_state *srv_slot(const void *location){
-    for(size_t i=0;i<32;i++)if(!srv_states[i].id)return &srv_states[i];
+    for(size_t i=0;i<SRV_SOCKET_LIMIT;i++)if(!srv_states[i].id)return &srv_states[i];
     runtime_error(location,"बहुत अधिक HTTP संबंध।");return NULL;
 }
 static void srv_ready(srv_state *state,int write,const void *location){
@@ -121,14 +122,14 @@ uint64_t bh_server_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_in
     }
     if(op==4){
         if(!a||a>srv_next)runtime_error(location,"अमान्य HTTP संबंध पहचान।");
-        for(size_t i=0;i<32;i++)if(srv_states[i].id==a){srv_close_socket(srv_states[i].socket);memset(&srv_states[i],0,sizeof srv_states[i]);}
+        for(size_t i=0;i<SRV_SOCKET_LIMIT;i++)if(srv_states[i].id==a){srv_close_socket(srv_states[i].socket);memset(&srv_states[i],0,sizeof srv_states[i]);}
         srv_unhook();return 0;
     }
     srv_state *state=srv_find(a,location);
     if(op==1||op==7){
         if(!state->listener)runtime_error(location,"अमान्य HTTP सर्वर।");
         srv_state *child=NULL;
-        for(size_t i=0;i<32;i++)if(!srv_states[i].id){child=&srv_states[i];break;}
+        for(size_t i=0;i<SRV_SOCKET_LIMIT;i++)if(!srv_states[i].id){child=&srv_states[i];break;}
         if(!child){if(op==7)return 0;runtime_error(location,"बहुत अधिक HTTP संबंध।");}
         if(op==1){
             int result=srv_wait(state->socket,0,srv_clock()+250);
