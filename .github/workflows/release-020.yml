@@ -107,6 +107,7 @@ jobs:
           assert result == "मेरी कार्यसूची", result
           PY
           python -m pip install release/bhash_jupyter-0.1.6-py3-none-any.whl
+          mkdir -p target
           python -m bhash_jupyter.install --notebook target/hindi-starter.ipynb
           cmp target/hindi-starter.ipynb release/hindi-starter.ipynb
           python editors/jupyter/test_kernel.py --installed --notebook target/hindi-starter.ipynb
