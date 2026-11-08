@@ -1755,12 +1755,13 @@ static int app_directory_exists_wide(const wchar_t *path){
     (void)CloseHandle(file);return found;
 }
 #endif
-static void app_entry(void **slots,const char *name,const void *location){
+static void app_entry(void **slots,const char *name,int64_t index,const void *location){
     uint64_t n=strlen(name);
     if(!valid_utf8((const unsigned char *)name,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");
-    if(((bh_collection *)slots[0])->size>=65536)runtime_error(location,"निर्देशिका में बहुत अधिक नाम हैं।");
+    if(index<0&&((bh_collection *)slots[0])->size>=65536)runtime_error(location,"निर्देशिका में बहुत अधिक नाम हैं।");
     slots[1]=new_text(n,location);memcpy(text_data(slots[1]),name,(size_t)n);
-    (void)bh_collection_call(slots[0],BH_ADD,(uint64_t)(uintptr_t)slots[1],0,NULL,location);
+    if(index<0)(void)bh_collection_call(slots[0],BH_ADD,pointer_bits(slots[1]),0,NULL,location);
+    else (void)bh_collection_call(slots[0],BH_SET,(uint64_t)index,pointer_bits(slots[1]),NULL,location);
     slots[1]=NULL;
 }
 #ifdef BHASH_AUTHENTICATION
@@ -1792,21 +1793,26 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
     }
     if(op==13){
         void *slots[3]={NULL,NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,3);
-        slots[0]=bh_collection_new(info,0,location);
+        int array=info->kind==BH_ARRAY;
 #ifdef _WIN32
         int count=0;wchar_t **args=CommandLineToArgvW(GetCommandLineW(),&count);
         if(!args)runtime_error(location,"तर्क उपलब्ध नहीं हैं।");
         bh_cleanup cleanup={cleanups,args,app_local_free};cleanups=&cleanup;
+#else
+        int count=app_argc;
+#endif
+        slots[0]=bh_collection_new(info,array&&count>0?count-1:0,location);
+#ifdef _WIN32
         for(int i=1;i<count;i++){
             int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,args[i],-1,NULL,0,NULL,NULL);
             if(n<=0)runtime_error(location,"अमान्य यूनिकोड पाठ।");
             slots[2]=new_text((uint64_t)n,location);
             WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,args[i],-1,(char *)text_data(slots[2]),n,NULL,NULL);
-            app_entry(slots,(const char *)text_data(slots[2]),location);slots[2]=NULL;
+            app_entry(slots,(const char *)text_data(slots[2]),array?i-1:-1,location);slots[2]=NULL;
         }
         cleanups=cleanup.previous;LocalFree(args);
 #else
-        for(int i=1;i<app_argc;i++)app_entry(slots,app_argv[i],location);
+        for(int i=1;i<count;i++)app_entry(slots,app_argv[i],array?i-1:-1,location);
 #endif
         uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
     }
@@ -1911,7 +1917,7 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
         do {
             char name[4*MAX_PATH];int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,entry.cFileName,-1,name,(int)sizeof name,NULL,NULL);
             if(bytes<=0)runtime_error(location,"अमान्य यूनिकोड पाठ।");
-            if(strcmp(name,".")&&strcmp(name,".."))app_entry(slots,name,location);
+            if(strcmp(name,".")&&strcmp(name,".."))app_entry(slots,name,-1,location);
         }while(FindNextFileW(dir,&entry));
         DWORD error=GetLastError();cleanups=cleanup.previous;FindClose(dir);
         if(error!=ERROR_NO_MORE_FILES)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
@@ -1930,7 +1936,7 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
         DIR *dir=opendir(name);if(!dir)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
         bh_cleanup cleanup={cleanups,dir,app_dir_close};cleanups=&cleanup;slots[0]=bh_collection_new(info,0,location);
         struct dirent *entry;int error=0;
-        for(;;){errno=0;entry=readdir(dir);if(!entry){error=errno;break;}if(strcmp(entry->d_name,".")&&strcmp(entry->d_name,".."))app_entry(slots,entry->d_name,location);}
+        for(;;){errno=0;entry=readdir(dir);if(!entry){error=errno;break;}if(strcmp(entry->d_name,".")&&strcmp(entry->d_name,".."))app_entry(slots,entry->d_name,-1,location);}
         cleanups=cleanup.previous;if(closedir(dir)||error)runtime_error(location,"निर्देशिका पढ़ी नहीं जा सकी।");
         uint64_t result=(uint64_t)(uintptr_t)slots[0];bh_roots_pop(&frame);return result;
     }
