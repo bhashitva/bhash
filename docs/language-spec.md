@@ -133,15 +133,17 @@ package-private unless marked `सार्वजनिक`; imports are scoped 
 Qualified names and `उपनाम` aliases resolve cross-file references. See the
 [project and package rules](projects-packages.md) for source discovery, resolution,
 visibility and commands. No top-level executable statements, globals or nested
-class declarations are supported. Executables must define exactly one
-`मुख्य()` returning `शून्य` across the whole project. Empty source is syntactically valid but is not a
+class declarations are supported. Executables must define exactly one `मुख्य`
+returning `शून्य` across the whole project. It can take zero parameters or one
+`पाठ[]` parameter containing the [command-line arguments](cli.md#command-line-arguments).
+Empty source is syntactically valid but is not a
 valid executable. Functions may overload by parameter types; return-type-only overloads are rejected. Classes have their own
 member scopes, described in [Objects and inheritance](objects.md). Forward calls
 and recursion are permitted; collect function signatures before resolving bodies.
 All parameters and return types are explicit. Parameters are immutable bindings.
 Arguments evaluate left to right and must match the signature in count and type.
 
-**हिन्दी:** फ़ाइल में पहले वैकल्पिक `संकुल`, फिर `आयात`, फिर फलन, वर्ग या अनुबंध घोषणाएँ हैं। परियोजना `bhash.project` के स्रोत roots इकट्ठे करती है। सार्वजनिक चिह्न के बिना घोषणा संकुल तक और आयात फ़ाइल तक है। पूरे नाम और `उपनाम` से दूसरी फ़ाइल का नाम लें। ऊपरी स्तर पर executable कथन, globals और भीतर के वर्ग नहीं हैं। परियोजना में ठीक एक `मुख्य() -> शून्य` चाहिए। खाली फ़ाइल parse हो सकती है लेकिन ऐप नहीं है। ओवरलोड मापदंड से अलग हों। आगे घोषित फलन और पुनरावृत्ति मान्य हैं। प्रकार स्पष्ट हैं, मापदंड अचल हैं और तर्क बाएँ से दाएँ चलते हैं। [परियोजना नियम](projects-packages.md) देखें।
+**हिन्दी:** फ़ाइल में पहले वैकल्पिक `संकुल`, फिर `आयात`, फिर फलन, वर्ग या अनुबंध घोषणाएँ हैं। परियोजना `bhash.project` के स्रोत roots इकट्ठे करती है। सार्वजनिक चिह्न के बिना घोषणा संकुल तक और आयात फ़ाइल तक है। पूरे नाम और `उपनाम` से दूसरी फ़ाइल का नाम लें। ऊपरी स्तर पर executable कथन, globals और भीतर के वर्ग नहीं हैं। परियोजना में ठीक एक `मुख्य` चाहिए। उसका परिणाम `शून्य` है और वह बिना मापदंड या एक `पाठ[]` मापदंड के साथ लिखा जा सकता है। खाली फ़ाइल parse हो सकती है लेकिन ऐप नहीं है। ओवरलोड मापदंड से अलग हों। आगे घोषित फलन और पुनरावृत्ति मान्य हैं। प्रकार स्पष्ट हैं, मापदंड अचल हैं और तर्क बाएँ से दाएँ चलते हैं। [परियोजना नियम](projects-packages.md) देखें।
 
 ## 4. Bindings, scope and control flow
 
@@ -394,7 +396,7 @@ Function types, capture semantics and cross-target lowering are specified in [fu
 
 The task-core contract is specified in [task-core-implementation.md](task-core-implementation.md).
 An `असमकालिक फलन` returns `कार्यफल<T>` to callers while its body returns T.
-`प्रतीक्षा` suspends only inside async bodies. Async `मुख्य()->शून्य` drives
+`प्रतीक्षा` suspends only inside async bodies. An async `मुख्य` drives
 structured task completion. `असमकालिक संसाधन` awaits `बंदकरो()->कार्यफल<शून्य>`;
 both sync and async resources drain children before disposal. See the
 [Hindi tutorial](../tutorial/async/README.md) and [approved design](async-await-design.md).

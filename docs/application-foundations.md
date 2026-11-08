@@ -164,6 +164,13 @@ permission details are not exposed in this edition.
 | `परीक्षण.सत्यहै(condition, message)` | Throw catchable `अपवाद` when false |
 | `परीक्षण.बराबर(expected, actual)` | Exact equality overloads for पूर्णांक, पाठ, तार्किक |
 
+Use [`मुख्य(तर्क: पाठ[])`](cli.md#command-line-arguments) when you need the raw
+arguments, including positional values. Use `विन्यास.तर्क()` to parse named
+options as configuration values.
+
+**हिन्दी:** मूल तर्कों के लिए `मुख्य(तर्क: पाठ[])` लिखें। `--नाम=मान` को विन्यास
+के रूप में पढ़ने के लिए `विन्यास.तर्क()` लें।
+
 Configuration layering is explicit: choose defaults, load values, then overwrite
 using the application’s desired precedence. Values are not implicitly converted
 and environment variables are not interpolated. Do not log secrets automatically.

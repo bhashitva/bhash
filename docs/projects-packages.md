@@ -85,8 +85,9 @@ of a given function name must use the same top-level visibility. Duplicate
 parameter signatures remain errors; return types do not distinguish overloads.
 Built-in function names remain reserved in every package.
 
-An executable project must have exactly one global `फलन मुख्य() -> शून्य`
-across all packages and source roots. Each file does not need an entry point.
+An executable project must have exactly one global entry point across all packages
+and source roots. Use `फलन मुख्य() -> शून्य` or
+`फलन मुख्य(तर्क: पाठ[]) -> शून्य` to [receive command-line arguments](cli.md#command-line-arguments).
 The entry point may be package-private; it is not imported under a short alias.
 This version builds executables, not separately compiled library artifacts.
 
