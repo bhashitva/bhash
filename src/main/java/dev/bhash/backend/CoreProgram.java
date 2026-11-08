@@ -10,7 +10,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
-public record CoreProgram(List<Function> functions, int entry, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes, List<StaticField> staticFields, List<ClassInitialization> initializations, boolean networking, boolean database, boolean postgresql, boolean server, boolean authentication) {
+public record CoreProgram(List<Function> functions, int entry, int entryArguments, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes, List<StaticField> staticFields, List<ClassInitialization> initializations, boolean networking, boolean database, boolean postgresql, boolean server, boolean authentication) {
+    public static final int APPLICATION_ARGUMENTS = 13;
     public enum Type { INT, BYTE, INT32, REAL, BOOL, TEXT, OBJECT, ANY, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT || this==ANY; }
     }
@@ -297,14 +298,17 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
         }
         static String originalName(org.antlr.v4.runtime.Token token){return token instanceof LocatedToken t?t.originalText():token.getText();}
         CoreProgram program(ProgramContext tree) throws CompilationException {
-            var result=new ArrayList<Function>(); int entry=-1;
+            var result=new ArrayList<Function>(); int entry=-1, entryArguments=-1;
             for(var d:tree.functionDecl()) {
                 if(library(d))continue;
                 var f=declarations.get(d);
                 var parameters=new ArrayList<Binding>();
                 if(d.parameters()!=null)for(var p:d.parameters().parameter())parameters.add(binding(a.bindings.get(p),p));
                 int id=ids.get(f);resultType=type(f.result,d);
-                if(Identifiers.key(d.IDENTIFIER().getText()).equals(Identifiers.key("मुख्य")))entry=id;
+                if(Identifiers.key(d.IDENTIFIER().getText()).equals(Identifiers.key("मुख्य"))) {
+                    entry=id;
+                    if(!f.parameters.isEmpty())entryArguments=collectionId(f.parameters.get(0),d);
+                }
                 result.add(new Function(id,type(f.result,d),List.copyOf(parameters),block(d.block()),source(d)));
             }
             if(entry<0)throw new CompilationException("Native core has no checked entry point.");
@@ -412,7 +416,7 @@ public record CoreProgram(List<Function> functions, int entry, List<ObjectType> 
             for(var c:classes)if(!c.record())functionNames.put(classInitializers.get(c),originalName(c.declaration!=null?c.declaration.IDENTIFIER().getSymbol():c.enumeration.IDENTIFIER().getSymbol())+".<वर्ग आरंभ>");
             self=null;
             result.replaceAll(f->new Function(f.id(),f.result(),f.parameters(),f.body(),f.source(),f.initialization(),functionNames.getOrDefault(f.id(),"")));
-            return new CoreProgram(List.copyOf(result),entry,List.copyOf(objectTypes),types.stream()
+            return new CoreProgram(List.copyOf(result),entry,entryArguments,List.copyOf(objectTypes),types.stream()
                 .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections),new ObjectType(-5,"अपवाद",List.of(messageField,locationField),List.of(),
                     Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().filter(c->!c.record()).map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList(),networking,database,postgresql,server,authentication);
         }
