@@ -17,6 +17,42 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class ManagedCompilerTest {
+    static final String ARGUMENT_ENTRY_BODY = """
+        लिखो(तर्क.आकार);
+        प्रत्येक (तर्क में अंश: पाठ) { लिखो("[" + अंश + "]"); }
+        """;
+
+    @Test void entryReceivesRawArgumentsInOrder() throws Exception {
+        // java.exe uses the Windows ANSI code page before the program starts.
+        String text = !clr() && System.getProperty("os.name").startsWith("Windows")
+            && !java.nio.charset.Charset.forName(System.getProperty("native.encoding", "UTF-8")).newEncoder().canEncode("भारत😀")
+            ? "India" : "भारत😀";
+        for (String prefix : List.of("", "असमकालिक ")) {
+            String await = prefix.isEmpty() ? "" : "प्रतीक्षा मानक.कार्य.विलंब(१);\n";
+            Path program = compile(prefix + "फलन मुख्य(तर्क: पाठ[]) -> शून्य {\n" + await + ARGUMENT_ENTRY_BODY + "}");
+            assertEquals(new Execution(0, "०\n"), run(program, ""));
+            assertEquals(new Execution(0, "४\n[--flag]\n[two words]\n[]\n[" + text + "]\n"),
+                run(program, "", "--flag", "two words", "", text));
+        }
+    }
+
+    @Test void cliRunForwardsArgumentsAfterSeparator() throws Exception {
+        Path source = directory.resolve("args.bhash");
+        Files.writeString(source, """
+            फलन मुख्य(तर्क: पाठ[]) -> शून्य {
+                यदि (तर्क.आकार != ४ || तर्क[०] != "--target" || तर्क[१] != "two words"
+                    || तर्क[२] != "" || तर्क[३] != "--") {
+                    फेंको नया अपवाद("Arguments were changed");
+                }
+            }
+            """);
+        var output = new ByteArrayOutputStream();
+        try (var log = new PrintStream(output, true, StandardCharsets.UTF_8)) {
+            assertEquals(0, Main.run(new String[]{"run", source.toString(), "--target", clr() ? "clr" : "jvm",
+                "--", "--target", "two words", "", "--"}, log, log), output.toString(StandardCharsets.UTF_8));
+        }
+    }
+
     @Test void asyncLanguageFixturesMatch()throws Exception {
         for(var f:AsyncFixtures.cases()) {
             System.out.println("Async "+target+": "+f.name());
@@ -238,11 +274,12 @@ abstract class ManagedCompilerTest {
         return compile("फलन मुख्य() -> शून्य { " + statements + " }");
     }
 
-    private Execution run(Path jar, String input) throws Exception {
+    private Execution run(Path jar, String input, String... arguments) throws Exception {
         String java = Path.of(System.getProperty("java.home"), "bin",
                 System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
         var command = clr() ? new ProcessBuilder(ClrCompiler.executable(), jar.toString())
                 : new ProcessBuilder(java, "-Xverify:all", "-jar", jar.toString());
+        command.command().addAll(List.of(arguments));
         // Drain output directly to a file: waiting on a full pipe deadlocks on Windows.
         Path capture = directory.resolve("output-" + next++ + ".txt");
         var process = command.redirectErrorStream(true).redirectOutput(capture.toFile()).start();
@@ -416,6 +453,9 @@ abstract class ManagedCompilerTest {
     @Test void rejectsBadSignaturesScopeAndControlFlow() {
         reject("", "मुख्य");
         reject("फलन मुख्य(संख्या: पूर्णांक) -> शून्य {}", "मुख्य");
+        reject("फलन मुख्य(तर्क: सूची<पाठ>) -> शून्य {}", "मुख्य");
+        reject("फलन मुख्य(तर्क: पाठ[][]) -> शून्य {}", "मुख्य");
+        reject("फलन मुख्य() -> शून्य {} फलन मुख्य(तर्क: पाठ[]) -> शून्य {}", "मुख्य");
         reject("फलन मुख्य() -> पूर्णांक { लौटाओ १; }", "मुख्य");
         reject("फलन पढ़ो() -> पूर्णांक { लौटाओ १; } फलन मुख्य() -> शून्य {}", "reserved");
         reject("फलन मुख्य() -> शून्य { विराम; }", "Loop control");
