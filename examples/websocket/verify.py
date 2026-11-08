@@ -148,40 +148,40 @@ def verify(command, expanded=False):
                 finally:
                     with_socket.close()
 
-                for status, headers in (
-                    (401, {"Cookie": None}), (403, {"Origin": None}),
-                    (403, {"Origin": "https://elsewhere.example"}),
-                    (426, {"Sec-WebSocket-Version": "12"}),
-                    (400, {"Sec-WebSocket-Key": "not-a-key"}),
-                    (400, {"Sec-WebSocket-Protocol": "other"}),
-                ):
-                    with connect(status=status, **headers):
-                        pass
+            for status, headers in (
+                (401, {"Cookie": None}), (403, {"Origin": None}),
+                (403, {"Origin": "https://elsewhere.example"}),
+                (426, {"Sec-WebSocket-Version": "12"}),
+                (400, {"Sec-WebSocket-Key": "not-a-key"}),
+                (400, {"Sec-WebSocket-Protocol": "other"}),
+            ):
+                with connect(status=status, **headers):
+                    pass
 
-                text = "नमस्ते, भारत 😀".encode()
-                with connect(early=frame(1, text[:2], final=False)) as (peer, wire, _):
-                    assert http("/health") == 200
-                    peer.sendall(frame(9, b"ping") + frame(0, text[2:]))
-                    assert receive(wire) == (10, True, b"ping")
-                    assert message(wire) == (1, text)
-                    payload = bytes(range(256)) * 257
-                    peer.sendall(frame(2, payload))
-                    assert message(wire) == (2, payload)
-                    peer.sendall(frame(8, struct.pack("!H", 1000) + text))
-                    assert receive(wire) == (8, True, struct.pack("!H", 1000) + text)
-                    assert wire.read() == b""
+            text = "नमस्ते, भारत 😀".encode()
+            with connect(early=frame(1, text[:2], final=False)) as (peer, wire, _):
+                assert http("/health") == 200
+                peer.sendall(frame(9, b"ping") + frame(0, text[2:]))
+                assert receive(wire) == (10, True, b"ping")
+                assert message(wire) == (1, text)
+                payload = bytes(range(256)) * 257
+                peer.sendall(frame(2, payload))
+                assert message(wire) == (2, payload)
+                peer.sendall(frame(8, struct.pack("!H", 1000) + text))
+                assert receive(wire) == (8, True, struct.pack("!H", 1000) + text)
+                assert wire.read() == b""
 
-                for packet, expected in (
-                    (frame(1, b"x", mask=False), 1002),
-                    (frame(1, b"\xff"), 1007),
-                    (frame(0, b"x"), 1002),
-                    (frame(9, b"x", final=False), 1002),
-                    (frame(8, struct.pack("!H", 1006)), 1002),
-                    (b"\x82\xff" + struct.pack("!Q", 262145) + b"mask", 1009),
-                ):
-                    with connect() as (peer, wire, _):
-                        peer.sendall(packet)
-                        assert code(wire) == expected
+            for packet, expected in (
+                (frame(1, b"x", mask=False), 1002),
+                (frame(1, b"\xff"), 1007),
+                (frame(0, b"x"), 1002),
+                (frame(9, b"x", final=False), 1002),
+                (frame(8, struct.pack("!H", 1006)), 1002),
+                (b"\x82\xff" + struct.pack("!Q", 262145) + b"mask", 1009),
+            ):
+                with connect() as (peer, wire, _):
+                    peer.sendall(packet)
+                    assert code(wire) == expected
             verify_capacity(connect, http, 32 if expanded else 8)
             try:
                 http("/stop", "POST")
