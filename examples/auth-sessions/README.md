@@ -57,7 +57,7 @@ java -jar build/auth.jar --local=true --port=8080 --db=accounts.db
 इस स्पष्ट स्थानीय मोड में कुकी `bhash-local-session` है और Secure छोड़ता है;
 इसे सार्वजनिक इंटरनेट के लिए प्रयोग न करें। listener को loopback पर ही रहने दें।
 
-VS Code में यह फ़ोल्डर खोलकर compiler से build करें, फिर integrated terminal में ऊपर का executable command चलाएँ। इस फ़ोल्डर का working directory रखें ताकि तीन स्थिर assets मिलें। `run` compiler command application तर्क आगे नहीं भेजता; इस उदाहरण में arguments देने के लिए बने हुए artifact को सीधे चलाएँ।
+VS Code में यह फ़ोल्डर खोलकर compiler से build करें, फिर integrated terminal में ऊपर का executable command चलाएँ। इस फ़ोल्डर का working directory रखें ताकि तीन स्थिर assets मिलें। कमांड लाइन से सीधे संकलन और निष्पादन के लिए `run bhash.project -- --local=true --port=8080 --db=accounts.db` भी चला सकते हैं। [कमांड लाइन तर्क](../../docs/cli.md#command-line-arguments) देखें।
 
 ## HTTPS पर चलाना (Deployment)
 
