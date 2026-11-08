@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.0
+
+- Bundle Bhash command-line argument support from [PR #90](https://github.com/bhashitva/bhash/pull/90).
+- Accept one optional `पाठ[]` parameter on synchronous and asynchronous `मुख्य`.
+- See the [command-line guide](https://github.com/bhashitva/bhash/blob/main/docs/cli.md#command-line-arguments) for launching with arguments.
+
 ## 0.20.0
 
 - Bundle configurable async HTTP and WebSocket capacity from [PR #88](https://github.com/bhashitva/bhash/pull/88).

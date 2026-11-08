@@ -7,21 +7,24 @@ programs while you edit.
 
 **हिन्दी:** Windows, macOS, Linux, WSL और दूरस्थ VS Code होस्ट पर भाष लिखें। एक्सटेंशन में भाष संकलक और Java भाषा सर्वर है। संपादन का विश्लेषण उसी होस्ट पर होता है। कोड सार्वजनिक Playground पर नहीं भेजा जाता और संपादन के समय चलता नहीं है।
 
-## What's new in 0.20.0 / इस रिलीज़ में
+## What's new in 0.21.0 / इस रिलीज़ में
 
-The bundled compiler includes configurable connection limits for asynchronous HTTP
-and WebSocket servers on JVM, .NET and native targets. Existing applications keep
-the defaults of 16 active HTTP connections and eight WebSocket upgrades. Configure
-the limits separately to leave slots available for ordinary HTTP requests.
+Declare `फलन मुख्य(तर्क: पाठ[]) -> शून्य` to receive command-line arguments
+in order. Synchronous and asynchronous entry points accept the array on JVM,
+.NET, and native targets. The parameterless `मुख्य()` form remains available.
 
-**हिन्दी:** JVM, .NET और नेटिव लक्ष्य पर असमकालिक HTTP और WebSocket सर्वर की
-कनेक्शन सीमा चुन सकते हैं। डिफ़ॉल्ट सीमा 16 सक्रिय HTTP कनेक्शन और आठ WebSocket
-अपग्रेड है। सामान्य HTTP अनुरोधों के लिए जगह रखने हेतु दोनों सीमाएँ अलग चुनें।
+Use **Bhash: Build Project or File**, then launch the generated application
+with its arguments from the integrated terminal. The standalone compiler also
+forwards arguments supplied after `run --`.
 
-See the [WebSocket guide](../../docs/websocket.md#कनेक्शन-की-क्षमता),
-[async HTTP server guide](../../docs/async-http-server.md), and [changelog](CHANGELOG.md).
-The [standalone compiler](https://github.com/bhashitva/bhash/releases/tag/bhash-0.20.0)
-is also available for command-line use with JDK 17+.
+**हिन्दी:** कमांड लाइन के तर्क पाने के लिए `फलन मुख्य(तर्क: पाठ[]) -> शून्य`
+लिखें। तर्क उसी क्रम में सरणी में मिलते हैं। असमकालिक `मुख्य` भी यह
+मापदंड ले सकता है। VS Code में **Bhash: Build Project or File** से बनाएँ,
+फिर टर्मिनल में बने क्रमानुदेश के नाम के बाद तर्क दें।
+
+See the [command-line guide](../../docs/cli.md#command-line-arguments),
+[standalone compiler](https://github.com/bhashitva/bhash/releases/tag/bhash-0.21.0),
+and [changelog](CHANGELOG.md).
 
 ## Hindi syntax / नया हिन्दी शब्दक्रम
 
