@@ -35,7 +35,7 @@ let logs=''; server.stderr.on('data', data => {logs+=data;});
     await page.selectOption('#example','factorial');await execute('गुणनफल: १२०\n');console.log('PASS playground input factorial');
     await page.selectOption('#example','types');await execute('तैयार २ ३\nसत्य सत्य\n');console.log('PASS playground records enums');
     await page.selectOption('#mode','program');
-    await page.locator('.cm-content').fill('वर्ग गिनती { साझा मान अंक: पूर्णांक = ०; साझा फलन अगला() -> पूर्णांक { अंक = अंक + १; लौटाओ अंक; } } फलन मुख्य() -> शून्य { लिखो(गिनती.अगला()); }');
+    await page.locator('.cm-content').fill('वर्ग गिनती { साझा मान अंक: पूर्णांक = ०; साझा फलन अगला() -> पूर्णांक { अंक = अंक + १; लौटाओ अंक; } } असमकालिक फलन मुख्य(तर्क: पाठ[]) -> शून्य { प्रतीक्षा मानक.कार्य.विलंब(१); लिखो(गिनती.अगला() + तर्क.आकार); }');
     await execute('१\n');await execute('१\n');console.log('PASS cached program gets fresh static state');
     if(process.env.BHASH_BROWSER_HOST) {
       const responses=await page.request.get(origin+'/api/config');assert.equal(responses.status(),200);
