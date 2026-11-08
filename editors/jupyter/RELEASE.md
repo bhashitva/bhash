@@ -1,9 +1,9 @@
-Version 0.1.5 bundles the current Bhash compiler with the asynchronous HTTP server and RFC 6455 WebSocket library. The installed kernel smoke test runs the [in-memory WebSocket example](https://github.com/bhashitva/bhash/blob/main/examples/websocket/stream.bhash) in a full program cell, including its cancellation and cleanup checks.
+Version 0.1.6 bundles Bhash 0.20.0, including the configurable async HTTP and WebSocket connection limits from [PR #88](https://github.com/bhashitva/bhash/pull/88). The installed wheel is tested with the Hindi starter notebook on Linux, Windows and macOS.
 
 Install or upgrade in the Python environment where you run Jupyter. The wheel includes the compiler and needs a full JDK 17 or newer.
 
 ```sh
-python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.5/bhash_jupyter-0.1.5-py3-none-any.whl"
+python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.6/bhash_jupyter-0.1.6-py3-none-any.whl"
 python -m bhash_jupyter.install
 python -m pip show bhash-jupyter
 ```

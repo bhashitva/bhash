@@ -7,6 +7,26 @@ A Devanagari-first programming language with a compiler written in Java.
 Bhash source (`.bhash`) compiles to a **JVM executable JAR**, a **.NET CLR managed assembly**, or a **browser WebAssembly application**.
 All three targets support the same factorial source.
 
+## Download and run Bhash / भाष डाउनलोड करें
+
+| Environment | Get started |
+| --- | --- |
+| Command line | [Download the prebuilt compiler JAR and checksum](https://github.com/bhashitva/bhash/releases/tag/bhash-0.20.0). Use a full JDK 17+. |
+| VS Code | [Install Bhash from the Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash) or [download the VSIX](https://github.com/bhashitva/bhash/releases/tag/vscode-0.20.0). |
+| Jupyter | [Install the prebuilt kernel wheel and Hindi starter notebook](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.6). |
+| Browser | [Open the Playground](https://play.bhashitva.org/). |
+
+From a UTF-8 terminal, use the downloaded JAR with your own source file:
+
+```sh
+java -jar bhash-compiler-0.20.0.jar run hello.bhash --target jvm
+java -jar bhash-compiler-0.20.0.jar compile hello.bhash --target jvm -o hello.jar
+```
+
+See the [command-line guide](docs/cli.md) for installation, checksums, and other
+targets. पहले से बने JAR से चलाने के लिए पूरा JDK 17+ चाहिए। Maven केवल
+स्रोत से संकलक बनाने के लिए चाहिए।
+
 ## Community and support / समुदाय और सहायता
 
 Join the [Bhash Discord community](https://discord.gg/qC5zdJy6Qw) to learn with other Bhash users,
@@ -40,7 +60,7 @@ for Unicode spellings, nukta, conjunct joiners, and editor diagnostics. The
 [design](docs/unicode-identifiers-design.md), [approved decisions](docs/unicode-identifiers-decisions.md),
 and [exact repertoire review](docs/unicode-identifiers-repertoire-review.md) are available with the user documentation.
 
-## Try the interactive factorial program
+## Build from source and try the interactive factorial program
 
 Install **JDK 17+** and **Maven 3.9+**, then run these commands from a UTF-8
 terminal (PowerShell, Windows Terminal, macOS Terminal or a Linux terminal):

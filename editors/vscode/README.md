@@ -7,57 +7,21 @@ programs while you edit.
 
 **हिन्दी:** Windows, macOS, Linux, WSL और दूरस्थ VS Code होस्ट पर भाष लिखें। एक्सटेंशन में भाष संकलक और Java भाषा सर्वर है। संपादन का विश्लेषण उसी होस्ट पर होता है। कोड सार्वजनिक Playground पर नहीं भेजा जाता और संपादन के समय चलता नहीं है।
 
-## 0.16.0: Function values, lambdas and closures / फलन मान और संवृतियाँ
+## What's new in 0.20.0 / इस रिलीज़ में
 
-This release bundles the compiler from merged PR #63. Pass, return and store
-`फलन(पूर्णांक) -> पूर्णांक` values, write typed lambdas, and capture lexical
-bindings in nested or escaping closures. Mutable captures share storage;
-native closure environments are traced automatically by the collector.
+The bundled compiler includes configurable connection limits for asynchronous HTTP
+and WebSocket servers on JVM, .NET and native targets. Existing applications keep
+the defaults of 16 active HTTP connections and eight WebSocket upgrades. Configure
+the limits separately to leave slots available for ordinary HTTP requests.
 
-**हिन्दी:** इस रिलीज़ में PR #63 का संकलक है। `फलन(पूर्णांक) -> पूर्णांक` जैसे मान भेजें, लौटाएँ और सहेजें। प्रकारयुक्त लैम्ब्डा बनाएँ और nested या बाहर जाने वाली संवृतियों में आसपास के बंधन पकड़ें। बदलने वाले पकड़े बंधन भंडार साझा करते हैं। नेटिव GC उनका पता रखता है।
+**हिन्दी:** JVM, .NET और नेटिव लक्ष्य पर असमकालिक HTTP और WebSocket सर्वर की
+कनेक्शन सीमा चुन सकते हैं। डिफ़ॉल्ट सीमा 16 सक्रिय HTTP कनेक्शन और आठ WebSocket
+अपग्रेड है। सामान्य HTTP अनुरोधों के लिए जगह रखने हेतु दोनों सीमाएँ अलग चुनें।
 
-Use the `lambda` / `लैम्ब्डा` and `callback` snippets to get started. See the
-[Hindi tutorial](../../tutorial/functions/README.md),
-[runnable callback example](../../tutorial/functions/callbacks.bhash), and
-[function-value contract](../../docs/function-values.md).
-
-**हिन्दी:** `lambda`/`लैम्ब्डा` और `callback` snippets से शुरू करें। [हिन्दी ट्यूटोरियल](../../tutorial/functions/README.md), [चलने वाला callback](../../tutorial/functions/callbacks.bhash) और [फलन मान के नियम](../../docs/function-values.md) देखें।
-
-The feature works on JVM, CLR, browser/WASM and native targets. Parameters and
-return types are explicit. Callbacks run synchronously; this release does not
-add async/await or implicit adapters for existing callback interfaces.
-
-**हिन्दी:** यह JVM, CLR, ब्राउज़र/WASM और native पर चलता है। मापदंड और परिणाम प्रकार स्पष्ट हैं। इस रिलीज़ में callbacks तुल्यकालिक थे। बाद की async API के लिए [असमकालिक ट्यूटोरियल](../../tutorial/async/README.md) देखें।
-
-## 0.15.0: PostgreSQL and migrations / डेटाबेस माइग्रेशन
-
-This release bundles the compiler from merged PR #61. Use a common connection,
-statement and transaction API for SQLite or PostgreSQL, with parameterized SQL,
-verified TLS, typed values and deterministic cleanup. Apply ordered schema
-migrations with SHA-256 history validation and atomic rollback on failure.
-
-**हिन्दी:** PR #61 के संकलक में SQLite और PostgreSQL के लिए साझा संबंध, कथन और लेनदेन API है। मापदंडयुक्त SQL, सत्यापित TLS, प्रकारयुक्त मान और समय पर सफ़ाई मिलते हैं। माइग्रेशन SHA-256 इतिहास जाँचते हैं और विफलता पर पूरा बैच वापस लेते हैं।
-
-Start with the [Hindi database-provider tutorial](../../tutorial/database-providers/README.md),
-[runnable migration example](../../tutorial/database-providers/migrations.bhash),
-and [provider/runtime contract](../../docs/database-providers.md).
-
-**हिन्दी:** [हिन्दी डेटाबेस ट्यूटोरियल](../../tutorial/database-providers/README.md), [चलने वाला माइग्रेशन](../../tutorial/database-providers/migrations.bhash) और [प्रदाता नियम](../../docs/database-providers.md) से शुरू करें।
-
-JVM applications include the verified PostgreSQL JDBC driver. CLR and native
-PostgreSQL applications require the **libpq 14+ client runtime** and its dependencies:
-`libpq5` on Linux, or a PostgreSQL client distribution on Windows/macOS. Set
-`BHASH_LIBPQ` to an absolute library path if needed. No PostgreSQL development
-headers are required. Native applications still need neither JVM nor .NET.
-The server and libpq are not installed by this extension; SQLite remains bundled.
-Direct database access is unavailable in browser/WASM.
-
-**हिन्दी:** JVM ऐप में सत्यापित PostgreSQL JDBC driver है। CLR/native PostgreSQL ऐप को libpq 14+ और उसकी निर्भरताएँ चाहिए। Linux में `libpq5`, Windows/macOS में client distribution लें। जरूरत पर `BHASH_LIBPQ` में पूरा पथ दें। development headers नहीं चाहिए। SQLite साथ है। ब्राउज़र में सीधा डेटाबेस नहीं है।
-
-साझा डेटाबेस (Database provider) API से SQLite तथा PostgreSQL पर मापदंड वाले
-कथन और लेनदेन चलाएँ। माइग्रेशन (Migrations) से तालिका में क्रमबद्ध बदलाव करें;
-विफलता पर नया बैच वापस होता है। PostgreSQL का सामान्य TLS विकल्प `verify-full`
-है; मेज़बान और विश्वसनीय CA प्रमाणपत्र का विन्यास करें। गुप्तशब्द स्रोत में न रखें।
+See the [WebSocket guide](../../docs/websocket.md#कनेक्शन-की-क्षमता),
+[async HTTP server guide](../../docs/async-http-server.md), and [changelog](CHANGELOG.md).
+The [standalone compiler](https://github.com/bhashitva/bhash/releases/tag/bhash-0.20.0)
+is also available for command-line use with JDK 17+.
 
 ## Hindi syntax / नया हिन्दी शब्दक्रम
 

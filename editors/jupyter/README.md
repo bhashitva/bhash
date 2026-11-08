@@ -8,9 +8,9 @@ worker and speaks the standard Jupyter kernel protocol.
 
 ## Install
 
-For the prebuilt compiler and notebook, follow the [0.1.5 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.5). The source build below is for development.
+For the prebuilt compiler and notebook, follow the [0.1.6 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.6). The source build below is for development.
 
-**हिन्दी:** पहले से बना संकलक और नोटबुक स्थापित करने के लिए [Jupyter 0.1.5 के रिलीज़ निर्देश](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.5) देखें। नीचे का स्रोत निर्माण विकास के लिए है।
+**हिन्दी:** पहले से बना संकलक और नोटबुक स्थापित करने के लिए [Jupyter 0.1.6 के रिलीज़ निर्देश](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.6) देखें। नीचे का स्रोत निर्माण विकास के लिए है।
 
 For Devanagari name equivalence, joiner diagnostics, and examples, see the [Hindi identifier guide](../../tutorial/unicode-identifiers/README.md).
 
