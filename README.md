@@ -11,16 +11,16 @@ All three targets support the same factorial source.
 
 | Environment | Get started |
 | --- | --- |
-| Command line | [Download the prebuilt compiler JAR and checksum](https://github.com/bhashitva/bhash/releases/tag/bhash-0.20.0). Use a full JDK 17+. |
-| VS Code | [Install Bhash from the Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash) or [download the VSIX](https://github.com/bhashitva/bhash/releases/tag/vscode-0.20.0). |
-| Jupyter | [Install the prebuilt kernel wheel and Hindi starter notebook](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.6). |
+| Command line | [Download the prebuilt compiler JAR and checksum](https://github.com/bhashitva/bhash/releases/tag/bhash-0.21.0). Use a full JDK 17+. |
+| VS Code | [Install Bhash from the Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash) or [download the VSIX](https://github.com/bhashitva/bhash/releases/tag/vscode-0.21.0). |
+| Jupyter | [Install the prebuilt kernel wheel and Hindi starter notebook](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.7). |
 | Browser | [Open the Playground](https://play.bhashitva.org/). |
 
 From a UTF-8 terminal, use the downloaded JAR with your own source file:
 
 ```sh
-java -jar bhash-compiler-0.20.0.jar run hello.bhash --target jvm
-java -jar bhash-compiler-0.20.0.jar compile hello.bhash --target jvm -o hello.jar
+java -jar bhash-compiler-0.21.0.jar run hello.bhash --target jvm
+java -jar bhash-compiler-0.21.0.jar compile hello.bhash --target jvm -o hello.jar
 ```
 
 See the [command-line guide](docs/cli.md) for installation, checksums, and other

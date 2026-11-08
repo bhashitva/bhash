@@ -23,12 +23,12 @@
 - [VS Code](../editors/vscode/README.md) में Bhash एक्सटेंशन और पूरा JDK 17+ स्थापित करें। फ़ाइल UTF-8 में `.bhash` विस्तार से सहेजें। **Bhash: Run Project or File** से पहले JVM चुनें।
 - [Jupyter](../editors/jupyter/README.md) में भाष कर्नेल स्थापित करें और **Bhash (भाष)** चुनें। ऊपर का पूरा क्रमानुदेश एक कक्ष में चलाएँ। फिर अलग नोटबुक में [हिन्दी आरंभिक नोटबुक](../editors/jupyter/पहली-नोटबुक.ipynb) के कक्ष क्रम से चलाकर देखें कि घोषणाएँ उसी कर्नेल सत्र में कैसे बनी रहती हैं।
 
-स्थानीय कमांड लाइन के लिए पूरा JDK 17+ और [पहले से बना भाष संकलक](https://github.com/bhashitva/bhash/releases/tag/bhash-0.20.0)
+स्थानीय कमांड लाइन के लिए पूरा JDK 17+ और [पहले से बना भाष संकलक](https://github.com/bhashitva/bhash/releases/tag/bhash-0.21.0)
 डाउनलोड करें। ऊपर का उदाहरण `hello.bhash` नाम से UTF-8 में सहेजें और उसी
 फ़ोल्डर में निम्न आदेश चलाएँ। Maven केवल स्रोत से संकलक बनाने के लिए चाहिए।
 
 ```sh
-java -jar bhash-compiler-0.20.0.jar run hello.bhash --target jvm
+java -jar bhash-compiler-0.21.0.jar run hello.bhash --target jvm
 ```
 
 जब क्रमानुदेश को चलाते समय फ़ाइल का नाम या दूसरा तर्क देना हो, तो

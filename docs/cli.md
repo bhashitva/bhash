@@ -1,7 +1,7 @@
 # Bhash command-line compiler / कमांड लाइन संकलक
 
-Download `bhash-compiler-0.20.0.jar` and its checksum from the
-[Bhash 0.20.0 release](https://github.com/bhashitva/bhash/releases/tag/bhash-0.20.0).
+Download `bhash-compiler-0.21.0.jar` and its checksum from the
+[Bhash 0.21.0 release](https://github.com/bhashitva/bhash/releases/tag/bhash-0.21.0).
 Install a full JDK 17 or newer and make sure `java -version` reports that JDK.
 The JAR includes the compiler, standard library, and dependencies. Maven is
 needed only when building the compiler from source.
@@ -9,9 +9,9 @@ needed only when building the compiler from source.
 **हिन्दी:** रिलीज़ से संकलक JAR और उसका SHA-256 चेकसम लें। पूरा JDK 17 या नया
 संस्करण स्थापित करें। अपने भाष स्रोत को UTF-8 में सहेजें और नीचे का आदेश चलाएँ।
 
-Compare the published checksum with `sha256sum -c bhash-compiler-0.20.0.jar.sha256`
-on Linux, `shasum -a 256 -c bhash-compiler-0.20.0.jar.sha256` on macOS, or
-`Get-FileHash .\bhash-compiler-0.20.0.jar -Algorithm SHA256` in PowerShell.
+Compare the published checksum with `sha256sum -c bhash-compiler-0.21.0.jar.sha256`
+on Linux, `shasum -a 256 -c bhash-compiler-0.21.0.jar.sha256` on macOS, or
+`Get-FileHash .\bhash-compiler-0.21.0.jar -Algorithm SHA256` in PowerShell.
 
 Save this as `hello.bhash`:
 
@@ -22,8 +22,8 @@ Save this as `hello.bhash`:
 ```
 
 ```sh
-java -jar bhash-compiler-0.20.0.jar run hello.bhash --target jvm
-java -jar bhash-compiler-0.20.0.jar compile hello.bhash --target jvm -o hello.jar
+java -jar bhash-compiler-0.21.0.jar run hello.bhash --target jvm
+java -jar bhash-compiler-0.21.0.jar compile hello.bhash --target jvm -o hello.jar
 java -jar hello.jar
 ```
 
@@ -33,9 +33,8 @@ the source file. The same compiler supports additional targets with their
 respective toolchains. See [.NET](clr-target.md),
 [native](managed-native-toolchain.md), and [browser WebAssembly](wasm-browser.md).
 
-This release includes the configurable async HTTP and WebSocket capacity
-from [PR #88](https://github.com/bhashitva/bhash/pull/88). See the
-[server guide](async-http-server.md) and [WebSocket guide](websocket.md).
+This release includes command-line argument support from
+[PR #90](https://github.com/bhashitva/bhash/pull/90).
 
 ## Command-line arguments
 
@@ -58,15 +57,14 @@ keep `फलन मुख्य() -> शून्य`.
 }
 ```
 
-Save the example as `args.bhash`. Use a compiler build with entry-point argument
-support. Place compiler options before `--`, and quote a value that contains spaces.
+Save the example as `args.bhash`. Place compiler options before `--`, and quote a value that contains spaces.
 
 **हिन्दी:** उदाहरण को `args.bhash` में सहेजें। `--` से पहले संकलक के विकल्प और
 उसके बाद क्रमानुदेश के तर्क दें। रिक्त स्थान वाला तर्क उद्धरण में रखें।
 
 ```sh
-java -jar bhash-compiler.jar run args.bhash --target jvm -- input.txt 'two words'
-java -jar bhash-compiler.jar compile args.bhash --target jvm -o args.jar
+java -jar bhash-compiler-0.21.0.jar run args.bhash --target jvm -- input.txt 'two words'
+java -jar bhash-compiler-0.21.0.jar compile args.bhash --target jvm -o args.jar
 java -jar args.jar input.txt 'two words'
 ```
 
