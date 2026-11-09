@@ -75,7 +75,14 @@ jobs:
         env:
           ANDROID_SERIAL: emulator-5554
         run: |
-          echo no | avdmanager create avd --force --name bhash-api29 --package "$IMAGE"
+          unset ANDROID_SDK_HOME
+          export ANDROID_USER_HOME="$RUNNER_TEMP/bhash-android"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | avdmanager create avd --force --name bhash-api29 --package "$IMAGE" -p "$ANDROID_AVD_HOME/bhash-api29.avd"
+          test -f "$ANDROID_AVD_HOME/bhash-api29.ini"
+          emulator -list-avds | grep -Fx bhash-api29
           emulator -accel-check
           adb start-server
           emulator -avd bhash-api29 -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader > "$RUNNER_TEMP/emulator.log" 2>&1 &
