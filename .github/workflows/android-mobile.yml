@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      IMAGE: system-images;android-29;google_apis;x86_64
+      IMAGE: system-images;android-29;default;x86_64
       APP: examples/android-offline-task-list
     steps:
       - uses: actions/checkout@v5
@@ -72,12 +72,33 @@ jobs:
             done
           done
       - name: Run the Hindi task list offline with forced GC and CheckJNI
+        env:
+          ANDROID_SERIAL: emulator-5554
         run: |
           echo no | avdmanager create avd --force --name bhash-api29 --package "$IMAGE"
-          emulator -avd bhash-api29 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          trap 'adb emu kill || true' EXIT
-          timeout 240 adb wait-for-device
-          timeout 240 bash -c 'until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          emulator -accel-check
+          adb start-server
+          emulator -avd bhash-api29 -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          emulator_pid=$!
+          finish() {
+            status=$?
+            if ((status != 0)); then
+              tail -n 120 "$RUNNER_TEMP/emulator.log" || true
+              adb devices -l || true
+            fi
+            timeout 10 adb emu kill || true
+            kill "$emulator_pid" 2>/dev/null || true
+          }
+          trap finish EXIT
+          deadline=$((SECONDS + 300))
+          until [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; do
+            if ! kill -0 "$emulator_pid" 2>/dev/null || ((SECONDS >= deadline)); then
+              echo "::error::The API 29 emulator failed to boot."
+              exit 1
+            fi
+            sleep 3
+          done
+          adb shell input keyevent 82
           adb shell settings put global airplane_mode_on 1
           adb shell svc wifi disable
           adb shell svc data disable
