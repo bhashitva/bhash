@@ -14,7 +14,8 @@ public final class NativeLibrary {
     private static final String RESOURCE = "/dev/bhash/backend/native/";
     private record Tools(String clang, String objcopy, String target, String version, boolean android) {}
 
-    public static Path build(List<SourceFile> sources, Path exports, Path output, Path ndk, String abi, int api)
+    public static Path build(List<SourceFile> sources, Path exports, Path output, Path ndk, String abi, int api,
+                             boolean embedSymbols)
             throws IOException, CompilationException {
         var library = ManagedEmitter.libraryCore(sources, NativeExports.read(exports));
         var core = library.program();
@@ -57,8 +58,12 @@ public final class NativeLibrary {
             link.addAll(List.of("-o", "libbhash_app.so"));
             compile(work, tools, link);
             NativeToolchain.runProcess(work, List.of(tools.objcopy(), "--only-keep-debug", "libbhash_app.so", "libbhash_app.so.debug"));
-            NativeToolchain.runProcess(work, List.of(tools.objcopy(), "--strip-debug",
-                "--add-gnu-debuglink=libbhash_app.so.debug", "libbhash_app.so", "distribution/libbhash_app.so"));
+            if (embedSymbols) {
+                Files.move(work.resolve("libbhash_app.so"), distribution.resolve("libbhash_app.so"));
+            } else {
+                NativeToolchain.runProcess(work, List.of(tools.objcopy(), "--strip-debug",
+                    "--add-gnu-debuglink=libbhash_app.so.debug", "libbhash_app.so", "distribution/libbhash_app.so"));
+            }
             Files.move(work.resolve("libbhash_app.so.debug"), distribution.resolve("libbhash_app.so.debug"));
             Files.writeString(distribution.resolve("bhash-abi.json"), metadata + "\n");
             Licensing.copyTo(distribution);

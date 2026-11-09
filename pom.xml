@@ -52,7 +52,7 @@
         <targetPath>dev/bhash/android-starter</targetPath>
         <includes>
           <include>gradlew</include><include>gradlew.bat</include>
-          <include>gradle/wrapper/*</include>
+          <include>gradle/wrapper/gradle-wrapper.jar</include>
         </includes>
       </resource>
       <resource>

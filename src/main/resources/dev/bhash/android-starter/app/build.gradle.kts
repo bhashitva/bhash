@@ -1,18 +1,18 @@
 plugins {
-    id("com.android.application") version "8.8.0"
+    id("com.android.application") version "8.10.1"
     id("org.jetbrains.kotlin.android") version "2.1.20"
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.20"
 }
 
 android {
     namespace = "org.bhashitva.androidstarter"
-    compileSdk = 35
+    compileSdk = 36
     buildToolsVersion = "35.0.0"
     ndkVersion = "28.2.13676358"
     defaultConfig {
         applicationId = providers.gradleProperty("bhashApplicationId").get()
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
         ndk { abiFilters.addAll(listOf("arm64-v8a", "x86_64")) }
@@ -29,6 +29,7 @@ kotlin {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 
+apply(from = rootProject.file("gradle/bhash-release.gradle"))
 apply(from = rootProject.file("gradle/bhash-native.gradle"))
 
 dependencies {
