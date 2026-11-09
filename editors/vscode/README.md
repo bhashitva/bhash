@@ -16,7 +16,14 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.22.0 / इस रिलीज़ में
+## What's new in 0.22.1 / इस रिलीज़ में
+
+- Open the Hindi book and Hindi API reference from the Command Palette or the documentation links above.
+- This extension includes the Bhash 0.22.0 compiler.
+
+**हिन्दी:** कमांड पैलेट और ऊपर दिए लिंक से हिन्दी पुस्तक और हिन्दी API संदर्भ खोलें। इस एक्सटेंशन में भाष 0.22.0 संकलक है।
+
+## Compiler 0.22.0 highlights / संकलक 0.22.0 की मुख्य बातें
 
 - Format values with positional placeholders, alignment, and numeric precision using [`मानक.पाठस्वरूप.बनाओ`](../../tutorial/standard-library/08-formatting.md).
 - Use [`मानक.समुच्चय<त>`](../../tutorial/standard-library/09-sets.md) for unique values, insertion-order iteration, union, intersection, and difference.

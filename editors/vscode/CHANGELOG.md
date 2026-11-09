@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.1
+
+- Link to the Hindi book and standard-library API reference from the extension overview.
+- Add Command Palette commands to open the book and API reference.
+- Bundle the Bhash 0.22.0 compiler.
+
 ## 0.22.0
 
 - Bundle the compiler with positional formatting, alignment, numeric precision, and generic sets.
