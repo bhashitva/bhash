@@ -7,6 +7,15 @@ programs while you edit.
 
 **हिन्दी:** Windows, macOS, Linux, WSL और दूरस्थ VS Code होस्ट पर भाष लिखें। एक्सटेंशन में भाष संकलक और Java भाषा सर्वर है। संपादन का विश्लेषण उसी होस्ट पर होता है। कोड सार्वजनिक Playground पर नहीं भेजा जाता और संपादन के समय चलता नहीं है।
 
+## Hindi documentation / हिन्दी प्रलेखन
+
+- [भाष में प्रोग्रामिंग (Hindi book)](https://github.com/bhashitva/bhash/blob/main/book/README.md) has guided chapters, a downloadable PDF, and an offline companion ZIP.
+- [मानक पुस्तकालय का हिन्दी API संदर्भ (Standard library API reference)](https://github.com/bhashitva/bhash/blob/main/tutorial/standard-library/reference/README.md) lists types, constructors, methods, parameters, return values, and examples.
+
+In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi API Reference**.
+
+कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
+
 ## What's new in 0.22.0 / इस रिलीज़ में
 
 - Format values with positional placeholders, alignment, and numeric precision using [`मानक.पाठस्वरूप.बनाओ`](../../tutorial/standard-library/08-formatting.md).

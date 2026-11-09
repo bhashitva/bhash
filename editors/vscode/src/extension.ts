@@ -176,6 +176,8 @@ export function activate(extensionContext: vscode.ExtensionContext) {
     command('bhash.lockDependencies',()=>dependencies('lock'));
     command('bhash.restoreDependencies',()=>dependencies('restore'));
     command('bhash.verifyDependencies',()=>dependencies('verify'));
+    command('bhash.openHindiBook', () => vscode.env.openExternal(vscode.Uri.parse('https://github.com/bhashitva/bhash/blob/main/book/README.md')));
+    command('bhash.openHindiApiReference', () => vscode.env.openExternal(vscode.Uri.parse('https://github.com/bhashitva/bhash/blob/main/tutorial/standard-library/reference/README.md')));
     command('bhash.openCommunity',()=>vscode.env.openExternal(vscode.Uri.parse('https://discord.gg/qC5zdJy6Qw')));
     command('bhash.restartServer',restart);command('bhash.openPlayground',()=>vscode.env.openExternal(vscode.Uri.parse('https://play.bhashitva.org/')));
     context.subscriptions.push(vscode.workspace.onDidGrantWorkspaceTrust(() => {void startServer();}));
