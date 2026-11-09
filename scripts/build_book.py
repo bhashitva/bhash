@@ -25,13 +25,14 @@ ROOT = Path(__file__).resolve().parents[1]
 GITHUB = "https://github.com/bhashitva/bhash"
 CONTENTS = "book/README.md"
 TREES = ("book", "docs", "examples", "lessons", "tutorial", "editors/jupyter",
-         "editors/vscode", "licenses")
+         "editors/vscode", "licenses", "src/main/resources/dev/bhash/stdlib")
 FILES = ("README.md", "SUPPORT.md", "LICENSING.md", "LICENSE", "NOTICE",
          "THIRD_PARTY_NOTICES.md", "scripts/generate_orm.py",
          "scripts/test_generate_orm.py", "src/main/antlr4/Bhash.g4")
 EXAMPLE_TREES = ("book/examples/", "examples/", "lessons/", "tutorial/")
 EXAMPLE_METADATA = ("coverage.json", "expected-keywords.txt")
 REPO_FILE = re.compile(r"^/bhashitva/bhash/(?:blob|tree|raw)/(.+)$")
+EMPTY_ANCHOR = re.compile(r'\s*<a id="([^"\s<>]+)"></a>\s*')
 
 
 def git(*args):
@@ -146,13 +147,13 @@ class Book:
                 return f'<h{level} id="{escape(prefix + unique)}">{text}</h{level}>\n'
 
             def block_html(self, html):
-                anchor = re.fullmatch(r'\s*<a id="([\w-]+)"></a>\s*', html)
+                anchor = EMPTY_ANCHOR.fullmatch(html)
                 if anchor:
                     return f'<span id="{escape(prefix + anchor[1])}"></span>\n'
                 return super().block_html(html)
 
             def paragraph(self, text):
-                anchor = re.fullmatch(r'<a id="([\w-]+)"></a>', unescape(text))
+                anchor = EMPTY_ANCHOR.fullmatch(unescape(text))
                 if anchor:
                     return f'<span id="{escape(prefix + anchor[1])}"></span>\n'
                 return super().paragraph(text)
@@ -172,7 +173,7 @@ class Book:
 
         markdown = mistune.create_markdown(renderer=Renderer(), plugins=["table", "strikethrough"])
         if text is None:
-            text = self.files[source].decode("utf-8-sig")
+            text = self.files[source].decode("utf-8-sig").replace("\r\n", "\n")
         if pdf and source == CONTENTS:
             text = re.sub(r"^## ऑफ़लाइन संस्करण\n.*?(?=^## )", "", text, flags=re.M | re.S)
         return markdown(text)
