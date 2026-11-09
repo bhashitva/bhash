@@ -1,5 +1,11 @@
 # Bhash standard library — first edition
 
+Start with the [complete Hindi class and API index](../tutorial/standard-library/reference/README.md).
+Each page lists public constructors, overloads, parameters, results, fields, and usage examples.
+
+**हिन्दी:** [मानक पुस्तकालय की पूरी प्रकार सूची](../tutorial/standard-library/reference/README.md)
+से शुरू करें। हर पृष्ठ में सार्वजनिक निर्माता, सभी ओवरलोड, मापदंड, फल, क्षेत्र और उपयोग के उदाहरण हैं।
+
 For collection algorithms, buffered streams, scoped cleanup, paths/directories,
 configuration, logging and testing, see [application foundations](application-foundations.md).
 For `मानक.समुच्चय<त>`, see the [Hindi Set tutorial](../tutorial/standard-library/09-sets.md).

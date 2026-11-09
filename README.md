@@ -53,7 +53,8 @@ to `if`/`return` and prepare learners for Java/C# concepts.
 
 The separate [tutorial references](tutorial/README.md) explain individual topics in Hindi,
 with familiar English names, runnable examples, expected output and API limits.
-Start with the [complete standard-library tutorials](tutorial/standard-library/README.md).
+Browse the [complete Hindi class and API reference](tutorial/standard-library/reference/README.md)
+or work through the [standard-library tutorials](tutorial/standard-library/README.md).
 
 See the [Hindi identifier and keyboard guide](tutorial/unicode-identifiers/README.md)
 for Unicode spellings, nukta, conjunct joiners, and editor diagnostics. The

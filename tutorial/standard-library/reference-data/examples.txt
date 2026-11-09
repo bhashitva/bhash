@@ -1,0 +1,13 @@
+# प्रकार | पसंद का स्रोत[::पंक्ति का अंश] | दूसरा स्रोत (वैकल्पिक)
+पाठस्वरूप|src/test/resources/stdlib/formatting.bhash|tutorial/standard-library/08-formatting.md
+समुच्चय|tutorial/standard-library/09-sets.md::सुबह.जोड़ो("मीरा");|tutorial/standard-library/09-sets.md::सुबह.संघ(शाम)
+प्रवाह|tutorial/application-foundations/README.md::प्रवाह.लेखन("संदेश.txt")|tutorial/application-foundations/README.md::प्रवाह.पठन("मूल.bin")
+एचटीटीपी|examples/networking/client.bhash|tutorial/async-io/README.md
+माइग्रेशन|tutorial/database-providers/migrations.bhash
+वेबसॉकेटमार्ग|examples/websocket/server.bhash|examples/live-task-board/src/main.bhash
+वेबसॉकेटसंबंध|examples/websocket/server.bhash|examples/websocket/stream.bhash
+डेटाकथन|tutorial/database-providers/migrations.bhash::INSERT INTO tasks|tutorial/database-providers/migrations.bhash::SELECT title FROM tasks
+कार्यसमूह|tutorial/standard-library/reference-data/examples/async-scope.bhash::प्रतीक्षा कार्यसमूह.चलाओ|tutorial/async/README.md::प्रतीक्षा मानक.कार्यसमूह.चलाओ
+असमवेबचालक|tutorial/standard-library/reference-data/examples/web-adapters.bhash::स्थिर चालक: असमवेबचालक|examples/async-web/server.bhash::सार्वजनिक असमकालिक फलन संभालो
+असमवेबउन्नयन|examples/live-task-board/src/main.bhash::सर्वर.उन्नयनचलाओ|src/main/resources/dev/bhash/stdlib/async-web.bhash::उन्नयन.चुनो(
+असमएचटीटीपीसर्वर|examples/async-web/server.bhash::नया असमएचटीटीपीसर्वर|examples/live-task-board/src/main.bhash::सर्वर.उन्नयनचलाओ
