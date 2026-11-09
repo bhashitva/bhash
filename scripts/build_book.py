@@ -147,6 +147,8 @@ class Book:
                 return f'<h{level} id="{escape(prefix + unique)}">{text}</h{level}>\n'
 
             def block_html(self, html):
+                if html.lstrip().startswith("<!--"):
+                    return ""
                 anchor = EMPTY_ANCHOR.fullmatch(html)
                 if anchor:
                     return f'<span id="{escape(prefix + anchor[1])}"></span>\n'
