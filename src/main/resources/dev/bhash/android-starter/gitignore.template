@@ -5,4 +5,8 @@
 /local.properties
 /bhash/compiler.jar
 /app/build/
+*.jks
+*.keystore
+*.p12
+/keystore.properties
 *.iml

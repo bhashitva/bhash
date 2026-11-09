@@ -7,6 +7,7 @@ def abis = ['arm64-v8a': 'aarch64', 'x86_64': 'x86_64']
 def android = extensions.getByName('android')
 def minApi = android.defaultConfig.minSdk
 def ndkVersion = android.ndkVersion
+def embedSymbols = project.ext.has('bhashEmbedSymbols') && project.ext.bhashEmbedSymbols
 def sdk = extensions.getByName('androidComponents').sdkComponents.sdkDirectory
 def compilerHash = providers.gradleProperty('bhashCompilerSha256')
 def compiler = providers.gradleProperty('bhashCompilerJar').map { rootProject.file(it) }.orElse(
@@ -21,6 +22,7 @@ def buildNative = tasks.register('buildBhashNative') {
     inputs.property('compilerSha256', compilerHash.orElse(''))
     inputs.property('ndk', ndkVersion)
     inputs.property('api', minApi)
+    inputs.property('embedSymbols', embedSymbols)
     outputs.dir(nativeOutput)
     doLast {
         if (compilerHash.isPresent()) {
@@ -49,13 +51,15 @@ def buildNative = tasks.register('buildBhashNative') {
             jni.mkdirs()
             project.exec {
                 workingDir(rootProject.projectDir)
-                commandLine(java, '-jar', compiler.get(), 'compile', 'bhash.project', '--target', 'android',
-                    '--abi', abi, '--ndk', ndk, '--android-api', minApi, '--exports', 'bhash.exports', '-o', library)
+                def command = [java, '-jar', compiler.get(), 'compile', 'bhash.project', '--target', 'android',
+                    '--abi', abi, '--ndk', ndk, '--android-api', minApi, '--exports', 'bhash.exports', '-o', library]
+                if (embedSymbols) command.addAll(['--debug-symbols', 'embedded'])
+                commandLine(command)
             }
             project.exec {
-                commandLine(clang, "--target=${cpu}-linux-android$minApi", '-std=c17', '-O2',
+                commandLine(clang, "--target=${cpu}-linux-android$minApi", '-std=c17', '-O2', '-g',
                     '-fPIC', '-fvisibility=hidden', '-Wall', '-Wextra', '-Werror', '-shared',
-                    '-Wl,--no-undefined', '-Wl,-z,max-page-size=16384',
+                    '-Wl,--no-undefined', '-Wl,-z,max-page-size=16384', '-Wl,--build-id=sha1',
                     '-I', library, jniSource.asFile, '-L', library, '-lbhash_app',
                     '-o', new File(jni, 'libbhash_jni.so'))
             }

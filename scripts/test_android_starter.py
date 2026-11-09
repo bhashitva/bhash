@@ -10,13 +10,13 @@ import tempfile
 import zipfile
 
 
-def invoke(command, cwd, expected=0, message=None):
+def invoke(command, cwd, expected=0, message=None, env=None):
     print(subprocess.list2cmdline([str(arg) for arg in command]), flush=True)
     if message is None:
-        result = subprocess.run(command, cwd=cwd, timeout=900)
+        result = subprocess.run(command, cwd=cwd, timeout=900, env=env)
     else:
         result = subprocess.run(command, cwd=cwd, timeout=900, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, encoding="utf-8", errors="replace")
+                                stderr=subprocess.STDOUT, encoding="utf-8", errors="replace", env=env)
         print(result.stdout, end="", flush=True)
         if message not in result.stdout:
             raise RuntimeError(f"Expected output containing {message!r}")
@@ -35,6 +35,38 @@ def native_digests(apk):
         for name in ("LICENSE", "NOTICE", "LICENSING.md"):
             archive.getinfo(f"assets/licenses/bhash/{name}")
     return hashes
+
+
+def smoke_release(cli, project, java, tools, suffix):
+    credentials = {
+        "BHASH_ANDROID_KEYSTORE": str(project.parent / "test upload.p12"),
+        "BHASH_ANDROID_STORE_PASSWORD": "temporary-ci-key",
+        "BHASH_ANDROID_KEY_ALIAS": "upload",
+        "BHASH_ANDROID_KEY_PASSWORD": "temporary-ci-key",
+    }
+    unsigned = {name: value for name, value in os.environ.items() if name not in credentials}
+    invoke([*cli, "release"], project, expected=1, message="Set the release signing variables", env=unsigned)
+    signing = {**os.environ, **credentials}
+    keytool = java.with_name(f"keytool{suffix}")
+    invoke([keytool, "-genkeypair", "-keyalg", "RSA", "-keysize", "2048", "-validity", "30",
+            "-dname", "CN=Bhash CI", "-storetype", "PKCS12", "-keystore", credentials["BHASH_ANDROID_KEYSTORE"],
+            "-alias", "upload", "-storepass:env", "BHASH_ANDROID_STORE_PASSWORD",
+            "-keypass:env", "BHASH_ANDROID_KEY_PASSWORD"], project, env=signing)
+    invoke([*cli, "release"], project, message="Verified signed APK, App Bundle", env=signing)
+    output = project / "app/build/outputs/bhash-release"
+    apk = output / "app-release.apk"
+    native_digests(apk)
+    badging = invoke([tools / f"aapt2{suffix}", "dump", "badging", apk], project, message="targetSdkVersion:'36'")
+    if "application-debuggable" in badging:
+        raise RuntimeError("The signed release APK is debuggable")
+    with zipfile.ZipFile(output / "app-release.aab") as bundle, \
+            zipfile.ZipFile(output / "native-debug-symbols.zip") as symbols:
+        expected = {f"{abi}/libbhash_{lib}.so.dbg" for abi in ("arm64-v8a", "x86_64") for lib in ("app", "jni")}
+        if set(symbols.namelist()) != expected:
+            raise RuntimeError("Incorrect release symbol ZIP entries")
+        for name in expected:
+            if symbols.read(name) != bundle.read(f"BUNDLE-METADATA/com.android.tools.build.debugsymbols/{name}"):
+                raise RuntimeError(f"The symbol ZIP entry differs from the App Bundle for {name}")
 
 
 def smoke(compiler, directory, serial):
@@ -87,6 +119,8 @@ def smoke(compiler, directory, serial):
     for name in before:
         if name.endswith("libbhash_app.so") and before[name] == after[name]:
             raise RuntimeError(f"{name} did not change after editing the Bhash source")
+
+    smoke_release(cli, project, java, tools, suffix)
 
     if serial:
         adb = [sdk / "platform-tools" / f"adb{suffix}", "-s", serial]

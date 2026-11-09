@@ -1,0 +1,209 @@
+// SPDX-License-Identifier: Apache-2.0
+import java.nio.file.Files
+import java.security.KeyStore
+import java.security.MessageDigest
+import java.util.jar.JarFile
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
+
+def android = extensions.getByName('android')
+def sdkDirectory = extensions.getByName('androidComponents').sdkComponents.sdkDirectory
+def credentials = ['BHASH_ANDROID_KEYSTORE', 'BHASH_ANDROID_STORE_PASSWORD',
+                   'BHASH_ANDROID_KEY_ALIAS', 'BHASH_ANDROID_KEY_PASSWORD']
+    .collectEntries { [(it): providers.environmentVariable(it).orNull] }
+def missing = credentials.findAll { name, value -> !value }.keySet()
+def keystore = missing.isEmpty() ? rootProject.file(credentials.BHASH_ANDROID_KEYSTORE) : null
+def release = android.buildTypes.getByName('release')
+release.ndk.debugSymbolLevel = 'FULL'
+project.ext.bhashEmbedSymbols = true
+android.packaging.jniLibs.useLegacyPackaging = false
+if (keystore != null) {
+    release.signingConfig = android.signingConfigs.create('bhashUpload') {
+        storeFile = keystore
+        storePassword = credentials.BHASH_ANDROID_STORE_PASSWORD
+        keyAlias = credentials.BHASH_ANDROID_KEY_ALIAS
+        keyPassword = credentials.BHASH_ANDROID_KEY_PASSWORD
+    }
+}
+
+def checkSigning = tasks.register('checkBhashReleaseSigning') {
+    doLast {
+        if (!missing.isEmpty()) throw new GradleException("Set the release signing variables: $missing")
+        if (!keystore.isFile()) throw new GradleException('BHASH_ANDROID_KEYSTORE must point to an existing keystore.')
+    }
+}
+tasks.matching { it.name in ['preReleaseBuild', 'validateSigningRelease'] }.configureEach {
+    dependsOn(checkSigning)
+}
+
+// Use the bundletool and transitive dependencies resolved by the pinned Android plugin.
+def bundletool = project.buildscript.configurations.getByName('classpath')
+
+def runTool = { List args ->
+    def output = new ByteArrayOutputStream()
+    project.exec {
+        commandLine(args)
+        standardOutput = output
+    }
+    output.toString('UTF-8')
+}
+
+def runBundletool = { List arguments ->
+    def output = new ByteArrayOutputStream()
+    project.javaexec {
+        classpath = bundletool
+        mainClass.set('com.android.tools.build.bundletool.BundleToolMain')
+        args(arguments)
+        standardOutput = output
+    }
+    output.toString('UTF-8')
+}
+
+def fingerprint = { cert ->
+    MessageDigest.getInstance('SHA-256').digest(cert.encoded).encodeHex().toString()
+}
+
+def signedBundleCertificate = { File bundle ->
+    new JarFile(bundle, true).withCloseable { jar ->
+        def fingerprints = [] as Set
+        jar.entries().each { entry ->
+            boolean signatureFile = entry.name ==~ /(?i)META-INF\/(MANIFEST\.MF|[^\/]+\.(SF|RSA|DSA|EC)|SIG-[^\/]+)/
+            if (!entry.directory && !signatureFile) {
+                // JarFile verifies each signature when the full entry is read.
+                jar.getInputStream(entry).withCloseable { it.transferTo(OutputStream.nullOutputStream()) }
+                if (entry.codeSigners?.length != 1) {
+                    throw new GradleException("Missing or ambiguous App Bundle signature for ${entry.name}")
+                }
+                def cert = entry.codeSigners[0].signerCertPath.certificates[0]
+                fingerprints.add(fingerprint(cert))
+            }
+        }
+        if (fingerprints.size() != 1) throw new GradleException('The App Bundle must use one signing certificate.')
+        fingerprints.first()
+    }
+}
+
+def outputsRoot = layout.buildDirectory.dir('outputs')
+tasks.register('bhashRelease') {
+    group = 'build'
+    description = 'Build and verify a signed APK, Google Play App Bundle, and native symbols.'
+    dependsOn(checkSigning, ':app:assembleRelease', ':app:bundleRelease')
+    doLast {
+        def root = outputsRoot.get().asFile
+        def apk = new File(root, 'apk/release/app-release.apk')
+        def bundle = new File(root, 'bundle/release/app-release.aab')
+        def windows = System.getProperty('os.name').startsWith('Windows')
+        def suffix = windows ? '.exe' : ''
+        def host = windows ? 'windows-x86_64' : 'linux-x86_64'
+        def java = new File(System.getProperty('java.home'), "bin/java$suffix")
+        def sdk = sdkDirectory.get().asFile
+        def tools = new File(sdk, "build-tools/${android.buildToolsVersion}")
+        def zipalign = new File(tools, "zipalign$suffix")
+        def readelf = new File(sdk, "ndk/${android.ndkVersion}/toolchains/llvm/prebuilt/$host/bin/llvm-readelf$suffix")
+        def abis = ['arm64-v8a': 183, 'x86_64': 62]
+        def required = abis.keySet().collectMany { abi -> ['libbhash_app.so', 'libbhash_jni.so'].collect { "$abi/$it".toString() } }
+        def artifact = new File(temporaryDir, 'native.elf')
+
+        def inspect = { ZipFile zip, ZipEntry entry ->
+            zip.getInputStream(entry).withCloseable { input ->
+                artifact.withOutputStream { output -> input.transferTo(output) }
+            }
+            runTool([readelf, '--program-headers', '--notes', '--sections', '--wide', artifact])
+        }
+        def buildId = { String report, String name ->
+            def notes = report =~ /Build ID:\s*([0-9a-f]+)/
+            if (!notes.find()) throw new GradleException("Missing ELF build ID in $name")
+            notes.group(1)
+        }
+        def verifyLibraries = { ZipFile zip, String prefix ->
+            def ids = [:]
+            zip.entries().each { entry ->
+                if (entry.name.startsWith(prefix) && entry.name.endsWith('.so')) {
+                    def name = entry.name.substring(prefix.length())
+                    def parts = name.split('/', -1)
+                    if (parts.length != 2 || !abis.containsKey(parts[0])) {
+                        throw new GradleException("Unexpected native library entry ${entry.name}")
+                    }
+                    if (prefix == 'lib/' && entry.method != ZipEntry.STORED) {
+                        throw new GradleException("Native APK library must be uncompressed: ${entry.name}")
+                    }
+                    def report = inspect(zip, entry)
+                    byte[] header
+                    artifact.withInputStream { header = it.readNBytes(20) }
+                    if (header.length < 20 || header[4] != 2 || header[5] != 1 ||
+                        ((header[18] & 255) | ((header[19] & 255) << 8)) != abis[parts[0]]) {
+                        throw new GradleException("Incorrect ELF architecture in ${entry.name}")
+                    }
+                    def loads = report.readLines().findAll { it.trim().startsWith('LOAD ') }
+                    if (loads.isEmpty() || loads.any { line ->
+                        Long.decode(line.trim().split(/\s+/).last()) < 16384
+                    }) throw new GradleException("ELF LOAD segments are not 16 KB aligned in ${entry.name}")
+                    if (required.contains(name)) ids[name] = buildId(report, entry.name)
+                }
+            }
+            if (ids.keySet() != required.toSet()) throw new GradleException('Both Bhash libraries are required for both Android ABIs.')
+            ids
+        }
+
+        def apkSignature = runTool([java, '-jar', new File(tools, 'lib/apksigner.jar'), 'verify', '--print-certs', apk])
+        def apkCertificate = apkSignature =~ /Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F]+)/
+        def store = KeyStore.getInstance(keystore, credentials.BHASH_ANDROID_STORE_PASSWORD.toCharArray())
+        def expected = fingerprint(store.getCertificate(credentials.BHASH_ANDROID_KEY_ALIAS))
+        if (!apkCertificate.find() || !apkCertificate.group(1).equalsIgnoreCase(expected) ||
+                signedBundleCertificate(bundle) != expected) {
+            throw new GradleException('The APK and App Bundle must both match the configured release certificate.')
+        }
+        runTool([zipalign, '-c', '-P', '16', '4', apk])
+        runBundletool(['validate', "--bundle=$bundle".toString()])
+        if (!runBundletool(['dump', 'config', "--bundle=$bundle".toString()]).contains('PAGE_ALIGNMENT_16K')) {
+            throw new GradleException('The App Bundle must request PAGE_ALIGNMENT_16K.')
+        }
+
+        def archive = new File(temporaryDir, 'release.apks')
+        def aapt2 = new File(tools, "aapt2$suffix")
+        runBundletool(['build-apks', '--mode=universal', '--overwrite',
+            "--aapt2=$aapt2".toString(), "--bundle=$bundle".toString(), "--output=$archive".toString()])
+        def universal = new File(temporaryDir, 'universal.apk')
+        new ZipFile(archive).withCloseable { zip ->
+            zip.getInputStream(zip.getEntry('universal.apk')).withCloseable { input ->
+                universal.withOutputStream { output -> input.transferTo(output) }
+            }
+        }
+        runTool([zipalign, '-c', '-P', '16', '4', universal])
+
+        def apkIds = new ZipFile(apk).withCloseable { verifyLibraries(it, 'lib/') }
+        def universalIds = new ZipFile(universal).withCloseable { verifyLibraries(it, 'lib/') }
+        def symbols = new File(temporaryDir, 'native-debug-symbols.zip')
+        new ZipFile(bundle).withCloseable { zip ->
+            def ids = verifyLibraries(zip, 'base/lib/')
+            if (ids != apkIds || ids != universalIds) {
+                throw new GradleException('Native build IDs differ across the APK and App Bundle.')
+            }
+            def prefix = 'BUNDLE-METADATA/com.android.tools.build.debugsymbols/'
+            new ZipOutputStream(new FileOutputStream(symbols)).withCloseable { out ->
+                required.sort().each { name ->
+                    def entry = zip.getEntry(prefix + name + '.dbg')
+                    if (entry == null) throw new GradleException("App Bundle is missing native debug symbols for $name")
+                    def report = inspect(zip, entry)
+                    if (!report.contains('.debug_info') || buildId(report, name) != ids[name]) {
+                        throw new GradleException("Debug symbols do not match $name")
+                    }
+                    out.putNextEntry(new ZipEntry(name + '.dbg'))
+                    Files.copy(artifact.toPath(), out)
+                    out.closeEntry()
+                }
+            }
+        }
+        def verified = new File(root, 'bhash-release')
+        def staged = Files.createTempDirectory(root.toPath(), '.bhash-release-')
+        try {
+            [apk, bundle, symbols].each { file -> Files.copy(file.toPath(), staged.resolve(file.name)) }
+            project.delete(verified)
+            Files.move(staged, verified.toPath())
+        } finally {
+            project.delete(staged.toFile())
+        }
+        logger.lifecycle('Verified signed APK, App Bundle, 16 KB alignment, and matching native debug symbols.')
+    }
+}

@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 final class AndroidCommands {
     private static final String RESOURCES = "/dev/bhash/android-starter/";
     private static final String NDK = "28.2.13676358";
-    private static final String SDK_PLATFORM = "35";
+    private static final String RELEASE_SCRIPT = "gradle/bhash-release.gradle";
     private static final String BUILD_TOOLS = "35.0.0";
     private static final String COMPILER = "bhash/compiler.jar";
     private static final String WRAPPER = "gradle/wrapper/gradle-wrapper.jar";
@@ -28,7 +28,7 @@ final class AndroidCommands {
     private static final Path APK = Path.of("app/build/outputs/apk/debug/app-debug.apk");
     private static final List<String> TEMPLATE_FILES = List.of(
         "gradlew", "gradlew.bat", WRAPPER, "gradle/wrapper/gradle-wrapper.properties",
-        "settings.gradle.kts", "gradle.properties", "gradle/bhash-native.gradle", "bhash.project", "bhash.exports",
+        "settings.gradle.kts", "gradle.properties", "gradle/bhash-native.gradle", RELEASE_SCRIPT, "bhash.project", "bhash.exports",
         ".gitignore", "src/greeting.bhash", "app/build.gradle.kts",
         "app/src/main/AndroidManifest.xml", "app/src/main/res/values/strings.xml",
         "app/src/main/cpp/bridge.c",
@@ -40,20 +40,20 @@ final class AndroidCommands {
     static int run(String[] args, Path cwd, PrintStream out, PrintStream err) {
         Path base = cwd == null ? Path.of("").toAbsolutePath() : cwd;
         try {
-            if (args.length < 2) throw new IllegalArgumentException("Choose android init, doctor, build or run.");
+            if (args.length < 2) throw new IllegalArgumentException("Choose android init, doctor, build, run or release.");
             String operation = args[1];
             if (operation.equals("init")) {
                 init(args, base, out);
                 return 0;
             }
-            if (!Set.of("doctor", "build", "run").contains(operation)) {
+            if (!Set.of("doctor", "build", "run", "release").contains(operation)) {
                 throw new IllegalArgumentException("Unknown Android command: " + operation);
             }
             int index = 2;
             Path project = base;
             if (index < args.length && !args[index].startsWith("--")) project = base.resolve(args[index++]).normalize();
             String serial = null;
-            if (index < args.length && !operation.equals("build") && index + 2 == args.length
+            if (index < args.length && Set.of("doctor", "run").contains(operation) && index + 2 == args.length
                     && args[index].equals("--device")) {
                 serial = args[index + 1];
                 if (!serial.matches("[A-Za-z0-9_.:%\\[\\]-]+") || serial.startsWith("-")) {
@@ -69,11 +69,16 @@ final class AndroidCommands {
             if (!sha256(compiler).equals(config.getProperty("bhashCompilerSha256"))) {
                 throw new IOException("Compiler checksum mismatch. Restore the original bhash/compiler.jar.");
             }
-            Setup setup = setup(project);
+            boolean releaseProject = Files.isRegularFile(project.resolve(RELEASE_SCRIPT));
+            if (operation.equals("release") && !releaseProject) {
+                throw new IOException("Create a project with the current android init to get the release build files.");
+            }
+            String sdkPlatform = releaseProject ? "36" : "35";
+            Setup setup = setup(project, sdkPlatform);
             if (operation.equals("doctor")) {
                 out.println("Java " + setup.javaHome());
                 out.println("Android SDK " + setup.sdk());
-                out.println("Platform " + SDK_PLATFORM + ", Build-Tools " + BUILD_TOOLS + ", NDK " + NDK);
+                out.println("Platform " + sdkPlatform + ", Build-Tools " + BUILD_TOOLS + ", NDK " + NDK);
                 out.println("Pinned compiler " + compiler);
                 try {
                     List<Device> devices = devices(project, setup);
@@ -87,7 +92,16 @@ final class AndroidCommands {
                 return 0;
             }
             String selected = operation.equals("run") ? selectDevice(devices(project, setup), serial) : null;
-            int status = build(project, setup, wrapper);
+            if (operation.equals("release")) {
+                int status = build(project, setup, wrapper, ":app:bhashRelease");
+                if (status != 0) return status;
+                Path output = project.resolve("app/build/outputs/bhash-release");
+                for (String file : List.of("app-release.aab", "app-release.apk", "native-debug-symbols.zip")) {
+                    out.println(require(output.resolve(file), "Gradle did not produce the verified release file."));
+                }
+                return 0;
+            }
+            int status = build(project, setup, wrapper, ":app:assembleDebug");
             if (status != 0) return status;
             Path apk = require(project.resolve(APK), "Gradle did not produce the expected debug APK.");
             out.println("Debug APK " + apk);
@@ -191,7 +205,7 @@ final class AndroidCommands {
     private record Setup(Path javaHome, Path java, Path sdk, Path adb) {}
     private record Device(String serial, String state) {}
 
-    private static Setup setup(Path project) throws IOException {
+    private static Setup setup(Path project, String sdkPlatform) throws IOException {
         boolean windows = System.getProperty("os.name").startsWith("Windows");
         String arch = System.getProperty("os.arch");
         if (!(windows || System.getProperty("os.name").equals("Linux")) || !Set.of("amd64", "x86_64").contains(arch)) {
@@ -206,7 +220,7 @@ final class AndroidCommands {
             throw new IOException("Use JDK 17 or 21 for this starter. Set JAVA_HOME (found " + version + ").");
         }
         Path sdk = sdkPath(project, windows);
-        require(sdk.resolve("platforms/android-" + SDK_PLATFORM + "/android.jar"), "Install Android SDK Platform " + SDK_PLATFORM + ".");
+        require(sdk.resolve("platforms/android-" + sdkPlatform + "/android.jar"), "Install Android SDK Platform " + sdkPlatform + ".");
         require(sdk.resolve("build-tools/" + BUILD_TOOLS + "/aapt2" + suffix), "Install Android SDK Build-Tools " + BUILD_TOOLS + ".");
         Path ndk = sdk.resolve("ndk/" + NDK);
         Path bin = ndk.resolve("toolchains/llvm/prebuilt/" + (windows ? "windows-x86_64" : "linux-x86_64") + "/bin");
@@ -254,10 +268,12 @@ final class AndroidCommands {
         }
     }
 
-    private static int build(Path project, Setup setup, Path wrapper) throws IOException, InterruptedException {
+    private static int build(Path project, Setup setup, Path wrapper, String task) throws IOException, InterruptedException {
         // Invoking the wrapper's Java entry point avoids cmd.exe quoting of paths on Windows.
-        var command = new ProcessBuilder(setup.java().toString(), "-classpath", wrapper.toString(),
-            "org.gradle.wrapper.GradleWrapperMain", ":app:assembleDebug")
+        var arguments = new ArrayList<>(List.of(setup.java().toString(), "-classpath", wrapper.toString(),
+            "org.gradle.wrapper.GradleWrapperMain", task));
+        if (task.equals(":app:bhashRelease")) arguments.add("--no-configuration-cache");
+        var command = new ProcessBuilder(arguments)
             .directory(project.toFile()).inheritIO();
         command.environment().put("JAVA_HOME", setup.javaHome().toString());
         command.environment().put("ANDROID_HOME", setup.sdk().toString());

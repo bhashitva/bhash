@@ -15,15 +15,17 @@ final class NativeCommands {
             var values = new HashMap<String, String>();
             for (int i = 3; i < args.length; i++) {
                 String flag = args[i];
-                if (!Set.of("-o", "--exports", "--target", "--abi", "--ndk", "--android-api").contains(flag)
+                if (!Set.of("-o", "--exports", "--target", "--abi", "--ndk", "--android-api", "--debug-symbols").contains(flag)
                         || i + 1 >= args.length || values.containsKey(flag))
                     throw new IllegalArgumentException("Invalid native library option: " + flag);
                 values.put(flag, args[++i]);
             }
             for (var flag : List.of("-o", "--exports"))
                 if (!values.containsKey(flag)) throw new IllegalArgumentException("Native library builds require " + flag);
-            if (!android && values.keySet().stream().anyMatch(Set.of("--target", "--abi", "--ndk", "--android-api")::contains))
+            if (!android && values.keySet().stream().anyMatch(Set.of("--target", "--abi", "--ndk", "--android-api", "--debug-symbols")::contains))
                 throw new IllegalArgumentException("Android options require compile --target android.");
+            if (values.containsKey("--debug-symbols") && !"embedded".equals(values.get("--debug-symbols")))
+                throw new IllegalArgumentException("Use --debug-symbols embedded to let Android Gradle Plugin extract native symbols.");
             if (android && (!"android".equals(values.get("--target")) || !values.containsKey("--abi")))
                 throw new IllegalArgumentException("Android library builds require --target android and --abi.");
             var project = ProjectLoader.load(Path.of(args[2]));
@@ -33,7 +35,8 @@ final class NativeCommands {
             String ndk = values.getOrDefault("--ndk", System.getenv("ANDROID_NDK_HOME"));
             int api = Integer.parseInt(values.getOrDefault("--android-api", "29"));
             Path library = NativeLibrary.build(project.sources(), manifest, output,
-                ndk == null || ndk.isBlank() ? null : Path.of(ndk), values.get("--abi"), api);
+                ndk == null || ndk.isBlank() ? null : Path.of(ndk), values.get("--abi"), api,
+                values.containsKey("--debug-symbols"));
             out.println("Compiled native library: " + library);
             return 0;
         } catch (CompilationException e) {

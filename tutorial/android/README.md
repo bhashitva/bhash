@@ -8,7 +8,7 @@ Windows या Linux के x86-64 कंप्यूटर पर JDK 17 या
 
 | भाग | संस्करण |
 | --- | --- |
-| Android SDK Platform | 35 |
+| Android SDK Platform | 36 |
 | Android SDK Build-Tools | 35.0.0 |
 | Android SDK Platform-Tools | स्थापित करें। इसमें `adb` आता है। |
 | NDK (Side by side) | 28.2.13676358 |
@@ -74,4 +74,4 @@ Android Studio से चलाना हो तो उसी नए फ़ो�
 
 परीक्षण स्क्रीन को दोबारा बनाता है और कई UTF-8 अभिवादन जाँचता है। परीक्षण रनर हर आवंटन पर भाष का कचरा संग्रह (forced GC) चलाने वाला मोड सक्रिय करता है। CLI से चलने वाले सामान्य डिबग ऐप में यह परीक्षण मोड सक्रिय नहीं होता।
 
-SQLite, निजी फ़ोन भंडार और स्क्रीन में स्थिति सँभालने के लिए [ऑफ़लाइन कार्य सूची का उदाहरण](../../examples/android-offline-task-list/README.md) देखें।
+Google Play के लिए [हस्ताक्षरित रिलीज़ और App Bundle](release.md) बनाएँ। SQLite, निजी फ़ोन भंडार और स्क्रीन में स्थिति सँभालने के लिए [ऑफ़लाइन कार्य सूची का उदाहरण](../../examples/android-offline-task-list/README.md) देखें।
