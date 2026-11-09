@@ -165,9 +165,15 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             throw unsupported(c);
         for (int i=0;i<c.getChildCount();i++) if (c.getChild(i) instanceof ParserRuleContext p) validate(p);
     }
-    static CoreProgram build(ProgramContext tree, ManagedEmitter.Analysis analysis,
-                             List<ManagedEmitter.Function> checked, List<ManagedEmitter.ClassInfo> classes) throws CompilationException {
-        return new Builder(analysis,checked,classes).program(tree);
+    public record Export(String symbol, Function function, List<Integer> handleTypes, int resultHandleType) {}
+    public record Library(CoreProgram program, List<Export> exports) {}
+
+    static Library build(ProgramContext tree, ManagedEmitter.Analysis analysis,
+                         List<ManagedEmitter.Function> checked, List<ManagedEmitter.ClassInfo> classes,
+                         Map<String,String> names, List<NativeExports.Request> exports) throws CompilationException {
+        var builder = new Builder(analysis, checked, classes);
+        var program = builder.program(tree, exports.isEmpty());
+        return new Library(program, builder.exports(program, names, exports));
     }
     private static final class Builder {
         final ManagedEmitter.Analysis a;
@@ -195,6 +201,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
         final List<CollectionType> collections=new ArrayList<>();
         StructuredTypes structuredTypes;
         boolean networking, database, postgresql, server, authentication;
+        boolean embedded;
         void ensureStructuredTypes(ParserRuleContext at)throws CompilationException{
             if(structuredTypes!=null)return;
             int texts=collectionId(listType(ManagedEmitter.Type.TEXT),at);
@@ -297,7 +304,8 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             return result;
         }
         static String originalName(org.antlr.v4.runtime.Token token){return token instanceof LocatedToken t?t.originalText():token.getText();}
-        CoreProgram program(ProgramContext tree) throws CompilationException {
+        CoreProgram program(ProgramContext tree, boolean executable) throws CompilationException {
+            embedded = !executable;
             var result=new ArrayList<Function>(); int entry=-1, entryArguments=-1;
             for(var d:tree.functionDecl()) {
                 if(library(d))continue;
@@ -305,13 +313,13 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                 var parameters=new ArrayList<Binding>();
                 if(d.parameters()!=null)for(var p:d.parameters().parameter())parameters.add(binding(a.bindings.get(p),p));
                 int id=ids.get(f);resultType=type(f.result,d);
-                if(Identifiers.key(d.IDENTIFIER().getText()).equals(Identifiers.key("मुख्य"))) {
+                if(executable && Identifiers.key(d.IDENTIFIER().getText()).equals(Identifiers.key("मुख्य"))) {
                     entry=id;
                     if(!f.parameters.isEmpty())entryArguments=collectionId(f.parameters.get(0),d);
                 }
                 result.add(new Function(id,type(f.result,d),List.copyOf(parameters),block(d.block()),source(d)));
             }
-            if(entry<0)throw new CompilationException("Native core has no checked entry point.");
+            if(executable && entry<0)throw new CompilationException("Native core has no checked entry point.");
             var objectTypes=new ArrayList<ObjectType>();
             for(var c:classes){
                 var membership=new LinkedHashSet<ManagedEmitter.ClassInfo>();collectTypes(c,membership);
@@ -420,6 +428,38 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                 .map(c->new RuntimeType(classIds.get(c),c.spelling,c.isInterface())).toList(),List.copyOf(collections),new ObjectType(-5,"अपवाद",List.of(messageField,locationField),List.of(),
                     Collections.nCopies(interfaceMethods.size(),-1),List.of(-5,-4)),structuredTypes,List.copyOf(statics.values()),classes.stream().filter(c->!c.record()).map(c->new ClassInitialization(classIds.get(c),classInitializers.get(c))).toList(),networking,database,postgresql,server,authentication);
         }
+        List<Export> exports(CoreProgram program, Map<String,String> names, List<NativeExports.Request> requests)
+                throws CompilationException {
+            var result = new ArrayList<Export>();
+            for (var request : requests) {
+                var candidates = declarations.values().stream()
+                    .filter(f -> f.owner == null && !library(f.declaration)
+                        && request.function().equals(names.get(f.declaration.IDENTIFIER().getText()))
+                        && request.parameters().equals(f.parameters.stream().map(t -> exportName(t, names)).toList())
+                        && request.result().equals(exportName(f.result, names))).toList();
+                if (candidates.size() != 1)
+                    throw new CompilationException(request.location() + ": Native export needs one matching top-level function: " + request.function());
+                var candidate = candidates.get(0);
+                var function = program.functions().stream().filter(f -> f.id() == ids.get(candidate)).findFirst().orElseThrow();
+                var kinds = new ArrayList<Integer>();
+                for (var parameter : candidate.parameters) kinds.add(exportHandleType(parameter, request));
+                result.add(new Export(request.symbol(), function, List.copyOf(kinds), exportHandleType(candidate.result, request)));
+            }
+            return List.copyOf(result);
+        }
+
+        private static String exportName(ManagedEmitter.Type type, Map<String,String> names) {
+            return names.getOrDefault(type.bhash, Identifiers.key(type.bhash));
+        }
+
+        private int exportHandleType(ManagedEmitter.Type type, NativeExports.Request request) throws CompilationException {
+            if (type == ManagedEmitter.Type.INT || type == ManagedEmitter.Type.BOOL ||
+                    type == ManagedEmitter.Type.TEXT || type == ManagedEmitter.Type.VOID) return 0;
+            if (type.object != null && classIds.containsKey(type.object) && !type.object.isInterface())
+                return classIds.get(type.object) + 16;
+            throw new CompilationException(request.location() + ": Unsupported native export type: " + type.bhash);
+        }
+
         void collectTypes(ManagedEmitter.ClassInfo c, Set<ManagedEmitter.ClassInfo> result) throws CompilationException {
             if(c==null || !result.add(c))return;
             if(!classIds.containsKey(c))throw unsupported(c.at());
@@ -521,7 +561,10 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             }
             if(s.RETURN()!=null)return new Return(s.expression()==null?null:coerce(expression(s.expression()),resultType),source(s));
             if(s.BREAK()!=null || s.CONTINUE()!=null)return new Jump(s.BREAK()!=null,source(s));
-            if(s.PRINT()!=null)return new Print(arguments(s.arguments()),source(s));
+            if(s.PRINT()!=null){
+                if (embedded) throw new CompilationException(source(s) + ": Console output is unavailable in native libraries.");
+                return new Print(arguments(s.arguments()),source(s));
+            }
             if(s.block()!=null)return block(s.block());
             return new Evaluate(expression(s.expression()));
         }
@@ -539,7 +582,10 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             return List.copyOf(values);
         }
         Expression libraryCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
-            if(f.java.equals("BhashRuntime.readText") || f.java.equals("BhashRuntime.readInteger"))return new InputCall(type(f.result,at),source(at));
+            if(f.java.equals("BhashRuntime.readText") || f.java.equals("BhashRuntime.readInteger")){
+                if (embedded) throw new CompilationException(source(at) + ": Console input is unavailable in native libraries.");
+                return new InputCall(type(f.result,at),source(at));
+            }
             String intrinsic=f.intrinsic;
             if(intrinsic==null && at instanceof PrimaryContext p && p.IDENTIFIER()!=null){
                 String name=Identifiers.key(p.IDENTIFIER().getText());

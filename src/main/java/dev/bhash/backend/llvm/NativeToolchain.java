@@ -136,7 +136,10 @@ public final class NativeToolchain {
         }
         return runProcess(work,args);
     }
-    private static String runProcess(Path work,List<String> args)throws IOException,CompilationException{
+    static String runProcess(Path work,List<String> args)throws IOException,CompilationException{
+        return runProcess(work, args, TIMEOUT_SECONDS);
+    }
+    static String runProcess(Path work,List<String> args,long timeoutSeconds)throws IOException,CompilationException{
         Process process;
         try{process=builder(args,work).start();}
         catch(IOException e){throw new CompilationException("[BH9102] Cannot start native tool "+args.get(0)+". Use native toolchain install for the managed SDK, or install a matching LLVM 18 target toolchain; see docs/managed-native-toolchain.md. Cause: "+e.getMessage());}
@@ -149,7 +152,7 @@ public final class NativeToolchain {
         },"bhash-native-output");
         reader.setDaemon(true);reader.start();
         try{
-            if(!process.waitFor(TIMEOUT_SECONDS,TimeUnit.SECONDS))throw new CompilationException("Native tool timed out after "+TIMEOUT_SECONDS+" seconds: "+args.get(0));
+            if(!process.waitFor(timeoutSeconds,TimeUnit.SECONDS))throw new CompilationException("Native tool timed out after "+timeoutSeconds+" seconds: "+args.get(0));
             reader.join(2000);
             if(reader.isAlive())throw new CompilationException("Native tool output did not close: "+args.get(0));
             if(overflow.get())throw new CompilationException("Native tool output exceeded "+LOG_LIMIT+" bytes: "+args.get(0));

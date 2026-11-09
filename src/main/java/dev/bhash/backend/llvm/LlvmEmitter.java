@@ -28,6 +28,8 @@ public final class LlvmEmitter {
     private boolean debugEnabled;
     private NativeDebugInfo debug;
     private String buildInfo;
+    private String target = NativeBuildInfo.TARGET;
+    private List<Export> libraryExports = List.of();
     private int debugScope=-1;
     private Source debugSource;
     private Function currentFunction;
@@ -59,6 +61,14 @@ public final class LlvmEmitter {
         catch(java.io.IOException | dev.bhash.backend.CompilationException error){throw new IllegalStateException(error);}
     }
     public static String emit(CoreProgram program,String notices,boolean debugging,String buildInfo){var emitter=new LlvmEmitter();emitter.debugEnabled=debugging;emitter.buildInfo=buildInfo;return emitter.program(program,notices);}
+    static String emitLibrary(CoreProgram.Library library, String target, String buildInfo) {
+        var emitter = new LlvmEmitter();
+        emitter.target = target;
+        emitter.libraryExports = library.exports();
+        emitter.debugEnabled = true;
+        emitter.buildInfo = buildInfo;
+        return emitter.program(library.program(), "");
+    }
     private String program(CoreProgram program,String notices){
         if(debugEnabled){
             debug=new NativeDebugInfo(program.functions().get(0).source());
@@ -132,9 +142,13 @@ public final class LlvmEmitter {
         String license=text(notices);
         byte[] info=buildInfo.getBytes(StandardCharsets.UTF_8);globals.append("@bhash_build_info = private constant [").append(info.length+1).append(" x i8] c\"");
         for(byte b:info)globals.append(String.format(Locale.ROOT,"\\%02X",b&255));
-        globals.append("\\00\", section \""+(NativePlatform.macos()?"__DATA,__bhash_build":NativePlatform.windows()?".bhash":".bhash.build")+"\", align 1\n@llvm.used = appending global [1 x ptr] [ptr @bhash_build_info], section \"llvm.metadata\"\n");
+        boolean embedded = !libraryExports.isEmpty();
+        globals.append("\\00\", section \""+(!embedded&&NativePlatform.macos()?"__DATA,__bhash_build":!embedded&&NativePlatform.windows()?".bhash":".bhash.build")+"\", align 1\n@llvm.used = appending global [1 x ptr] [ptr @bhash_build_info], section \"llvm.metadata\"\n");
+        String configuration = "  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+
+            "  call void @bh_static_roots_configure(ptr @static_roots, i64 "+staticRoots.size()+")\n";
+        if (embedded) emitLibraryThunks(configuration);
         return "; Bhash native: direct LLVM IR, internal ABI v17\n"+
-            "target triple = \""+NativeBuildInfo.TARGET+"\"\n%TraceFrame = type { ptr, ptr, ptr }\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%RecordInfo = type { %ClassInfo, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
+            "target triple = \""+target+"\"\n%TraceFrame = type { ptr, ptr, ptr }\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%RecordInfo = type { %ClassInfo, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
             globals+"\ndeclare void @"+NativeBuildInfo.GUARD+"()\ndeclare i32 @bh_print_build_info_if_requested(i32, ptr, ptr)\ndeclare void @bh_trace_enter(ptr, ptr, ptr)\ndeclare void @bh_trace_at(ptr)\ndeclare void @bh_trace_leave()\ndeclare void @bh_static_roots_configure(ptr, i64)\ndeclare void @bh_static_reference_store(ptr, ptr)\ndeclare void @bh_class_initialize(ptr, ptr, ptr)\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+
             "declare i32 @bh_print_licenses_if_requested(i32, ptr, ptr)\ndeclare void @bh_runtime_init()\ndeclare void @bh_shutdown()\ndeclare void @bh_print_text(ptr)\ndeclare void @bh_print_int(i64)\n"+
@@ -147,9 +161,44 @@ public final class LlvmEmitter {
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
             "declare i64 @bh_database_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+
             "declare i64 @bh_server_call(i32, i64, i64, ptr, ptr)\ndeclare i64 @bh_network_call(i32, i64, i64, i64, i64, i64, ptr, ptr)\ndeclare void @bh_application_arguments(i32, ptr)\ndeclare i64 @bh_foundation_call(i32, i64, i64, ptr, ptr)\n"+textDeclarations()+numericDeclarations()+"declare ptr @bh_console_text(ptr)\ndeclare i64 @bh_console_integer(ptr)\n"+"declare i64 @bh_time_now(ptr)\ndeclare i64 @bh_time_read(ptr, ptr)\ndeclare ptr @bh_time_write(i64, ptr)\ndeclare i64 @bh_time_year(i64, ptr)\ndeclare i64 @bh_time_month(i64, ptr)\ndeclare i64 @bh_time_day(i64, ptr)\n"+"declare i64 @bh_to_byte(i64, ptr)\ndeclare i64 @bh_to_int32(i64, ptr)\ndeclare i64 @bh_buffer_call(i32, i64, i64, i64, i64, ptr, ptr)\n"+"declare i32 @bh_file_supported(ptr)\ndeclare i32 @bh_file_exists(ptr, ptr)\ndeclare ptr @bh_file_read_text(ptr, ptr)\ndeclare void @bh_file_write_text(ptr, ptr, ptr)\n"+"declare void @bh_data_configure(ptr)\ndeclare ptr @bh_data_split(ptr, ptr, ptr)\ndeclare ptr @bh_data_join(ptr, ptr, ptr)\ndeclare ptr @bh_data_json_read(ptr, ptr)\ndeclare ptr @bh_data_json_write(ptr, ptr)\n"+typeTestHelper()+equalityHelper()+functions+
-            "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n"+entryArguments+
+            (embedded ? "" : "define internal i64 @bhash_entry(ptr %unused) {\nentry:\n"+entryArguments+
             "  call void @bfn"+program.entry()+"("+entryParameter+")\n  ret i64 0\n}\n"+
-            "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @"+NativeBuildInfo.GUARD+"()\n  call void @bh_runtime_init()\n  call void @bh_application_arguments(i32 %argc, ptr %argv)\n  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+"  call void @bh_static_roots_configure(ptr @static_roots, i64 "+staticRoots.size()+")\n  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %info = call i32 @bh_print_build_info_if_requested(i32 %argc, ptr %argv, ptr @bhash_build_info)\n  %handled = or i32 %shown, %info\n  %skip = icmp ne i32 %handled, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n"+(debug==null?"":debug.render());
+            "define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @"+NativeBuildInfo.GUARD+"()\n  call void @bh_runtime_init()\n  call void @bh_application_arguments(i32 %argc, ptr %argv)\n"+configuration+"  %shown = call i32 @bh_print_licenses_if_requested(i32 %argc, ptr %argv, ptr "+license+")\n  %info = call i32 @bh_print_build_info_if_requested(i32 %argc, ptr %argv, ptr @bhash_build_info)\n  %handled = or i32 %shown, %info\n  %skip = icmp ne i32 %handled, 0\n  br i1 %skip, label %done, label %application\napplication:\n  %status = call i32 @bh_run(ptr @bhash_entry)\n  call void @bh_shutdown()\n  br label %done\ndone:\n  %result = phi i32 [ 0, %entry ], [ %status, %application ]\n  ret i32 %result\n}\n")+(debug==null?"":debug.render());
+    }
+
+    private void emitLibraryThunks(String configuration) {
+        functions.append("define hidden void @bhash_internal_configure() {\nentry:\n  call void @")
+            .append(NativeBuildInfo.GUARD).append("()\n  call void @bh_runtime_init()\n")
+            .append(configuration).append("  ret void\n}\n");
+        var emitted = new HashSet<Integer>();
+        for (var export : libraryExports) {
+            Function f = export.function();
+            if (!emitted.add(f.id())) continue;
+            functions.append("define hidden void @bhash_internal_call_").append(f.id())
+                .append("(ptr %scalars, ptr %references) {\nentry:\n");
+            var arguments = new ArrayList<String>();
+            for (int i = 0; i < f.parameters().size(); i++) {
+                Type type = f.parameters().get(i).type();
+                String storage = type.reference() ? "ptr" : "i64";
+                functions.append("  %slot").append(i).append(" = getelementptr ").append(storage)
+                    .append(", ptr %").append(type.reference() ? "references" : "scalars").append(", i64 ").append(i)
+                    .append("\n  %arg").append(i).append(" = load ").append(storage).append(", ptr %slot").append(i).append("\n");
+                if (type == Type.BOOL)
+                    functions.append("  %bool").append(i).append(" = trunc i64 %arg").append(i).append(" to i1\n");
+                arguments.add(llvm(type) + (type == Type.BOOL ? " %bool" : " %arg") + i);
+            }
+            Type result = f.result();
+            functions.append(result == Type.VOID ? "  call " : "  %result = call ").append(llvm(result))
+                .append(" @bfn").append(f.id()).append("(").append(String.join(", ", arguments)).append(")\n");
+            if (result != Type.VOID) {
+                if (result == Type.BOOL) functions.append("  %wide = zext i1 %result to i64\n");
+                String storage = result.reference() ? "ptr" : "i64";
+                functions.append("  %out = getelementptr ").append(storage).append(", ptr %")
+                    .append(result.reference() ? "references" : "scalars").append(", i64 ").append(f.parameters().size())
+                    .append("\n  store ").append(storage).append(result == Type.BOOL ? " %wide" : " %result").append(", ptr %out\n");
+            }
+            functions.append("  ret void\n}\n");
+        }
     }
     private static String numericDeclarations(){
         var declarations=new StringBuilder();
