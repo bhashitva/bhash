@@ -123,6 +123,14 @@
         "title": "Bhash: Open Browser Playground"
       },
       {
+        "command": "bhash.openHindiBook",
+        "title": "Bhash: Open Hindi Book"
+      },
+      {
+        "command": "bhash.openHindiApiReference",
+        "title": "Bhash: Open Hindi API Reference"
+      },
+      {
         "command": "bhash.openCommunity",
         "title": "Bhash: Community & Support (Discord)"
       },
