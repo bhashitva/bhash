@@ -100,6 +100,8 @@ uses the JDK compiler to produce JVM bytecode. It is a compiler, not a parse-tre
 interpreter. CLR and browser WebAssembly output are also implemented (see below); the experimental native target supports Linux/Windows x86-64 and macOS 14+ Apple Silicon ARM64.
 See the [native design](docs/native-compilation-design.md), [Windows setup](docs/native-windows.md), and [macOS setup](docs/native-macos.md).
 
+To create, build and run a standalone Android app with the compiler JAR, follow the [Hindi Android starter tutorial](tutorial/android/README.md).
+
 On Windows, if Devanagari input is garbled, run `chcp 65001` before starting Java
 and use a font with Devanagari support.
 

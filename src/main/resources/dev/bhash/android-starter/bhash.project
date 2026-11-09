@@ -1,0 +1,4 @@
+name=android-starter
+sources=src
+kind=library
+version=0.1.0
