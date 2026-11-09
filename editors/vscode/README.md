@@ -7,24 +7,15 @@ programs while you edit.
 
 **हिन्दी:** Windows, macOS, Linux, WSL और दूरस्थ VS Code होस्ट पर भाष लिखें। एक्सटेंशन में भाष संकलक और Java भाषा सर्वर है। संपादन का विश्लेषण उसी होस्ट पर होता है। कोड सार्वजनिक Playground पर नहीं भेजा जाता और संपादन के समय चलता नहीं है।
 
-## What's new in 0.21.0 / इस रिलीज़ में
+## What's new in 0.22.0 / इस रिलीज़ में
 
-Declare `फलन मुख्य(तर्क: पाठ[]) -> शून्य` to receive command-line arguments
-in order. Synchronous and asynchronous entry points accept the array on JVM,
-.NET, and native targets. The parameterless `मुख्य()` form remains available.
+- Format values with positional placeholders, alignment, and numeric precision using [`मानक.पाठस्वरूप.बनाओ`](../../tutorial/standard-library/08-formatting.md).
+- Use [`मानक.समुच्चय<त>`](../../tutorial/standard-library/09-sets.md) for unique values, insertion-order iteration, union, intersection, and difference.
+- Missing-semicolon diagnostics point to the insertion location and explain the fix in Hindi.
 
-Use **Bhash: Build Project or File**, then launch the generated application
-with its arguments from the integrated terminal. The standalone compiler also
-forwards arguments supplied after `run --`.
+**हिन्दी:** `मानक.पाठस्वरूप.बनाओ` से स्थानचिह्न, संरेखण और दशमलव के अंकों वाला पाठ बनाएँ। `मानक.समुच्चय<त>` में हर सदस्य एक बार रखें और संघ, प्रतिच्छेद या अंतर निकालें। छूटा अर्धविराम अब उसी जगह दिखता है जहाँ उसे लगाना है।
 
-**हिन्दी:** कमांड लाइन के तर्क पाने के लिए `फलन मुख्य(तर्क: पाठ[]) -> शून्य`
-लिखें। तर्क उसी क्रम में सरणी में मिलते हैं। असमकालिक `मुख्य` भी यह
-मापदंड ले सकता है। VS Code में **Bhash: Build Project or File** से बनाएँ,
-फिर टर्मिनल में बने क्रमानुदेश के नाम के बाद तर्क दें।
-
-See the [command-line guide](../../docs/cli.md#command-line-arguments),
-[standalone compiler](https://github.com/bhashitva/bhash/releases/tag/bhash-0.21.0),
-and [changelog](CHANGELOG.md).
+See the [standalone compiler](https://github.com/bhashitva/bhash/releases/tag/bhash-0.22.0) and [changelog](CHANGELOG.md).
 
 ## Hindi syntax / नया हिन्दी शब्दक्रम
 

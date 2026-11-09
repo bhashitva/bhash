@@ -7,8 +7,8 @@ install anything on the VPS or create DNS records.
 
 ## Compiler release
 
-The Playground is built with the Bhash 0.21.0 compiler. The editor links to the
-[standalone compiler release](https://github.com/bhashitva/bhash/releases/tag/bhash-0.21.0)
+The Playground is built with the Bhash 0.22.0 compiler. The editor links to the
+[standalone compiler release](https://github.com/bhashitva/bhash/releases/tag/bhash-0.22.0)
 for local use. Use the JVM, .NET or native target for applications that listen
 for incoming HTTP or WebSocket connections.
 
