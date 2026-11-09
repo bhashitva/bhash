@@ -45,7 +45,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Install Android build and emulator tools
         run: |
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'emulator' 'platform-tools' "$IMAGE"
+          tools="$ANDROID_HOME/cmdline-tools/latest/bin"
+          "$tools/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'emulator' 'platform-tools' "$IMAGE"
+          printf '%s\n' "$tools" "$ANDROID_HOME/emulator" "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           test -e /dev/kvm
           sudo chown "$USER" /dev/kvm
       - run: mvn --batch-mode --no-transfer-progress -DskipTests package
@@ -87,3 +89,4 @@ jobs:
           path: |
             examples/android-offline-task-list/app/build/outputs/apk/debug/app-debug.apk
             examples/android-offline-task-list/app/build/generated/bhash/libraries/*/*.debug
+
