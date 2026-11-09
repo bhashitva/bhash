@@ -13,6 +13,7 @@ import org.antlr.v4.runtime.Token;
 
 /** Shared semantic checking and source lowering for JVM and CLR. User names are mangled. */
 public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> {
+    static final String SET_ELEMENTS = "तत्व";
     enum CollectionKind { ARRAY, LIST, MAP, BUFFER }
     record CollectionKey(CollectionKind kind,List<Type> arguments) {}
     record ArrayFactory(String name,String code) {}
@@ -1351,7 +1352,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
     private EnumSet<Flow> foreachStatement(ForeachStatementContext loop) {
         var source=visit(loop.expression());
-        if (source.type.collection==null) throw error(loop,"Collection iteration requires an array, list or map.");
+        if (standardSet(source.type)) source=callMethod(loop,source,SET_ELEMENTS,List.of());
+        if (source.type.collection==null) throw error(loop,"Collection iteration requires an array, list, map or set.");
         boolean pair=loop.parameter().size()==2, map=source.type.collection==CollectionKind.MAP;
         if (pair && !map) throw error(loop,"Two iteration bindings require a map.");
         var types=source.type.arguments;
@@ -1381,6 +1383,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (body.contains(Flow.RETURN)) flow.add(Flow.RETURN);
         if (body.contains(Flow.THROW)) flow.add(Flow.THROW);
         return flow;
+    }
+
+    private boolean standardSet(Type type) {
+        if (type.object==null || type.object.declaration==null) return false;
+        var name=type.object.declaration.IDENTIFIER().getSymbol();
+        return name instanceof LocatedToken token
+                && dev.bhash.stdlib.StandardLibrary.FOUNDATIONS_NAME.equals(LocatedToken.source(name,""))
+                && Identifiers.key(token.originalText()).equals("समुच्चय");
     }
 
     private List<Expr> arguments(ArgumentsContext args) {

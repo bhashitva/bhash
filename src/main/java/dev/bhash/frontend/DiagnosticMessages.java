@@ -13,6 +13,7 @@ public final class DiagnosticMessages {
         if(message.startsWith("प्रतीक्षा के लिए"))return new Entry("BH8002","प्रतीक्षा का मान कार्यफल होना चाहिए।");
         if(message.startsWith("कार्यफल को संग्रहित"))return new Entry("BH8003","कार्य का परिणाम सम्भालें ताकि उसकी विफलता अनदेखी न हो।");
         if(message.startsWith("असमकालिक संसाधन"))return new Entry("BH8004","असमकालिक सफ़ाई का हस्ताक्षर और कार्यक्षेत्र जाँचें।");
+        if (message.equals("missing ';'")) return new Entry("BH1001", "अर्धविराम (;) यहाँ लगाएँ।");
         if (message.matches("(?s).*(mismatched input|extraneous input|no viable alternative|token recognition error|missing .* at).*"))
             return new Entry("BH1001", "वाक्य रचना जाँचें; कोष्ठक और अर्धविराम सही स्थान पर रखें।");
         if (message.startsWith("Undefined variable:")) return new Entry("BH2001", "यह नाम घोषित नहीं है। नाम की वर्तनी और उसका कार्यक्षेत्र जाँचें।");

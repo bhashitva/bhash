@@ -238,14 +238,18 @@ final class AsyncSourceLowering {
             return state(pending+"="+(failed?ref(error):"रिक्त")+";"+(failed?scope+".आंतरिकचिह्न.निरस्तकरो();":"")+scope+".आंतरिकसफल();"+ref(pc)+"="+drained+";"+scope+".आंतरिकप्रतीक्षा("+arg+");लौटाओ;",outer.failed,r.start);
         }
         int each(ForeachStatementContext loop,int next,Flow flow)throws CompilationException {
-            String collection=ref(temp(loop.expression())),index=ref(field("पूर्णांक")),version=ref(field("पूर्णांक"));
+            String source=ref(temp(loop.expression()));
+            var projection=analysis.calls.get(loop);
+            String collection=projection==null?source:ref(field(type(projection.result)));
+            String index=ref(field("पूर्णांक")),version=ref(field("पूर्णांक"));
             int head=state("",flow.failed,loop.start),advance=action(index+"="+index+"+१;",head,flow,loop.start);
             int body=block(loop.block(),advance,new Flow(flow.failed,flow.returned,next,advance,flow.caught));
             StringBuilder bind=new StringBuilder();for(int i=0;i<loop.parameter().size();i++)bind.append(ref(binding(analysis.bindings.get(loop.parameter(i))))).append('=').append(collection).append(i==0?".आंतरिककुंजी(":".आंतरिकमान(").append(index).append(");");
             int items=action(bind.toString(),body,flow,loop.start);
             states.set(head,new State("यदि("+collection+".आंतरिकजाँच("+version+","+index+")){"+go(items)+"}"+go(next),flow.failed,loop.start));
             int init=action(index+"=०;"+version+"="+collection+".आंतरिकसंस्करण();",head,flow,loop.start);
-            return expression(loop.expression(),collection,init,flow);
+            if(projection!=null)init=assign(collection,source+"."+ManagedEmitter.SET_ELEMENTS+"()",init,flow,loop.start);
+            return expression(loop.expression(),source,init,flow);
         }
         String factory() {
             String original=tree.IDENTIFIER().getText();

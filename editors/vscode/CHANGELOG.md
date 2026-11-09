@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.0
+
+- Bundle the compiler with positional formatting, alignment, numeric precision, and generic sets.
+- Show missing-semicolon diagnostics at the insertion point with direct Hindi guidance.
+- Include links to the Hindi formatting and Set tutorials in the extension overview.
+
 ## 0.21.0
 
 - Bundle Bhash command-line argument support from [PR #90](https://github.com/bhashitva/bhash/pull/90).

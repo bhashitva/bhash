@@ -2,6 +2,7 @@
 
 For collection algorithms, buffered streams, scoped cleanup, paths/directories,
 configuration, logging and testing, see [application foundations](application-foundations.md).
+For `मानक.समुच्चय<त>`, see the [Hindi Set tutorial](../tutorial/standard-library/09-sets.md).
 
 For Hindi explanations and runnable examples of every function and overload, see the
 [standard-library tutorials](../tutorial/standard-library/README.md).
@@ -31,7 +32,8 @@ Output:
 
 Fully qualified calls such as `मानक.गणित.वर्गमूल(२.०)` also work. In playground
 Statements mode, use fully qualified names; imports belong to Full program mode.
-Library classes contain static methods and cannot be instantiated or redefined.
+The intrinsic catalog classes expose static methods. Library types such as
+`मानक.समुच्चय<त>` can be instantiated.
 The catalog reserves the six listed fully qualified class names, not all ordinary
 Devanagari names. Existing globals such as `लंबाई`, `अंश`, `पाठपढ़ो` and conversions
 retain their existing behavior.
@@ -58,6 +60,10 @@ Native also supports [UTC time](native-time.md), [text files](native-files.md),
   to nearest, ties to even, using integer arithmetic on every target. For example,
   `०.१२५` at 2 places is `0.12`, and `०.३७५` is `0.38`. Negative zero retains its sign.
   This is formatting, not an exact decimal arithmetic type. Use `अंकदेवनागरी` for display.
+- **String formatting:** `मानक.पाठस्वरूप.बनाओ(साँचा: पाठ, मानक: सूची<सर्ववस्तु>) → पाठ`
+  uses `{index[,alignment][:Fprecision]}` fields on JVM, .NET, native, and browser
+  WebAssembly. See the [Hindi formatting tutorial](../tutorial/standard-library/08-formatting.md)
+  for scalar types, escaping, rounding, and limits.
 - **Randomness:** SplitMix64 with explicit signed 64-bit seeds gives the same sequence
   on all targets. `पूर्णांकचुनो(lower, upper)` uses an inclusive lower and exclusive
   upper bound, unbiased rejection sampling, and requires a positive span no greater

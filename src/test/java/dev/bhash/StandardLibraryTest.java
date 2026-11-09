@@ -14,6 +14,18 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 abstract class StandardLibraryTest {
+    static final Path FORMATTING_FIXTURE = Path.of("src/test/resources/stdlib/formatting.bhash");
+    static final String FORMATTING_OUTPUT = "मीरा  |  2.62|{😀}\nरिक्त:सत्य:मीरा:मीरा\nस्वरूपण ठीक\n";
+    static final Path SET_FIXTURE = Path.of("src/test/resources/stdlib/set.bhash");
+    static final String SET_OUTPUT = "समुच्चय ठीक\n";
+
+    @Test void genericSetsArePortable() throws Exception {
+        assertEquals(SET_OUTPUT, execute(Files.readString(SET_FIXTURE)));
+    }
+
+    @Test void textFormattingIsPortable() throws Exception {
+        assertEquals(FORMATTING_OUTPUT, execute(Files.readString(FORMATTING_FIXTURE)));
+    }
     final boolean clr;
     @TempDir Path directory;
     int next;

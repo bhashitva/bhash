@@ -17,6 +17,7 @@ on:
       - 'examples/**'
       - 'scripts/browser_smoke_test.cjs'
       - 'scripts/playground_smoke_test.cjs'
+      - 'src/test/resources/stdlib/set.bhash'
       - 'scripts/playground_performance.cjs'
       - 'scripts/profile_browser_publish.py'
       - 'scripts/analyze_playground_performance.py'

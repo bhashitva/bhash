@@ -495,8 +495,15 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             }
             if(s.ifStatement()!=null)return branch(s.ifStatement());
             if(s.foreachStatement()!=null){
-                var loop=s.foreachStatement();var managed=a.expressions.get(loop.expression()).type();
-                Expression collection=expression(loop.expression());var owner=new Binding(nextBinding++,Type.OBJECT);
+                var loop=s.foreachStatement();
+                var managed=a.expressions.get(loop.expression()).type();
+                Expression collection=expression(loop.expression());
+                var projection=a.calls.get(loop);
+                if(projection!=null){
+                    collection=methodCall(projection,List.of(collection),loop);
+                    managed=projection.result;
+                }
+                var owner=new Binding(nextBinding++,Type.OBJECT);
                 var index=new Binding(nextBinding++,Type.INT);var version=new Binding(nextBinding++,Type.INT);
                 var items=new ArrayList<Assign>();
                 for(int i=0;i<loop.parameter().size();i++){

@@ -45,6 +45,24 @@ public final class Frontend {
         var parser = new BhashParser(new CommonTokenStream(lexer));
         parser.removeErrorListeners();
         parser.addErrorListener(listener);
+        parser.setErrorHandler(new DefaultErrorStrategy() {
+            @Override protected void reportMissingToken(Parser recognizer) {
+                var expected = getExpectedTokens(recognizer);
+                var previous = recognizer.getInputStream().LT(-1);
+                if (expected.size() != 1 || !expected.contains(BhashParser.SEMI) || previous == null) {
+                    super.reportMissingToken(recognizer);
+                    return;
+                }
+                if (inErrorRecoveryMode(recognizer)) return;
+                beginErrorCondition(recognizer);
+                // A semicolon belongs immediately after the preceding token, before any trivia.
+                var insertion = new CommonToken(BhashParser.SEMI, ";");
+                insertion.setLine(previous.getLine());
+                insertion.setCharPositionInLine(previous.getCharPositionInLine()
+                        + previous.getStopIndex() - previous.getStartIndex() + 1);
+                recognizer.notifyErrorListeners(insertion, "missing ';'", null);
+            }
+        });
         var tree = parser.program();
         return new Result(tree, List.copyOf(diagnostics));
     }
