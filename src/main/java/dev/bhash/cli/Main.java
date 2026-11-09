@@ -57,6 +57,7 @@ public final class Main {
         }
         if (args.length > 0 && args[0].equals("test")) return TestCommands.run(args,out,err);
         if (args.length > 0 && args[0].equals("native")) return NativeCommands.run(args,out,err);
+        if (args.length > 0 && args[0].equals("android")) return AndroidCommands.run(args, launchDirectory.get(), out, err);
         if (args.length == 1 && args[0].equals("targets")) {
             for (var target : Target.values()) {
                 out.println(target.name().toLowerCase(java.util.Locale.ROOT) + ": "
@@ -133,6 +134,8 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar native doctor [--json]");
         err.println("       java -jar bhash-compiler.jar native library <source|project> --exports <file> -o <new-directory>");
         err.println("       java -jar bhash-compiler.jar compile <source|project> --target android --abi <arm64-v8a|x86_64> --exports <file> -o <new-directory> [--ndk <path>] [--android-api 29]");
+        err.println("       java -jar bhash-compiler.jar android init <new-directory> --id <application-id> [--name <display-name>]");
+        err.println("       java -jar bhash-compiler.jar android doctor|build|run [project-directory] [--device <adb-serial>]");
         err.println("       java -jar bhash-compiler.jar native inspect <executable> [--json] [--require-runtime-match]");
         err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz|archive.zip> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");
         err.println("       Native compile/run also accept --source-root ROOT for reproducible source paths.");

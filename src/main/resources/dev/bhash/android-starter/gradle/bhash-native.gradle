@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: Apache-2.0
+// This script is applied after com.android.application in a Bhash Android module.
+import java.nio.file.Files
+import java.security.MessageDigest
+
+def abis = ['arm64-v8a': 'aarch64', 'x86_64': 'x86_64']
+def android = extensions.getByName('android')
+def minApi = android.defaultConfig.minSdk
+def ndkVersion = android.ndkVersion
+def sdk = extensions.getByName('androidComponents').sdkComponents.sdkDirectory
+def compilerHash = providers.gradleProperty('bhashCompilerSha256')
+def compiler = providers.gradleProperty('bhashCompilerJar').map { rootProject.file(it) }.orElse(
+    compilerHash.isPresent() ? rootProject.file('bhash/compiler.jar') :
+        rootProject.file('../../target/bhash-compiler-0.1.0-SNAPSHOT.jar'))
+def jniSource = layout.projectDirectory.file('src/main/cpp/bridge.c')
+def nativeOutput = layout.buildDirectory.dir('generated/bhash')
+def buildNative = tasks.register('buildBhashNative') {
+    inputs.files(rootProject.fileTree('src') { include '**/*.bhash' },
+        rootProject.file('bhash.project'), rootProject.file('bhash.exports'), jniSource)
+    inputs.file(compiler)
+    inputs.property('compilerSha256', compilerHash.orElse(''))
+    inputs.property('ndk', ndkVersion)
+    inputs.property('api', minApi)
+    outputs.dir(nativeOutput)
+    doLast {
+        if (compilerHash.isPresent()) {
+            def hash = MessageDigest.getInstance('SHA-256')
+            compiler.get().withInputStream { stream ->
+                byte[] buffer = new byte[65536]
+                for (int length; (length = stream.read(buffer)) != -1;) hash.update(buffer, 0, length)
+            }
+            if (hash.digest().encodeHex().toString() != compilerHash.get()) {
+                throw new GradleException('Compiler checksum mismatch. Restore the pinned bhash/compiler.jar.')
+            }
+        }
+        def host = System.getProperty('os.name')
+        def windows = host.startsWith('Windows')
+        def suffix = windows ? '.exe' : ''
+        def tag = windows ? 'windows-x86_64' : (host.startsWith('Mac') ? 'darwin-x86_64' : 'linux-x86_64')
+        def ndk = new File(sdk.get().asFile, "ndk/$ndkVersion")
+        def clang = new File(ndk, "toolchains/llvm/prebuilt/$tag/bin/clang$suffix")
+        if (!clang.isFile()) throw new GradleException("Install Android NDK $ndkVersion via SDK Manager.")
+        def output = nativeOutput.get().asFile
+        project.delete(output)
+        def java = new File(System.getProperty('java.home'), "bin/java$suffix")
+        abis.each { abi, cpu ->
+            def library = new File(output, "libraries/$abi")
+            def jni = new File(output, "jniLibs/$abi")
+            jni.mkdirs()
+            project.exec {
+                workingDir(rootProject.projectDir)
+                commandLine(java, '-jar', compiler.get(), 'compile', 'bhash.project', '--target', 'android',
+                    '--abi', abi, '--ndk', ndk, '--android-api', minApi, '--exports', 'bhash.exports', '-o', library)
+            }
+            project.exec {
+                commandLine(clang, "--target=${cpu}-linux-android$minApi", '-std=c17', '-O2',
+                    '-fPIC', '-fvisibility=hidden', '-Wall', '-Wextra', '-Werror', '-shared',
+                    '-Wl,--no-undefined', '-Wl,-z,max-page-size=16384',
+                    '-I', library, jniSource.asFile, '-L', library, '-lbhash_app',
+                    '-o', new File(jni, 'libbhash_jni.so'))
+            }
+            Files.copy(new File(library, 'libbhash_app.so').toPath(), new File(jni, 'libbhash_app.so').toPath())
+        }
+        def notices = new File(output, 'assets/licenses/bhash')
+        notices.mkdirs()
+        ['LICENSE', 'NOTICE', 'LICENSING.md'].each { name ->
+            Files.copy(new File(output, "libraries/arm64-v8a/$name").toPath(), new File(notices, name).toPath())
+        }
+    }
+}
+
+android.sourceSets.main.jniLibs.srcDir(nativeOutput.map { it.dir('jniLibs') })
+android.sourceSets.main.assets.srcDir(nativeOutput.map { it.dir('assets') })
+tasks.named('preBuild') { dependsOn(buildNative) }

@@ -48,6 +48,14 @@
     <resources>
       <resource><directory>src/main/resources</directory></resource>
       <resource>
+        <directory>examples/android-offline-task-list</directory>
+        <targetPath>dev/bhash/android-starter</targetPath>
+        <includes>
+          <include>gradlew</include><include>gradlew.bat</include>
+          <include>gradle/wrapper/*</include>
+        </includes>
+      </resource>
+      <resource>
         <directory>${project.basedir}</directory>
         <targetPath>META-INF/bhash</targetPath>
         <includes>

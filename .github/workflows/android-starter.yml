@@ -1,0 +1,97 @@
+name: Bhash Android starter kit
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/android-starter.yml'
+      - 'src/main/java/dev/bhash/cli/AndroidCommands.java'
+      - 'src/main/java/dev/bhash/cli/Main.java'
+      - 'src/main/resources/dev/bhash/android-starter/**'
+      - 'pom.xml'
+      - 'examples/android-offline-task-list/gradlew*'
+      - 'examples/android-offline-task-list/gradle/wrapper/**'
+      - 'scripts/test_android_starter.py'
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  starter:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Use a clean Gradle home
+        shell: pwsh
+        run: '"GRADLE_USER_HOME=$(Join-Path $env:RUNNER_TEMP bhash-starter-gradle)" >> $env:GITHUB_ENV'
+      - name: Install pinned Android build tools on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $manager = Join-Path $env:ANDROID_HOME 'cmdline-tools/latest/bin/sdkmanager.bat'
+          & $manager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'platform-tools' "--sdk_root=$env:ANDROID_HOME"
+          exit $LASTEXITCODE
+      - name: Install Android tools and API 29 image on Linux
+        if: runner.os == 'Linux'
+        env:
+          IMAGE: system-images;android-29;default;x86_64
+        run: |
+          tools="$ANDROID_HOME/cmdline-tools/latest/bin"
+          "$tools/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358' 'platform-tools' 'emulator' "$IMAGE"
+          printf '%s\n' "$tools" "$ANDROID_HOME/emulator" "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          test -e /dev/kvm
+          sudo chown "$USER" /dev/kvm
+      - run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Generate, build and rebuild a standalone app on Windows
+        if: runner.os == 'Windows'
+        run: python scripts/test_android_starter.py target/bhash-compiler-0.1.0-SNAPSHOT.jar
+      - name: Generate, build, run and test with forced GC on API 29
+        if: runner.os == 'Linux'
+        env:
+          IMAGE: system-images;android-29;default;x86_64
+          ANDROID_SERIAL: emulator-5554
+        run: |
+          unset ANDROID_SDK_HOME
+          export ANDROID_USER_HOME="$RUNNER_TEMP/bhash-starter-android"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | avdmanager create avd --name starter-api29 --package "$IMAGE" -p "$ANDROID_AVD_HOME/starter-api29.avd"
+          test -f "$ANDROID_AVD_HOME/starter-api29.ini"
+          emulator -list-avds | grep -Fx starter-api29
+          emulator -accel-check
+          adb start-server
+          emulator -avd starter-api29 -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader > "$RUNNER_TEMP/starter-emulator.log" 2>&1 &
+          emulator_pid=$!
+          finish() {
+            status=$?
+            if ((status != 0)); then
+              tail -n 120 "$RUNNER_TEMP/starter-emulator.log" || true
+              adb devices -l || true
+            fi
+            timeout 10 adb emu kill || true
+            kill "$emulator_pid" 2>/dev/null || true
+          }
+          trap finish EXIT
+          deadline=$((SECONDS + 300))
+          until [[ "$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; do
+            if ! kill -0 "$emulator_pid" 2>/dev/null || ((SECONDS >= deadline)); then
+              echo "::error::The API 29 emulator failed to boot."
+              exit 1
+            fi
+            sleep 3
+          done
+          adb shell input keyevent 82
+          python scripts/test_android_starter.py target/bhash-compiler-0.1.0-SNAPSHOT.jar --device "$ANDROID_SERIAL"
