@@ -126,6 +126,9 @@ static void mark(void *payload) {
     if (!o || o->marked) return;
     o->marked = 1; o->work_next = work; work = o;
 }
+#ifdef BHASH_EMBEDDED
+static void bh_embed_mark_handles(void);
+#endif
 void bh_roots_push(bh_root_frame *f, void **slots, uint64_t count) {
     f->previous = roots; f->slots = slots; f->count = count; roots = f;
 }
@@ -138,6 +141,9 @@ void bh_collect(void) {
     collecting = 1;
     ++collections;
     mark(pending_exception);
+#ifdef BHASH_EMBEDDED
+    bh_embed_mark_handles();
+#endif
     for(uint64_t i=0;i<static_root_count;++i)mark(*static_roots[i]);
     for (bh_root_frame *f = roots; f; f = f->previous)
         for (uint64_t i = 0; i < f->count; ++i) mark(f->slots[i]);
@@ -232,7 +238,7 @@ static int environment_flag(const char *name) {
 }
 void bh_runtime_init(void) {
     console_skip_lf=0;
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(BHASH_EMBEDDED)
     (void)_setmode(_fileno(stdin),_O_BINARY);
     (void)_setmode(_fileno(stdout),_O_BINARY);
     (void)_setmode(_fileno(stderr),_O_BINARY);
@@ -1956,4 +1962,8 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
 
 #ifdef BHASH_SERVER
 #include "bhash_server.inc"
+#endif
+
+#ifdef BHASH_EMBEDDED
+#include "bhash_embed.inc"
 #endif

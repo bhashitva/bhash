@@ -148,17 +148,29 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     /** Native typed core, using the same checker and overload decisions as managed targets. */
     public static CoreProgram core(List<SourceFile> sources) throws CompilationException {
+        return nativeCore(sources, List.of()).program();
+    }
+
+    public static CoreProgram.Library libraryCore(List<SourceFile> sources, List<NativeExports.Request> exports)
+            throws CompilationException {
+        if (exports.isEmpty()) throw new IllegalArgumentException("A native library needs at least one export");
+        return nativeCore(sources, exports);
+    }
+
+    private static CoreProgram.Library nativeCore(List<SourceFile> sources, List<NativeExports.Request> exports)
+            throws CompilationException {
         var resolution = ProjectResolver.resolve(sources);
+        boolean executable = exports.isEmpty();
         try {
             var emitter = new ManagedEmitter("project", Target.JVM);
             emitter.analysis = new Analysis();
             emitter.analysis.exceptionClass=emitter.exceptionClass;
-            var tree = prepare("project",resolution,emitter,true);
+            var tree = prepare("project",resolution,emitter,executable);
             // Validate concrete specializations, just as the managed targets check them.
             CoreProgram.validateProfile(tree);
-            emitter.program(tree, true);
+            emitter.program(tree, executable);
             var functions = emitter.functions.values().stream().flatMap(List::stream).toList();
-            return CoreProgram.build(tree, emitter.analysis, functions, emitter.classOrder);
+            return CoreProgram.build(tree, emitter.analysis, functions, emitter.classOrder, resolution.names(), exports);
         } catch (Invalid e) { throw new CompilationException(resolution.describe(e.getMessage())); }
           catch (CompilationException e) { throw new CompilationException(resolution.describe(e.getMessage())); }
     }

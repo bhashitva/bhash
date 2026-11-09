@@ -9,10 +9,46 @@ import java.util.*;
 
 final class NativeCommands {
     private NativeCommands(){}
+    static int library(String[] args, boolean android, PrintStream out, PrintStream err) {
+        try {
+            if (args.length < 3) throw new IllegalArgumentException("Expected a Bhash source or project.");
+            var values = new HashMap<String, String>();
+            for (int i = 3; i < args.length; i++) {
+                String flag = args[i];
+                if (!Set.of("-o", "--exports", "--target", "--abi", "--ndk", "--android-api").contains(flag)
+                        || i + 1 >= args.length || values.containsKey(flag))
+                    throw new IllegalArgumentException("Invalid native library option: " + flag);
+                values.put(flag, args[++i]);
+            }
+            for (var flag : List.of("-o", "--exports"))
+                if (!values.containsKey(flag)) throw new IllegalArgumentException("Native library builds require " + flag);
+            if (!android && values.keySet().stream().anyMatch(Set.of("--target", "--abi", "--ndk", "--android-api")::contains))
+                throw new IllegalArgumentException("Android options require compile --target android.");
+            if (android && (!"android".equals(values.get("--target")) || !values.containsKey("--abi")))
+                throw new IllegalArgumentException("Android library builds require --target android and --abi.");
+            var project = ProjectLoader.load(Path.of(args[2]));
+            Path output = Path.of(values.get("-o"));
+            project.protectOutput(output, true);
+            Path manifest = Path.of(values.get("--exports")).toRealPath();
+            String ndk = values.getOrDefault("--ndk", System.getenv("ANDROID_NDK_HOME"));
+            int api = Integer.parseInt(values.getOrDefault("--android-api", "29"));
+            Path library = NativeLibrary.build(project.sources(), manifest, output,
+                ndk == null || ndk.isBlank() ? null : Path.of(ndk), values.get("--abi"), api);
+            out.println("Compiled native library: " + library);
+            return 0;
+        } catch (CompilationException e) {
+            err.println(e.getMessage());
+            return 1;
+        } catch (IOException | IllegalArgumentException e) {
+            err.println(e.getMessage());
+            return 2;
+        }
+    }
     static int run(String[] args,PrintStream out,PrintStream err){
         try{
-            if(args.length<2)throw new IllegalArgumentException("Expected native doctor, toolchain, debugger, inspect or package; see docs/native-releases.md");
+            if(args.length<2)throw new IllegalArgumentException("Expected native doctor, toolchain, debugger, inspect, package or library; see docs/native-releases.md");
             switch(args[1]){
+                case "library" -> { return library(args, false, out, err); }
                 case "toolchain", "debugger" -> {
                     boolean debugger=args[1].equals("debugger");
                     if(args.length<3)throw new IllegalArgumentException("Usage: native toolchain|debugger status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");

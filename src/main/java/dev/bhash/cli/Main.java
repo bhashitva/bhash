@@ -75,7 +75,19 @@ public final class Main {
                 err.println(exception.getMessage()); return 2;
             }
         }
-        if (args.length >= 2 && args[0].equals("compile")) return compile(args, out, err);
+        if (args.length >= 2 && args[0].equals("compile")) {
+            for (int i = 2; i + 1 < args.length; i += 2) {
+                if (args[i].equals("--target") && args[i + 1].equals("android")) {
+                    var libraryArgs = new String[args.length + 1];
+                    libraryArgs[0] = "native";
+                    libraryArgs[1] = "library";
+                    System.arraycopy(args, 1, libraryArgs, 2, args.length - 1);
+                    return NativeCommands.library(libraryArgs, true, out, err);
+                }
+                if (args[i].equals("--debug")) i--;
+            }
+            return compile(args, out, err);
+        }
         if (args.length >= 2 && args[0].equals("run")) return execute(args, err);
         if (args.length != 2 || !(args[0].equals("check") || args[0].equals("parse"))) return usage(err);
         try {
@@ -119,6 +131,8 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar deps lock|restore|verify <project> [--offline]");
         err.println("       java -jar bhash-compiler.jar native toolchain status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
         err.println("       java -jar bhash-compiler.jar native doctor [--json]");
+        err.println("       java -jar bhash-compiler.jar native library <source|project> --exports <file> -o <new-directory>");
+        err.println("       java -jar bhash-compiler.jar compile <source|project> --target android --abi <arm64-v8a|x86_64> --exports <file> -o <new-directory> [--ndk <path>] [--android-api 29]");
         err.println("       java -jar bhash-compiler.jar native inspect <executable> [--json] [--require-runtime-match]");
         err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz|archive.zip> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");
         err.println("       Native compile/run also accept --source-root ROOT for reproducible source paths.");
