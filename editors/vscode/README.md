@@ -104,7 +104,9 @@ A locally packaged or Actions-built version can be installed before its Marketpl
 
 ## Android projects
 
-Open the folder created by `bhash android init` in desktop VS Code on Windows or Linux x86-64. The extension uses the Android SDK, NDK and JDK 17 or 21 on the VS Code extension host. Start the emulator in Android Studio or connect an authorized phone. See the [Android setup guide](https://github.com/bhashitva/bhash/blob/main/tutorial/android/README.md).
+Run **Bhash: New Android Project** from the Command Palette and select **Hindi Offline Task List** or **Hello World**. Choose a parent folder, enter a name for the new folder and an Android application ID. The extension creates the project using its bundled compiler and opens it in a new VS Code window. You can also open a project created with `bhash android init`.
+
+On Windows or Linux x86-64, use the Android SDK, NDK and JDK 17 or 21 on the VS Code extension host to build the app. Start the emulator in Android Studio or connect an authorized phone. [Android setup guide](https://github.com/bhashitva/bhash/blob/main/tutorial/android/README.md)
 
 | Command Palette command | What it does |
 | --- | --- |
@@ -114,7 +116,7 @@ Open the folder created by `bhash android init` in desktop VS Code on Windows or
 | **Bhash: Android Run** | Saves, builds, installs and launches the app on the selected device. With one ready device, the extension can select it automatically. |
 | **Bhash: Android Logcat** | Streams logs from the running app's main process into a task terminal. Use **Tasks: Terminate Task** or Ctrl+C to stop. Restart the Logcat task after restarting the app. |
 
-**हिन्दी:** `android init` से बना फ़ोल्डर खोलें। **Bhash: Android Check Setup** से औज़ार जाँचें। **Android Select Device** से यंत्र चुनें, **Android Run** से ऐप चलाएँ और **Android Logcat** से चल रहे ऐप के संदेश देखें। [हिन्दी ऑफ़लाइन कार्य सूची](https://github.com/bhashitva/bhash/blob/main/tutorial/android/task-list.md) में पूरा उदाहरण है।
+**हिन्दी:** **Bhash: New Android Project** से **Hindi Offline Task List** चुनें। नया फ़ोल्डर कहाँ बनेगा, उसका नाम और ऐप की पहचान दें। एक्सटेंशन अपने संकलक से परियोजना बनाकर नई VS Code विंडो में खोलता है। **Bhash: Android Check Setup** से औज़ार जाँचें। **Android Select Device** से यंत्र चुनें, **Android Run** से ऐप चलाएँ और **Android Logcat** से चल रहे ऐप के संदेश देखें। [हिन्दी ऑफ़लाइन कार्य सूची](https://github.com/bhashitva/bhash/blob/main/tutorial/android/task-list.md) में पूरा उदाहरण है।
 
 ## Native debugging on Linux and WSL
 
