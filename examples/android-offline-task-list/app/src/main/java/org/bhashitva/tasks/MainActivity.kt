@@ -46,8 +46,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
+import org.bhashitva.tasks.bhash.BhashRuntime
 
 class MainActivity : ComponentActivity() {
     private val tasks: TaskListModel by viewModels()
@@ -84,7 +84,7 @@ internal class TaskListModel(app: Application) : AndroidViewModel(app) {
         private set
 
     private fun store(): NativeTaskStore =
-        store ?: BhashWorker.open(filesDir).also { store = it }
+        store ?: NativeTaskStore(filesDir).also { store = it }
 
     fun refresh(next: TaskFilter = filter) {
         if (saving) return
@@ -95,7 +95,7 @@ internal class TaskListModel(app: Application) : AndroidViewModel(app) {
             loading = true
             error = null
             try {
-                tasks = withContext(BhashWorker.dispatcher) { store().snapshot(next) }
+                tasks = BhashRuntime.onWorker { store().snapshot(next) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -119,11 +119,11 @@ internal class TaskListModel(app: Application) : AndroidViewModel(app) {
         error = null
         viewModelScope.launch {
             try {
-                if (withContext(BhashWorker.dispatcher) { action(store()) }) {
+                if (BhashRuntime.onWorker { action(store()) }) {
                     committed()
                     try {
                         val selected = filter
-                        tasks = withContext(BhashWorker.dispatcher) { store().snapshot(selected) }
+                        tasks = BhashRuntime.onWorker { store().snapshot(selected) }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
@@ -143,11 +143,9 @@ internal class TaskListModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
-        BhashWorker.executor.execute {
+        BhashRuntime.enqueueCleanup {
             try {
                 store?.close()
-            } catch (error: IllegalStateException) {
-                android.util.Log.w("BhashTasks", "Could not close the task store", error)
             } finally {
                 store = null
             }

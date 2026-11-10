@@ -133,8 +133,8 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar native toolchain status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
         err.println("       java -jar bhash-compiler.jar native doctor [--json]");
         err.println("       java -jar bhash-compiler.jar native library <source|project> --exports <file> -o <new-directory>");
-        err.println("       java -jar bhash-compiler.jar compile <source|project> --target android --abi <arm64-v8a|x86_64> --exports <file> -o <new-directory> [--ndk <path>] [--android-api 29] [--debug-symbols embedded]");
-        err.println("       java -jar bhash-compiler.jar android init <new-directory> --id <application-id> [--name <display-name>]");
+        err.println("       java -jar bhash-compiler.jar compile <source|project> --target android --abi <arm64-v8a|x86_64> --exports <file> -o <new-directory> [--ndk <path>] [--android-api 29] [--debug-symbols embedded] [--jni-package <package>]");
+        err.println("       java -jar bhash-compiler.jar android init <new-directory> --id <application-id> [--name <display-name>] [--template hello|task-list]");
         err.println("       java -jar bhash-compiler.jar android doctor|build|run [project-directory] [--device <adb-serial>]");
         err.println("       java -jar bhash-compiler.jar android release [project-directory]");
         err.println("       java -jar bhash-compiler.jar native inspect <executable> [--json] [--require-runtime-match]");

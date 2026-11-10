@@ -5,10 +5,13 @@ on:
       - '.github/workflows/android-starter.yml'
       - 'src/main/java/dev/bhash/cli/AndroidCommands.java'
       - 'src/main/java/dev/bhash/cli/Main.java'
+      - 'src/main/java/dev/bhash/cli/NativeCommands.java'
+      - 'src/main/java/dev/bhash/backend/llvm/AndroidBindings.java'
+      - 'src/main/java/dev/bhash/backend/llvm/NativeLibrary.java'
+      - 'src/main/resources/dev/bhash/backend/android/**'
       - 'src/main/resources/dev/bhash/android-starter/**'
       - 'pom.xml'
-      - 'examples/android-offline-task-list/gradlew*'
-      - 'examples/android-offline-task-list/gradle/wrapper/**'
+      - 'examples/android-offline-task-list/**'
       - 'scripts/test_android_starter.py'
       - '!**/*.md'
   workflow_dispatch:
@@ -54,10 +57,10 @@ jobs:
           test -e /dev/kvm
           sudo chown "$USER" /dev/kvm
       - run: mvn --batch-mode --no-transfer-progress -DskipTests package
-      - name: Generate, rebuild and sign a standalone app on Windows
+      - name: Build both standalone templates and verify signing on Windows
         if: runner.os == 'Windows'
         run: python scripts/test_android_starter.py target/bhash-compiler-0.1.0-SNAPSHOT.jar
-      - name: Generate, sign, run and test with forced GC on API 29
+      - name: Build and test both standalone templates with forced GC on API 29
         if: runner.os == 'Linux'
         env:
           IMAGE: system-images;android-29;default;x86_64

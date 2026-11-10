@@ -15,7 +15,7 @@ public final class NativeLibrary {
     private record Tools(String clang, String objcopy, String target, String version, boolean android) {}
 
     public static Path build(List<SourceFile> sources, Path exports, Path output, Path ndk, String abi, int api,
-                             boolean embedSymbols)
+                             boolean embedSymbols, String jniPackage)
             throws IOException, CompilationException {
         var library = ManagedEmitter.libraryCore(sources, NativeExports.read(exports));
         var core = library.program();
@@ -37,6 +37,7 @@ public final class NativeLibrary {
                 Files.write(work.resolve(file), NativeBuildInfo.resource(RESOURCE + file));
             Files.copy(work.resolve("bhash_embed.h"), distribution.resolve("bhash_embed.h"));
             writeWrappers(library, distribution, work);
+            if (jniPackage != null) AndroidBindings.write(library, jniPackage, distribution);
             if (core.database()) SqliteAssets.copySource(work);
             compile(work, tools, List.of("-c", "program.ll", "-o", "program.o"));
             var runtime = new ArrayList<>(List.of("-std=c17", "-Wall", "-Wextra", "-Werror", "-DBHASH_EMBEDDED=1",

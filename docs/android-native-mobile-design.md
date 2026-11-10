@@ -1,6 +1,8 @@
 # Android-first mobile development with Bhash
 
-**Status: approved for the first implementation.** The [Hindi offline task list](../examples/android-offline-task-list/README.md) includes build and test instructions. The C sketch below describes the design. The generated headers define the implemented ABI.
+**Status: implemented.** The [Hindi offline task list starter](../tutorial/android/task-list.md) covers the generated Kotlin API and Android build. The C sketch below describes the original design. The generated headers define the implemented ABI.
+
+The Android Gradle task requests Kotlin and JNI output from the same checked exports as the C header. The generated Kotlin runtime serializes calls on a process-wide worker. Android apps own their handles and close them on that worker. The original ABI remains available to C embedders.
 
 In ABI v1, application functions are selected by a typed export manifest. Exported values are signed 64-bit integers, one-byte booleans, UTF-8 views or owned buffers, and opaque handles to concrete Bhash classes and records. Each UTF-8 argument or result is limited to 8 MiB. The sample represents filters as integers, invalid titles as an ID of zero, and missing tasks as a false result. Database failures cross the C boundary as Bhash exceptions. The sample closes its SQLite store and releases its handle in two calls from the JNI adapter. Schema version 1 is applied transactionally using SQLite's `user_version`.
 

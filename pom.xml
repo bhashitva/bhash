@@ -56,6 +56,15 @@
         </includes>
       </resource>
       <resource>
+        <directory>examples/android-offline-task-list</directory>
+        <targetPath>dev/bhash/android-tasks</targetPath>
+        <includes>
+          <include>bhash.project</include><include>bhash.exports</include><include>src/**/*.bhash</include>
+          <include>app/src/main/AndroidManifest.xml</include><include>app/src/main/res/xml/**</include>
+          <include>app/src/main/java/**/*.kt</include><include>app/src/androidTest/java/**/*.kt</include>
+        </includes>
+      </resource>
+      <resource>
         <directory>${project.basedir}</directory>
         <targetPath>META-INF/bhash</targetPath>
         <includes>

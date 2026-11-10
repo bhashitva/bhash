@@ -13,16 +13,17 @@ def compilerHash = providers.gradleProperty('bhashCompilerSha256')
 def compiler = providers.gradleProperty('bhashCompilerJar').map { rootProject.file(it) }.orElse(
     compilerHash.isPresent() ? rootProject.file('bhash/compiler.jar') :
         rootProject.file('../../target/bhash-compiler-0.1.0-SNAPSHOT.jar'))
-def jniSource = layout.projectDirectory.file('src/main/cpp/bridge.c')
+def bindingsPackage = android.namespace + '.bhash'
 def nativeOutput = layout.buildDirectory.dir('generated/bhash')
 def buildNative = tasks.register('buildBhashNative') {
     inputs.files(rootProject.fileTree('src') { include '**/*.bhash' },
-        rootProject.file('bhash.project'), rootProject.file('bhash.exports'), jniSource)
+        rootProject.file('bhash.project'), rootProject.file('bhash.exports'))
     inputs.file(compiler)
     inputs.property('compilerSha256', compilerHash.orElse(''))
     inputs.property('ndk', ndkVersion)
     inputs.property('api', minApi)
     inputs.property('embedSymbols', embedSymbols)
+    inputs.property('bindingsPackage', bindingsPackage)
     outputs.dir(nativeOutput)
     doLast {
         if (compilerHash.isPresent()) {
@@ -52,7 +53,8 @@ def buildNative = tasks.register('buildBhashNative') {
             project.exec {
                 workingDir(rootProject.projectDir)
                 def command = [java, '-jar', compiler.get(), 'compile', 'bhash.project', '--target', 'android',
-                    '--abi', abi, '--ndk', ndk, '--android-api', minApi, '--exports', 'bhash.exports', '-o', library]
+                    '--abi', abi, '--ndk', ndk, '--android-api', minApi, '--exports', 'bhash.exports',
+                    '--jni-package', bindingsPackage, '-o', library]
                 if (embedSymbols) command.addAll(['--debug-symbols', 'embedded'])
                 commandLine(command)
             }
@@ -60,11 +62,15 @@ def buildNative = tasks.register('buildBhashNative') {
                 commandLine(clang, "--target=${cpu}-linux-android$minApi", '-std=c17', '-O2', '-g',
                     '-fPIC', '-fvisibility=hidden', '-Wall', '-Wextra', '-Werror', '-shared',
                     '-Wl,--no-undefined', '-Wl,-z,max-page-size=16384', '-Wl,--build-id=sha1',
-                    '-I', library, jniSource.asFile, '-L', library, '-lbhash_app',
+                    '-I', library, new File(library, 'bhash_jni.c'), '-L', library, '-lbhash_app',
                     '-o', new File(jni, 'libbhash_jni.so'))
             }
             Files.copy(new File(library, 'libbhash_app.so').toPath(), new File(jni, 'libbhash_app.so').toPath())
         }
+        def kotlinOutput = new File(output, 'kotlin')
+        kotlinOutput.mkdirs()
+        Files.copy(new File(output, 'libraries/arm64-v8a/BhashBindings.kt').toPath(),
+            new File(kotlinOutput, 'BhashBindings.kt').toPath())
         def notices = new File(output, 'assets/licenses/bhash')
         notices.mkdirs()
         ['LICENSE', 'NOTICE', 'LICENSING.md'].each { name ->
@@ -75,4 +81,10 @@ def buildNative = tasks.register('buildBhashNative') {
 
 android.sourceSets.main.jniLibs.srcDir(nativeOutput.map { it.dir('jniLibs') })
 android.sourceSets.main.assets.srcDir(nativeOutput.map { it.dir('assets') })
+extensions.getByName('kotlin').sourceSets.named('main') { sourceSet ->
+    sourceSet.kotlin.srcDir(nativeOutput.map { it.dir('kotlin') })
+}
 tasks.named('preBuild') { dependsOn(buildNative) }
+tasks.matching { it.name.startsWith('compile') && it.name.endsWith('Kotlin') }.configureEach {
+    dependsOn(buildNative)
+}

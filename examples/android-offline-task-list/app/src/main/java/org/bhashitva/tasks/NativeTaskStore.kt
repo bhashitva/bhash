@@ -3,53 +3,28 @@ package org.bhashitva.tasks
 
 import java.io.Closeable
 import java.io.File
-import java.util.concurrent.Executors
-import kotlinx.coroutines.asCoroutineDispatcher
+import org.bhashitva.tasks.bhash.BhashBindings
+import org.bhashitva.tasks.bhash.BhashHandle
 import org.json.JSONArray
 
-internal object BhashBridge {
-    init { System.loadLibrary("bhash_jni") }
-
-    external fun start(stress: Boolean)
-    external fun open(path: ByteArray): Long
-    external fun add(store: Long, title: ByteArray): Long
-    external fun setDone(store: Long, id: Long, done: Boolean): Boolean
-    external fun list(store: Long, filter: Int): ByteArray
-    external fun close(store: Long)
-}
-
-// The process has one Bhash mutator. Every native call, including close, uses this executor.
-internal object BhashWorker {
-    val executor = Executors.newSingleThreadExecutor { Thread(it, "bhash-tasks") }
-    val dispatcher = executor.asCoroutineDispatcher()
-    private var started = false
-
-    fun start(stress: Boolean) {
-        if (!started) {
-            BhashBridge.start(stress)
-            started = true
-        }
-    }
-
-    fun open(directory: File): NativeTaskStore {
-        start(false)
-        return NativeTaskStore(BhashBridge.open(directory.absolutePath.encodeToByteArray()))
-    }
-}
-
-internal enum class TaskFilter(val code: Int, val label: String) {
+internal enum class TaskFilter(val code: Long, val label: String) {
     ALL(0, "सभी"), OPEN(1, "बाकी"), DONE(2, "पूरे")
 }
 
 internal data class Task(val id: Long, val title: String, val done: Boolean)
 
-internal class NativeTaskStore(private var handle: Long) : Closeable {
-    fun add(title: String): Boolean = BhashBridge.add(handle, title.encodeToByteArray()) != 0L
+// The model owns this store on the Bhash worker.
+internal class NativeTaskStore(directory: File) : Closeable {
+    private var handle: BhashHandle? = BhashBindings.bhash_tasks_open(directory.absolutePath)
 
-    fun setDone(id: Long, done: Boolean): Boolean = BhashBridge.setDone(handle, id, done)
+    private fun openHandle() = checkNotNull(handle) { "The task store is closed." }
+
+    fun add(title: String): Boolean = BhashBindings.bhash_tasks_add(openHandle(), title) != 0L
+
+    fun setDone(id: Long, done: Boolean): Boolean = BhashBindings.bhash_tasks_set_done(openHandle(), id, done)
 
     fun snapshot(filter: TaskFilter): List<Task> {
-        val json = JSONArray(BhashBridge.list(handle, filter.code).decodeToString(throwOnInvalidSequence = true))
+        val json = JSONArray(BhashBindings.bhash_tasks_list(openHandle(), filter.code))
         return List(json.length()) { index ->
             val row = json.getJSONObject(index)
             Task(row.getString("id").toLong(), row.getString("title"), row.getBoolean("done"))
@@ -57,8 +32,8 @@ internal class NativeTaskStore(private var handle: Long) : Closeable {
     }
 
     override fun close() {
-        val closing = handle
-        handle = 0
-        if (closing != 0L) BhashBridge.close(closing)
+        val closing = handle ?: return
+        handle = null
+        closing.use { BhashBindings.bhash_tasks_close(it) }
     }
 }

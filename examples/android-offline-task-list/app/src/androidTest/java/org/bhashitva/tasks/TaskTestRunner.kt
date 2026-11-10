@@ -3,12 +3,13 @@ package org.bhashitva.tasks
 
 import android.os.Bundle
 import androidx.test.runner.AndroidJUnitRunner
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.runBlocking
+import org.bhashitva.tasks.bhash.BhashRuntime
 
 class TaskTestRunner : AndroidJUnitRunner() {
     override fun onCreate(arguments: Bundle) {
         // Queue before launching any Activity so every test call runs with forced GC.
-        BhashWorker.executor.submit { BhashWorker.start(true) }.get(30, TimeUnit.SECONDS)
+        runBlocking { BhashRuntime.startWithForcedGc() }
         super.onCreate(arguments)
     }
 }

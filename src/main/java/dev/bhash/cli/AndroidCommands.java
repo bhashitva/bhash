@@ -24,16 +24,31 @@ final class AndroidCommands {
     private static final String BUILD_TOOLS = "35.0.0";
     private static final String COMPILER = "bhash/compiler.jar";
     private static final String WRAPPER = "gradle/wrapper/gradle-wrapper.jar";
-    private static final String ACTIVITY = "org.bhashitva.androidstarter.MainActivity";
     private static final Path APK = Path.of("app/build/outputs/apk/debug/app-debug.apk");
     private static final List<String> TEMPLATE_FILES = List.of(
         "gradlew", "gradlew.bat", WRAPPER, "gradle/wrapper/gradle-wrapper.properties",
-        "settings.gradle.kts", "gradle.properties", "gradle/bhash-native.gradle", RELEASE_SCRIPT, "bhash.project", "bhash.exports",
-        ".gitignore", "src/greeting.bhash", "app/build.gradle.kts",
-        "app/src/main/AndroidManifest.xml", "app/src/main/res/values/strings.xml",
-        "app/src/main/cpp/bridge.c",
-        "app/src/main/java/org/bhashitva/androidstarter/MainActivity.kt",
-        "app/src/androidTest/java/org/bhashitva/androidstarter/StarterTest.kt");
+        "settings.gradle.kts", "gradle.properties", "gradle/bhash-native.gradle", RELEASE_SCRIPT,
+        ".gitignore", "app/build.gradle.kts", "app/src/main/res/values/strings.xml");
+
+    private record Starter(String resources, String namespace, String runner, String name, List<String> files) {}
+
+    private static Starter starter(String template) {
+        return switch (template) {
+            case "hello" -> new Starter(RESOURCES, "org.bhashitva.androidstarter", "StarterTestRunner", "भाष ऐप",
+                List.of("bhash.project", "bhash.exports", "src/greeting.bhash", "app/src/main/AndroidManifest.xml",
+                    "app/src/main/java/org/bhashitva/androidstarter/MainActivity.kt",
+                    "app/src/androidTest/java/org/bhashitva/androidstarter/StarterTest.kt"));
+            case "task-list" -> new Starter("/dev/bhash/android-tasks/", "org.bhashitva.tasks", "TaskTestRunner", "मेरी कार्य सूची",
+                List.of("bhash.project", "bhash.exports", "src/tasks.bhash", "app/src/main/AndroidManifest.xml",
+                    "app/src/main/res/xml/backup_rules.xml",
+                    "app/src/main/java/org/bhashitva/tasks/MainActivity.kt",
+                    "app/src/main/java/org/bhashitva/tasks/NativeTaskStore.kt",
+                    "app/src/androidTest/java/org/bhashitva/tasks/TaskListTest.kt",
+                    "app/src/androidTest/java/org/bhashitva/tasks/TaskPersistenceTest.kt",
+                    "app/src/androidTest/java/org/bhashitva/tasks/TaskTestRunner.kt"));
+            default -> throw new IllegalArgumentException("Choose --template hello or task-list.");
+        };
+    }
 
     private AndroidCommands() {}
 
@@ -106,10 +121,11 @@ final class AndroidCommands {
             Path apk = require(project.resolve(APK), "Gradle did not produce the expected debug APK.");
             out.println("Debug APK " + apk);
             if (selected != null) {
+                String activity = starter(config.getProperty("bhashStarterTemplate", "hello")).namespace() + ".MainActivity";
                 String installed = adb(project, setup, List.of("-s", selected, "install", "-r", apk.toString()), 180);
                 if (!installed.lines().anyMatch(line -> line.trim().equals("Success"))) throw new IOException(installed.trim());
                 String launched = adb(project, setup,
-                    List.of("-s", selected, "shell", "am", "start", "-W", "-n", appId + "/" + ACTIVITY), 60);
+                    List.of("-s", selected, "shell", "am", "start", "-W", "-n", appId + "/" + activity), 60);
                 if (!launched.lines().anyMatch(line -> line.trim().equals("Status: ok"))) throw new IOException(launched.trim());
                 out.println("Started " + appId + " on " + selected);
             }
@@ -125,18 +141,22 @@ final class AndroidCommands {
     }
 
     private static void init(String[] args, Path base, PrintStream out) throws IOException {
-        if (args.length != 5 && args.length != 7) {
-            throw new IllegalArgumentException("Usage: android init <new-directory> --id <application-id> [--name <display-name>]");
+        if (args.length < 5 || args.length > 9 || args.length % 2 == 0) {
+            throw new IllegalArgumentException("Usage: android init <new-directory> --id <application-id> [--name <display-name>] [--template hello|task-list]");
         }
         String id = null;
         String name = null;
+        String template = null;
         for (int i = 3; i < args.length; i += 2) {
             if (args[i].equals("--id") && id == null) id = args[i + 1];
             else if (args[i].equals("--name") && name == null) name = args[i + 1];
+            else if (args[i].equals("--template") && template == null) template = args[i + 1];
             else throw new IllegalArgumentException("Unexpected or repeated option: " + args[i]);
         }
         id = applicationId(id);
-        if (name == null) name = "भाष ऐप";
+        if (template == null) template = "hello";
+        var starter = starter(template);
+        if (name == null) name = starter.name();
         if (name.isBlank() || name.length() > 100 || name.codePoints().anyMatch(Character::isISOControl)) {
             throw new IllegalArgumentException("Use a nonempty display name of at most 100 characters with no control characters.");
         }
@@ -156,15 +176,11 @@ final class AndroidCommands {
         require(jar, "Run android init using the standalone compiler JAR.");
         Path stage = Files.createTempDirectory(destination.getParent(), ".bhash-android-");
         try {
-            for (String file : TEMPLATE_FILES) {
-                Path target = stage.resolve(file);
-                Files.createDirectories(target.getParent());
-                String resource = file.equals(".gitignore") ? "gitignore.template" : file;
-                try (var input = AndroidCommands.class.getResourceAsStream(RESOURCES + resource)) {
-                    if (input == null) throw new IOException("Missing Android starter resource: " + file);
-                    Files.copy(input, target);
-                }
-            }
+            copyTemplate(RESOURCES, TEMPLATE_FILES, stage);
+            copyTemplate(starter.resources(), starter.files(), stage);
+            Path module = stage.resolve("app/build.gradle.kts");
+            Files.writeString(module, Files.readString(module).replace("@APP_PACKAGE@", starter.namespace())
+                .replace("@TEST_RUNNER@", starter.namespace() + "." + starter.runner()));
             Path shellWrapper = stage.resolve("gradlew");
             Files.writeString(shellWrapper, Files.readString(shellWrapper).replace("\r\n", "\n"));
             if (Files.getFileStore(stage).supportsFileAttributeView("posix")) {
@@ -174,7 +190,8 @@ final class AndroidCommands {
             Files.createDirectories(copy.getParent());
             Files.copy(jar, copy);
             Files.writeString(stage.resolve("gradle.properties"),
-                "\nbhashApplicationId=" + id + "\nbhashCompilerSha256=" + sha256(copy) + "\n",
+                "\nbhashApplicationId=" + id + "\nbhashStarterTemplate=" + template +
+                    "\nbhashCompilerSha256=" + sha256(copy) + "\n",
                 java.nio.file.StandardOpenOption.APPEND);
             Path strings = stage.resolve("app/src/main/res/values/strings.xml");
             Files.writeString(strings, Files.readString(strings).replace("@APP_NAME@", resourceString(name)));
@@ -188,6 +205,18 @@ final class AndroidCommands {
         }
         out.println("Created Android project " + destination);
         out.println("In that directory, run java -jar bhash/compiler.jar android doctor.");
+    }
+
+    private static void copyTemplate(String prefix, List<String> files, Path destination) throws IOException {
+        for (String file : files) {
+            Path target = destination.resolve(file);
+            Files.createDirectories(target.getParent());
+            String resource = file.equals(".gitignore") ? "gitignore.template" : file;
+            try (var input = AndroidCommands.class.getResourceAsStream(prefix + resource)) {
+                if (input == null) throw new IOException("Missing Android starter resource: " + file);
+                Files.copy(input, target);
+            }
+        }
     }
 
     private static String resourceString(String value) {
