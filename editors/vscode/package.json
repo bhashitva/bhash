@@ -116,6 +116,10 @@
         "title": "Bhash: Run Project or File"
       },
       {
+        "command": "bhash.android.newProject",
+        "title": "Bhash: New Android Project"
+      },
+      {
         "command": "bhash.android.doctor",
         "title": "Bhash: Android Check Setup"
       },

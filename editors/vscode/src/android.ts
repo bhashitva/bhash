@@ -21,7 +21,7 @@ interface Project { folder: vscode.WorkspaceFolder; directory: string; }
 interface Device { serial: string; state: string; }
 interface Services {
     trusted(): boolean;
-    tools(folder: vscode.WorkspaceFolder): {java: string; jar: string};
+    tools(folder?: vscode.WorkspaceFolder, compiler?: 'configured' | 'bundled'): {java: string; jar: string};
     execution(request: ConsoleRequest, cwd: string): vscode.CustomExecution;
 }
 
@@ -82,6 +82,38 @@ async function devices(project: Project, services: Services): Promise<Device[]> 
     return result as Device[];
 }
 
+async function newProject(services: Services): Promise<void> {
+    const starter = await vscode.window.showQuickPick([
+        {label: 'Hindi Offline Task List', description: 'मेरी कार्य सूची', template: 'task-list', folder: 'hindi-tasks', appId: 'org.example.hinditasks'},
+        {label: 'Hello World', description: 'नमस्ते, दुनिया!', template: 'hello', folder: 'bhash-android-app', appId: 'org.example.bhashapp'},
+    ], {title: 'Choose a Bhash Android starter'});
+    if (!starter) return;
+    const [parent] = await vscode.window.showOpenDialog({
+        canSelectFiles: false, canSelectFolders: true, openLabel: 'Select parent folder',
+        title: 'Choose where to create the Android project',
+    }) ?? [];
+    if (!parent) return;
+    if (parent.scheme !== 'file') throw new Error('Choose a folder on the file system of the VS Code host.');
+    const folder = await vscode.window.showInputBox({
+        title: 'New Android project folder', value: starter.folder,
+        validateInput: value => /^[\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*$/u.test(value)
+            ? undefined : 'Use letters, numbers, spaces, underscores, or hyphens for the new folder name.',
+    });
+    if (!folder) return;
+    const appId = await vscode.window.showInputBox({
+        title: 'Android application ID', value: starter.appId,
+        validateInput: value => /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/.test(value)
+            ? undefined : 'Enter a lowercase application ID such as org.example.hinditasks.',
+    });
+    if (!appId) return;
+    const destination = vscode.Uri.joinPath(parent, folder);
+    const {java, jar} = services.tools(undefined, 'bundled');
+    const args = ['android', 'init', destination.fsPath, '--id', appId, '--template', starter.template];
+    const invocation = compilerInvocation(jar, args, process.platform, parent.fsPath);
+    await capture(java, invocation.args, process.env, undefined, invocation.cwd ?? parent.fsPath, 60_000);
+    await vscode.commands.executeCommand('vscode.openFolder', destination, {forceNewWindow: true});
+}
+
 export function registerAndroid(context: vscode.ExtensionContext, services: Services): void {
     const selected = new Map<string, string>();
     async function selectDevice(project: Project, alwaysAsk: boolean): Promise<string | undefined> {
@@ -136,9 +168,12 @@ export function registerAndroid(context: vscode.ExtensionContext, services: Serv
         return vscode.tasks.executeTask(taskFor(definition, project));
     }
 
-    for (const operation of ['doctor', 'selectDevice', 'build', 'run', 'logcat'] as const) {
+    for (const operation of ['newProject', 'doctor', 'selectDevice', 'build', 'run', 'logcat'] as const) {
         context.subscriptions.push(vscode.commands.registerCommand('bhash.android.' + operation, async () => {
-            try { return await run(operation); }
+            try {
+                if (operation !== 'newProject') return await run(operation);
+                if (services.trusted()) await newProject(services);
+            }
             catch (error) {
                 void vscode.window.showErrorMessage('Bhash Android: ' + (error instanceof Error ? error.message : String(error)));
             }

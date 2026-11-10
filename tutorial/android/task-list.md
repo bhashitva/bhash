@@ -4,7 +4,11 @@
 
 ## १. नया ऐप बनाएँ
 
-[पहला Android ऐप](README.md) के अनुसार JDK और Android SDK तैयार करें। ऐसे स्टैंडअलोन कंपाइलर का उपयोग करें जिसके `android init` में `--template task-list` विकल्प है। नीचे डाउनलोड किए गए JAR का नाम `bhash-compiler.jar` है।
+[पहला Android ऐप](README.md) के अनुसार JDK और Android SDK तैयार करें। VS Code के कमांड पैलेट में **Bhash: New Android Project** चलाएँ और **Hindi Offline Task List** चुनें। जहाँ परियोजना बनानी है वह फ़ोल्डर चुनें। नए फ़ोल्डर के लिए `hindi-tasks` और ऐप की पहचान के लिए `org.example.hinditasks` रख सकते हैं। एक्सटेंशन अपने संकलक से परियोजना बनाकर नई विंडो में खोलता है।
+
+एमुलेटर चालू करें। नई विंडो में **Bhash: Android Check Setup** से औज़ार जाँचें और **Bhash: Android Run** से ऐप चलाएँ। चलते ऐप के संदेश **Bhash: Android Logcat** में देखें।
+
+कमांड लाइन से यही परियोजना बनाने के लिए `--template task-list` वाला स्टैंडअलोन संकलक लें। नीचे उसके JAR का नाम `bhash-compiler.jar` है।
 
 ```text
 java -jar bhash-compiler.jar android init hindi-tasks --id org.example.hinditasks --template task-list
