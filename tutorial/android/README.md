@@ -49,6 +49,8 @@ java -jar bhash/compiler.jar android run --device emulator-5554
 
 Android Studio से चलाना हो तो उसी नए फ़ोल्डर को Gradle प्रोजेक्ट की तरह खोलें। Gradle के लिए JDK 17 या 21 चुनें, फिर अपना यंत्र चुनकर **Run** दबाएँ।
 
+VS Code में प्रोजेक्ट का मूल फ़ोल्डर खोलें। Command Palette में **Bhash: Android Check Setup** से औज़ार जाँचें और **Bhash: Android Select Device** से एमुलेटर या फ़ोन चुनें। **Bhash: Android Build** डिबग APK बनाता है। **Bhash: Android Run** उसे स्थापित करके ऐप खोलता है। फिर **Bhash: Android Logcat** चल रहे ऐप के मुख्य प्रोसेस के संदेश टर्मिनल में दिखाता है। ऐप फिर शुरू करने पर Logcat कार्य भी फिर शुरू करें।
+
 ## ४. भाष फलन बदलें
 
 `src/greeting.bhash` खोलें।

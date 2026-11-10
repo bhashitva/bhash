@@ -103,6 +103,20 @@ A locally packaged or Actions-built version can be installed before its Marketpl
 
 **हिन्दी:** पैकेज वाला एक्सटेंशन उपयोग करने के लिए Maven या Node नहीं चाहिए। [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash) से स्थापित करें। नया Marketplace अपडेट आने से पहले स्थानीय या Actions का VSIX लगा सकते हैं।
 
+## Android projects
+
+Open the folder created by `bhash android init` in desktop VS Code on Windows or Linux x86-64. The extension uses the Android SDK, NDK and JDK 17 or 21 on the VS Code extension host. Start the emulator in Android Studio or connect an authorized phone. See the [Android setup guide](../../tutorial/android/README.md).
+
+| Command Palette command | What it does |
+| --- | --- |
+| **Bhash: Android Check Setup** | Runs the CLI checks for the JDK, SDK, pinned compiler and ADB. |
+| **Bhash: Android Select Device** | Chooses a ready emulator or phone for the open project. Run and Logcat reuse the selection while that device is connected. |
+| **Bhash: Android Build** | Saves project files and builds the debug APK with the project's Gradle wrapper. |
+| **Bhash: Android Run** | Saves, builds, installs and launches the app on the selected device. With one ready device, the extension can select it automatically. |
+| **Bhash: Android Logcat** | Streams logs from the running app's main process into a task terminal. Use **Tasks: Terminate Task** or Ctrl+C to stop. Restart the Logcat task after restarting the app. |
+
+**हिन्दी:** `android init` से बना फ़ोल्डर खोलें। **Bhash: Android Check Setup** से औज़ार जाँचें। **Android Select Device** से यंत्र चुनें, **Android Run** से ऐप चलाएँ और **Android Logcat** से चल रहे ऐप के संदेश देखें। [हिन्दी ऑफ़लाइन कार्य सूची](../../tutorial/android/task-list.md) में पूरा उदाहरण है।
+
 ## Native debugging on Linux and WSL
 
 Run **Bhash: Debug Native** to save and compile the active Bhash project

@@ -2,11 +2,12 @@
 import {spawn, ChildProcess, SpawnOptions} from 'node:child_process';
 import * as path from 'node:path';
 import {NativeOptions, compilerInvocation, ensureNative, nativeEnvironment, capture, requireNativeHost, terminateTree} from './native';
-export interface ConsoleRequest extends NativeOptions {
+interface CompilerConsoleRequest extends NativeOptions {
     operation: 'build' | 'run' | 'setup' | 'check' | 'repair';
     input?: string;
     target?: 'native' | 'jvm' | 'clr' | 'wasm-browser';
 }
+export type ConsoleRequest = CompilerConsoleRequest | {java: string; jar: string; androidArgs: string[]};
 type Launch = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
 /** Windows terminal backed by pipes, without a shell or another desktop Code.exe. */
 export class TaskConsole {
@@ -62,21 +63,29 @@ export class TaskConsole {
     }
     async start(): Promise<void> {
         try {
-            const target = this.request.target || 'native';
-            if (target === 'native') {
-                requireNativeHost();
-                if (this.request.operation !== 'check') await ensureNative(this.request, message => this.output(message+'\n'), this.abort.signal, this.request.operation === 'repair');
+            const request = this.request;
+            let args: string[];
+            let env: NodeJS.ProcessEnv = {...process.env};
+            if ('androidArgs' in request) {
+                args = ['android', ...request.androidArgs];
+            } else {
+                const target = request.target || 'native';
+                if (target === 'native') {
+                    requireNativeHost();
+                    if (request.operation !== 'check') await ensureNative(request, message => this.output(message+'\n'), this.abort.signal, request.operation === 'repair');
+                    env = nativeEnvironment(request);
+                }
+                if (['setup','check','repair'].includes(request.operation)) {
+                    const invocation = compilerInvocation(request.jar,['native','doctor','--json'],process.platform,this.cwd);
+                    this.output(await capture(request.java,invocation.args,env,this.abort.signal,invocation.cwd));
+                    this.finish(0); return;
+                }
+                if (!request.input) throw new Error('Task input is missing.');
+                args = [request.operation === 'build' ? 'compile' : 'run', path.resolve(this.cwd,request.input), '--target', target];
             }
             this.abort.signal.throwIfAborted();
-            const env = target === 'native' ? nativeEnvironment(this.request) : {...process.env};
-            if (['setup','check','repair'].includes(this.request.operation)) {
-                const invocation = compilerInvocation(this.request.jar,['native','doctor','--json'],process.platform,this.cwd);
-                this.output(await capture(this.request.java,invocation.args,env,this.abort.signal,invocation.cwd));
-                this.finish(0); return;
-            }
-            if (!this.request.input) throw new Error('Task input is missing.');
-            const invocation = compilerInvocation(this.request.jar,[this.request.operation === 'build' ? 'compile' : 'run',path.resolve(this.cwd,this.request.input),'--target',target],process.platform,this.cwd);
-            this.child = this.launch(this.request.java,invocation.args,{env,cwd:invocation.cwd || this.cwd,windowsHide:true,stdio:'pipe',detached:process.platform !== 'win32'});
+            const invocation = compilerInvocation(request.jar,args,process.platform,this.cwd);
+            this.child = this.launch(request.java,invocation.args,{env,cwd:invocation.cwd || this.cwd,windowsHide:true,stdio:'pipe',detached:process.platform !== 'win32'});
             const child=this.child;
             child.stdin?.on('error',()=>{}); // A program may exit before queued input is consumed.
             child.stdout?.setEncoding('utf8').on('data',(text:string)=>this.output(text));

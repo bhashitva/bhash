@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.bhash.cli;
 
+import com.google.gson.Gson;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -55,20 +56,20 @@ final class AndroidCommands {
     static int run(String[] args, Path cwd, PrintStream out, PrintStream err) {
         Path base = cwd == null ? Path.of("").toAbsolutePath() : cwd;
         try {
-            if (args.length < 2) throw new IllegalArgumentException("Choose android init, doctor, build, run or release.");
+            if (args.length < 2) throw new IllegalArgumentException("Choose android init, doctor, devices, build, run, logcat or release.");
             String operation = args[1];
             if (operation.equals("init")) {
                 init(args, base, out);
                 return 0;
             }
-            if (!Set.of("doctor", "build", "run", "release").contains(operation)) {
+            if (!Set.of("doctor", "devices", "build", "run", "logcat", "release").contains(operation)) {
                 throw new IllegalArgumentException("Unknown Android command: " + operation);
             }
             int index = 2;
             Path project = base;
             if (index < args.length && !args[index].startsWith("--")) project = base.resolve(args[index++]).normalize();
             String serial = null;
-            if (index < args.length && Set.of("doctor", "run").contains(operation) && index + 2 == args.length
+            if (index < args.length && Set.of("doctor", "run", "logcat").contains(operation) && index + 2 == args.length
                     && args[index].equals("--device")) {
                 serial = args[index + 1];
                 if (!serial.matches("[A-Za-z0-9_.:%\\[\\]-]+") || serial.startsWith("-")) {
@@ -106,7 +107,12 @@ final class AndroidCommands {
                 }
                 return 0;
             }
-            String selected = operation.equals("run") ? selectDevice(devices(project, setup), serial) : null;
+            if (operation.equals("devices")) {
+                out.println(new Gson().toJson(devices(project, setup)));
+                return 0;
+            }
+            String selected = Set.of("run", "logcat").contains(operation) ? selectDevice(devices(project, setup), serial) : null;
+            if (operation.equals("logcat")) return logcat(project, setup, selected, appId, out);
             if (operation.equals("release")) {
                 int status = build(project, setup, wrapper, ":app:bhashRelease");
                 if (status != 0) return status;
@@ -331,6 +337,28 @@ final class AndroidCommands {
         if (ready.size() == 1) return ready.get(0);
         if (ready.isEmpty()) throw new IOException("No ready ADB device. Start an emulator or connect and authorize a phone.");
         throw new IOException("More than one ADB device is ready. Choose --device from " + String.join(", ", ready) + ".");
+    }
+
+    private static int logcat(Path project, Setup setup, String serial, String appId, PrintStream out)
+            throws IOException, InterruptedException {
+        String pid;
+        try {
+            pid = adb(project, setup, List.of("-s", serial, "shell", "pidof", appId), 20).strip();
+        } catch (IOException failure) {
+            throw new IOException("Could not find " + appId + " on " + serial + ". Run the app first. " + failure.getMessage(), failure);
+        }
+        if (!pid.matches("[1-9][0-9]*")) throw new IOException("Expected one running process for " + appId + " on " + serial + ".");
+        out.println("Logcat for " + appId + " (PID " + pid + ") on " + serial + ". Stop this command to close the stream.");
+        Process process = new ProcessBuilder(setup.adb().toString(), "-s", serial, "logcat", "--pid=" + pid)
+            .directory(project.toFile()).inheritIO().start();
+        Thread shutdown = new Thread(process::destroy);
+        Runtime.getRuntime().addShutdownHook(shutdown);
+        try {
+            return process.waitFor();
+        } finally {
+            if (process.isAlive()) process.destroy();
+            Runtime.getRuntime().removeShutdownHook(shutdown);
+        }
     }
 
     private static String adb(Path project, Setup setup, List<String> arguments, long timeout)

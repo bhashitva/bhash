@@ -135,7 +135,8 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar native library <source|project> --exports <file> -o <new-directory>");
         err.println("       java -jar bhash-compiler.jar compile <source|project> --target android --abi <arm64-v8a|x86_64> --exports <file> -o <new-directory> [--ndk <path>] [--android-api 29] [--debug-symbols embedded] [--jni-package <package>]");
         err.println("       java -jar bhash-compiler.jar android init <new-directory> --id <application-id> [--name <display-name>] [--template hello|task-list]");
-        err.println("       java -jar bhash-compiler.jar android doctor|build|run [project-directory] [--device <adb-serial>]");
+        err.println("       java -jar bhash-compiler.jar android doctor|run|logcat [project-directory] [--device <adb-serial>]");
+        err.println("       java -jar bhash-compiler.jar android devices|build [project-directory]");
         err.println("       java -jar bhash-compiler.jar android release [project-directory]");
         err.println("       java -jar bhash-compiler.jar native inspect <executable> [--json] [--require-runtime-match]");
         err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz|archive.zip> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");
