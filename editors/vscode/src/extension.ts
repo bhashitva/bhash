@@ -3,7 +3,8 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import {NativeOptions, requireNativeHost} from './native';
-import {TaskConsole} from './task-console';
+import {ConsoleRequest, TaskConsole} from './task-console';
+import {registerAndroid} from './android';
 import {registerNativeDebug} from './debug-integration';
 import {LanguageClient, LanguageClientOptions, ServerOptions} from 'vscode-languageclient/node';
 
@@ -22,8 +23,8 @@ function trusted(): boolean {
     void vscode.window.showWarningMessage('Trust this workspace to start Bhash analysis or execute compiler tasks. Highlighting and snippets remain available.');
     return false;
 }
-function tools() {
-    const config = vscode.workspace.getConfiguration('bhash');
+function tools(folder?: vscode.WorkspaceFolder) {
+    const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
     const java = config.get<string>('javaPath', 'java');
     const configured = config.get<string>('compilerPath', '');
     if (configured && !path.isAbsolute(configured)) throw new Error('bhash.compilerPath must be an absolute JAR path.');
@@ -78,21 +79,24 @@ function taskFor(definition: BhashTask, folder: vscode.WorkspaceFolder | undefin
     task.presentationOptions = {echo: false, reveal: vscode.TaskRevealKind.Always, focus: definition.command === 'run', panel: vscode.TaskPanelKind.Dedicated, clear: true};
     return task;
 }
+function consoleExecution(request: ConsoleRequest, cwd: string): vscode.CustomExecution {
+    return new vscode.CustomExecution(async () => {
+        const written = new vscode.EventEmitter<string>();
+        const closed = new vscode.EventEmitter<number>();
+        const terminal = new TaskConsole(request, cwd,
+            text => written.fire(text), code => closed.fire(code));
+        return {onDidWrite: written.event, onDidClose: closed.event,
+            open: () => {void terminal.start();}, close: () => {terminal.close(); written.dispose(); closed.dispose();},
+            handleInput: (data: string) => terminal.handleInput(data)};
+    });
+}
 function compilerExecution(operation: 'build' | 'run' | 'setup' | 'check' | 'repair', input?: string, folder?: vscode.WorkspaceFolder, target: Target = 'native'): vscode.ProcessExecution | vscode.CustomExecution {
     if (target === 'native') requireNativeHost();
     const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
     const {java, jar} = tools();
     const options: NativeOptions = {java, jar, mode: config.get('native.toolchainMode', 'managed'), home: config.get('native.toolchainHome', '')};
     const cwd = folder?.uri.fsPath || (input ? path.dirname(input) : path.dirname(jar));
-    if (process.platform === 'win32') return new vscode.CustomExecution(async () => {
-        const written = new vscode.EventEmitter<string>();
-        const closed = new vscode.EventEmitter<number>();
-        const terminal = new TaskConsole({...options, operation, input, target}, cwd,
-            text => written.fire(text), code => closed.fire(code));
-        return {onDidWrite: written.event, onDidClose: closed.event,
-            open: () => {void terminal.start();}, close: () => {terminal.close(); written.dispose(); closed.dispose();},
-            handleInput: (data: string) => terminal.handleInput(data)};
-    });
+    if (process.platform === 'win32') return consoleExecution({...options, operation, input, target}, cwd);
     return new vscode.ProcessExecution(process.execPath, [context.asAbsolutePath('dist/native-task.js'), JSON.stringify({...options, operation, input, target})],
         {cwd, env: {ELECTRON_RUN_AS_NODE:'1'}});
 }
@@ -164,6 +168,7 @@ async function newProject() {
 export function activate(extensionContext: vscode.ExtensionContext) {
     context = extensionContext;
     output = vscode.window.createOutputChannel('Bhash');context.subscriptions.push(output);
+    registerAndroid(context, {trusted, tools, execution: consoleExecution});
     registerNativeDebug(context, {activeInput, save: saveInput, log: text => output.appendLine(text), tools: folder => {
         const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
         return {...tools(), mode: config.get('native.toolchainMode', 'managed'), home: config.get('native.toolchainHome', '')};

@@ -39,7 +39,8 @@
     "onDebugResolve:cppdbg",
     "onDebugResolve:bhash-native-windows",
     "onDebugResolve:bhash-native",
-    "onTaskType:bhash-native-tools"
+    "onTaskType:bhash-native-tools",
+    "onTaskType:bhash-android"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -113,6 +114,26 @@
       {
         "command": "bhash.run",
         "title": "Bhash: Run Project or File"
+      },
+      {
+        "command": "bhash.android.doctor",
+        "title": "Bhash: Android Check Setup"
+      },
+      {
+        "command": "bhash.android.selectDevice",
+        "title": "Bhash: Android Select Device"
+      },
+      {
+        "command": "bhash.android.build",
+        "title": "Bhash: Android Build"
+      },
+      {
+        "command": "bhash.android.run",
+        "title": "Bhash: Android Run"
+      },
+      {
+        "command": "bhash.android.logcat",
+        "title": "Bhash: Android Logcat"
       },
       {
         "command": "bhash.restartServer",
@@ -245,6 +266,24 @@
       }
     },
     "taskDefinitions": [
+      {
+        "type": "bhash-android",
+        "required": ["operation"],
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": ["doctor", "build", "run", "logcat"]
+          },
+          "project": {
+            "type": "string",
+            "description": "Android project directory relative to the workspace folder."
+          },
+          "device": {
+            "type": "string",
+            "description": "ADB serial for Run or Logcat, for example emulator-5554."
+          }
+        }
+      },
       {
         "type": "bhash",
         "required": [
