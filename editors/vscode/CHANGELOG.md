@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.24.1
+
+- Recover Android Run when the requested app window is visible after the launch wait times out.
+- Verify timeout recovery and app-scoped Logcat on the Android API 29 emulator.
+
 ## 0.24.0
 
 - Add **Bhash: New Android Project** with Hindi Offline Task List and Hello World starters.
