@@ -23,10 +23,10 @@ function trusted(): boolean {
     void vscode.window.showWarningMessage('Trust this workspace to start Bhash analysis or execute compiler tasks. Highlighting and snippets remain available.');
     return false;
 }
-function tools(folder?: vscode.WorkspaceFolder) {
+function tools(folder?: vscode.WorkspaceFolder, compiler: 'configured' | 'bundled' = 'configured') {
     const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
     const java = config.get<string>('javaPath', 'java');
-    const configured = config.get<string>('compilerPath', '');
+    const configured = compiler === 'configured' ? config.get<string>('compilerPath', '') : '';
     if (configured && !path.isAbsolute(configured)) throw new Error('bhash.compilerPath must be an absolute JAR path.');
     return {java, jar: configured || context.asAbsolutePath('server/bhash-compiler.jar')};
 }
