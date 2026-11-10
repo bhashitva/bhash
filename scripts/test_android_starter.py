@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 
@@ -194,4 +195,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
     main()
