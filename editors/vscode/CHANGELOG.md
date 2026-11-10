@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.24.0
+
+- Add **Bhash: New Android Project** with Hindi Offline Task List and Hello World starters.
+- Generate projects with the bundled compiler and open them in a new VS Code window.
+- Cover Hindi folder names, cancellation, and protection of existing projects in the wizard tests.
+
 ## 0.23.0
 
 - Check the Android SDK, NDK and JDK, and choose a connected device from the Command Palette on Windows and Linux x86-64.
