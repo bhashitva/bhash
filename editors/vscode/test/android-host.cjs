@@ -87,6 +87,10 @@ exports.run = async () => {
     await fs.access(path.join(project, 'app/build/outputs/apk/debug/app-debug.apk'));
     const run = await executeTask('run');
     assert.equal(run.task.definition.device, serial);
+    if (process.env.BHASH_ANDROID_TIMEOUT_MARKER) {
+        await fs.access(process.env.BHASH_ANDROID_TIMEOUT_MARKER);
+        console.log('PASS VS Code Android Run recovered from am start -W reporting timeout on API 29.');
+    }
     const logcat = await vscode.commands.executeCommand('bhash.android.logcat');
     assert.equal(logcat?.task.definition.device, serial);
     try {
