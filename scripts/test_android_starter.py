@@ -37,6 +37,42 @@ def native_digests(apk):
     return hashes
 
 
+def install_tests(java, project, adb):
+    invoke([java, "-classpath", project / "gradle/wrapper/gradle-wrapper.jar",
+            "org.gradle.wrapper.GradleWrapperMain", ":app:assembleDebugAndroidTest"], project)
+    test_apk = project / "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+    invoke([*adb, "install", "-r", test_apk], project)
+
+
+def smoke_task_list(compiler, directory, java, sdk, suffix, serial):
+    project = directory / "Hindi Task List"
+    app_id = "org.bhashitva.startertasks"
+    invoke([java, "-jar", compiler, "android", "init", project.name, "--id", app_id, "--template", "task-list"],
+           directory)
+    if (project / "app/src/main/cpp").exists() or (project / "src/greeting.bhash").exists():
+        raise RuntimeError("The task-list template contains a handwritten bridge or greeting source")
+    cli = [java, "-jar", project / "bhash/compiler.jar", "android"]
+    invoke([*cli, "run", "--device", serial] if serial else [*cli, "build"], project)
+    apk = project / "app/build/outputs/apk/debug/app-debug.apk"
+    native_digests(apk)
+    badging = invoke([sdk / "build-tools" / "35.0.0" / f"aapt2{suffix}", "dump", "badging", apk],
+                     project, message="launchable-activity: name='org.bhashitva.tasks.MainActivity'")
+    if f"package: name='{app_id}'" not in badging or "targetSdkVersion:'36'" not in badging:
+        raise RuntimeError("The generated task list has the wrong application ID or target API")
+    if serial:
+        adb = [sdk / "platform-tools" / f"adb{suffix}", "-s", serial]
+        invoke([*adb, "shell", "am", "force-stop", app_id], project)
+        install_tests(java, project, adb)
+        runner = f"{app_id}.test/org.bhashitva.tasks.TaskTestRunner"
+        invoke([*adb, "shell", "am", "instrument", "-w", "-e", "class",
+                "org.bhashitva.tasks.TaskListTest", runner], project, message="OK (4 tests)")
+        for phase in ("write", "read"):
+            invoke([*adb, "shell", "am", "force-stop", app_id], project)
+            invoke([*adb, "shell", "am", "instrument", "-w", "-e", "class",
+                    "org.bhashitva.tasks.TaskPersistenceTest", "-e", "persistence", phase, runner],
+                   project, message="OK (1 test)")
+
+
 def smoke_release(cli, project, java, tools, suffix):
     credentials = {
         "BHASH_ANDROID_KEYSTORE": str(project.parent / "test upload.p12"),
@@ -78,6 +114,8 @@ def smoke(compiler, directory, serial):
     shutil.copyfile(compiler, launcher)
     cli = [java, "-jar", launcher, "android"]
     invoke([*cli, "init", "invalid", "--id", "bad;id"], directory, 2, "Supply an application ID")
+    invoke([*cli, "init", "invalid", "--id", app_id, "--template", "unknown"], directory, 2,
+           "Choose --template hello or task-list")
     if (directory / "invalid").exists():
         raise RuntimeError("Invalid application ID produced a project")
     project = directory / "Android Starter App"
@@ -113,12 +151,20 @@ def smoke(compiler, directory, serial):
     original = source.read_text(encoding="utf-8")
     if original.count('"नमस्ते"') != 1:
         raise RuntimeError("The editable greeting literal is missing")
-    source.write_text(original.replace('"नमस्ते"', '"Updated"'), encoding="utf-8")
+    source.write_text(original.replace('"नमस्ते"', '"Updated"') +
+                      "\nफलन जोड़ापाठ(पहला: पाठ, दूसरा: पाठ) -> पाठ { लौटाओ पहला + दूसरा; }\n",
+                      encoding="utf-8")
+    with (project / "bhash.exports").open("a", encoding="utf-8") as exports:
+        exports.write("\nbhash_join_text = जोड़ापाठ(पाठ, पाठ) -> पाठ\n")
+    activity = project / "app/src/main/java/org/bhashitva/androidstarter/MainActivity.kt"
+    activity.write_text(activity.read_text(encoding="utf-8").replace(
+        'bhash_greeting("भाष")', 'bhash_greeting(BhashBindings.bhash_join_text("भा", "ष"))'),
+        encoding="utf-8")
     invoke([*cli, build, *target], project)
     after = native_digests(apk)
     for name in before:
-        if name.endswith("libbhash_app.so") and before[name] == after[name]:
-            raise RuntimeError(f"{name} did not change after editing the Bhash source")
+        if before[name] == after[name]:
+            raise RuntimeError(f"{name} did not change after adding a Bhash export")
 
     smoke_release(cli, project, java, tools, suffix)
 
@@ -129,13 +175,11 @@ def smoke(compiler, directory, serial):
             raise RuntimeError(f"Expected Android API 29, got {api.strip()!r}")
         invoke([*adb, "shell", "setprop", "debug.checkjni", "1"], project)
         invoke([*adb, "shell", "am", "force-stop", app_id], project)
-        invoke([java, "-classpath", project / "gradle/wrapper/gradle-wrapper.jar",
-                "org.gradle.wrapper.GradleWrapperMain", ":app:assembleDebugAndroidTest"], project)
-        test_apk = project / "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
-        invoke([*adb, "install", "-r", test_apk], project)
+        install_tests(java, project, adb)
         invoke([*adb, "shell", "am", "instrument", "-w", "-e", "prefix", "Updated",
                 f"{app_id}.test/org.bhashitva.androidstarter.StarterTestRunner"],
                project, message="OK (1 test)")
+    smoke_task_list(compiler, directory, java, sdk, suffix, serial)
 
 
 def main():

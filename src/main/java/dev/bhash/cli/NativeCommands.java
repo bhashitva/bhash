@@ -15,14 +15,14 @@ final class NativeCommands {
             var values = new HashMap<String, String>();
             for (int i = 3; i < args.length; i++) {
                 String flag = args[i];
-                if (!Set.of("-o", "--exports", "--target", "--abi", "--ndk", "--android-api", "--debug-symbols").contains(flag)
+                if (!Set.of("-o", "--exports", "--target", "--abi", "--ndk", "--android-api", "--debug-symbols", "--jni-package").contains(flag)
                         || i + 1 >= args.length || values.containsKey(flag))
                     throw new IllegalArgumentException("Invalid native library option: " + flag);
                 values.put(flag, args[++i]);
             }
             for (var flag : List.of("-o", "--exports"))
                 if (!values.containsKey(flag)) throw new IllegalArgumentException("Native library builds require " + flag);
-            if (!android && values.keySet().stream().anyMatch(Set.of("--target", "--abi", "--ndk", "--android-api", "--debug-symbols")::contains))
+            if (!android && values.keySet().stream().anyMatch(Set.of("--target", "--abi", "--ndk", "--android-api", "--debug-symbols", "--jni-package")::contains))
                 throw new IllegalArgumentException("Android options require compile --target android.");
             if (values.containsKey("--debug-symbols") && !"embedded".equals(values.get("--debug-symbols")))
                 throw new IllegalArgumentException("Use --debug-symbols embedded to let Android Gradle Plugin extract native symbols.");
@@ -36,7 +36,7 @@ final class NativeCommands {
             int api = Integer.parseInt(values.getOrDefault("--android-api", "29"));
             Path library = NativeLibrary.build(project.sources(), manifest, output,
                 ndk == null || ndk.isBlank() ? null : Path.of(ndk), values.get("--abi"), api,
-                values.containsKey("--debug-symbols"));
+                values.containsKey("--debug-symbols"), values.get("--jni-package"));
             out.println("Compiled native library: " + library);
             return 0;
         } catch (CompilationException e) {

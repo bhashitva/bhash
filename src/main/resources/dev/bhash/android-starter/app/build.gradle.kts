@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "org.bhashitva.androidstarter"
+    namespace = "@APP_PACKAGE@"
     compileSdk = 36
     buildToolsVersion = "35.0.0"
     ndkVersion = "28.2.13676358"
@@ -16,7 +16,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         ndk { abiFilters.addAll(listOf("arm64-v8a", "x86_64")) }
-        testInstrumentationRunner = "org.bhashitva.androidstarter.StarterTestRunner"
+        testInstrumentationRunner = "@TEST_RUNNER@"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -36,6 +36,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.04.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test:runner:1.6.2")

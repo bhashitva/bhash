@@ -15,10 +15,18 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlin.io.path.createTempDirectory
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import org.bhashitva.tasks.bhash.BhashBindings
+import org.bhashitva.tasks.bhash.BhashException
+import org.bhashitva.tasks.bhash.BhashHandle
+import org.bhashitva.tasks.bhash.BhashRuntime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -50,22 +58,85 @@ class TaskListTest {
     }
 
     @Test fun nativeStoreSurvivesCloseAndReopen() = runBlocking {
-        withContext(BhashWorker.dispatcher) {
+        BhashRuntime.onWorker {
             val testDirectory = createTempDirectory(instrumentation.targetContext.cacheDir.toPath()).toFile()
             try {
-                BhashWorker.open(testDirectory).use { store ->
+                NativeTaskStore(testDirectory).use { store ->
                     assertFalse(store.add("  "))
                     assertTrue(store.add("किताब पढ़ें😀"))
                     val task = store.snapshot(TaskFilter.OPEN).single()
                     assertTrue(store.setDone(task.id, true))
                 }
-                BhashWorker.open(testDirectory).use { store ->
+                NativeTaskStore(testDirectory).use { store ->
                     assertEquals(emptyList<Task>(), store.snapshot(TaskFilter.OPEN))
                     assertEquals("किताब पढ़ें😀", store.snapshot(TaskFilter.DONE).single().title)
                 }
             } finally {
                 testDirectory.deleteRecursively()
             }
+        }
+    }
+
+    @Test fun generatedBindingsPreserveHandlesAndRecoverFromExceptions() = runBlocking {
+        assertThrows(IllegalStateException::class.java) { BhashBindings.bhash_tasks_open("") }
+        BhashRuntime.onWorker {
+            val directory = createTempDirectory(instrumentation.targetContext.cacheDir.toPath()).toFile()
+            try {
+                val handle = BhashBindings.bhash_tasks_open(directory.absolutePath)
+                handle.use {
+                    try {
+                        val failure = assertThrows(BhashException::class.java) {
+                            BhashBindings.bhash_tasks_list(handle, -1L)
+                        }
+                        assertEquals(6, failure.status)
+                        assertTrue(failure.message.orEmpty().contains("कार्य सूची की छननी अमान्य है।"))
+                        repeat(25) { index ->
+                            assertTrue(BhashBindings.bhash_tasks_add(handle, "परीक्षण 😀 $index") > 0L)
+                        }
+                        val snapshot = org.json.JSONArray(BhashBindings.bhash_tasks_list(handle, 0L))
+                        assertEquals(25, snapshot.length())
+                        assertEquals("परीक्षण 😀 24", snapshot.getJSONObject(24).getString("title"))
+                    } finally {
+                        BhashBindings.bhash_tasks_close(handle)
+                    }
+                }
+                handle.close()
+                assertThrows(IllegalStateException::class.java) { BhashBindings.bhash_tasks_list(handle, 0L) }
+                NativeTaskStore(directory).use { assertEquals(25, it.snapshot(TaskFilter.ALL).size) }
+            } finally {
+                directory.deleteRecursively()
+            }
+            Unit
+        }
+    }
+
+    @Test fun cancellingUndeliveredHandleResultReleasesItsRoot() = runBlocking {
+        val directory = createTempDirectory(instrumentation.targetContext.cacheDir.toPath()).toFile()
+        val reached = CompletableDeferred<Unit>()
+        val finish = CountDownLatch(1)
+        lateinit var returned: BhashHandle
+        try {
+            val call = launch {
+                BhashRuntime.onWorker {
+                    returned = BhashBindings.bhash_tasks_open(directory.absolutePath)
+                    BhashBindings.bhash_tasks_close(returned)
+                    reached.complete(Unit)
+                    check(finish.await(10, TimeUnit.SECONDS))
+                    returned
+                }
+                error("The cancelled call delivered a handle.")
+            }
+            kotlinx.coroutines.withTimeout(10_000) { reached.await() }
+            call.cancel()
+            finish.countDown()
+            call.join()
+            BhashRuntime.onWorker {
+                assertThrows(IllegalStateException::class.java) { returned.borrow() }
+                NativeTaskStore(directory).use { assertTrue(it.add("रद्द होने के बाद 😀")) }
+            }
+        } finally {
+            finish.countDown()
+            directory.deleteRecursively()
         }
     }
 
