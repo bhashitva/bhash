@@ -16,12 +16,12 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.23.0 / इस रिलीज़ में
+## What's new in 0.24.0 / इस रिलीज़ में
 
-- Check your Android setup, select an emulator or phone, build a debug APK, run the app, and view its Logcat output from the Command Palette on Windows and Linux x86-64.
-- Start with the [Hindi Android tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/android/README.md). The bundled compiler supports generating Kotlin and JNI bindings and building signed APKs and App Bundles from the CLI.
+- Run **Bhash: New Android Project** from the Command Palette and choose **Hindi Offline Task List** or **Hello World**.
+- The wizard uses the bundled compiler, creates a new folder, and opens it in VS Code. Use **Bhash: Android Run** and **Bhash: Android Logcat** to try the app.
 
-**हिन्दी:** Windows और Linux x86-64 पर कमांड पैलेट से Android के औज़ार जाँचें, एमुलेटर या फ़ोन चुनें, डीबग APK बनाएँ, ऐप चलाएँ और उसके Logcat संदेश देखें। [हिन्दी Android ट्यूटोरियल](https://github.com/bhashitva/bhash/blob/main/tutorial/android/README.md) से शुरू करें।
+**हिन्दी:** कमांड पैलेट में **Bhash: New Android Project** चलाएँ और **Hindi Offline Task List** या **Hello World** चुनें। एक्सटेंशन अपने संकलक से नया फ़ोल्डर बनाकर VS Code में खोलता है। [हिन्दी Android ट्यूटोरियल](https://github.com/bhashitva/bhash/blob/main/tutorial/android/task-list.md) से शुरू करें।
 
 ## Compiler 0.22.0 highlights / संकलक 0.22.0 की मुख्य बातें
 
