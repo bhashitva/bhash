@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 final class AndroidCommands {
     private static final String RESOURCES = "/dev/bhash/android-starter/";
@@ -26,6 +27,9 @@ final class AndroidCommands {
     private static final String COMPILER = "bhash/compiler.jar";
     private static final String WRAPPER = "gradle/wrapper/gradle-wrapper.jar";
     private static final Path APK = Path.of("app/build/outputs/apk/debug/app-debug.apk");
+    private static final Pattern FOCUSED_WINDOW = Pattern.compile("(?m)^\\h*mCurrentFocus=(Window\\{[a-fA-F0-9]+ u\\d+ ([^\\s}]+)})\\h*$");
+    private static final Pattern WINDOW_RECORD = Pattern.compile("Window #\\d+ (Window\\{[^}]+}):");
+    private static final Pattern DRAWN_WINDOW = Pattern.compile("\\bmDrawState=HAS_DRAWN\\b");
     private static final List<String> TEMPLATE_FILES = List.of(
         "gradlew", "gradlew.bat", WRAPPER, "gradle/wrapper/gradle-wrapper.properties",
         "settings.gradle.kts", "gradle.properties", "gradle/bhash-native.gradle", RELEASE_SCRIPT,
@@ -132,7 +136,11 @@ final class AndroidCommands {
                 if (!installed.lines().anyMatch(line -> line.trim().equals("Success"))) throw new IOException(installed.trim());
                 String launched = adb(project, setup,
                     List.of("-s", selected, "shell", "am", "start", "-W", "-n", appId + "/" + activity), 60);
-                if (!launched.lines().anyMatch(line -> line.trim().equals("Status: ok"))) throw new IOException(launched.trim());
+                if (!hasLaunchStatus(launched, "ok")) {
+                    if (!hasLaunchStatus(launched, "timeout")) throw new IOException(launched.strip());
+                    confirmTimedOutLaunch(project, setup, selected, appId, activity, launched);
+                    out.println("Android confirmed the app window after the launch wait timed out.");
+                }
                 out.println("Started " + appId + " on " + selected);
             }
             return 0;
@@ -337,6 +345,53 @@ final class AndroidCommands {
         if (ready.size() == 1) return ready.get(0);
         if (ready.isEmpty()) throw new IOException("No ready ADB device. Start an emulator or connect and authorize a phone.");
         throw new IOException("More than one ADB device is ready. Choose --device from " + String.join(", ", ready) + ".");
+    }
+
+    private static boolean hasLaunchStatus(String output, String status) {
+        return output.lines().anyMatch(line -> line.strip().equals("Status: " + status));
+    }
+
+    private static void confirmTimedOutLaunch(Path project, Setup setup, String serial, String appId, String activity,
+                                              String launched) throws IOException, InterruptedException {
+        String failure = "Android's launch wait timed out and the app window could not be confirmed on " + serial + ".\n"
+            + launched.strip();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            String windows;
+            try {
+                windows = adb(project, setup,
+                    List.of("-s", serial, "shell", "dumpsys", "-t", "3", "window", "-a", "visible-apps"), 5);
+            } catch (IOException error) {
+                throw new IOException(failure + "\n" + error.getMessage(), error);
+            }
+            if (hasDrawnFocusedActivity(windows, appId, activity)) return;
+            if (attempt == 0) Thread.sleep(1000);
+        }
+        throw new IOException(failure);
+    }
+
+    static boolean hasDrawnFocusedActivity(String windows, String appId, String activity) {
+        String full = appId + "/" + activity;
+        String abbreviated = activity.startsWith(appId + ".") ? appId + "/" + activity.substring(appId.length()) : full;
+        var focused = FOCUSED_WINDOW.matcher(windows).results()
+            .filter(window -> window.group(2).equals(full) || window.group(2).equals(abbreviated))
+            .map(window -> window.group(1)).toList();
+        if (focused.isEmpty()) return false;
+
+        // Match the draw state to the focused window's own record.
+        var lines = windows.lines().iterator();
+        boolean matchingWindow = false;
+        while (lines.hasNext()) {
+            String line = lines.next().strip();
+            if (line.isEmpty()) {
+                matchingWindow = false;
+            } else if (line.startsWith("Window #")) {
+                var record = WINDOW_RECORD.matcher(line);
+                matchingWindow = record.matches() && focused.contains(record.group(1));
+            } else if (matchingWindow && DRAWN_WINDOW.matcher(line).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int logcat(Path project, Setup setup, String serial, String appId, PrintStream out)
