@@ -16,12 +16,12 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.22.1 / इस रिलीज़ में
+## What's new in 0.23.0 / इस रिलीज़ में
 
-- Open the Hindi book and Hindi API reference from the Command Palette or the documentation links above.
-- This extension includes the Bhash 0.22.0 compiler.
+- Check your Android setup, select an emulator or phone, build a debug APK, run the app, and view its Logcat output from the Command Palette on Windows and Linux x86-64.
+- Start with the [Hindi Android tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/android/README.md). The bundled compiler supports generating Kotlin and JNI bindings and building signed APKs and App Bundles from the CLI.
 
-**हिन्दी:** कमांड पैलेट और ऊपर दिए लिंक से हिन्दी पुस्तक और हिन्दी API संदर्भ खोलें। इस एक्सटेंशन में भाष 0.22.0 संकलक है।
+**हिन्दी:** Windows और Linux x86-64 पर कमांड पैलेट से Android के औज़ार जाँचें, एमुलेटर या फ़ोन चुनें, डीबग APK बनाएँ, ऐप चलाएँ और उसके Logcat संदेश देखें। [हिन्दी Android ट्यूटोरियल](https://github.com/bhashitva/bhash/blob/main/tutorial/android/README.md) से शुरू करें।
 
 ## Compiler 0.22.0 highlights / संकलक 0.22.0 की मुख्य बातें
 
@@ -31,7 +31,7 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 **हिन्दी:** `मानक.पाठस्वरूप.बनाओ` से स्थानचिह्न, संरेखण और दशमलव के अंकों वाला पाठ बनाएँ। `मानक.समुच्चय<त>` में हर सदस्य एक बार रखें और संघ, प्रतिच्छेद या अंतर निकालें। छूटा अर्धविराम अब उसी जगह दिखता है जहाँ उसे लगाना है।
 
-See the [standalone compiler](https://github.com/bhashitva/bhash/releases/tag/bhash-0.22.0) and [changelog](CHANGELOG.md).
+See [Bhash Downloads](https://github.com/bhashitva/bhash/blob/main/DOWNLOADS.md) for standalone compiler releases and the [changelog](CHANGELOG.md) for extension releases.
 
 ## Hindi syntax / नया हिन्दी शब्दक्रम
 
@@ -80,13 +80,12 @@ In VS Code, run **Bhash: Community & Support (Discord)** from the Command Palett
 
 ## Install
 
-1. Download the `.vsix` package from the **Bhash VS Code extension** GitHub
-   Actions artifact for a successful main-branch build.
+1. Install **Bhash (भाष)** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash).
 
-   **हिन्दी:** मुख्य शाखा के सफल **Bhash VS Code extension** GitHub Actions artifact से `.vsix` लें।
-2. In VS Code choose **Extensions → … → Install from VSIX…** and select the file.
+   **हिन्दी:** [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash) से **Bhash (भाष)** स्थापित करें।
+2. For offline installation, get a `.vsix` from [Bhash Downloads](https://github.com/bhashitva/bhash/blob/main/DOWNLOADS.md#vs-code-extension) and choose **Extensions → … → Install from VSIX…**.
 
-   **हिन्दी:** VS Code में **Extensions → … → Install from VSIX…** चुनें और फ़ाइल दें।
+   **हिन्दी:** ऑफ़लाइन स्थापना के लिए [भाष डाउनलोड](https://github.com/bhashitva/bhash/blob/main/DOWNLOADS.md#vs-code-extension) से `.vsix` लें और VS Code में **Extensions → … → Install from VSIX…** चुनें।
 3. Install **Java 17 or later** on the computer running the extension host.
    A full JDK is needed for JVM build/run. In WSL, SSH, or Codespaces, install Java
    on that remote host and install the extension there.
@@ -105,7 +104,7 @@ A locally packaged or Actions-built version can be installed before its Marketpl
 
 ## Android projects
 
-Open the folder created by `bhash android init` in desktop VS Code on Windows or Linux x86-64. The extension uses the Android SDK, NDK and JDK 17 or 21 on the VS Code extension host. Start the emulator in Android Studio or connect an authorized phone. See the [Android setup guide](../../tutorial/android/README.md).
+Open the folder created by `bhash android init` in desktop VS Code on Windows or Linux x86-64. The extension uses the Android SDK, NDK and JDK 17 or 21 on the VS Code extension host. Start the emulator in Android Studio or connect an authorized phone. See the [Android setup guide](https://github.com/bhashitva/bhash/blob/main/tutorial/android/README.md).
 
 | Command Palette command | What it does |
 | --- | --- |
@@ -115,7 +114,7 @@ Open the folder created by `bhash android init` in desktop VS Code on Windows or
 | **Bhash: Android Run** | Saves, builds, installs and launches the app on the selected device. With one ready device, the extension can select it automatically. |
 | **Bhash: Android Logcat** | Streams logs from the running app's main process into a task terminal. Use **Tasks: Terminate Task** or Ctrl+C to stop. Restart the Logcat task after restarting the app. |
 
-**हिन्दी:** `android init` से बना फ़ोल्डर खोलें। **Bhash: Android Check Setup** से औज़ार जाँचें। **Android Select Device** से यंत्र चुनें, **Android Run** से ऐप चलाएँ और **Android Logcat** से चल रहे ऐप के संदेश देखें। [हिन्दी ऑफ़लाइन कार्य सूची](../../tutorial/android/task-list.md) में पूरा उदाहरण है।
+**हिन्दी:** `android init` से बना फ़ोल्डर खोलें। **Bhash: Android Check Setup** से औज़ार जाँचें। **Android Select Device** से यंत्र चुनें, **Android Run** से ऐप चलाएँ और **Android Logcat** से चल रहे ऐप के संदेश देखें। [हिन्दी ऑफ़लाइन कार्य सूची](https://github.com/bhashitva/bhash/blob/main/tutorial/android/task-list.md) में पूरा उदाहरण है।
 
 ## Native debugging on Linux and WSL
 
