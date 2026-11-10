@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.23.0
+
+- Check the Android SDK, NDK and JDK, and choose a connected device from the Command Palette on Windows and Linux x86-64.
+- Build a debug APK, install and launch it, and stream Logcat for the running app.
+- Bundle the compiler with the Android starter, signed APK and App Bundle builds, and generated Kotlin and JNI bindings.
+- Verify the extension workflow end to end on the Android API 29 emulator.
+
 ## 0.22.1
 
 - Link to the Hindi book and standard-library API reference from the extension overview.
