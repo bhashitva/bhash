@@ -16,7 +16,13 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.24.0 / इस रिलीज़ में
+## What's new in 0.24.1 / इस रिलीज़ में
+
+**Bhash: Android Run** now reports success if Android's launch wait times out after the requested app window has appeared. If the app window cannot be confirmed, the command still reports the launch error.
+
+**हिन्दी:** Android की लॉन्च प्रतीक्षा का समय पूरा होने पर **Bhash: Android Run** जाँचता है कि ऐप की विंडो खुल चुकी है या नहीं। विंडो दिखने पर रन सफल माना जाता है। विंडो की पुष्टि न होने पर लॉन्च त्रुटि दिखाई जाती है।
+
+## Android project wizard / नया Android प्रोजेक्ट
 
 - Run **Bhash: New Android Project** from the Command Palette and choose **Hindi Offline Task List** or **Hello World**.
 - The wizard uses the bundled compiler, creates a new folder, and opens it in VS Code. Use **Bhash: Android Run** and **Bhash: Android Logcat** to try the app.
