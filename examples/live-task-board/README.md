@@ -28,6 +28,8 @@ java -jar target/live-task-board.jar --local=true --port=8080 \
 
 ## २. HTTPS और WSS
 
+[Linux पर Caddy, Nginx और Apache के साथ हिन्दी परिनियोजन अभ्यास](deployment-hi.md)
+
 सर्वर केवल loopback पर सुनता है। TLS के लिए उसी मशीन पर भरोसेमंद रिवर्स प्रॉक्सी रखें। उदाहरण के लिए, अपने वास्तविक DNS नाम के लिए Caddy में यह नियम लगाएँ।
 
 ```caddy
