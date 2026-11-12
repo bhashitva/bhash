@@ -12,6 +12,7 @@ Run the compiler JAR with a full JDK 17 or newer. See the [command-line guide](d
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.25.1](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.1) | 2026-11-12 19:11 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.1/bhash-compiler-0.25.1.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.1/bhash-compiler-0.25.1.jar.sha256) |
 | [0.25.0](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.0) | 2026-11-10 03:23 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.0/bhash-compiler-0.25.0.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.0/bhash-compiler-0.25.0.jar.sha256) |
 | [0.24.0](https://github.com/bhashitva/bhash/releases/tag/bhash-0.24.0) | 2026-11-09 23:10 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.24.0/bhash-compiler-0.24.0.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.24.0/bhash-compiler-0.24.0.jar.sha256) |
 | [0.23.0](https://github.com/bhashitva/bhash/releases/tag/bhash-0.23.0) | 2026-11-09 20:12 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.23.0/bhash-compiler-0.23.0.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.23.0/bhash-compiler-0.23.0.jar.sha256) |
