@@ -32,6 +32,7 @@ def proxy_command(name, directory, public, backend):
     if name == "caddy":
         config.write_text(f"""{{
     admin off
+    auto_https disable_redirects
 }}
 https://127.0.0.1:{public} {{
     bind 127.0.0.1
