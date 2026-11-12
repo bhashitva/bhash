@@ -113,6 +113,11 @@ uint64_t bh_server_call(uint32_t op,uint64_t a,uint64_t b,const bh_collection_in
         if(socket_value==SRV_INVALID)runtime_error(location,"HTTP सर्वर खोला नहीं जा सका।");
 #ifndef _WIN32
         if(socket_value>=FD_SETSIZE){srv_close_socket(socket_value);runtime_error(location,"HTTP सर्वर खोला नहीं जा सका।");}
+        /* Allow a supervisor to restart on the same port while old TCP connections expire. */
+        int reuse_address=1;
+        if(setsockopt(socket_value,SOL_SOCKET,SO_REUSEADDR,&reuse_address,sizeof reuse_address)){
+            srv_close_socket(socket_value);runtime_error(location,"HTTP सर्वर खोला नहीं जा सका।");
+        }
 #endif
         /* INADDR_LOOPBACK is a BSD extension hidden by Darwin's POSIX headers.
          * The public API accepts exactly 127.0.0.1 or 0.0.0.0, so use its IPv4 value. */
