@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.24.2
+
+- Bundle the native HTTP runtime fix for restarting on the same port on Linux and macOS.
+- Verify Linux restart with the same application behind Caddy, Nginx, and Apache.
+
 ## 0.24.1
 
 - Recover Android Run when the requested app window is visible after the launch wait times out.

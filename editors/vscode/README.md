@@ -16,7 +16,13 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.24.1 / इस रिलीज़ में
+## What's new in 0.24.2 / इस रिलीज़ में
+
+Native HTTP servers can restart on the same port while old TCP connections expire. Rebuild existing native server executables to pick up the fix. Restart was verified on Linux behind Caddy, Nginx, and Apache.
+
+**हिन्दी:** पुराने TCP संबंध समाप्त होने के दौरान नेटिव HTTP सर्वर उसी पोर्ट पर फिर शुरू हो सकता है। सुधार पाने के लिए मौजूदा नेटिव सर्वर को फिर संकलित करें। Linux पर Caddy, Nginx और Apache के साथ इसकी जाँच की गई है।
+
+## Android launch timeout recovery / Android लॉन्च समयसीमा
 
 **Bhash: Android Run** now reports success if Android's launch wait times out after the requested app window has appeared. If the app window cannot be confirmed, the command still reports the launch error.
 
