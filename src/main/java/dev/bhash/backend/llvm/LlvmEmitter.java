@@ -574,7 +574,18 @@ public final class LlvmEmitter {
     }
     private void declareVariables(List<Binding> parameters){
         if(debug==null)return;
-        for(var b:bindings.keySet()){String declaration=debug.declare(b,address(b),debugScope,parameters.indexOf(b)+1);if(!declaration.isEmpty()){Source previous=debugSource;debugSource=b.source();line(declaration);debugSource=previous;}}
+        for (var binding : bindings.keySet()) {
+            // LLVM needs the root stack allocation and a byte offset to locate a reference.
+            Integer rootSlot = outlined ? null : bindingRoots.get(binding);
+            String storage = rootSlot == null ? address(binding) : "%roots";
+            String declaration = debug.declare(binding, storage, debugScope, parameters.indexOf(binding) + 1, rootSlot);
+            if (!declaration.isEmpty()) {
+                Source previous = debugSource;
+                debugSource = binding.source();
+                line(declaration);
+                debugSource = previous;
+            }
+        }
     }
     private void traceAt(Source source){if(source!=null)line("call void @bh_trace_at(ptr "+text(source.toString())+")");}
     private void leaveTrace(){if(traced)line("call void @bh_trace_leave()");}
