@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: github.event.pull_request.merged && github.event.pull_request.number == 118 && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.number == 118 && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -127,6 +127,7 @@ jobs:
           python editors/jupyter/test_kernel.py --installed --notebook target/hindi-starter.ipynb
 
   publish:
+    if: github.event.pull_request.merged
     needs: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 10
