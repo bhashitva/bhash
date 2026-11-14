@@ -1,7 +1,7 @@
 name: Publish Bhash 0.25.2
 on:
-  push:
-    branches: [release/bhash-0.25.2]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: github.ref == 'refs/heads/release/bhash-0.25.2'
+    if: github.event.pull_request.merged && github.event.pull_request.number == 118 && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
