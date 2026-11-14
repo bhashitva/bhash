@@ -51,10 +51,12 @@ final class NativeDebugInfo {
         case REAL->add("!DIBasicType(name: "+quote("दशमलव")+", size: 64, encoding: DW_ATE_float)");
         default->add("!DIDerivedType(tag: DW_TAG_typedef, name: "+quote(t==Type.TEXT?"पाठ":t==Type.ANY?"सर्ववस्तु":"वस्तु")+", baseType: !"+add("!DIDerivedType(tag: DW_TAG_pointer_type, baseType: null, size: 64)")+")");
     });}
-    String declare(Binding binding,String address,int scope,int argument){
+    String declare(Binding binding,String address,int scope,int argument,Integer rootSlot){
         if(binding.name().isEmpty() || binding.source()==null)return "";
         int var=add("!DILocalVariable(name: "+quote(binding.name())+(argument>0?", arg: "+argument:"")+", scope: !"+scope+", file: !"+file(binding.source())+", line: "+binding.source().line()+", type: !"+type(binding.type())+")");
-        return "call void @llvm.dbg.declare(metadata ptr "+address+", metadata !"+var+", metadata !"+expression+")";
+        int storage = rootSlot == null || rootSlot == 0 ? expression
+                : add("!DIExpression(DW_OP_plus_uconst, " + (rootSlot * Long.BYTES) + ")");
+        return "call void @llvm.dbg.declare(metadata ptr "+address+", metadata !"+var+", metadata !"+storage+")";
     }
     /** Debug-only, immutable schema. No runtime calls, allocation or GC ABI changes. */
     static String schema(CoreProgram program){
