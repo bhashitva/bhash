@@ -1,9 +1,9 @@
-Version 0.1.8 bundles Bhash 0.22.0 with [string formatting](https://github.com/bhashitva/bhash/blob/main/tutorial/standard-library/08-formatting.md), [generic sets](https://github.com/bhashitva/bhash/blob/main/tutorial/standard-library/09-sets.md), and more precise missing-semicolon diagnostics. The installed wheel is tested with the Hindi starter notebook on Linux, Windows, and macOS.
+Version 0.1.9 bundles the Bhash 0.25.2 compiler. The installed wheel is tested with the Hindi starter notebook on Linux, Windows, and macOS.
 
 Install or upgrade in the Python environment where you run Jupyter. The wheel includes the compiler and needs a full JDK 17 or newer.
 
 ```sh
-python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.8/bhash_jupyter-0.1.8-py3-none-any.whl"
+python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.9/bhash_jupyter-0.1.9-py3-none-any.whl"
 python -m bhash_jupyter.install
 python -m pip show bhash-jupyter
 ```

@@ -16,7 +16,11 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.24.2 / इस रिलीज़ में
+## What's new in 0.25.2 / इस रिलीज़ में
+
+Bundles Bhash compiler 0.25.2, which preserves local reference variable locations for Android native debugging.
+
+## 0.24.2
 
 Native HTTP servers can restart on the same port while old TCP connections expire. Rebuild existing native server executables to pick up the fix. Restart was verified on Linux behind Caddy, Nginx, and Apache.
 
