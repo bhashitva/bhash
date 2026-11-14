@@ -1,0 +1,155 @@
+name: Publish Bhash 0.25.2
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release-bhash-0252
+  cancel-in-progress: false
+jobs:
+  package:
+    if: github.event.pull_request.number == 118 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      - run: npm run package --prefix editors/vscode
+      - run: npm test --prefix editors/vscode
+      - run: python -m pip install build
+      - run: python scripts/package_jupyter.py
+      - name: Stage assets and verify the bundled compiler and overview
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cp target/bhash-compiler-0.1.0-SNAPSHOT.jar release/bhash-compiler-0.25.2.jar
+          cp target/bhash-vscode-0.25.2.vsix target/jupyter-dist/bhash_jupyter-0.1.9-py3-none-any.whl release/
+          cp editors/jupyter/पहली-नोटबुक.ipynb release/hindi-starter.ipynb
+          cd release
+          python - <<'PY'
+          import json, pathlib, zipfile
+          jar = pathlib.Path("bhash-compiler-0.25.2.jar").read_bytes()
+          with zipfile.ZipFile("bhash-vscode-0.25.2.vsix") as vsix:
+              assert vsix.read("extension/server/bhash-compiler.jar") == jar
+              assert json.loads(vsix.read("extension/package.json"))["version"] == "0.25.2"
+              overview = vsix.read("extension/readme.md").decode()
+              assert "What's new in 0.25.2" in overview and "merged PR #63" not in overview
+          with zipfile.ZipFile("bhash_jupyter-0.1.9-py3-none-any.whl") as wheel:
+              assert wheel.read("bhash_jupyter/assets/bhash-compiler.jar") == jar
+          PY
+          sha256sum bhash-compiler-0.25.2.jar > bhash-compiler-0.25.2.jar.sha256
+          sha256sum bhash-vscode-0.25.2.vsix > bhash-vscode-0.25.2.vsix.sha256
+          sha256sum bhash_jupyter-0.1.9-py3-none-any.whl hindi-starter.ipynb > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bhash-0.25.2-release
+          path: release/
+          if-no-files-found: error
+
+  verify:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bhash-0.25.2-release
+          path: release
+      - name: Verify the standalone compiler and installed notebook kernel
+        shell: bash
+        env:
+          JUPYTER_DATA_DIR: ${{ github.workspace }}/target/jupyter-user
+          PYTHONUTF8: '1'
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, pathlib, subprocess
+          root = pathlib.Path("release")
+          for manifest in ("SHA256SUMS", "bhash-compiler-0.25.2.jar.sha256", "bhash-vscode-0.25.2.vsix.sha256"):
+              for row in (root / manifest).read_text().splitlines():
+                  sha, name = row.split()
+                  assert hashlib.sha256((root / name).read_bytes()).hexdigest() == sha, name
+          source = root / "args.bhash"
+          source.write_text('असमकालिक फलन मुख्य(तर्क: पाठ[]) -> शून्य { प्रतीक्षा मानक.कार्य.विलंब(१); प्रत्येक (तर्क में तर्कांश: पाठ) { लिखो("[" + तर्कांश + "]"); } }', encoding="utf-8")
+          compiler = ["java", "-jar", str(root / "bhash-compiler-0.25.2.jar")]
+          output = root / "args.jar"
+          arguments = ["input.txt", "two words", "", "--target"]
+          expected = ["[input.txt]", "[two words]", "[]", "[--target]"]
+          subprocess.run(compiler + ["compile", str(source), "--target", "jvm", "-o", str(output)], check=True)
+          for command in (["java", "-jar", str(output)], compiler + ["run", str(source), "--"]):
+              result = subprocess.check_output(command + arguments).decode("utf-8").splitlines()
+              assert result == expected, result
+          for fixture, marker in (("formatting", "स्वरूपण ठीक"), ("set", "समुच्चय ठीक")):
+              program = f"src/test/resources/stdlib/{fixture}.bhash"
+              result = subprocess.check_output(compiler + ["run", program, "--target", "jvm"]).decode("utf-8").splitlines()
+              assert result[-1] == marker, result
+          source = root / "missing-semicolon.bhash"
+          line = "    लिखो(१)"
+          source.write_text(f"फलन मुख्य() -> शून्य {{\n{line}\n}}\n", encoding="utf-8")
+          failure = subprocess.run(compiler + ["parse", str(source)], capture_output=True)
+          assert failure.returncode == 1 and f"missing-semicolon.bhash:2:{len(line) + 1}: [BH1001]".encode() in failure.stderr, failure.stderr
+          PY
+          python -m pip install release/bhash_jupyter-0.1.9-py3-none-any.whl
+          mkdir -p target
+          python -m bhash_jupyter.install --notebook target/hindi-starter.ipynb
+          cmp target/hindi-starter.ipynb release/hindi-starter.ipynb
+          python editors/jupyter/test_kernel.py --installed --notebook target/hindi-starter.ipynb
+
+  publish:
+    if: github.event.pull_request.merged
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: bhash-0.25.2-release
+          path: release
+      - name: Publish versioned GitHub releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          (
+            cd release
+            sha256sum -c bhash-compiler-0.25.2.jar.sha256
+            sha256sum -c bhash-vscode-0.25.2.vsix.sha256
+            sha256sum -c SHA256SUMS
+          )
+          gh release create bhash-0.25.2 --target "$GITHUB_SHA" --latest --title "Bhash compiler 0.25.2" --notes "Download the shaded compiler JAR and its SHA-256 checksum. Run it with a full JDK 17 or newer. Preserves variable locations for Android native source debugging. See the [command-line guide](https://github.com/bhashitva/bhash/blob/$GITHUB_SHA/docs/cli.md)." release/bhash-compiler-0.25.2.jar release/bhash-compiler-0.25.2.jar.sha256
+          gh release create vscode-0.25.2 --target "$GITHUB_SHA" --latest=false --title "Bhash VS Code extension 0.25.2" --notes "Bundles the same Bhash 0.25.2 compiler as the standalone release. See the [changelog](https://github.com/bhashitva/bhash/blob/$GITHUB_SHA/editors/vscode/CHANGELOG.md)." release/bhash-vscode-0.25.2.vsix release/bhash-vscode-0.25.2.vsix.sha256
+          gh release create jupyter-0.1.9 --target "$GITHUB_SHA" --latest=false --title "Bhash Jupyter kernel 0.1.9" --notes-file editors/jupyter/RELEASE.md release/bhash_jupyter-0.1.9-py3-none-any.whl release/SHA256SUMS release/hindi-starter.ipynb

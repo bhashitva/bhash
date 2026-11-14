@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.2
+
+- Bundle Bhash compiler 0.25.2 with Android native variable debug information.
+
 ## 0.24.2
 
 - Bundle the native HTTP runtime fix for restarting on the same port on Linux and macOS.
