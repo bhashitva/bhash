@@ -7,6 +7,9 @@ on:
       - 'docs/identifier-profile.json'
       - 'docs/identifier-profile-baseline.g4'
       - 'editors/jupyter/**'
+      - 'scripts/package_jupyter.py'
+      - 'src/test/resources/mysql/**'
+      - '.github/workflows/jupyter.yml'
       - '!**/*.md'
   push:
     branches: [main]
@@ -35,3 +38,56 @@ jobs:
       - run: mvn --batch-mode --no-transfer-progress package -DskipTests
       - run: python -m pip install ./editors/jupyter
       - run: python editors/jupyter/test_kernel.py target/bhash-compiler-0.1.0-SNAPSHOT.jar --notebook editors/jupyter/पहली-नोटबुक.ipynb
+
+  mysql:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: bhash
+          MYSQL_USER: bhash
+          MYSQL_PASSWORD: ci-user-only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      JUPYTER_DATA_DIR: ${{ github.workspace }}/target/jupyter-user
+      BHASH_MYSQL_PASSWORD: ci-user-only
+      BHASH_MYSQL_TLS: disable
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - run: mvn --batch-mode --no-transfer-progress dependency:copy -Dartifact=com.mysql:mysql-connector-j:9.3.0 -DoutputDirectory=target/mysql-driver
+      - name: Package and install the wheel
+        run: |
+          python -m pip install build
+          python scripts/package_jupyter.py
+          python -m pip install target/jupyter-dist/*.whl
+          python -m bhash_jupyter.install --mysql-driver "target/mysql-driver/mysql-connector-j-9.3.0.jar" --notebook target/jupyter-dist/hindi-starter.ipynb
+      - name: Run Jupyter cells against MySQL 8.4
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+        run: |
+          docker exec -e MYSQL_PWD="$BHASH_MYSQL_PASSWORD" "$MYSQL_CONTAINER" \
+            mysql -h127.0.0.1 -ubhash bhash -e 'CREATE TABLE items (id BIGINT PRIMARY KEY, body VARCHAR(200) CHARACTER SET utf8mb4, payload VARBINARY(32), extra INT NULL) ENGINE=InnoDB'
+          python editors/jupyter/test_kernel.py --installed --notebook target/jupyter-dist/hindi-starter.ipynb --mysql
+      - name: Save tested release files
+        run: |
+          cd target/jupyter-dist
+          sha256sum *.whl hindi-starter.ipynb > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jupyter-mysql-wheel
+          path: target/jupyter-dist/
