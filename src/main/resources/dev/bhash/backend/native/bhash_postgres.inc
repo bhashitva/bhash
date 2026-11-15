@@ -92,13 +92,27 @@ static const char *pg_kind(unsigned int oid){switch(oid){case 20:case 21:case 23
 static const char *pg_cell(pg_statement *s,uint64_t at,const char *want,const void *location){int col=pg_column(s,at,location);if(s->state!=1)runtime_error(location,"PostgreSQL परिणाम की वर्तमान पंक्ति नहीं है।");if(pg_PQgetisnull(s->rows,s->row,col))runtime_error(location,"PostgreSQL स्तंभ रिक्त है।");if(strcmp(pg_kind(pg_PQftype(s->meta,col)),want))runtime_error(location,"PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");return pg_PQgetvalue(s->rows,s->row,col);}
 static uint64_t pg_text(const char *s,const void *location){if(!s)runtime_error(location,"PostgreSQL कथन असफल।");size_t n=strlen(s);if(!valid_utf8((const unsigned char*)s,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");void *value=new_text(n,location);memcpy(text_data(value),s,n);return pointer_bits(value);}
 static char *pg_copy(const char *s,size_t n,const void *location){char *p=malloc(n+1);if(!p)runtime_error(location,"स्मृति उपलब्ध नहीं है।");memcpy(p,s,n);p[n]=0;return p;}
+#ifdef __linux__
+#include "bhash_mysql.inc"
+#endif
 static uint64_t pg_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,const bh_collection_info *info,const void *location){
     (void)d;
+#ifdef __linux__
+    if(op&&a>>63)return mysql_call(op,a,b,c,info,location);
+#endif
     if(op==0){
+        void *config=bits_pointer(a);bh_instance(config,location);size_t n=text_length(config);
+        if(n>=10&&!memcmp(text_data(config),"\nmysql-v1\n",10)){
+#ifdef __linux__
+            return mysql_open((const char *)text_data(config)+10,n-10,location);
+#else
+            runtime_error(location,"नेटिव MySQL के लिए Linux लक्ष्य चाहिए।");
+#endif
+        }
         if(!pg_load())runtime_error(location,"PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।");
         pg_connection *slot=NULL;for(int i=0;i<32;i++)if(!pg_connections[i].id){slot=&pg_connections[i];break;}
         if(!slot)runtime_error(location,"बहुत अधिक खुले PostgreSQL संबंध।");
-        void *config=bits_pointer(a);bh_instance(config,location);size_t n=text_length(config);if(n>40000)runtime_error(location,"अमान्य PostgreSQL विन्यास।");
+        if(n>40000)runtime_error(location,"अमान्य PostgreSQL विन्यास।");
         char *copy=pg_copy((const char*)text_data(config),n,location);char *v[9];char *p=copy;
         for(int i=0;i<9;i++){v[i]=p;char *end=strchr(p,'\n');if(!end){free(copy);runtime_error(location,"अमान्य PostgreSQL विन्यास।");}*end=0;p=end+1;}
         if(*p){free(copy);runtime_error(location,"अमान्य PostgreSQL विन्यास।");}
