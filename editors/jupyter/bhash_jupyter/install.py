@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--compiler", type=Path, help="Override the bundled Bhash compiler JAR")
     parser.add_argument("--java", default="java", help="Java executable from a full JDK 17 or newer")
     parser.add_argument("--mysql-driver", type=Path, help="Path to a trusted MySQL Connector/J JAR")
+    parser.add_argument("--sqlserver-driver", type=Path, help="Path to a trusted Microsoft JDBC Driver JAR")
     parser.add_argument("--notebook", type=Path, help="Copy the Hindi starter notebook to this new file")
     args = parser.parse_args()
     assets = Path(__file__).resolve().parent / "assets"
@@ -21,9 +22,16 @@ def main():
     java = shutil.which(args.java)
     if not compiler.is_file() or java is None:
         parser.error("A readable compiler JAR and a Java executable are required")
-    driver = args.mysql_driver.resolve() if args.mysql_driver else None
-    if driver and (not driver.is_file() or driver.suffix.lower() != ".jar"):
-        parser.error("--mysql-driver must point to a MySQL Connector/J JAR")
+    driver_settings = []
+    for option in ("mysql_driver", "sqlserver_driver"):
+        supplied = getattr(args, option)
+        if supplied is None:
+            continue
+        driver = supplied.resolve()
+        if not driver.is_file() or driver.suffix.lower() != ".jar":
+            flag = "--" + option.replace("_", "-")
+            parser.error(f"{flag} must point to a JDBC driver JAR")
+        driver_settings.append(f"--BhashKernel.{option}={driver}")
     if args.notebook:
         try:
             notebook = (assets / "starter.ipynb").read_bytes()
@@ -37,8 +45,7 @@ def main():
         "display_name": "Bhash (भाष)",
         "language": "bhash",
     }
-    if driver:
-        spec["argv"].append("--BhashKernel.mysql_driver=" + str(driver))
+    spec["argv"].extend(driver_settings)
     with TemporaryDirectory(prefix="bhash-kernelspec-") as temporary:
         Path(temporary, "kernel.json").write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
         location = KernelSpecManager().install_kernel_spec(temporary, kernel_name="bhash", user=True)
