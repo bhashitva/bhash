@@ -16,12 +16,15 @@ MAX_FRAME = 1024 * 1024
 
 
 class Worker:
-    def __init__(self, java, compiler):
+    def __init__(self, java, compiler, mysql_driver):
         self.scratch = TemporaryDirectory(prefix="bhash-worker-")
+        command = [java, "-Djava.io.tmpdir=" + self.scratch.name, "-cp", compiler,
+                   "dev.bhash.backend.jvm.NotebookWorker"]
+        if mysql_driver:
+            command.append(mysql_driver)
         try:
             self.process = subprocess.Popen(
-                [java, "-Djava.io.tmpdir=" + self.scratch.name, "-cp", compiler,
-                 "dev.bhash.backend.jvm.NotebookWorker"],
+                command,
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             )
         except BaseException:
@@ -76,6 +79,7 @@ class BhashKernel(Kernel):
     banner = "Bhash (भाष) notebook kernel"
     java = Unicode("java", config=True)
     compiler = Unicode(config=True)
+    mysql_driver = Unicode(config=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -86,7 +90,7 @@ class BhashKernel(Kernel):
         if self.worker is None:
             if not self.compiler:
                 raise OSError("Install the Bhash kernelspec with --compiler pointing to the compiler JAR")
-            self.worker = Worker(self.java, self.compiler)
+            self.worker = Worker(self.java, self.compiler, self.mysql_driver)
         return self.worker
 
     def stop_worker(self):
