@@ -12,6 +12,7 @@ Run the compiler JAR with a full JDK 17 or newer. See the [command-line guide](d
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.25.4](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.4) | 2026-11-15 15:07 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.4/bhash-compiler-0.25.4.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.4/bhash-compiler-0.25.4.jar.sha256) |
 | [0.25.3](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.3) | 2026-11-15 02:51 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.3/bhash-compiler-0.25.3.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.3/bhash-compiler-0.25.3.jar.sha256) |
 | [0.25.2](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.2) | 2026-11-14 01:11 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.2/bhash-compiler-0.25.2.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.2/bhash-compiler-0.25.2.jar.sha256) |
 | [0.25.1](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.1) | 2026-11-12 19:11 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.1/bhash-compiler-0.25.1.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.1/bhash-compiler-0.25.1.jar.sha256) |
@@ -28,6 +29,7 @@ Install or update from the [Visual Studio Marketplace](https://marketplace.visua
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.25.4](https://github.com/bhashitva/bhash/releases/tag/vscode-0.25.4) | 2026-11-15 15:07 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.4/bhash-vscode-0.25.4.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.4/bhash-vscode-0.25.4.vsix.sha256) |
 | [0.25.3](https://github.com/bhashitva/bhash/releases/tag/vscode-0.25.3) | 2026-11-15 02:51 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.3/bhash-vscode-0.25.3.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.3/bhash-vscode-0.25.3.vsix.sha256) |
 | [0.25.2](https://github.com/bhashitva/bhash/releases/tag/vscode-0.25.2) | 2026-11-14 01:12 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.2/bhash-vscode-0.25.2.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.2/bhash-vscode-0.25.2.vsix.sha256) |
 | [0.24.2](https://github.com/bhashitva/bhash/releases/tag/vscode-0.24.2) | 2026-11-12 19:19 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.24.2/bhash-vscode-0.24.2.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.24.2/bhash-vscode-0.24.2.vsix.sha256) |
@@ -72,6 +74,7 @@ Read the [online edition](book/README.md), download the PDF, or get the companio
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [1.3.1](https://github.com/bhashitva/bhash/releases/tag/book-hi-1.3.1) | 2026-11-15 15:10 | [PDF](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.1/bhash-book-1.3.1-hi.pdf) · [Offline ZIP](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.1/bhash-book-1.3.1-hi-offline.zip) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.1/SHA256SUMS) |
 | [1.3.0](https://github.com/bhashitva/bhash/releases/tag/book-hi-1.3.0) | 2026-11-09 03:04 | [PDF](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.0/bhash-book-1.3.0-hi.pdf) · [Offline ZIP](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.0/bhash-book-1.3.0-hi-offline.zip) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.0/SHA256SUMS) |
 | [1.2.0](https://github.com/bhashitva/bhash/releases/tag/book-hi-1.2.0) | 2026-11-07 22:27 | [PDF](https://github.com/bhashitva/bhash/releases/download/book-hi-1.2.0/bhash-book-1.2.0-hi.pdf) · [Offline ZIP](https://github.com/bhashitva/bhash/releases/download/book-hi-1.2.0/bhash-book-1.2.0-hi-offline.zip) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/book-hi-1.2.0/SHA256SUMS) |
 | [1.1.0](https://github.com/bhashitva/bhash/releases/tag/book-hi-1.1.0) | 2026-11-06 03:02 | [PDF](https://github.com/bhashitva/bhash/releases/download/book-hi-1.1.0/bhash-book-1.1.0-hi.pdf) · [Offline ZIP](https://github.com/bhashitva/bhash/releases/download/book-hi-1.1.0/bhash-book-1.1.0-hi-offline.zip) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/book-hi-1.1.0/SHA256SUMS) |

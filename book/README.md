@@ -12,8 +12,8 @@
 
 ## ऑफ़लाइन संस्करण
 
-- [हिन्दी पुस्तक डाउनलोड करें (PDF)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.0/bhash-book-1.3.0-hi.pdf)
-- [ट्यूटोरियल, उदाहरण और नोटबुक डाउनलोड करें (ZIP)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.0/bhash-book-1.3.0-hi-offline.zip)
+- [हिन्दी पुस्तक डाउनलोड करें (PDF)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.1/bhash-book-1.3.1-hi.pdf)
+- [ट्यूटोरियल, उदाहरण और नोटबुक डाउनलोड करें (ZIP)](https://github.com/bhashitva/bhash/releases/download/book-hi-1.3.1/bhash-book-1.3.1-hi-offline.zip)
 
 PDF में अध्यायों के साथ उनके संदर्भ, हिन्दी API संदर्भ, ट्यूटोरियल और पूरे कोड उदाहरण हैं।
 अध्यायों के लिंक सीधे परिशिष्ट में सही अनुभाग या फ़ाइल पर ले जाते हैं।
