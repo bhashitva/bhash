@@ -162,3 +162,50 @@ truststore में उसका प्रमाणपत्र रखें।
 `पाठलो(०)` परिणाम का पहला स्तंभ पढ़ता है। सेल में ही संबंध और कथन बंद
 होते हैं। [MySQL अभ्यास](../../tutorial/database-providers/mysql.md) में
 लेनदेन सहेजने और वापस लेने के उदाहरण हैं।
+
+
+## Jupyter में SQL Server 2022
+
+[Microsoft JDBC Driver for SQL Server](https://learn.microsoft.com/sql/connect/jdbc/download-microsoft-jdbc-driver-for-sql-server)
+का विश्वसनीय `jre11` JAR डाउनलोड करें। Jupyter वाले Python परिवेश में
+दोबारा कर्नेल पंजीकृत करें। MySQL भी उपयोग करते हों तो इसी कमांड में
+`--mysql-driver` और उसका JAR पथ भी दें।
+
+```sh
+python -m bhash_jupyter.install --sqlserver-driver "/path/to/mssql-jdbc-12.10.2.jre11.jar"
+```
+
+Jupyter शुरू करने से पहले उसके परिवेश में `BHASH_SQLSERVER_URL` को
+Microsoft JDBC संबंधपाठ दें। अपना मेज़बान, डेटाबेस और उपयोगकर्ता भरें।
+गुप्तशब्द सहित संबंधपाठ नोटबुक, लॉग या Git में न रखें।
+सर्वर का प्रमाणपत्र Java के विश्वसनीय प्रमाणपत्र भंडार में होना चाहिए।
+
+```text
+jdbc:sqlserver://sql.example.org:1433;databaseName=school;user=school_app;password={replace-me};encrypt=true;trustServerCertificate=false
+```
+
+Jupyter फिर शुरू करें, **Bhash (भाष)** कर्नेल चुनें और यह सेल चलाएँ।
+
+```bhash
+आयात मानक.डेटा;
+आयात मानक.डेटासंबंध;
+आयात मानक.डेटाकथन;
+आयात मानक.विन्यास;
+
+{
+    स्थिर पता: पाठ = विन्यास.परिवेश("BHASH_SQLSERVER_URL", "");
+    संसाधन (ड: डेटासंबंध = डेटा.एसक्यूएलसर्वर(पता)) {
+        संसाधन (क: डेटाकथन = ड.तैयार("SELECT CAST(? AS NVARCHAR(120)) AS संदेश")) {
+            क.पाठरखो(१, "नमस्ते, SQL Server!");
+            यदि (क.अगला()) { लिखो(क.पाठलो(०)); }
+        }
+    }
+}
+```
+
+`?` पहले मापदंड की जगह रखता है। `पाठरखो` उसका मान भेजता है और
+`पाठलो(०)` पहली पंक्ति का पहला स्तंभ पढ़ता है। बदलाव करने के लिए
+`डेटालेनदेन` को `संसाधन` में खोलें और बदलाव रखने के लिए `सहेजो()`
+चलाएँ। उसके बिना दायरा बंद होने पर बदलाव वापस हो जाते हैं।
+[SQL Server का पूरा हिन्दी अभ्यास](../../tutorial/database-providers/sqlserver.md)
+में चालक, संबंधपाठ और ORM की जानकारी है।

@@ -180,6 +180,43 @@ def test_ordered_bindings(run):
     run("मिला", expected="७")
 
 
+def test_sqlserver(client):
+    execute(client, """आयात मानक.डेटा;
+आयात मानक.डेटासंबंध;
+आयात मानक.डेटाकथन;
+आयात मानक.डेटालेनदेन;
+आयात मानक.परीक्षण;
+आयात मानक.विन्यास;
+स्थिर संबंधपाठ: पाठ = विन्यास.परिवेश("BHASH_SQLSERVER_URL", "");
+स्थिर नमूना: पाठ = "कक्षा 😀 ' ? ;";
+""")
+    execute(client, """संसाधन (ड: डेटासंबंध = डेटा.एसक्यूएलसर्वर(संबंधपाठ)) {
+    संसाधन (ल: डेटालेनदेन = ड.लेनदेन()) {
+        संसाधन (क: डेटाकथन = ड.तैयार("INSERT INTO dbo.gradelevel (id, name) VALUES (?, ?)")) {
+            परीक्षण.बराबर(२, क.बंधनसंख्या());
+            क.पूर्णांकरखो(१, ९९);
+            क.पाठरखो(२, नमूना);
+            परीक्षण.बराबर(१, क.चलाओ());
+        }
+        संसाधन (क: डेटाकथन = ड.तैयार("SELECT name FROM dbo.gradelevel WHERE id=?")) {
+            क.पूर्णांकरखो(१, ९९);
+            परीक्षण.सत्यहै(क.अगला(), "लेनदेन में लिखी पंक्ति मिली।");
+            परीक्षण.बराबर(नमूना, क.पाठलो(०));
+            परीक्षण.सत्यहै(!क.अगला(), "एक ही पंक्ति मिली।");
+        }
+    }
+}
+""")
+    execute(client, """संसाधन (ड: डेटासंबंध = डेटा.एसक्यूएलसर्वर(संबंधपाठ)) {
+    संसाधन (क: डेटाकथन = ड.तैयार("SELECT name FROM dbo.gradelevel WHERE id=?")) {
+        क.पूर्णांकरखो(१, ९९);
+        परीक्षण.सत्यहै(!क.अगला(), "नए संबंध में पंक्ति नहीं है।");
+    }
+}
+लिखो("SQLSERVER_JUPYTER_OK");
+""", streams="SQLSERVER_JUPYTER_OK\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("compiler", type=Path, nargs="?")
@@ -187,7 +224,10 @@ def main():
     parser.add_argument("--notebook", type=Path, help="Also execute the Hindi starter notebook")
     parser.add_argument("--java", default="java")
     parser.add_argument("--mysql", action="store_true", help="Exercise MySQL with the installed kernelspec and fixture")
+    parser.add_argument("--sqlserver", action="store_true", help="Exercise SQL Server with the installed kernelspec and fixture")
     args = parser.parse_args()
+    if args.sqlserver and not args.installed:
+        parser.error("--sqlserver requires an installed kernelspec configured with --sqlserver-driver")
     if args.mysql and not args.installed:
         parser.error("--mysql requires an installed kernelspec configured with --mysql-driver")
     if args.installed == (args.compiler is not None):
@@ -266,6 +306,9 @@ def main():
                 source = example.read_text(encoding="utf-8")
                 execute(client, source.replace("फलन मुख्य()", "फलन माईएसक्यूएलपरीक्षण()", 1))
                 execute(client, "माईएसक्यूएलपरीक्षण();", streams="MYSQL_OK\n")
+            if args.sqlserver:
+                test_sqlserver(client)
+                print("SQL Server 2022 Jupyter parameter binding and rollback passed")
         finally:
             client.stop_channels()
             manager.shutdown_kernel()
