@@ -57,9 +57,11 @@ jobs:
       - name: Install MySqlConnector and runtime dependencies
         if: matrix.target == 'clr'
         run: |
-          dotnet new classlib -o target/mysql-driver-project --no-restore
-          dotnet add target/mysql-driver-project package MySqlConnector --version 2.4.0
+          dotnet new console -o target/mysql-driver-project --no-restore
+          dotnet add target/mysql-driver-project package MySqlConnector --version 2.6.2
           dotnet publish target/mysql-driver-project -o target/mysql-driver
+          test -f target/mysql-driver/MySqlConnector.dll
+          test -f target/mysql-driver/Microsoft.Extensions.Logging.Abstractions.dll
           echo "BHASH_MYSQL_DOTNET_DRIVER=$PWD/target/mysql-driver/MySqlConnector.dll" >> "$GITHUB_ENV"
       - name: Test Bhash against MySQL
         env:
