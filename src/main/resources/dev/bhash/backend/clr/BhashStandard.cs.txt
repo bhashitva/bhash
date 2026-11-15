@@ -890,6 +890,7 @@ internal static class BhashStandard {
     private static IntPtr pgChecked(PgConnection c,IntPtr r){if(r==IntPtr.Zero||PgNative.PQresultStatus(r)!=1&&PgNative.PQresultStatus(r)!=2)throw pgFailure(c,r);return r;}
     private static string pgQuote(string s)=>"'"+s.Replace("\\","\\\\").Replace("'","\\'")+"'";
     internal static long pgOpen(string config){
+        if(config?.StartsWith("\nmysql-v1\n",StringComparison.Ordinal)==true)return BhashMysql.Open(config);
         PgNative.Load();if(pgConnections.Count>=32)throw failure("बहुत अधिक खुले PostgreSQL संबंध।");
         string[] a=config.Split('\n');if(a.Length!=10)throw failure("अमान्य PostgreSQL विन्यास।");
         string options="-c statement_timeout="+a[8]+" -c lock_timeout="+a[8]+" -c timezone=UTC -c datestyle=ISO -c standard_conforming_strings=on -c bytea_output=hex";
@@ -910,22 +911,22 @@ internal static class BhashStandard {
     private static string pgCell(PgStatement s,long i,string kind){int n=pgColumn(s,i);if(s.state!=1)throw failure("PostgreSQL परिणाम की वर्तमान पंक्ति नहीं है।");if(PgNative.PQgetisnull(s.rows,s.row,n)!=0)throw failure("PostgreSQL स्तंभ रिक्त है।");if(pgKind(PgNative.PQftype(s.meta,n))!=kind)throw failure("PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");return pgString(PgNative.PQgetvalue(s.rows,s.row,n));}
     private static void pgRowsClear(PgStatement s,int state){if(s.rows!=IntPtr.Zero)PgNative.PQclear(s.rows);s.rows=IntPtr.Zero;s.row=-1;s.state=state;}
     private static void pgDispose(PgStatement s){pgRowsClear(s,0);if(s.meta!=IntPtr.Zero)PgNative.PQclear(s.meta);s.meta=IntPtr.Zero;}
-    internal static long pgPrepare(long id,string original,string converted){var c=pgConnection(id);pgHealthy(c);if(pgStatements.Count>=128)throw failure("बहुत अधिक खुले PostgreSQL कथन।");
+    internal static long pgPrepare(long id,string original,string converted){if(id<0)return BhashMysql.Prepare(id,original);var c=pgConnection(id);pgHealthy(c);if(pgStatements.Count>=128)throw failure("बहुत अधिक खुले PostgreSQL कथन।");
         var sql=pgUtf8(converted);IntPtr r=pgChecked(c,PgNative.PQprepare(c.db,pgUtf8(""),sql,0,IntPtr.Zero));PgNative.PQclear(r);
         r=pgChecked(c,PgNative.PQdescribePrepared(c.db,pgUtf8("")));int n=PgNative.PQnparams(r);
         if(n>999||PgNative.PQnfields(r)>256){PgNative.PQclear(r);throw failure("PostgreSQL परिणाम या मापदंड सीमा से बाहर है।");}
         long key=++pgStatementNext;pgStatements.Add(key,new PgStatement{owner=c,sql=sql,meta=r,values=new string[n],bound=new bool[n]});return key;
     }
-    internal static void pgClose(long id){if(!pgConnections.Remove(id,out var c))return;foreach(var item in new List<KeyValuePair<long,PgStatement>>(pgStatements))if(item.Value.owner==c){pgStatements.Remove(item.Key);pgDispose(item.Value);}PgNative.PQfinish(c.db);}
-    internal static void pgFinalize(long id){if(pgStatements.Remove(id,out var s))pgDispose(s);}
-    internal static long pgParameterCount(long id)=>pgStatement(id).bound.Length;
+    internal static void pgClose(long id){if(id<0){BhashMysql.Close(id);return;}if(!pgConnections.Remove(id,out var c))return;foreach(var item in new List<KeyValuePair<long,PgStatement>>(pgStatements))if(item.Value.owner==c){pgStatements.Remove(item.Key);pgDispose(item.Value);}PgNative.PQfinish(c.db);}
+    internal static void pgFinalize(long id){if(id<0){BhashMysql.Finalize(id);return;}if(pgStatements.Remove(id,out var s))pgDispose(s);}
+    internal static long pgParameterCount(long id){if(id<0)return BhashMysql.ParameterCount(id);return pgStatement(id).bound.Length;}
     private static void pgBind(long id,long index,string value){var s=pgStatement(id);int i=pgBinding(s,index);s.values[i]=value;s.bound[i]=true;}
-    internal static void pgBindInt(long id,long i,long v)=>pgBind(id,i,v.ToString(CultureInfo.InvariantCulture));
-    internal static void pgBindReal(long id,long i,double v){if(!double.IsFinite(v))throw failure("PostgreSQL दशमलव सीमित नहीं है।");pgBind(id,i,v.ToString("G17",CultureInfo.InvariantCulture));}
-    internal static void pgBindBool(long id,long i,bool v)=>pgBind(id,i,v?"true":"false");
-    internal static void pgBindText(long id,long i,string v){BhashRuntime.instance(v);if(v.IndexOf('\0')>=0||Encoding.UTF8.GetByteCount(v)>8388608)throw failure("अमान्य PostgreSQL पाठ।");pgBind(id,i,v);}
-    internal static void pgBindBytes(long id,long i,BhashRuntime.BBuffer v){BhashRuntime.instance(v);if(v.size()>8388608)throw failure("PostgreSQL मान सीमा से बाहर है।");var t=new StringBuilder("\\x");for(long k=0;k<v.size();k++)t.Append(((byte)v.get(k)).ToString("x2",CultureInfo.InvariantCulture));pgBind(id,i,t.ToString());}
-    internal static void pgBindNull(long id,long i)=>pgBind(id,i,null);
+    internal static void pgBindInt(long id,long i,long v){if(id<0){BhashMysql.Bind(id,i,v);return;}pgBind(id,i,v.ToString(CultureInfo.InvariantCulture));}
+    internal static void pgBindReal(long id,long i,double v){if(id<0){BhashMysql.Bind(id,i,v);return;}if(!double.IsFinite(v))throw failure("PostgreSQL दशमलव सीमित नहीं है।");pgBind(id,i,v.ToString("G17",CultureInfo.InvariantCulture));}
+    internal static void pgBindBool(long id,long i,bool v){if(id<0){BhashMysql.Bind(id,i,v);return;}pgBind(id,i,v?"true":"false");}
+    internal static void pgBindText(long id,long i,string v){BhashRuntime.instance(v);if(id<0){BhashMysql.Bind(id,i,v);return;}if(v.IndexOf('\0')>=0||Encoding.UTF8.GetByteCount(v)>8388608)throw failure("अमान्य PostgreSQL पाठ।");pgBind(id,i,v);}
+    internal static void pgBindBytes(long id,long i,BhashRuntime.BBuffer v){BhashRuntime.instance(v);if(id<0){BhashMysql.Bind(id,i,v);return;}if(v.size()>8388608)throw failure("PostgreSQL मान सीमा से बाहर है।");var t=new StringBuilder("\\x");for(long k=0;k<v.size();k++)t.Append(((byte)v.get(k)).ToString("x2",CultureInfo.InvariantCulture));pgBind(id,i,t.ToString());}
+    internal static void pgBindNull(long id,long i){if(id<0){BhashMysql.Bind(id,i,null);return;}pgBind(id,i,null);}
     private static void pgExecuteStart(PgStatement s){
         foreach(bool b in s.bound)if(!b)throw failure("सभी PostgreSQL मापदंड बाँधें।");
         var values=new IntPtr[s.values.Length];try{
@@ -934,22 +935,22 @@ internal static class BhashStandard {
             if(r==IntPtr.Zero||PgNative.PQresultStatus(r)!=1&&PgNative.PQresultStatus(r)!=2){s.state=3;throw pgFailure(s.owner,r);}s.rows=r;
         }finally{foreach(IntPtr p in values)if(p!=IntPtr.Zero)System.Runtime.InteropServices.Marshal.FreeCoTaskMem(p);}
     }
-    internal static long pgExecute(long id){var s=pgStatement(id);pgHealthy(s.owner);pgReady(s);if(PgNative.PQnfields(s.meta)!=0)throw failure("PostgreSQL पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");pgExecuteStart(s);string count=pgString(PgNative.PQcmdTuples(s.rows));long n=count.Length==0?0:long.Parse(count,CultureInfo.InvariantCulture);pgRowsClear(s,2);return n;}
-    internal static bool pgNext(long id){var s=pgStatement(id);pgHealthy(s.owner);if(s.state==2)return false;if(s.state==3)throw failure("PostgreSQL कथन को रीसेट करें।");if(PgNative.PQnfields(s.meta)==0)throw failure("PostgreSQL बदलाव के लिए चलाओ उपयोग करें।");if(s.state==0)pgExecuteStart(s);
+    internal static long pgExecute(long id){if(id<0)return BhashMysql.Execute(id);var s=pgStatement(id);pgHealthy(s.owner);pgReady(s);if(PgNative.PQnfields(s.meta)!=0)throw failure("PostgreSQL पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");pgExecuteStart(s);string count=pgString(PgNative.PQcmdTuples(s.rows));long n=count.Length==0?0:long.Parse(count,CultureInfo.InvariantCulture);pgRowsClear(s,2);return n;}
+    internal static bool pgNext(long id){if(id<0)return BhashMysql.Next(id);var s=pgStatement(id);pgHealthy(s.owner);if(s.state==2)return false;if(s.state==3)throw failure("PostgreSQL कथन को रीसेट करें।");if(PgNative.PQnfields(s.meta)==0)throw failure("PostgreSQL बदलाव के लिए चलाओ उपयोग करें।");if(s.state==0)pgExecuteStart(s);
         s.row++;if(s.row>=PgNative.PQntuples(s.rows)){pgRowsClear(s,2);return false;}
         long bytes=0;for(int i=0;i<PgNative.PQnfields(s.rows);i++){uint oid=PgNative.PQftype(s.rows,i);long n=PgNative.PQgetlength(s.rows,s.row,i);if(oid==17)bytes+=n>=2?(n-2)/2:0;else if(oid!=20&&oid!=21&&oid!=23&&oid!=700&&oid!=701&&oid!=16)bytes+=n;}if(bytes>8388608){pgRowsClear(s,3);throw failure("PostgreSQL पंक्ति सीमा से बाहर है।");}s.state=1;return true;}
-    internal static void pgReset(long id)=>pgRowsClear(pgStatement(id),0);
-    internal static void pgClear(long id){var s=pgStatement(id);pgReady(s);Array.Clear(s.values);Array.Clear(s.bound);}
-    internal static long pgColumns(long id)=>PgNative.PQnfields(pgStatement(id).meta);
-    internal static string pgName(long id,long i){var s=pgStatement(id);return pgString(PgNative.PQfname(s.meta,pgColumn(s,i)));}
-    internal static string pgType(long id,long i){var s=pgStatement(id);int n=pgColumn(s,i);if(s.state!=1)throw failure("PostgreSQL परिणाम की वर्तमान पंक्ति नहीं है।");return PgNative.PQgetisnull(s.rows,s.row,n)!=0?"रिक्त":pgKind(PgNative.PQftype(s.meta,n));}
+    internal static void pgReset(long id){if(id<0){BhashMysql.Reset(id);return;}pgRowsClear(pgStatement(id),0);}
+    internal static void pgClear(long id){if(id<0){BhashMysql.Clear(id);return;}var s=pgStatement(id);pgReady(s);Array.Clear(s.values);Array.Clear(s.bound);}
+    internal static long pgColumns(long id){if(id<0)return BhashMysql.Columns(id);return PgNative.PQnfields(pgStatement(id).meta);}
+    internal static string pgName(long id,long i){if(id<0)return BhashMysql.Name(id,i);var s=pgStatement(id);return pgString(PgNative.PQfname(s.meta,pgColumn(s,i)));}
+    internal static string pgType(long id,long i){if(id<0)return BhashMysql.TypeOf(id,i);var s=pgStatement(id);int n=pgColumn(s,i);if(s.state!=1)throw failure("PostgreSQL परिणाम की वर्तमान पंक्ति नहीं है।");return PgNative.PQgetisnull(s.rows,s.row,n)!=0?"रिक्त":pgKind(PgNative.PQftype(s.meta,n));}
     internal static bool pgIsNull(long id,long i)=>pgType(id,i)=="रिक्त";
-    internal static long pgInteger(long id,long i){var s=pgStatement(id);if(!long.TryParse(pgCell(s,i,"पूर्णांक"),NumberStyles.AllowLeadingSign,CultureInfo.InvariantCulture,out long v))throw failure("PostgreSQL पूर्णांक सीमा से बाहर है।");return v;}
-    internal static double pgReal(long id,long i){var s=pgStatement(id);if(!double.TryParse(pgCell(s,i,"दशमलव"),NumberStyles.Float,CultureInfo.InvariantCulture,out double v)||!double.IsFinite(v))throw failure("PostgreSQL दशमलव सीमित नहीं है।");return v;}
-    internal static bool pgBool(long id,long i)=>pgCell(pgStatement(id),i,"तार्किक")=="t";
-    internal static string pgText(long id,long i){var s=pgStatement(id);string kind=pgKind(PgNative.PQftype(s.meta,pgColumn(s,i)));if(kind!="पाठ"&&kind!="सटीकदशमलव"&&kind!="समय")throw failure("PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");return pgCell(s,i,kind);}
-    internal static BhashRuntime.BBuffer pgBytes(long id,long i){string hex=pgCell(pgStatement(id),i,"बाइटबफ़र");if(!hex.StartsWith("\\x",StringComparison.Ordinal)||hex.Length%2!=0)throw failure("अमान्य PostgreSQL बाइटबफ़र।");byte[] bytes;try{bytes=Convert.FromHexString(hex.Substring(2));}catch(FormatException){throw failure("अमान्य PostgreSQL बाइटबफ़र।");}var b=new BhashRuntime.BBuffer(bytes.Length);for(int k=0;k<bytes.Length;k++)b.set(k,bytes[k]);return b;}
-    internal static long pgTransaction(long id,long token,long op){if(!pgConnections.TryGetValue(id,out var c)){if(op==3)return 0;throw failure("PostgreSQL संबंध बंद है।");}if(op==3&&c.transaction!=token)return 0;
+    internal static long pgInteger(long id,long i){if(id<0)return Convert.ToInt64(BhashMysql.Cell(id,i,"पूर्णांक"),CultureInfo.InvariantCulture);var s=pgStatement(id);if(!long.TryParse(pgCell(s,i,"पूर्णांक"),NumberStyles.AllowLeadingSign,CultureInfo.InvariantCulture,out long v))throw failure("PostgreSQL पूर्णांक सीमा से बाहर है।");return v;}
+    internal static double pgReal(long id,long i){if(id<0)return Convert.ToDouble(BhashMysql.Cell(id,i,"दशमलव"),CultureInfo.InvariantCulture);var s=pgStatement(id);if(!double.TryParse(pgCell(s,i,"दशमलव"),NumberStyles.Float,CultureInfo.InvariantCulture,out double v)||!double.IsFinite(v))throw failure("PostgreSQL दशमलव सीमित नहीं है।");return v;}
+    internal static bool pgBool(long id,long i){if(id<0)return Convert.ToBoolean(BhashMysql.Cell(id,i,"तार्किक"),CultureInfo.InvariantCulture);return pgCell(pgStatement(id),i,"तार्किक")=="t";}
+    internal static string pgText(long id,long i){if(id<0)return (string)BhashMysql.Cell(id,i,"पाठ","सटीकदशमलव","समय");var s=pgStatement(id);string kind=pgKind(PgNative.PQftype(s.meta,pgColumn(s,i)));if(kind!="पाठ"&&kind!="सटीकदशमलव"&&kind!="समय")throw failure("PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");return pgCell(s,i,kind);}
+    internal static BhashRuntime.BBuffer pgBytes(long id,long i){if(id<0)return BhashMysql.Bytes(id,i);string hex=pgCell(pgStatement(id),i,"बाइटबफ़र");if(!hex.StartsWith("\\x",StringComparison.Ordinal)||hex.Length%2!=0)throw failure("अमान्य PostgreSQL बाइटबफ़र।");byte[] bytes;try{bytes=Convert.FromHexString(hex.Substring(2));}catch(FormatException){throw failure("अमान्य PostgreSQL बाइटबफ़र।");}var b=new BhashRuntime.BBuffer(bytes.Length);for(int k=0;k<bytes.Length;k++)b.set(k,bytes[k]);return b;}
+    internal static long pgTransaction(long id,long token,long op){if(id<0)return BhashMysql.Transaction(id,token,op);if(!pgConnections.TryGetValue(id,out var c)){if(op==3)return 0;throw failure("PostgreSQL संबंध बंद है।");}if(op==3&&c.transaction!=token)return 0;
         if(op==0&&c.transaction!=0||op!=0&&(token==0||token!=c.transaction))throw failure("PostgreSQL लेनदेन सक्रिय नहीं है।");if(op==1)pgHealthy(c);
         IntPtr r=pgChecked(c,PgNative.PQexec(c.db,pgUtf8(op==0?"BEGIN":op==1?"COMMIT":"ROLLBACK")));PgNative.PQclear(r);
         foreach(var s in pgStatements.Values)if(s.owner==c&&s.state!=0)pgRowsClear(s,3);c.failed=false;c.transaction=op==0?++pgTransactionNext:0;return c.transaction;
