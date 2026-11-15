@@ -21,9 +21,6 @@ jobs:
           ACCEPT_EULA: 'Y'
           MSSQL_SA_PASSWORD: 'BhashCi-Only2026!'
         ports: ['1433:1433']
-        options: >-
-          --health-cmd 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -Q "SELECT 1"'
-          --health-interval 5s --health-timeout 5s --health-retries 24
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -43,6 +40,12 @@ jobs:
           SQLSERVER_CONTAINER: ${{ job.services.sqlserver.id }}
           SQLCMDPASSWORD: 'BhashCi-Only2026!'
         run: |
+          sqlcmd=(docker exec -e SQLCMDPASSWORD "$SQLSERVER_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b)
+          for attempt in {1..24}; do
+            if "${sqlcmd[@]}" -Q 'SELECT 1' >/dev/null 2>&1; then break; fi
+            if [[ "$attempt" == 24 ]]; then docker logs "$SQLSERVER_CONTAINER"; exit 1; fi
+            sleep 3
+          done
           docker exec -i -e SQLCMDPASSWORD "$SQLSERVER_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b < src/test/resources/sqlserver/schema.sql
           cp -r src/test/resources/sqlserver target/sqlserver-integration
           python scripts/generate_orm.py target/sqlserver-integration/mapping.json --output target/sqlserver-integration/src/generated.bhash
