@@ -186,7 +186,10 @@ def main():
     parser.add_argument("--installed", action="store_true", help="Use the installed bhash kernelspec")
     parser.add_argument("--notebook", type=Path, help="Also execute the Hindi starter notebook")
     parser.add_argument("--java", default="java")
+    parser.add_argument("--mysql", action="store_true", help="Exercise MySQL with the installed kernelspec and fixture")
     args = parser.parse_args()
+    if args.mysql and not args.installed:
+        parser.error("--mysql requires an installed kernelspec configured with --mysql-driver")
     if args.installed == (args.compiler is not None):
         parser.error("Provide either a compiler JAR or --installed")
     with TemporaryDirectory(prefix="bhash-kernel-test-") as temporary:
@@ -258,6 +261,11 @@ def main():
                 assert len(code) == 4
                 for source, expected in zip(code, [None, "२", None, "४"]):
                     execute(client, source, expected=expected)
+            if args.mysql:
+                example = Path(__file__).resolve().parents[2] / "src/test/resources/mysql/integration.bhash"
+                source = example.read_text(encoding="utf-8")
+                execute(client, source.replace("फलन मुख्य()", "फलन माईएसक्यूएलपरीक्षण()", 1))
+                execute(client, "माईएसक्यूएलपरीक्षण();", streams="MYSQL_OK\n")
         finally:
             client.stop_channels()
             manager.shutdown_kernel()
