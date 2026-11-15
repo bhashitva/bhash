@@ -1,10 +1,12 @@
-Version 0.1.9 bundles the Bhash 0.25.2 compiler. The installed wheel is tested with the Hindi starter notebook on Linux, Windows, and macOS.
+Version 0.1.10 adds MySQL 8.4 access to Bhash notebooks. Supply a trusted Connector/J JAR with `--mysql-driver` when registering the kernel. See the [Hindi setup and query example](https://github.com/bhashitva/bhash/blob/jupyter-0.1.10/editors/jupyter/README.md#jupyter-में-mysql-84).
 
 Install or upgrade in the Python environment where you run Jupyter. The wheel includes the compiler and needs a full JDK 17 or newer.
 
 ```sh
-python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.9/bhash_jupyter-0.1.9-py3-none-any.whl"
+python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.10/bhash_jupyter-0.1.10-py3-none-any.whl"
 python -m bhash_jupyter.install
+# For MySQL, register with the driver instead:
+# python -m bhash_jupyter.install --mysql-driver "/path/to/mysql-connector-j.jar"
 python -m pip show bhash-jupyter
 ```
 
