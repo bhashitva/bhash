@@ -258,7 +258,10 @@
         s.query.setFetchSize(c.postgres?32:0);
         for(int i=0;i<j.parameters.length;i++){
             Object v=j.parameters[i];int n=i+1;
-            if(v==null)s.query.setNull(n,java.sql.Types.NULL);
+            if(v==null) {
+                if(c.sqlServer)sqlServerBindNull(s.query,n);
+                else s.query.setNull(n,java.sql.Types.NULL);
+            }
             else if(v instanceof Long number)s.query.setLong(n,number);
             else if(v instanceof Double number)s.query.setDouble(n,number);
             else if(v instanceof Boolean flag){if(c.postgres||c.sqlServer)s.query.setBoolean(n,flag);else s.query.setLong(n,flag?1:0);}

@@ -57,6 +57,14 @@
         return new SqlServerStatement(parameters, verb.group(1).equalsIgnoreCase("SELECT"));
     }
 
+    private static void sqlServerBindNull(java.sql.PreparedStatement query, int index)
+            throws java.sql.SQLException {
+        // The Microsoft driver treats Types.NULL as VARBINARY. Ask SQL Server
+        // for the parameter's actual type so typed NULL works for numeric columns.
+        int type = query.getParameterMetaData().getParameterType(index);
+        query.setNull(index, type);
+    }
+
     private static String sqlServerKind(java.sql.ResultSetMetaData meta, int column)
             throws java.sql.SQLException {
         String type = meta.getColumnTypeName(column).toLowerCase(java.util.Locale.ROOT);

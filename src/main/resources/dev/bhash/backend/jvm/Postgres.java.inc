@@ -156,7 +156,7 @@
         if(v.indexOf(0)>=0||v.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>8388608)throw failure("अमान्य PostgreSQL पाठ।");
         try{if(s.owner.sqlServer)s.query.setNString(i,v);else if(s.owner.mysql)s.query.setString(i,v);else s.query.setObject(i,v,java.sql.Types.OTHER);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
     static void pgBindBytes(long id,long index,BhashRuntime.BBuffer v){var s=pgStatement(id);int i=pgBinding(s,index);try{s.query.setBytes(i,dbArray(v));s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
-    static void pgBindNull(long id,long index){var s=pgStatement(id);int i=pgBinding(s,index);try{s.query.setNull(i,java.sql.Types.NULL);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
+    static void pgBindNull(long id,long index){var s=pgStatement(id);int i=pgBinding(s,index);try{if(s.owner.sqlServer)sqlServerBindNull(s.query,i);else s.query.setNull(i,java.sql.Types.NULL);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
     private static void pgBound(PgStatement s){for(boolean b:s.bound)if(!b)throw failure("सभी PostgreSQL मापदंड बाँधें।");}
     private static void pgResetValue(PgStatement s,int state)throws java.sql.SQLException {if(s.rows!=null){s.rows.close();s.rows=null;}s.values=null;s.state=state;}
     static long pgExecute(long id){var s=pgStatement(id);pgHealthy(s.owner);pgReady(s);pgBound(s);
