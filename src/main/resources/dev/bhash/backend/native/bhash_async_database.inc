@@ -271,6 +271,11 @@ static uint64_t ad_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
     if(op==14){for(size_t i=0;i<128;i++)if(ad_statements[i]&&ad_statements[i]->id==a&&!ad_statements[i]->closed)return (uint64_t)ad_statements[i]->parameters;runtime_error(location,"असमकालिक डेटाकथन बंद है।");}
     if(op==0){
         if(a>9)runtime_error(location,"अमान्य असमकालिक डेटा क्रिया।");
+        if(a==1){
+            void *config=bh_instance(bits_pointer(c),location);
+            if(text_length(config)>=14&&!memcmp(text_data(config),"\nsqlserver-v1\n",14))
+                runtime_error(location,"SQL Server के लिए JVM लक्ष्य चाहिए।");
+        }
         if(a==1&&!pg_load())runtime_error(location,"PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।");
         size_t slot=0;while(slot<AD_JOBS&&ad_jobs[slot])slot++;if(slot==AD_JOBS)runtime_error(location,"असमकालिक डेटा क्षमता समाप्त।");
         ad_connection *connection=NULL;ad_statement *statement=NULL;
