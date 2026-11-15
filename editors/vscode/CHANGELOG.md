@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.4
+
+- Bundle SQL Server 2022 support on JVM with Microsoft JDBC.
+- Support prepared parameters, transactions and generated ORM repositories.
+- Link the Hindi SQL Server setup tutorial.
+
 ## 0.25.3
 
 - Bundle MySQL 8.4 support for JVM, desktop .NET, and native Linux x64.
