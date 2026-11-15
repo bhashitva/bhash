@@ -102,6 +102,8 @@ static uint64_t pg_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
 #endif
     if(op==0){
         void *config=bits_pointer(a);bh_instance(config,location);size_t n=text_length(config);
+        if(n>=14&&!memcmp(text_data(config),"\nsqlserver-v1\n",14))
+            runtime_error(location,"SQL Server के लिए JVM लक्ष्य चाहिए।");
         if(n>=10&&!memcmp(text_data(config),"\nmysql-v1\n",10)){
 #ifdef __linux__
             return mysql_open((const char *)text_data(config)+10,n-10,location);

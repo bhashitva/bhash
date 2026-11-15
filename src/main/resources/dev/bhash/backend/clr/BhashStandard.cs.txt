@@ -890,6 +890,8 @@ internal static class BhashStandard {
     private static IntPtr pgChecked(PgConnection c,IntPtr r){if(r==IntPtr.Zero||PgNative.PQresultStatus(r)!=1&&PgNative.PQresultStatus(r)!=2)throw pgFailure(c,r);return r;}
     private static string pgQuote(string s)=>"'"+s.Replace("\\","\\\\").Replace("'","\\'")+"'";
     internal static long pgOpen(string config){
+        if(config?.StartsWith("\nsqlserver-v1\n",StringComparison.Ordinal)==true)
+            throw failure("SQL Server के लिए JVM लक्ष्य चाहिए।");
         if(config?.StartsWith("\nmysql-v1\n",StringComparison.Ordinal)==true)return BhashMysql.Open(config);
         PgNative.Load();if(pgConnections.Count>=32)throw failure("बहुत अधिक खुले PostgreSQL संबंध।");
         string[] a=config.Split('\n');if(a.Length!=10)throw failure("अमान्य PostgreSQL विन्यास।");
@@ -1274,6 +1276,8 @@ internal static class BhashStandard {
         if(error!=null){if(c.Transaction)c.Failed=true;if(j.Operation==7&&(error.Contains("[08",StringComparison.Ordinal)||error.Contains("[XXXXX]",StringComparison.Ordinal)||error.Contains("[40003]",StringComparison.Ordinal)||error.Contains("[57P01]",StringComparison.Ordinal)||error.Contains("[57P02]",StringComparison.Ordinal)||error.Contains("[57P03]",StringComparison.Ordinal))){adClose(c);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");}throw new AdError(error);}
     }
     private static async System.Threading.Tasks.Task adPostgres(AdJob j){
+        if(j.Operation==1&&j.Text.StartsWith("\nsqlserver-v1\n",StringComparison.Ordinal))
+            throw new AdError("SQL Server के लिए JVM लक्ष्य चाहिए।");
         lock(adLoader){PgNative.Load();}
         if(j.Operation==1){
             string[] a=j.Text.Split('\n');if(a.Length!=10)throw new AdError("अमान्य PostgreSQL विन्यास।");

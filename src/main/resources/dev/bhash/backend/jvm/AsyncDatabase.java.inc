@@ -2,15 +2,19 @@
     // objects and detached scalars/arrays; completion publication is volatile.
     private static final class AdError extends RuntimeException {AdError(String message){super(message);}}
     private static final class AdConnection {
-        final java.sql.Connection db;final boolean postgres;boolean transaction,failed,closed,busy;
-        AdConnection(java.sql.Connection db,boolean postgres){this.db=db;this.postgres=postgres;}
+        final java.sql.Connection db;final boolean postgres,sqlServer;boolean transaction,failed,closed,busy;
+        AdConnection(java.sql.Connection db,boolean postgres,boolean sqlServer){
+            this.db=db;this.postgres=postgres;this.sqlServer=sqlServer;
+        }
     }
     private static final class AdStatement {
         final AdConnection owner;final java.sql.PreparedStatement query;final int parameters,columns;boolean closed;
-        AdStatement(AdConnection owner,java.sql.PreparedStatement query)throws java.sql.SQLException {
-            this.owner=owner;this.query=query;parameters=query.getParameterMetaData().getParameterCount();
+        AdStatement(AdConnection owner,java.sql.PreparedStatement query,SqlServerStatement sqlServer)throws java.sql.SQLException {
+            this.owner=owner;this.query=query;
+            parameters=sqlServer==null?query.getParameterMetaData().getParameterCount():sqlServer.parameters();
             if(parameters>999)throw new AdError("डेटाकथन मापदंड सीमा ९९९ है।");
-            if(owner.postgres){var meta=query.getMetaData();columns=meta==null?0:meta.getColumnCount();}
+            if(sqlServer!=null)columns=sqlServer.rows()?-1:0;
+            else if(owner.postgres){var meta=query.getMetaData();columns=meta==null?0:meta.getColumnCount();}
             else try{var field=Class.forName("org.sqlite.core.CorePreparedStatement").getDeclaredField("columnCount");field.setAccessible(true);columns=field.getInt(query);}
             catch(ReflectiveOperationException error){throw new java.sql.SQLException("SQLite column metadata unavailable",error);}
         }
@@ -38,13 +42,13 @@
         // Independent reserved control capacity: cancellation cannot queue behind its query.
         static final java.util.concurrent.ThreadPoolExecutor CONTROL=adPool(2,64,"bhash-db-control");
     }
-    private static String adError(Throwable error,boolean postgres){
-        if(error instanceof AdError)return error.getMessage();
+    private static String adError(Throwable error,boolean postgres,boolean sqlServer){
+        if(error instanceof AdError||sqlServer&&error instanceof BhashRuntime.Failure)return error.getMessage();
         if(error instanceof java.sql.SQLException sql){
-            if(postgres){String state=sql.getSQLState();return "PostgreSQL त्रुटि ["+(state!=null&&state.matches("[A-Z0-9]{5}")?state:"XXXXX")+"]।";}
+            if(postgres||sqlServer){String state=sql.getSQLState();return (sqlServer?SQL_SERVER:"PostgreSQL")+" त्रुटि ["+(state!=null&&state.matches("[A-Z0-9]{5}")?state:"XXXXX")+"]।";}
             return switch(sql.getErrorCode()&255){case 5,6->"SQLite डेटाबेस व्यस्त है।";case 19->"SQLite बाधा का उल्लंघन।";case 18->"डेटा परिणाम की सीमा पार हो गई।";default->"SQLite कथन असफल।";};
         }
-        return postgres?"PostgreSQL त्रुटि [XXXXX]।":"SQLite कथन असफल।";
+        return sqlServer?"SQL Server त्रुटि [XXXXX]।":postgres?"PostgreSQL त्रुटि [XXXXX]।":"SQLite कथन असफल।";
     }
     private static AdJob adJob(long id){var j=adJobs.get(id);if(j==null)throw failure("असमकालिक डेटा क्रिया बंद है।");return j;}
     private static AdJob adReady(long id){var j=adJob(id);if(!j.finished)throw failure("डेटा क्रिया अभी पूरी नहीं हुई है।");if(j.error!=null)throw failure(j.error);return j;}
@@ -105,14 +109,16 @@
     }
     private static void adRun(AdJob j){
         synchronized(j){if(j.cancelled){j.workerFinished=true;adFinish(j);return;}j.dispatched=true;}
+        boolean sqlServer=j.connection!=null?j.connection.sqlServer:j.operation==1&&j.text.startsWith(SQL_SERVER_PREFIX);
         try{
             switch(j.operation){
-                case 0 -> j.opened=new AdConnection(adSqliteConnect(j.text),false);
-                case 1 -> j.opened=new AdConnection(adPostgresConnect(j.text),true);
+                case 0 -> j.opened=new AdConnection(adSqliteConnect(j.text),false,false);
+                case 1 -> j.opened=sqlServer?new AdConnection(sqlServerConnect(j.text),false,true):new AdConnection(adPostgresConnect(j.text),true,false);
                 case 2 -> {
                     if(j.connection.failed)throw new AdError("डेटालेनदेन असफल है; वापस लें।");
+                    var parsed=sqlServer?sqlServerStatement(j.text):null;
                     var query=j.connection.db.prepareStatement(j.text);j.active=query;
-                    try{j.prepared=new AdStatement(j.connection,query);}catch(Throwable error){query.close();throw error;}
+                    try{j.prepared=new AdStatement(j.connection,query,parsed);}catch(Throwable error){query.close();throw error;}
                 }
                 case 3,4 -> adQuery(j);
                 case 5 -> {j.statement.query.close();j.statement.closed=true;}
@@ -126,7 +132,7 @@
                     try{j.connection.db.commit();j.connection.db.setAutoCommit(true);j.connection.transaction=false;}
                     catch(java.sql.SQLException error){
                         String state=error.getSQLState();int code=error.getErrorCode()&255;
-                        if(j.connection.postgres&&state!=null&&!state.startsWith("08")&&!state.equals("40003")&&!state.equals("57P01")&&!state.equals("57P02")&&!state.equals("57P03")||!j.connection.postgres&&code!=10&&code!=11&&code!=26)throw error;
+                        if(!sqlServer&&(j.connection.postgres&&state!=null&&!state.startsWith("08")&&!state.equals("40003")&&!state.equals("57P01")&&!state.equals("57P02")&&!state.equals("57P03")||!j.connection.postgres&&code!=10&&code!=11&&code!=26))throw error;
                         adClose(j.connection);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");
                     }
                 }
@@ -134,7 +140,7 @@
                 case 9 -> adClose(j.connection);
                 default -> throw new AdError("अमान्य असमकालिक डेटा क्रिया।");
             }
-        }catch(Throwable error){j.error=adError(error,j.operation==1||j.connection!=null&&j.connection.postgres);if(j.connection!=null&&j.connection.transaction)j.connection.failed=true;}
+        }catch(Throwable error){j.error=adError(error,j.operation==1||j.connection!=null&&j.connection.postgres,sqlServer);if(j.connection!=null&&j.connection.transaction)j.connection.failed=true;}
         finally{synchronized(j){j.active=null;j.workerFinished=true;adFinish(j);}}
     }
     static boolean dbAsyncDispatched(long id){var j=adJob(id);synchronized(j){return j.dispatched;}}
@@ -252,11 +258,15 @@
         s.query.setFetchSize(c.postgres?32:0);
         for(int i=0;i<j.parameters.length;i++){
             Object v=j.parameters[i];int n=i+1;
-            if(v==null)s.query.setNull(n,java.sql.Types.NULL);
+            if(v==null) {
+                if(c.sqlServer)sqlServerBindNull(s.query,n);
+                else s.query.setNull(n,java.sql.Types.NULL);
+            }
             else if(v instanceof Long number)s.query.setLong(n,number);
             else if(v instanceof Double number)s.query.setDouble(n,number);
-            else if(v instanceof Boolean flag){if(c.postgres)s.query.setBoolean(n,flag);else s.query.setLong(n,flag?1:0);}
+            else if(v instanceof Boolean flag){if(c.postgres||c.sqlServer)s.query.setBoolean(n,flag);else s.query.setLong(n,flag?1:0);}
             else if(v instanceof byte[] bytes)s.query.setBytes(n,bytes);
+            else if(c.sqlServer)s.query.setNString(n,(String)v);
             else s.query.setString(n,(String)v);
         }
         if(j.operation==3){
@@ -274,8 +284,8 @@
                 var row=new AdCell[count];
                 for(int i=0;i<count;i++){
                     Object value=rows.getObject(i+1);String kind;
-                    if(c.postgres){
-                        kind=value==null?"रिक्त":pgKind(meta.getColumnTypeName(i+1));
+                    if(c.postgres||c.sqlServer){
+                        kind=value==null?"रिक्त":c.sqlServer?sqlServerKind(meta,i+1):pgKind(meta.getColumnTypeName(i+1));
                         if(value!=null)value=switch(kind){
                             case "पूर्णांक" -> rows.getLong(i+1);
                             case "दशमलव" -> rows.getDouble(i+1);

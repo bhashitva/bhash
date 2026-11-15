@@ -50,7 +50,7 @@ public final class JvmCompiler {
             try(var resource=JvmCompiler.class.getResourceAsStream("BhashStandard.java.txt")) {
                 if(resource==null)throw new CompilationException("Missing JVM standard library runtime.");
                 String text=new String(resource.readAllBytes(),StandardCharsets.UTF_8);
-                for(String helper:List.of("Postgres.java.inc","AsyncDatabase.java.inc"))try(var pg=JvmCompiler.class.getResourceAsStream(helper)) {
+                for(String helper:List.of("Postgres.java.inc","AsyncDatabase.java.inc","SqlServer.java.inc"))try(var pg=JvmCompiler.class.getResourceAsStream(helper)) {
                     if(pg==null)throw new CompilationException("Missing PostgreSQL runtime source.");
                     int end=text.lastIndexOf('}');
                     text=text.substring(0,end)+new String(pg.readAllBytes(),StandardCharsets.UTF_8)+text.substring(end);
