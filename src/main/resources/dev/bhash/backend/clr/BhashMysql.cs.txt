@@ -86,8 +86,8 @@ internal static class BhashMysql {
             db=null;
             return id;
         } catch(DbException e) {throw Failure(null,e);}
-        catch(Exception e) when(e is TargetInvocationException || e is FileLoadException || e is TypeInitializationException) {
-            throw Error("MySqlConnector और उसकी रनटाइम निर्भरताएँ स्थापित करें।");
+        catch(Exception e) when(e is TargetInvocationException || e is IOException || e is TypeInitializationException) {
+            throw Error("MySqlConnector और उसकी रनटाइम निर्भरताएँ स्थापित करें। ("+e.GetBaseException().GetType().Name+")");
         } finally {db?.Dispose();}
     }
     private static (string Sql,int Count,bool Select) Parameters(string sql) {
