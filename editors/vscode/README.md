@@ -16,7 +16,13 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.25.2 / इस रिलीज़ में
+## What's new in 0.25.3 / इस रिलीज़ में
+
+MySQL 8.4 joins the Bhash database providers on JVM, desktop .NET, and native Linux x64. Install the client driver for your target to use prepared statements and transactions. [Hindi MySQL tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/mysql.md)
+
+**हिन्दी:** JVM, डेस्कटॉप .NET और नेटिव Linux x64 में MySQL 8.4 के साथ मापदंडयुक्त SQL और लेनदेन उपयोग करें। अपने लक्ष्य का चालक स्थापित करें। [हिन्दी MySQL अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/mysql.md)
+
+## Android native debugging in 0.25.2 / Android नेटिव डीबगिंग
 
 Bundles Bhash compiler 0.25.2, which preserves local reference variable locations for Android native debugging.
 
