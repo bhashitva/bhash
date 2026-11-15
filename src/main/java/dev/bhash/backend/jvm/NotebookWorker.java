@@ -45,18 +45,17 @@ public final class NotebookWorker {
     public static void main(String[] args) throws IOException {
         ProcessHandle.current().parent().ifPresent(parent ->
                 parent.onExit().thenRun(() -> Runtime.getRuntime().halt(0)));
-        if (args.length > 1) throw new IllegalArgumentException("Expected at most one MySQL driver JAR");
-        URL driver = null;
-        if (args.length == 1) {
-            Path path = Path.of(args[0]).toRealPath();
+        URL[] driverUrls = new URL[args.length];
+        for (int i = 0; i < args.length; i++) {
+            Path path = Path.of(args[i]).toRealPath();
             if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
-                throw new IOException("Cannot read MySQL Connector/J JAR: " + path);
+                throw new IOException("Cannot read JDBC driver JAR: " + path);
             }
-            driver = path.toUri().toURL();
+            driverUrls[i] = path.toUri().toURL();
         }
         ClassLoader platform = ClassLoader.getPlatformClassLoader();
         // JDBC registrations and cleanup threads belong to the worker, not each cell.
-        try (var drivers = driver == null ? null : new URLClassLoader(new URL[]{driver}, platform)) {
+        try (var drivers = driverUrls.length == 0 ? null : new URLClassLoader(driverUrls, platform)) {
             new NotebookWorker(drivers == null ? platform : drivers).serve();
         }
     }
