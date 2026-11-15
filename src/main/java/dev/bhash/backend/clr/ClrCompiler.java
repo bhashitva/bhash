@@ -43,6 +43,7 @@ public final class ClrCompiler {
                 <Compile Include="Program.cs" />
                 <Compile Include="BhashRuntime.cs" />
                 <Compile Include="BhashStandard.cs" />
+                <Compile Include="BhashMysql.cs" />
               </ItemGroup>
             </Project>
             """;
@@ -78,6 +79,10 @@ public final class ClrCompiler {
                 if(standard==null)throw new CompilationException("Missing CLR standard library runtime.");
                 String text=new String(standard.readAllBytes(),StandardCharsets.UTF_8);
                 Files.writeString(work.resolve("BhashStandard.cs"),sqlite?SqliteAssets.clrSource(text):text,StandardCharsets.UTF_8);
+            }
+            try(var mysql=ClrCompiler.class.getResourceAsStream("BhashMysql.cs.txt")) {
+                if(mysql==null)throw new CompilationException("Missing CLR MySQL runtime source.");
+                Files.copy(mysql,work.resolve("BhashMysql.cs"));
             }
             var command = List.of(executable(), "publish", "BhashProgram.csproj", "--configuration", "Release",
                     "--output", stage.toString(), "--no-self-contained", "--nologo", "--verbosity", "quiet",
