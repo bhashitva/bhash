@@ -25,7 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 GITHUB = "https://github.com/bhashitva/bhash"
 CONTENTS = "book/README.md"
 TREES = ("book", "docs", "examples", "lessons", "tutorial", "editors/jupyter",
-         "editors/vscode", "licenses", "src/main/resources/dev/bhash/stdlib")
+         "editors/vscode", "licenses", "src/main/resources/dev/bhash/stdlib",
+         "src/test/resources/sqlserver")
 FILES = ("README.md", "SUPPORT.md", "LICENSING.md", "LICENSE", "NOTICE",
          "THIRD_PARTY_NOTICES.md", "scripts/generate_orm.py",
          "scripts/test_generate_orm.py", "src/main/antlr4/Bhash.g4")
@@ -207,6 +208,10 @@ class Book:
         if media_type in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
             data = base64.b64encode(self.files[source]).decode("ascii")
             return f'<img src="data:{media_type};base64,{data}" alt="{escape(source)}">'
+        if source.endswith(".jar") and source in self.companion_paths:
+            digest = hashlib.sha256(self.files[source]).hexdigest()
+            return ("<p>यह JAR फ़ाइल ऑफ़लाइन ZIP में मूल रूप में है।</p>"
+                    f"<p>SHA-256 <code>{digest}</code></p>")
         text = self.files[source].decode("utf-8-sig")
         if "\0" in text:
             raise ValueError(f"Cannot print binary reference {source}")
