@@ -12,3 +12,7 @@ CREATE TABLE student (
     note NVARCHAR(200) NULL,
     version BIGINT NOT NULL
 );
+GO
+IF OBJECT_ID(N'dbo.gradelevel', N'U') IS NULL OR OBJECT_ID(N'dbo.student', N'U') IS NULL
+    THROW 50000, 'The ORM fixture tables were not created.', 1;
+GO
