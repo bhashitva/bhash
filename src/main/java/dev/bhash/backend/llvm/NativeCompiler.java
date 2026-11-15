@@ -74,7 +74,7 @@ public final class NativeCompiler {
             }
             if(NativePlatform.windows())notices.append("\n--- MinGW-w64 runtime notices ---\n").append(new String(NativeBuildInfo.resource("/dev/bhash/backend/native/MINGW_RUNTIME_NOTICES.txt"),StandardCharsets.UTF_8));
             Files.writeString(work.resolve("program.ll"),LlvmEmitter.emit(core,notices.toString(),debug,buildInfo),StandardCharsets.UTF_8);
-            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_http.inc","bhash_sqlite.inc","bhash_postgres.inc","bhash_async_database.inc","bhash_server.inc","bhash_auth.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
+            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_http.inc","bhash_sqlite.inc","bhash_postgres.inc","bhash_mysql.inc","bhash_async_database.inc","bhash_server.inc","bhash_auth.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
                 if(in==null)throw new IOException("Missing native runtime: "+name);
                 Files.copy(in,work.resolve(name));
             }

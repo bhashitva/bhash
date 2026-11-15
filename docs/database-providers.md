@@ -16,6 +16,15 @@ Limits: 32 connections, 128 statements, 999 parameters, 256 columns, 64 KiB SQL,
 
 An uncommitted transaction rolls back on close. Server errors make it rollback-only. Commit/rollback invalidate active result cursors. Reset before executing again; reset retains bindings, clear removes them. PostgreSQL transaction DDL behavior differs from SQLite statement preparation; avoid changing a schema while holding prepared statements over it.
 
+## MySQL contract
+
+The initial MySQL adapter targets MySQL 8.4 with Connector/J on JVM, MySqlConnector
+on desktop .NET, and unixODBC with MariaDB Connector/ODBC on native Linux x64.
+Install the appropriate driver at application runtime. The dialect accepts parameterized
+SELECT, INSERT, UPDATE, and DELETE.
+Schema setup is external because MySQL DDL can implicitly commit. See the
+[Hindi MySQL tutorial](../tutorial/database-providers/mysql.md).
+
 ## Migrations
 
 An ordered immutable plan snapshots version/name/SQL lists. Versions must be positive and increasing. SHA-256 covers version, name and byte-length-framed SQL. Applied history must be an exact prefix; missing/reordered/edited/newer history is rejected. Changes are forward-only explicit CREATE/ALTER/DROP/INSERT/UPDATE/DELETE statements, not inferred schema differences. Use transactional DDL (no CREATE INDEX CONCURRENTLY, database creation, external side effects).

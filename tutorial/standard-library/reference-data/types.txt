@@ -47,7 +47,8 @@
 लेनदेन|SQLite Transaction|SQLite बदलावों को एक साथ सहेजें या वापस लें। बंद करने पर अधूरा लेनदेन लौटता है।
 डेटानियम|SQLite Validation|SQLite पाठ, पथ और कथन की इनपुट जाँच।|internal
 पोस्टग्रेसविन्यास|PostgreSQL Configuration|PostgreSQL का host, port, डेटाबेस, प्रमाणपत्र, सुरक्षा और समयसीमा तय करें। गुप्तशब्द साझा या लॉग न करें।
-डेटा|Database Providers|समान API वाले SQLite और PostgreSQL संबंध खोलें।
+माईएसक्यूएलविन्यास|MySQL Configuration|MySQL का मेज़बान, पोर्ट, डेटाबेस, सुरक्षा और समयसीमा तय करें। गुप्तशब्द साझा या लॉग न करें।
+डेटा|Database Providers|समान API वाले SQLite, PostgreSQL और MySQL संबंध खोलें।
 डेटासंबंध|Database Connection|प्रदाता का नाम जानें, SQL कथन तैयार करें, लेनदेन शुरू करें और संसाधन बंद करें।
 डेटाकथन|Database Statement|प्रदाता-स्वतंत्र मापदंडयुक्त SQL, प्रकारयुक्त bindings और पंक्ति पढ़ना।
 डेटालेनदेन|Database Transaction|साझा प्रदाता API में commit, rollback और scoped cleanup।

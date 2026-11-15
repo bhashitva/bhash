@@ -30,9 +30,11 @@ public final class NativeBuildInfo {
         byte[] http=resource("/dev/bhash/backend/native/bhash_http.inc");
         byte[] sqliteSource=resource("/dev/bhash/backend/native/bhash_sqlite.inc"),postgres=resource("/dev/bhash/backend/native/bhash_postgres.inc");
         byte[] asyncDatabase=resource("/dev/bhash/backend/native/bhash_async_database.inc");
-        byte[] sqlite=Arrays.copyOf(sqliteSource,sqliteSource.length+postgres.length+asyncDatabase.length);
+        byte[] mysql=resource("/dev/bhash/backend/native/bhash_mysql.inc");
+        byte[] sqlite=Arrays.copyOf(sqliteSource,sqliteSource.length+postgres.length+asyncDatabase.length+mysql.length);
         System.arraycopy(postgres,0,sqlite,sqliteSource.length,postgres.length);
         System.arraycopy(asyncDatabase,0,sqlite,sqliteSource.length+postgres.length,asyncDatabase.length);
+        System.arraycopy(mysql,0,sqlite,sqliteSource.length+postgres.length+asyncDatabase.length,mysql.length);
         byte[] server=resource("/dev/bhash/backend/native/bhash_server.inc");
         byte[] auth=resource("/dev/bhash/backend/native/bhash_auth.inc");
         byte[] runtime=java.util.Arrays.copyOf(source,source.length+http.length+sqlite.length+server.length+auth.length);

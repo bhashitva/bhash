@@ -1,0 +1,90 @@
+name: MySQL provider
+on:
+  pull_request:
+    paths:
+      - 'src/main/**'
+      - 'src/test/resources/mysql/**'
+      - '.github/workflows/mysql.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [jvm, clr, native]
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: bhash
+          MYSQL_USER: bhash
+          MYSQL_PASSWORD: ci-user-only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        if: matrix.target == 'clr'
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install the native toolchain and ODBC driver
+        if: matrix.target == 'native'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 llvm-18 build-essential binutils unixodbc odbc-mariadb
+          odbcinst -q -d
+      - name: Build the compiler
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Install Connector/J
+        if: matrix.target == 'jvm'
+        run: |
+          mvn --batch-mode --no-transfer-progress dependency:copy \
+            -Dartifact=com.mysql:mysql-connector-j:9.3.0 -DoutputDirectory=target/mysql-driver
+      - name: Install MySqlConnector and runtime dependencies
+        if: matrix.target == 'clr'
+        run: |
+          dotnet new console --framework net10.0 -o target/mysql-driver-project --no-restore
+          dotnet add target/mysql-driver-project package MySqlConnector --version 2.6.2
+          dotnet publish target/mysql-driver-project --framework net10.0 -p:CopyLocalLockFileAssemblies=true -o target/mysql-driver
+          ls -1 target/mysql-driver
+          test -f target/mysql-driver/MySqlConnector.dll
+          test -f target/mysql-driver/Microsoft.Extensions.Logging.Abstractions.dll
+          echo "BHASH_MYSQL_DOTNET_DRIVER=$PWD/target/mysql-driver/MySqlConnector.dll" >> "$GITHUB_ENV"
+      - name: Test Bhash against MySQL
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          TARGET: ${{ matrix.target }}
+          BHASH_MYSQL_PASSWORD: ci-user-only
+          BHASH_MYSQL_TLS: disable
+        run: |
+          set -euo pipefail
+          docker exec -e MYSQL_PWD="$BHASH_MYSQL_PASSWORD" "$MYSQL_CONTAINER" \
+            mysql -h127.0.0.1 -ubhash bhash -e 'CREATE TABLE items (id BIGINT PRIMARY KEY, body VARCHAR(200) CHARACTER SET utf8mb4, payload VARBINARY(32), extra INT NULL) ENGINE=InnoDB'
+          case "$TARGET" in
+            jvm) artifact=target/mysql-integration.jar ;;
+            clr) artifact=target/mysql-integration-clr ;;
+            native) artifact=target/mysql-integration ;;
+          esac
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile \
+            src/test/resources/mysql/integration.bhash --target "$TARGET" -o "$artifact"
+          case "$TARGET" in
+            jvm) output=$(java -cp "$artifact:target/mysql-driver/*" BhashProgram) ;;
+            clr) output=$(dotnet "$artifact/BhashProgram.dll") ;;
+            native) output=$(BHASH_GC_STRESS=1 "$artifact") ;;
+          esac
+          printf '%s\n' "$output"
+          grep -Fx MYSQL_OK <<<"$output"

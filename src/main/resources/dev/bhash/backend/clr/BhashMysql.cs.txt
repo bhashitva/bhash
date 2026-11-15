@@ -1,0 +1,313 @@
+// SPDX-License-Identifier: Apache-2.0
+using System;
+using System.Collections.Generic;
+using System.Data.Common;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+using System.Runtime.Loader;
+using System.Text;
+using System.Text.RegularExpressions;
+
+internal static class BhashMysql {
+    private sealed class DriverContext : AssemblyLoadContext {
+        private readonly string directory;
+        internal DriverContext(string directory) { this.directory=directory; }
+        protected override Assembly Load(AssemblyName name) {
+            string file=Path.Combine(directory,name.Name+".dll");
+            return File.Exists(file)?LoadFromAssemblyPath(file):null;
+        }
+    }
+    private sealed class Connection {
+        internal DbConnection db;
+        internal DbTransaction transaction;
+        internal long token;
+        internal bool failed;
+        internal int timeout;
+    }
+    private sealed class Statement {
+        internal Connection owner;
+        internal DbCommand command;
+        internal bool[] bound;
+        internal DbDataReader reader;
+        internal string[] names=Array.Empty<string>();
+        internal string[] kinds=Array.Empty<string>();
+        internal object[] row;
+        internal bool select;
+        internal int state;
+    }
+    private static readonly Dictionary<long,Connection> connections=new();
+    private static readonly Dictionary<long,Statement> statements=new();
+    private static long nextConnection,nextStatement,nextTransaction;
+    private static Type driver;
+    private static BhashRuntime.Failure Error(string message)=>new BhashRuntime.Failure(message);
+    private static BhashRuntime.Failure Failure(Connection connection,DbException exception) {
+        if(connection?.transaction!=null)connection.failed=true;
+        string state=exception.SqlState;
+        return Error("MySQL त्रुटि ["+(state!=null&&Regex.IsMatch(state,@"\A[A-Z0-9]{5}\z")?state:"XXXXX")+"]।");
+    }
+    private static Connection Conn(long id)=>connections.TryGetValue(id,out var c)?c:throw Error("MySQL संबंध बंद है।");
+    private static Statement Stmt(long id)=>statements.TryGetValue(id,out var s)?s:throw Error("MySQL कथन बंद है।");
+    private static void Healthy(Connection c) {
+        if(c.failed)throw Error("MySQL लेनदेन असफल है। इसे वापस लें।");
+    }
+    private static void Ready(Statement s) {
+        if(s.state!=0)throw Error("MySQL कथन को रीसेट करें।");
+    }
+    internal static long Open(string config) {
+        if(connections.Count>=32)throw Error("बहुत अधिक खुले MySQL संबंध।");
+        string[] a=config.Substring(1).Split('\n');
+        if(a.Length!=10||!Regex.IsMatch(a[1],@"\A[A-Za-z0-9.-]+\z")||!Regex.IsMatch(a[3],@"\A[A-Za-z0-9_]+\z"))
+            throw Error("अमान्य MySQL मेज़बान या डेटाबेस नाम।");
+        if(driver==null) {
+            string path=Environment.GetEnvironmentVariable("BHASH_MYSQL_DOTNET_DRIVER");
+            if(string.IsNullOrEmpty(path)||!Path.IsPathFullyQualified(path))
+                throw Error("BHASH_MYSQL_DOTNET_DRIVER में MySqlConnector.dll का पूरा पथ दें।");
+            try {
+                driver=new DriverContext(Path.GetDirectoryName(path)).LoadFromAssemblyPath(path)
+                    .GetType("MySqlConnector.MySqlConnection",true);
+            } catch(Exception e) when(e is IOException || e is TypeLoadException || e is BadImageFormatException) {
+                throw Error("MySqlConnector रनटाइम उपलब्ध नहीं है।");
+            }
+        }
+        var settings=new DbConnectionStringBuilder {
+            ["Server"]=a[1], ["Port"]=a[2], ["Database"]=a[3], ["User ID"]=a[4],
+            ["Password"]=a[5], ["SslMode"]=a[6]=="verify-full"?"VerifyFull":"None",
+            ["Connection Timeout"]=a[7], ["Pooling"]=false, ["TreatTinyAsBoolean"]=false,
+            ["UseAffectedRows"]=true
+        };
+        DbConnection db=null;
+        try {
+            db=(DbConnection)Activator.CreateInstance(driver);
+            db.ConnectionString=settings.ConnectionString;
+            db.Open();
+            long id=--nextConnection;
+            connections.Add(id,new Connection{db=db,timeout=(int.Parse(a[8],CultureInfo.InvariantCulture)+999)/1000});
+            db=null;
+            return id;
+        } catch(DbException e) {throw Failure(null,e);}
+        catch(Exception e) when(e is TargetInvocationException || e is IOException || e is TypeInitializationException) {
+            throw Error("MySqlConnector और उसकी रनटाइम निर्भरताएँ स्थापित करें। ("+e.GetBaseException().GetType().Name+")");
+        } finally {db?.Dispose();}
+    }
+    private static (string Sql,int Count,bool Select) Parameters(string sql) {
+        var first=Regex.Match(sql,@"\A\s*(SELECT|INSERT|UPDATE|DELETE)\b",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant);
+        if(!first.Success||Encoding.UTF8.GetByteCount(sql)>65536||sql.IndexOfAny(new[]{'\0',';','\\'})>=0)
+            throw Error("MySQL में एक SELECT, INSERT, UPDATE या DELETE कथन दें।");
+        var result=new StringBuilder(sql.Length);
+        int count=0;
+        char quote='\0';
+        for(int i=0;i<sql.Length;i++) {
+            char c=sql[i];
+            if(quote!='\0') {
+                result.Append(c);
+                if(c==quote) {
+                    if(i+1<sql.Length&&sql[i+1]==quote)result.Append(sql[++i]);
+                    else quote='\0';
+                }
+                continue;
+            }
+            if(c=='\''||c=='"'||c=='`')quote=c;
+            if(c=='@'||c=='#'||i+1<sql.Length&&(c=='-'&&sql[i+1]=='-'||c=='/'&&sql[i+1]=='*'))
+                throw Error("MySQL कथन में केवल अनाम ? मापदंड उपयोग करें।");
+            if(c=='?') {
+                if(++count>999)throw Error("मापदंड सीमा ९९९ है।");
+                result.Append("@p").Append(count.ToString(CultureInfo.InvariantCulture));
+            } else result.Append(c);
+        }
+        if(quote!='\0')throw Error("अमान्य MySQL उद्धरण।");
+        return (result.ToString(),count,first.Groups[1].Value.Equals("SELECT",StringComparison.OrdinalIgnoreCase));
+    }
+    internal static long Prepare(long id,string sql) {
+        var c=Conn(id);
+        Healthy(c);
+        if(statements.Count>=128)throw Error("बहुत अधिक खुले MySQL कथन।");
+        var parsed=Parameters(sql);
+        DbCommand command=c.db.CreateCommand();
+        try {
+            command.CommandText=parsed.Sql;
+            command.CommandTimeout=c.timeout;
+            command.Transaction=c.transaction;
+            for(int i=1;i<=parsed.Count;i++) {
+                var param=command.CreateParameter();
+                param.ParameterName="@p"+i.ToString(CultureInfo.InvariantCulture);
+                param.Value=DBNull.Value;
+                command.Parameters.Add(param);
+            }
+            command.Prepare();
+            long key=--nextStatement;
+            statements.Add(key,new Statement{owner=c,command=command,bound=new bool[parsed.Count],select=parsed.Select});
+            command=null;
+            return key;
+        } catch(DbException e) {throw Failure(c,e);}
+        finally {command?.Dispose();}
+    }
+    private static void EndRows(Statement s,int state) {
+        var reader=s.reader;
+        s.reader=null;
+        s.row=null;
+        s.state=state;
+        reader?.Dispose();
+    }
+    internal static void Finalize(long id) {
+        if(statements.Remove(id,out var s)) {
+            try {EndRows(s,0);}
+            finally {s.command.Dispose();}
+        }
+    }
+    internal static void Close(long id) {
+        if(!connections.Remove(id,out var c))return;
+        try {
+            foreach(var item in new List<KeyValuePair<long,Statement>>(statements))
+                if(item.Value.owner==c)Finalize(item.Key);
+            c.transaction?.Rollback();
+        } catch(DbException e) {throw Failure(c,e);}
+        finally {try{c.transaction?.Dispose();}finally{c.db.Dispose();}}
+    }
+    internal static long ParameterCount(long id)=>Stmt(id).bound.Length;
+    internal static void Bind(long id,long index,object value) {
+        var s=Stmt(id);
+        Ready(s);
+        if(index<1||index>s.bound.Length)throw Error("MySQL बंधन सूचकांक सीमा से बाहर है।");
+        if(value is double d&&!double.IsFinite(d))throw Error("MySQL दशमलव सीमित नहीं है।");
+        if(value is string t&&(t.IndexOf('\0')>=0||Encoding.UTF8.GetByteCount(t)>8388608))
+            throw Error("अमान्य MySQL पाठ।");
+        if(value is BhashRuntime.BBuffer original) {
+            if(original.size()>8388608)throw Error("MySQL मान सीमा से बाहर है।");
+            var bytes=new byte[(int)original.size()];
+            for(int i=0;i<bytes.Length;i++)bytes[i]=(byte)original.get(i);
+            value=bytes;
+        }
+        s.command.Parameters[(int)index-1].Value=value??DBNull.Value;
+        s.bound[(int)index-1]=true;
+    }
+    private static void Bound(Statement s) {
+        foreach(bool bound in s.bound)if(!bound)throw Error("सभी MySQL मापदंड बाँधें।");
+        s.command.Transaction=s.owner.transaction;
+    }
+    internal static long Execute(long id) {
+        var s=Stmt(id);
+        Healthy(s.owner);
+        Ready(s);
+        if(s.select)throw Error("MySQL पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");
+        Bound(s);
+        try {long result=s.command.ExecuteNonQuery();s.state=2;return result;}
+        catch(DbException e) {s.state=3;throw Failure(s.owner,e);}
+    }
+    internal static bool Next(long id) {
+        var s=Stmt(id);
+        Healthy(s.owner);
+        if(s.state==2)return false;
+        if(s.state==3)throw Error("MySQL कथन को रीसेट करें।");
+        if(!s.select)throw Error("MySQL बदलाव के लिए चलाओ उपयोग करें।");
+        if(s.state==0)Bound(s);
+        try {
+            if(s.state==0) {
+                s.reader=s.command.ExecuteReader();
+                int count=s.reader.FieldCount;
+                if(count>256)throw Error("MySQL स्तंभ सीमा से बाहर हैं।");
+                s.names=new string[count];
+                s.kinds=new string[count];
+                for(int i=0;i<count;i++) {
+                    s.names[i]=s.reader.GetName(i);
+                    s.kinds[i]=Kind(s.reader,i);
+                }
+            }
+            if(!s.reader.Read()){EndRows(s,2);return false;}
+            s.row=new object[s.names.Length];
+            long bytes=0;
+            for(int i=0;i<s.row.Length;i++) {
+                if(s.reader.IsDBNull(i))continue;
+                object value=s.kinds[i] switch {
+                    "पाठ" or "सटीकदशमलव" or "समय"=>ReadText(s.reader,i,s.kinds[i]),
+                    _=>s.reader.GetValue(i)
+                };
+                if(value is string t)bytes+=Encoding.UTF8.GetByteCount(t);
+                if(value is byte[] b)bytes+=b.Length;
+                if(bytes>8388608)throw Error("MySQL पंक्ति सीमा से बाहर है।");
+                s.row[i]=value;
+            }
+            s.state=1;
+            return true;
+        } catch(DbException e) {EndRows(s,3);throw Failure(s.owner,e);}
+        catch(BhashRuntime.Failure) {EndRows(s,3);throw;}
+    }
+    private static string ReadText(DbDataReader reader,int column,string kind) {
+        if(kind=="पाठ")return reader.GetString(column);
+        if(kind=="सटीकदशमलव") {
+            // MySqlConnector's decimal value can exceed System.Decimal's precision.
+            if(reader.GetDataTypeName(column)=="DECIMAL") {
+                var method=reader.GetType().GetMethod("GetMySqlDecimal",new[]{typeof(int)});
+                if(method!=null)return method.Invoke(reader,new object[]{column}).ToString();
+            }
+            return Convert.ToString(reader.GetValue(column),CultureInfo.InvariantCulture);
+        }
+        object value=reader.GetValue(column);
+        if(value is DateTime date)return date.ToString(reader.GetDataTypeName(column)=="DATE"?"yyyy-MM-dd":"yyyy-MM-dd HH:mm:ss.FFFFFF",CultureInfo.InvariantCulture);
+        return Convert.ToString(value,CultureInfo.InvariantCulture);
+    }
+    private static string Kind(DbDataReader reader,int column) {
+        string type=reader.GetDataTypeName(column).ToUpperInvariant();
+        if(type is "DECIMAL" or "NEWDECIMAL")return "सटीकदशमलव";
+        if(type is "DATE" or "DATETIME" or "TIMESTAMP" or "TIME")return "समय";
+        Type field=reader.GetFieldType(column);
+        if(field==typeof(ulong))return type=="BIT"?"तार्किक":"सटीकदशमलव";
+        if(field==typeof(bool))return "तार्किक";
+        if(field==typeof(byte)||field==typeof(sbyte)||field==typeof(short)||field==typeof(ushort)||
+           field==typeof(int)||field==typeof(uint)||field==typeof(long))return "पूर्णांक";
+        if(field==typeof(float)||field==typeof(double))return "दशमलव";
+        if(field==typeof(byte[]))return "बाइटबफ़र";
+        if(field==typeof(string))return "पाठ";
+        return "असमर्थित";
+    }
+    internal static void Reset(long id)=>EndRows(Stmt(id),0);
+    internal static void Clear(long id) {
+        var s=Stmt(id);
+        Ready(s);
+        Array.Clear(s.bound);
+        foreach(DbParameter p in s.command.Parameters)p.Value=DBNull.Value;
+    }
+    internal static long Columns(long id)=>Stmt(id).names.Length;
+    private static int Column(Statement s,long column) {
+        if(column<0||column>=s.names.Length)throw Error("MySQL स्तंभ सूचकांक सीमा से बाहर है।");
+        return (int)column;
+    }
+    internal static string Name(long id,long column) {var s=Stmt(id);return s.names[Column(s,column)];}
+    internal static string TypeOf(long id,long column) {
+        var s=Stmt(id);
+        int i=Column(s,column);
+        if(s.state!=1)throw Error("MySQL परिणाम की वर्तमान पंक्ति नहीं है।");
+        return s.row[i]==null?"रिक्त":s.kinds[i];
+    }
+    internal static object Cell(long id,long column,params string[] kinds) {
+        string kind=TypeOf(id,column);
+        if(!Array.Exists(kinds,expected=>kind==expected))throw Error("MySQL स्तंभ का प्रकार मेल नहीं खाता।");
+        return Stmt(id).row[(int)column];
+    }
+    internal static BhashRuntime.BBuffer Bytes(long id,long column) {
+        var value=(byte[])Cell(id,column,"बाइटबफ़र");
+        var result=new BhashRuntime.BBuffer(value.Length);
+        for(int i=0;i<value.Length;i++)result.set(i,value[i]);
+        return result;
+    }
+    internal static long Transaction(long id,long token,long op) {
+        if(op==3&&(!connections.TryGetValue(id,out var existing)||existing.token!=token))return 0;
+        var c=Conn(id);
+        if(op==0?c.transaction!=null:c.transaction==null||token!=c.token)
+            throw Error("MySQL लेनदेन सक्रिय नहीं है।");
+        if(op==1)Healthy(c);
+        try {
+            foreach(var s in statements.Values)if(s.owner==c&&s.state!=0)EndRows(s,3);
+            if(op==0) {
+                c.transaction=c.db.BeginTransaction();
+                c.failed=false;
+                return c.token=++nextTransaction;
+            }
+            if(op==1)c.transaction.Commit();else c.transaction.Rollback();
+            c.transaction.Dispose();
+            c.transaction=null;
+            c.failed=false;
+            return c.token=0;
+        } catch(DbException e) {throw Failure(c,e);}
+    }
+}

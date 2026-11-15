@@ -4,7 +4,12 @@
     private static long pgConnectionNext,pgStatementNext,pgTransactionNext;
     private static final class PgConnection {
         java.sql.Connection db; long transaction; boolean failed;
-        PgConnection(java.sql.Connection db){this.db=db;}
+        final boolean mysql;
+        final int queryTimeout;
+        PgConnection(java.sql.Connection db){this(db,false,0);}
+        PgConnection(java.sql.Connection db,boolean mysql,int queryTimeout){
+            this.db=db;this.mysql=mysql;this.queryTimeout=queryTimeout;
+        }
     }
     private static final class PgStatement {
         PgConnection owner; java.sql.PreparedStatement query; java.sql.ResultSet rows;
@@ -13,16 +18,22 @@
             this.owner=owner;this.query=query;bound=new boolean[query.getParameterMetaData().getParameterCount()];
             var meta=query.getMetaData();int n=meta==null?0:meta.getColumnCount();names=new String[n];types=new String[n];
             if(n>256||bound.length>999)throw failure("PostgreSQL परिणाम या मापदंड सीमा से बाहर है।");
-            for(int i=0;i<n;i++){names[i]=meta.getColumnLabel(i+1);types[i]=pgKind(meta.getColumnTypeName(i+1));}
+            for(int i=0;i<n;i++){
+                names[i]=meta.getColumnLabel(i+1);
+                types[i]=owner.mysql?mysqlKind(meta,i+1):pgKind(meta.getColumnTypeName(i+1));
+            }
         }
     }
     private static BhashRuntime.Failure pgFailure(java.sql.SQLException e,PgConnection c){
         if(c!=null&&c.transaction!=0)c.failed=true;
         String code=e.getSQLState();if(code==null||!code.matches("[A-Z0-9]{5}"))code="XXXXX";
-        return failure("PostgreSQL त्रुटि ["+code+"]।");
+        return failure((c!=null&&c.mysql?"MySQL":"PostgreSQL")+" त्रुटि ["+code+"]।");
     }
     static long pgOpen(String config){
-        BhashRuntime.instance(config);if(pgConnections.size()>=32)throw failure("बहुत अधिक खुले PostgreSQL संबंध।");
+        BhashRuntime.instance(config);
+        boolean mysql=config.startsWith("\nmysql-v1\n");
+        if(pgConnections.size()>=32)throw failure(mysql?"बहुत अधिक खुले MySQL संबंध।":"बहुत अधिक खुले PostgreSQL संबंध।");
+        if(mysql)return mysqlOpen(config.substring(1));
         String[] a=config.split("\n",-1);if(a.length!=10)throw failure("अमान्य PostgreSQL विन्यास।");
         java.sql.Connection db=null;
         try{
@@ -43,6 +54,64 @@
         catch(java.sql.SQLException e){throw failure("PostgreSQL त्रुटि [XXXXX]।");}
         finally{if(db!=null)try{db.close();}catch(java.sql.SQLException ignored){}}
     }
+    private static long mysqlOpen(String config){
+        String[] fields=config.split("\n",-1);
+        if(fields.length!=10||!fields[1].matches("[A-Za-z0-9.-]+")||!fields[3].matches("[A-Za-z0-9_]+")){
+            throw failure("अमान्य MySQL मेज़बान या डेटाबेस नाम।");
+        }
+        java.sql.Driver driver;
+        try{
+            driver=(java.sql.Driver)Class.forName("com.mysql.cj.jdbc.Driver").getConstructor().newInstance();
+        }catch(ReflectiveOperationException|LinkageError missing){
+            throw failure("MySQL Connector/J को Java classpath में जोड़ें।");
+        }
+        var properties=new java.util.Properties();
+        properties.setProperty("user",fields[4]);
+        properties.setProperty("password",fields[5]);
+        properties.setProperty("sslMode",fields[6].equals("verify-full")?"VERIFY_IDENTITY":"DISABLED");
+        properties.setProperty("connectTimeout",Integer.toString(Integer.parseInt(fields[7])*1000));
+        properties.setProperty("useServerPrepStmts","true");
+        properties.setProperty("emulateUnsupportedPstmts","false");
+        properties.setProperty("allowMultiQueries","false");
+        properties.setProperty("tinyInt1isBit","false");
+        properties.setProperty("connectionTimeZone","UTC");
+        properties.setProperty("forceConnectionTimeZoneToSession","true");
+        java.sql.Connection db=null;
+        try{
+            db=driver.connect("jdbc:mysql://"+fields[1]+":"+fields[2]+"/"+fields[3],properties);
+            if(db==null)throw failure("MySQL संबंध नहीं खुला।");
+            long id=++pgConnectionNext;
+            pgConnections.put(id,new PgConnection(db,true,(Integer.parseInt(fields[8])+999)/1000));
+            db=null;
+            return id;
+        }catch(java.sql.SQLException error){
+            throw failure("MySQL संबंध नहीं खुला।");
+        }finally{
+            if(db!=null)try{db.close();}catch(java.sql.SQLException ignored){}
+        }
+    }
+    private static String mysqlKind(java.sql.ResultSetMetaData meta,int column)throws java.sql.SQLException{
+        return switch(meta.getColumnType(column)){
+            case java.sql.Types.BIGINT -> meta.isSigned(column)?"पूर्णांक":"सटीकदशमलव";
+            case java.sql.Types.INTEGER,java.sql.Types.SMALLINT,java.sql.Types.TINYINT -> "पूर्णांक";
+            case java.sql.Types.FLOAT,java.sql.Types.REAL,java.sql.Types.DOUBLE -> "दशमलव";
+            case java.sql.Types.BOOLEAN -> "तार्किक";
+            case java.sql.Types.BIT -> meta.getPrecision(column)==1?"तार्किक":"बाइटबफ़र";
+            case java.sql.Types.DECIMAL,java.sql.Types.NUMERIC -> "सटीकदशमलव";
+            case java.sql.Types.BINARY,java.sql.Types.VARBINARY,java.sql.Types.LONGVARBINARY,java.sql.Types.BLOB -> "बाइटबफ़र";
+            case java.sql.Types.DATE,java.sql.Types.TIME,java.sql.Types.TIMESTAMP -> "समय";
+            case java.sql.Types.CHAR,java.sql.Types.VARCHAR,java.sql.Types.LONGVARCHAR,
+                 java.sql.Types.NCHAR,java.sql.Types.NVARCHAR,java.sql.Types.LONGNVARCHAR -> "पाठ";
+            default -> "असमर्थित";
+        };
+    }
+    private static void mysqlValidateSql(String sql){
+        if(sql.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>65536
+                ||sql.indexOf(0)>=0||sql.indexOf(';')>=0
+                ||!java.util.regex.Pattern.compile("(?is)^\\s*(SELECT|INSERT|UPDATE|DELETE)\\b").matcher(sql).find()){
+            throw failure("MySQL में एक SELECT, INSERT, UPDATE या DELETE कथन दें।");
+        }
+    }
     private static PgConnection pgConnection(long id){var c=pgConnections.get(id);if(c==null)throw failure("PostgreSQL संबंध बंद है।");return c;}
     private static PgStatement pgStatement(long id){var s=pgStatements.get(id);if(s==null)throw failure("PostgreSQL कथन बंद है।");return s;}
     private static void pgReady(PgStatement s){if(s.state!=0)throw failure("PostgreSQL कथन को रीसेट करें।");}
@@ -53,12 +122,14 @@
         if(s.values[n]==null)throw failure("PostgreSQL स्तंभ रिक्त है।");if(!s.types[n].equals(want))throw failure("PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");return n;}
     static long pgPrepare(long id,String original,String converted){var c=pgConnection(id);pgHealthy(c);
         if(pgStatements.size()>=128)throw failure("बहुत अधिक खुले PostgreSQL कथन।");java.sql.PreparedStatement query=null;
-        try{query=c.db.prepareStatement(original);var s=new PgStatement(c,query);long result=++pgStatementNext;pgStatements.put(result,s);query=null;return result;}
+        if(c.mysql)mysqlValidateSql(original);
+        try{query=c.db.prepareStatement(original);if(c.mysql)query.setQueryTimeout(c.queryTimeout);var s=new PgStatement(c,query);long result=++pgStatementNext;pgStatements.put(result,s);query=null;return result;}
         catch(java.sql.SQLException e){throw pgFailure(e,c);}finally{if(query!=null)try{query.close();}catch(java.sql.SQLException ignored){}}
     }
     static void pgClose(long id){var c=pgConnections.remove(id);if(c==null)return;
         for(var entry:new java.util.ArrayList<>(pgStatements.entrySet()))if(entry.getValue().owner==c){pgStatements.remove(entry.getKey());try{entry.getValue().query.close();}catch(java.sql.SQLException ignored){}}
-        try{c.db.close();}catch(java.sql.SQLException e){throw pgFailure(e,null);}
+        try(var db=c.db){if(c.mysql&&c.transaction!=0)db.rollback();}
+        catch(java.sql.SQLException e){throw pgFailure(e,c.mysql?c:null);}
     }
     static void pgFinalize(long id){var s=pgStatements.remove(id);if(s==null)return;try{s.query.close();}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
     static long pgParameterCount(long id){return pgStatement(id).bound.length;}
@@ -67,7 +138,7 @@
     static void pgBindBool(long id,long index,boolean v){var s=pgStatement(id);int i=pgBinding(s,index);try{s.query.setBoolean(i,v);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
     static void pgBindText(long id,long index,String v){var s=pgStatement(id);int i=pgBinding(s,index);BhashRuntime.instance(v);
         if(v.indexOf(0)>=0||v.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>8388608)throw failure("अमान्य PostgreSQL पाठ।");
-        try{s.query.setObject(i,v,java.sql.Types.OTHER);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
+        try{if(s.owner.mysql)s.query.setString(i,v);else s.query.setObject(i,v,java.sql.Types.OTHER);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
     static void pgBindBytes(long id,long index,BhashRuntime.BBuffer v){var s=pgStatement(id);int i=pgBinding(s,index);try{s.query.setBytes(i,dbArray(v));s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
     static void pgBindNull(long id,long index){var s=pgStatement(id);int i=pgBinding(s,index);try{s.query.setNull(i,java.sql.Types.NULL);s.bound[i-1]=true;}catch(java.sql.SQLException e){throw pgFailure(e,s.owner);}}
     private static void pgBound(PgStatement s){for(boolean b:s.bound)if(!b)throw failure("सभी PostgreSQL मापदंड बाँधें।");}
