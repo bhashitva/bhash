@@ -46,12 +46,14 @@ jobs:
             if [[ "$attempt" == 24 ]]; then docker logs "$SQLSERVER_CONTAINER"; exit 1; fi
             sleep 3
           done
-          docker exec -i -e SQLCMDPASSWORD "$SQLSERVER_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b < src/test/resources/sqlserver/schema.sql
+          docker cp src/test/resources/sqlserver/schema.sql "$SQLSERVER_CONTAINER:/tmp/bhash-schema.sql"
+          "${sqlcmd[@]}" -i /tmp/bhash-schema.sql
+          "${sqlcmd[@]}" -d bhash -Q "IF OBJECT_ID(N'dbo.gradelevel', N'U') IS NULL OR OBJECT_ID(N'dbo.student', N'U') IS NULL THROW 50000, 'Fixture tables missing in a new session.', 1;"
           cp -r src/test/resources/sqlserver target/sqlserver-integration
           python scripts/generate_orm.py target/sqlserver-integration/mapping.json --output target/sqlserver-integration/src/generated.bhash
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar deps lock target/sqlserver-integration
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile target/sqlserver-integration --target jvm -o target/sqlserver-integration.jar
           export BHASH_SQLSERVER_URL="jdbc:sqlserver://127.0.0.1:1433;databaseName=bhash;user=sa;password=$SQLCMDPASSWORD;encrypt=true;trustServerCertificate=true"
-          result=$(java -cp 'target/sqlserver-integration.jar:target/sqlserver-driver/*' BhashProgram)
-          printf '%s\n' "$result"
-          grep -Fx SQLSERVER_ORM_OK <<<"$result"
+          set -o pipefail
+          java -cp 'target/sqlserver-integration.jar:target/sqlserver-driver/*' BhashProgram | tee target/sqlserver-output.txt
+          grep -Fx SQLSERVER_ORM_OK target/sqlserver-output.txt
