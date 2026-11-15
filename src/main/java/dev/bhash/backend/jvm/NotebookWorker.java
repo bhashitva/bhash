@@ -25,6 +25,7 @@ public final class NotebookWorker {
     private static final String STORAGE = PREFIX + "संग्रह";
     private static final List<String> TYPES = List.of("पूर्णांक", "दशमलव", "तार्किक", "पाठ", "बाइट", "लघुपूर्णांक");
     private static final int MAX_FRAME = 1024 * 1024;
+    private final ClassLoader cellParent;
     private final Gson json = new Gson();
     private final DataInputStream input = new DataInputStream(System.in);
     private final DataOutputStream output = new DataOutputStream(System.out);
@@ -37,10 +38,27 @@ public final class NotebookWorker {
     private record Slot(String name, String type, boolean mutable, Object value) {}
     private record Definition(String name, String result, boolean async, String source) {}
 
+    private NotebookWorker(ClassLoader cellParent) {
+        this.cellParent = cellParent;
+    }
+
     public static void main(String[] args) throws IOException {
         ProcessHandle.current().parent().ifPresent(parent ->
                 parent.onExit().thenRun(() -> Runtime.getRuntime().halt(0)));
-        new NotebookWorker().serve();
+        if (args.length > 1) throw new IllegalArgumentException("Expected at most one MySQL driver JAR");
+        URL driver = null;
+        if (args.length == 1) {
+            Path path = Path.of(args[0]).toRealPath();
+            if (!Files.isRegularFile(path) || !Files.isReadable(path)) {
+                throw new IOException("Cannot read MySQL Connector/J JAR: " + path);
+            }
+            driver = path.toUri().toURL();
+        }
+        ClassLoader platform = ClassLoader.getPlatformClassLoader();
+        // JDBC registrations and cleanup threads belong to the worker, not each cell.
+        try (var drivers = driver == null ? null : new URLClassLoader(new URL[]{driver}, platform)) {
+            new NotebookWorker(drivers == null ? platform : drivers).serve();
+        }
     }
 
     private JsonObject receive() throws IOException {
@@ -273,7 +291,7 @@ public final class NotebookWorker {
         var oldOut = System.out;
         var oldErr = System.err;
         var oldIn = System.in;
-        try (var loader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, ClassLoader.getPlatformClassLoader())) {
+        try (var loader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, cellParent)) {
             System.setOut(stream("stdout"));
             System.setErr(stream("stderr"));
             System.setIn(new InputStream() {
