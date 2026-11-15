@@ -10,6 +10,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: sqlserver-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   jdbc:
     runs-on: ubuntu-24.04
@@ -55,5 +58,10 @@ jobs:
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile target/sqlserver-integration --target jvm -o target/sqlserver-integration.jar
           export BHASH_SQLSERVER_URL="jdbc:sqlserver://127.0.0.1:1433;databaseName=bhash;user=sa;password=$SQLCMDPASSWORD;encrypt=true;trustServerCertificate=true"
           set -o pipefail
-          java -cp 'target/sqlserver-integration.jar:target/sqlserver-driver/*' BhashProgram | tee target/sqlserver-output.txt
+          cat > target/sqlserver-logging.properties <<'EOF'
+          handlers=java.util.logging.ConsoleHandler
+          java.util.logging.ConsoleHandler.level=FINE
+          com.microsoft.sqlserver.jdbc.internals.SQLServerException.level=FINE
+          EOF
+          java -Djava.util.logging.config.file=target/sqlserver-logging.properties -cp 'target/sqlserver-integration.jar:target/sqlserver-driver/*' BhashProgram | tee target/sqlserver-output.txt
           grep -Fx SQLSERVER_ORM_OK target/sqlserver-output.txt
