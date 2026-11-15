@@ -237,17 +237,34 @@ def method_header(name, args, result):
     ]
 
 
-def query_method(name, sql, args, entity, many=False, sqlserver_sql=None, sqlserver_args=None):
-    result = f"सूची<{entity['name']}>" if many else entity["name"]
-    lines = method_header(name, args, result)
+def sql_selection(sql, sqlserver_sql):
     if isinstance(sql, dict):
-        lines += [f"        मान एसक्यूएल: पाठ={literal(sql['sqlite'])};",
+        lines = [f"        मान एसक्यूएल: पाठ={literal(sql['sqlite'])};",
                   f"        यदि (संबंध.आंतरिकपोस्टग्रेस) {{ एसक्यूएल={literal(sql['postgresql'])}; }}"]
     else:
         mutability = "मान" if sqlserver_sql else "स्थिर"
-        lines.append(f"        {mutability} एसक्यूएल: पाठ={literal(sql)};")
+        lines = [f"        {mutability} एसक्यूएल: पाठ={literal(sql)};"]
     if sqlserver_sql:
         lines.append(f"        यदि (संबंध.आंतरिकएसक्यूएलसर्वर) {{ एसक्यूएल={literal(sqlserver_sql)}; }}")
+    return lines
+
+
+def server_identifiers(sql):
+    # Generator-owned SQL only. Double quotes enclose validated identifiers.
+    return re.sub(r'"([A-Za-z_][A-Za-z0-9_]*)"', lambda match: "[" + match[1] + "]", sql)
+
+
+def write_open(sql, sqlserver_enabled):
+    if not sqlserver_enabled:
+        return [f"        असमकालिक संसाधन (कथन: असमडेटाकथन=प्रतीक्षा संबंध.तैयार({literal(sql)},चिह्न)) {{"]
+    return sql_selection(sql, server_identifiers(sql)) + [
+        "        असमकालिक संसाधन (कथन: असमडेटाकथन=प्रतीक्षा संबंध.तैयार(एसक्यूएल,चिह्न)) {"]
+
+
+def query_method(name, sql, args, entity, many=False, sqlserver_sql=None, sqlserver_args=None):
+    result = f"सूची<{entity['name']}>" if many else entity["name"]
+    lines = method_header(name, args, result)
+    lines += sql_selection(sql, sqlserver_sql)
     lines.append("        असमकालिक संसाधन (कथन: असमडेटाकथन=प्रतीक्षा संबंध.तैयार(एसक्यूएल,चिह्न)) {")
     if sqlserver_args:
         lines += ["            यदि (संबंध.आंतरिकएसक्यूएलसर्वर) {",
@@ -303,10 +320,13 @@ def generate(schema):
                 lines += [f'        यदि (कथन.रिक्तहै({index})) {{ फेंको नया अपवाद("ORM अनिवार्य स्तंभ रिक्त है।"); }}',
                           f"        स्थिर क्षेत्र_{index}: {typ(col)}={read};"]
         lines += [f"        लौटाओ नया {entity['name']}({', '.join('क्षेत्र_' + str(i) for i in range(len(cols)))});", "    }"]
-        lines += query_method("पहचानसेपाओ", select + " WHERE " + predicate, keyargs, entity)
+        sqlserver_enabled = schema.get("sqlserver", False)
+        by_key = select + " WHERE " + predicate
+        lines += query_method("पहचानसेपाओ", by_key, keyargs, entity,
+                              sqlserver_sql=server_identifiers(by_key) if sqlserver_enabled else None)
         ordered = select + " ORDER BY " + ", ".join(sql_name(k) for k in keys_)
         page = [("सीमा", {"type": "integer"}), ("अंतर", {"type": "integer"})]
-        sqlserver_page = ordered + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY" if schema.get("sqlserver") else None
+        sqlserver_page = server_identifiers(ordered) + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY" if sqlserver_enabled else None
         method = query_method("सूचीलो", ordered + " LIMIT ? OFFSET ?", page, entity, True,
                               sqlserver_page, page[::-1] if sqlserver_page else None)
         method.insert(5, '        यदि (सीमा<१ || सीमा>१००० || अंतर<०) { फेंको नया अपवाद("ORM पृष्ठ सीमा अमान्य है।"); }')
@@ -315,7 +335,7 @@ def generate(schema):
         insert = f"INSERT INTO {table} ({projection}) VALUES ({', '.join('?' for _ in cols)})"
         lines += method_header("जोड़ो", [("मानक", {"type": entity["name"]})], "पूर्णांक") + [
                   '        यदि (मानक==रिक्त) { फेंको नया अपवाद("ORM अभिलेख रिक्त है।"); }',
-                  f"        असमकालिक संसाधन (कथन: असमडेटाकथन=प्रतीक्षा संबंध.तैयार({literal(insert)},चिह्न)) {{",
+                  *write_open(insert, sqlserver_enabled),
                   *binds(rowargs), "            लौटाओ प्रतीक्षा कथन.चलाओ(चिह्न);", "        }", "    }"]
         writable = [c for c in cols if c["column"] not in keys_ and c["column"] != version]
         if writable or version:
@@ -333,7 +353,7 @@ def generate(schema):
             if version:
                 member = "मानक." + colmap[version]["name"]
                 lines += [f'        यदि ({member}<० || {member}==९२२३३७२०३६८५४७७५८०७) {{ फेंको नया अपवाद("ORM संस्करण सीमा अमान्य है।"); }}']
-            lines += [f"        असमकालिक संसाधन (कथन: असमडेटाकथन=प्रतीक्षा संबंध.तैयार({literal(sql)},चिह्न)) {{",
+            lines += [*write_open(sql, sqlserver_enabled),
                       *binds(updateargs), "            यदि ((प्रतीक्षा कथन.चलाओ(चिह्न))!=१) { फेंको नया ओआरएमसंघर्ष(); }", "        }"]
             values_ = ["मानक." + c["name"] + ("+१" if c["column"] == version else "") for c in cols]
             lines += [f"        लौटाओ नया {entity['name']}({', '.join(values_)});", "    }"]
@@ -342,7 +362,7 @@ def generate(schema):
             deleteargs.append(("अपेक्षितसंस्करण", colmap[version]))
         where = predicate + (f" AND {sql_name(version)}=?" if version else "")
         lines += method_header("हटाओ", deleteargs, "पूर्णांक") + [
-                  f"        असमकालिक संसाधन (कथन: असमडेटाकथन=प्रतीक्षा संबंध.तैयार({literal('DELETE FROM ' + table + ' WHERE ' + where)},चिह्न)) {{",
+                  *write_open('DELETE FROM ' + table + ' WHERE ' + where, sqlserver_enabled),
                   *binds(deleteargs), "            स्थिर संख्या: पूर्णांक=प्रतीक्षा कथन.चलाओ(चिह्न);"]
         if version:
             lines.append("            यदि (संख्या!=१) { फेंको नया ओआरएमसंघर्ष(); }")
