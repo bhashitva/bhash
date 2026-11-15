@@ -46,7 +46,7 @@ static my_statement my_statements[128];
 static uint64_t my_next_conn=UINT64_C(1)<<63,my_next_stmt=UINT64_C(1)<<63,my_next_tx;
 
 static int my_ok(my_short status){return status==0||status==1;}
-static void my_error(my_connection *c,my_short kind,my_handle handle,const void *location){
+static _Noreturn void my_error(my_connection *c,my_short kind,my_handle handle,const void *location){
     unsigned char state[6]="XXXXX";
     if(handle){
         unsigned char ignored[2];int code;my_short length;
@@ -158,7 +158,7 @@ static uint64_t my_prepare(my_connection *c,void *sql,const void *location){
     if(!slot)runtime_error(location,"बहुत अधिक खुले MySQL कथन।");
     my_handle stmt=NULL;
     if(!my_ok(my_SQLAllocHandle(MY_STMT,c->db,&stmt)))my_error(c,MY_DBC,c->db,location);
-    my_short count;
+    my_short count=0;
     if(!my_ok(my_SQLSetStmtAttr(stmt,0,(void *)(intptr_t)c->timeout,0))||
        !my_ok(my_SQLPrepare(stmt,text_data(sql),(int)text_length(sql)))||
        !my_ok(my_SQLNumParams(stmt,&count))){
@@ -278,7 +278,7 @@ static uint64_t mysql_call(uint32_t op,uint64_t id,uint64_t b,uint64_t value,con
         }else if(op==10){
             bh_collection *buffer=bits_pointer(value);bh_instance(buffer,location);
             if(buffer->size>MY_ROW_LIMIT)runtime_error(location,"MySQL मान सीमा से बाहर है।");
-            p.value=pg_copy(buffer->data,(size_t)buffer->size,location);p.length=(my_len)buffer->size;p.c_type=-2;p.sql_type=-3;
+            p.value=pg_copy((const char *)buffer->data,(size_t)buffer->size,location);p.length=(my_len)buffer->size;p.c_type=-2;p.sql_type=-3;
         }
         free(s->params[b-1].value);s->params[b-1]=p;return 0;
     }
