@@ -33,7 +33,7 @@ public final class NativeLibrary {
             String metadata = manifest(library, tools, abi, api);
             Files.writeString(work.resolve("program.ll"), LlvmEmitter.emitLibrary(library, tools.target(), metadata));
             for (String file : List.of("bhash_runtime.c", "bhash_runtime.h", "bhash_embed.h", "bhash_embed_internal.h",
-                    "bhash_embed.inc", "bhash_sqlite.inc", "bhash_postgres.inc", "bhash_async_database.inc"))
+                    "bhash_embed.inc", "bhash_sqlite.inc", "bhash_postgres.inc", "bhash_mysql.inc", "bhash_async_database.inc"))
                 Files.write(work.resolve(file), NativeBuildInfo.resource(RESOURCE + file));
             Files.copy(work.resolve("bhash_embed.h"), distribution.resolve("bhash_embed.h"));
             writeWrappers(library, distribution, work);
