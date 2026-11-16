@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
  * unixODBC 3 ABI on 64-bit Linux. Loading at runtime keeps C development
  * headers and the client driver optional for other Bhash programs. */
+#include <iconv.h>
 typedef int16_t my_short;
 typedef uint16_t my_ushort;
 typedef intptr_t my_len;
@@ -13,6 +14,10 @@ typedef void *my_handle;
  X(SQLSetConnectAttr,(my_handle,int,void*,int)) \
  X(SQLSetStmtAttr,(my_handle,int,void*,int)) \
  X(SQLDriverConnect,(my_handle,void*,unsigned char*,my_short,unsigned char*,my_short,my_short*,my_ushort)) \
+ X(SQLDriverConnectW,(my_handle,void*,uint16_t*,my_short,uint16_t*,my_short,my_short*,my_ushort)) \
+ X(SQLPrepareW,(my_handle,uint16_t*,int)) \
+ X(SQLDescribeParam,(my_handle,my_ushort,my_short*,my_ulen*,my_short*,my_short*)) \
+ X(SQLDescribeColW,(my_handle,my_ushort,uint16_t*,my_short,my_short*,my_short*,my_ulen*,my_short*,my_short*)) \
  X(SQLDisconnect,(my_handle)) \
  X(SQLPrepare,(my_handle,unsigned char*,int)) \
  X(SQLNumParams,(my_handle,my_short*)) \
@@ -34,7 +39,7 @@ enum {MY_ENV=1,MY_DBC=2,MY_STMT=3,MY_NO_DATA=100,MY_NULL=-1,MY_NTS=-3};
 enum {MY_INTEGER,MY_REAL,MY_BOOL,MY_TEXT,MY_BYTES,MY_DECIMAL,MY_TIME,MY_UNSUPPORTED};
 enum {MY_ROW_LIMIT=8388608};
 static my_handle my_env;
-typedef struct {uint64_t id,token;my_handle db;int failed,timeout;} my_connection;
+typedef struct {uint64_t id,token;my_handle db;int failed,timeout,sqlserver;} my_connection;
 typedef struct {void *value;my_len length;my_short c_type,sql_type;unsigned char bound;} my_binding;
 typedef struct {char name[1024];int kind;unsigned char *data;size_t length;int null;} my_column;
 typedef struct {
@@ -55,13 +60,13 @@ static _Noreturn void my_error(my_connection *c,my_short kind,my_handle handle,c
         state[5]=0;
     }
     if(c&&c->token)c->failed=1;
-    char message[64];snprintf(message,sizeof message,"MySQL त्रुटि [%s]।",state);
+    char message[64];snprintf(message,sizeof message,"%s त्रुटि [%s]।",c&&c->sqlserver?"SQL Server":"MySQL",state);
     runtime_error(location,message);
 }
 static void my_load(const void *location){
     if(my_env)return;
     void *lib=dlopen("libodbc.so.2",RTLD_NOW|RTLD_LOCAL);
-    if(!lib)runtime_error(location,"MySQL के लिए unixODBC रनटाइम चाहिए।");
+    if(!lib)runtime_error(location,"इस डेटा चालक के लिए unixODBC रनटाइम चाहिए।");
 #define MY_LOAD(name,args) do{void *p=dlsym(lib,#name);if(!p){dlclose(lib);runtime_error(location,"unixODBC रनटाइम असंगत है।");}memcpy(&my_##name,&p,sizeof p);}while(0);
     MY_API(MY_LOAD)
 #undef MY_LOAD
@@ -71,6 +76,97 @@ static void my_load(const void *location){
         dlclose(lib);runtime_error(location,"unixODBC परिवेश नहीं खुला।");
     }
     my_env=env;
+}
+static void *sqlserver_convert(const void *text,size_t size,size_t *length,int wide){
+    if(size>(SIZE_MAX-4)/4)return NULL;
+    iconv_t converter=iconv_open(wide?"UTF-16LE":"UTF-8",wide?"UTF-8":"UTF-16LE");
+    if(converter==(iconv_t)-1)return NULL;
+    size_t capacity=size*4+4,remaining=capacity-2;
+    char *result=malloc(capacity),*out=result,*in=(char *)text;
+    if(!result||iconv(converter,&in,&size,&out,&remaining)==(size_t)-1){free(result);result=NULL;}
+    else {*length=(size_t)(out-result);out[0]=out[1]=0;}
+    iconv_close(converter);
+    return result;
+}
+static int sqlserver_connect(const char *config,my_handle *db){
+    size_t bytes;
+    uint16_t *wide=sqlserver_convert(config,strlen(config),&bytes,1);
+    if(!wide)return 0;
+    int ok=bytes/2<=32767&&my_ok(my_SQLAllocHandle(MY_DBC,my_env,db))&&
+        my_ok(my_SQLSetConnectAttr(*db,103,(void *)(intptr_t)15,0))&&
+        my_ok(my_SQLDriverConnectW(*db,NULL,wide,(my_short)(bytes/2),NULL,0,NULL,0));
+    free(wide);
+    if(!ok&&*db){my_SQLFreeHandle(MY_DBC,*db);*db=NULL;}
+    if(ok)(void)my_SQLSetConnectAttr(*db,113,(void *)(intptr_t)30,0);
+    return ok;
+}
+static uint64_t sqlserver_open(const char *config,size_t length,const void *location){
+    my_load(location);
+    for(size_t i=0;i<32;i++)if(!my_connections[i].id){
+        char *copy=pg_copy(config,length,location);
+        my_handle db=NULL;
+        int ok=sqlserver_connect(copy,&db);
+        free(copy);
+        if(!ok)runtime_error(location,"SQL Server संबंध नहीं खुला। ODBC चालक, प्रमाणपत्र और विन्यास जाँचें।");
+        my_connections[i]=(my_connection){.id=++my_next_conn,.db=db,.timeout=30,.sqlserver=1};
+        return my_connections[i].id;
+    }
+    runtime_error(location,"बहुत अधिक खुले डेटा संबंध।");
+}
+static int sqlserver_prepare(my_handle db,const char *sql,size_t length,my_handle *stmt,my_short *count){
+    size_t bytes;
+    uint16_t *wide=sqlserver_convert(sql,length,&bytes,1);
+    if(!wide)return 0;
+    int ok=my_ok(my_SQLAllocHandle(MY_STMT,db,stmt))&&
+        my_ok(my_SQLSetStmtAttr(*stmt,0,(void *)(intptr_t)30,0))&&
+        my_ok(my_SQLPrepareW(*stmt,wide,(int)(bytes/2)))&&
+        my_ok(my_SQLNumParams(*stmt,count))&&*count>=0&&*count<=999;
+    free(wide);
+    return ok;
+}
+static int sqlserver_bind(my_handle stmt,int index,my_binding *p){
+    my_short type=p->sql_type,scale=0,nullable;
+    my_ulen size=p->length>0?(my_ulen)p->length:1;
+    if(p->c_type==-8)size=size>1?size/2:1;
+    if(p->sql_type==-3&&size>8000)type=-4;
+    if(p->length==MY_NULL&&!my_ok(my_SQLDescribeParam(stmt,(my_ushort)index,&type,&size,&scale,&nullable)))return 0;
+    return my_ok(my_SQLBindParameter(stmt,(my_ushort)index,1,p->c_type,type,size,scale,
+        p->value,p->length>0?p->length:0,&p->length));
+}
+static int sqlserver_read(my_handle stmt,my_ushort column,int binary,size_t limit,
+    unsigned char **result,size_t *length,int *isnull){
+    size_t used=0;unsigned char *data=NULL;
+    *result=NULL;*length=0;*isnull=0;
+    for(;;){
+        uint16_t chunk[2049];my_len indicator=0;
+        my_short status=my_SQLGetData(stmt,column,binary?-2:-8,chunk,binary?4096:sizeof chunk,&indicator);
+        if(status==MY_NO_DATA)break;
+        if(!my_ok(status)){free(data);return 0;}
+        if(indicator==MY_NULL){free(data);*isnull=1;return 1;}
+        if(indicator<0&&status==0){free(data);return 0;}
+        size_t got=indicator<0||indicator>4096?4096:(size_t)indicator;
+        size_t maximum=binary?limit:limit*2;
+        if(got>maximum-used){free(data);return 0;}
+        unsigned char *more=realloc(data,used+got+2);
+        if(!more){free(data);return 0;}
+        data=more;memcpy(data+used,chunk,got);used+=got;
+        if(!status)break;
+        if(!got){free(data);return 0;}
+    }
+    if(!binary){
+        unsigned char *utf8=sqlserver_convert(data,used,length,0);free(data);
+        if(!utf8||*length>limit){free(utf8);return 0;}
+        *result=utf8;return 1;
+    }
+    *result=data;*length=used;
+    return 1;
+}
+static int sqlserver_column(my_handle stmt,my_ushort index,my_short *type,char **name){
+    uint16_t wide[256];my_short chars,scale,nullable;my_ulen width;
+    if(!my_ok(my_SQLDescribeColW(stmt,index,wide,256,&chars,type,&width,&scale,&nullable))||chars<0||chars>=256)return 0;
+    size_t length;
+    *name=sqlserver_convert(wide,(size_t)chars*2,&length,0);
+    return *name!=NULL;
 }
 static int my_safe(const char *s,const char *blocked){return !strpbrk(s,blocked);}
 static uint64_t mysql_open(const char *config,size_t length,const void *location){
@@ -138,28 +234,44 @@ static void my_dispose(my_statement *s){
 static void my_healthy(my_connection *c,const void *location){
     if(c->failed)runtime_error(location,"MySQL लेनदेन असफल है। इसे वापस लें।");
 }
-static int my_sql_verb(const char *text,size_t n,const void *location){
-    if(n>65536||memchr(text,0,n)||memchr(text,';',n))runtime_error(location,"अमान्य MySQL कथन।");
+static int my_sql_type(const char *text,size_t n,int sqlserver){
+    if(n>65536||memchr(text,0,n)||(!sqlserver&&memchr(text,';',n)))return -1;
     size_t i=0;while(i<n&&strchr(" \t\r\n",text[i]))i++;
     char verb[8]={0};size_t j=0;
     while(i<n&&j<7&&((text[i]>='A'&&text[i]<='Z')||(text[i]>='a'&&text[i]<='z'))){
         unsigned char c=text[i++];verb[j++]=(char)(c>='a'&&c<='z'?c-32:c);
     }
-    if(i<n&&!strchr(" \t\r\n(",text[i]))runtime_error(location,"अमान्य MySQL कथन।");
+    if(i<n&&!strchr(" \t\r\n(",text[i]))return -1;
+    if(sqlserver){
+        char quote=0;
+        for(size_t k=i;k<n;k++){
+            char c=text[k];
+            if(quote){
+                if(c==quote){if(k+1<n&&text[k+1]==quote)k++;else quote=0;}
+            }else if(c=='\''||c=='"'||c=='[')quote=c=='['?']':c;
+            else if(c==';'||c=='@'||c=='#'||(k+1<n&&((c=='-'&&text[k+1]=='-')||(c=='/'&&text[k+1]=='*'))))return -1;
+        }
+        if(quote)return -1;
+    }
     if(!strcmp(verb,"SELECT"))return 1;
     if(!strcmp(verb,"INSERT")||!strcmp(verb,"UPDATE")||!strcmp(verb,"DELETE"))return 0;
-    runtime_error(location,"MySQL में एक SELECT, INSERT, UPDATE या DELETE कथन दें।");
+    return -1;
 }
 static uint64_t my_prepare(my_connection *c,void *sql,const void *location){
     my_healthy(c,location);bh_instance(sql,location);
-    int select=my_sql_verb((const char*)text_data(sql),text_length(sql),location);
+    int select=my_sql_type((const char*)text_data(sql),text_length(sql),c->sqlserver);
+    if(select<0)runtime_error(location,"एक SELECT, INSERT, UPDATE या DELETE कथन दें।");
     my_statement *slot=NULL;
     for(size_t i=0;i<128;i++)if(!my_statements[i].id){slot=&my_statements[i];break;}
     if(!slot)runtime_error(location,"बहुत अधिक खुले MySQL कथन।");
     my_handle stmt=NULL;
-    if(!my_ok(my_SQLAllocHandle(MY_STMT,c->db,&stmt)))my_error(c,MY_DBC,c->db,location);
     my_short count=0;
-    if(!my_ok(my_SQLSetStmtAttr(stmt,0,(void *)(intptr_t)c->timeout,0))||
+    if(c->sqlserver){
+        if(!sqlserver_prepare(c->db,(const char*)text_data(sql),text_length(sql),&stmt,&count)){
+            if(stmt)my_SQLFreeHandle(MY_STMT,stmt);
+            my_error(c,MY_DBC,c->db,location);
+        }
+    }else if(!my_ok(my_SQLAllocHandle(MY_STMT,c->db,&stmt))||!my_ok(my_SQLSetStmtAttr(stmt,0,(void *)(intptr_t)c->timeout,0))||
        !my_ok(my_SQLPrepare(stmt,text_data(sql),(int)text_length(sql)))||
        !my_ok(my_SQLNumParams(stmt,&count))){
         my_SQLFreeHandle(MY_STMT,stmt);my_error(c,MY_DBC,c->db,location);
@@ -178,8 +290,8 @@ static int my_kind(my_short type,my_len uns,my_ulen width){
         case 6:case 7:case 8:return MY_REAL;
         case 2:case 3:return MY_DECIMAL;
         case -2:case -3:case -4:return MY_BYTES;
-        case 91:case 92:case 93:return MY_TIME;
-        case -10:case -9:case -8:case -1:case 1:case 12:return MY_TEXT;
+        case -155:case -154:case 91:case 92:case 93:return MY_TIME;
+        case -11:case -10:case -9:case -8:case -1:case 1:case 12:return MY_TEXT;
         default:return MY_UNSUPPORTED;
     }
 }
@@ -202,10 +314,16 @@ static void my_describe(my_statement *s,const void *location){
     s->cols=cols;
     for(int i=0;i<cols;i++){
         my_column *column=&s->columns[i];
-        my_short type,length,scale,nullable;my_ulen width;my_len uns=0;
-        if(!my_ok(my_SQLDescribeCol(s->stmt,(my_ushort)i+1,(unsigned char*)column->name,
+        my_short type,length,scale,nullable;my_ulen width=0;my_len uns=0;
+        if(!s->owner->sqlserver&&!my_ok(my_SQLDescribeCol(s->stmt,(my_ushort)i+1,(unsigned char*)column->name,
             sizeof column->name,&length,&type,&width,&scale,&nullable)))my_fail_stmt(s,location);
-        if(type==-5)my_SQLColAttribute(s->stmt,(my_ushort)i+1,8,NULL,0,NULL,&uns);
+        if(s->owner->sqlserver){
+            char *name=NULL;
+            if(!sqlserver_column(s->stmt,(my_ushort)i+1,&type,&name))my_fail_stmt(s,location);
+            snprintf(column->name,sizeof column->name,"%s",name);free(name);
+            width=1;
+        }
+        if(type==-5&&!s->owner->sqlserver)my_SQLColAttribute(s->stmt,(my_ushort)i+1,8,NULL,0,NULL,&uns);
         column->kind=my_kind(type,uns,width);
     }
 }
@@ -213,6 +331,7 @@ static void my_execute(my_statement *s,const void *location){
     for(int i=0;i<s->count;i++)if(!s->params[i].bound)runtime_error(location,"सभी MySQL मापदंड बाँधें।");
     for(int i=0;i<s->count;i++){
         my_binding *p=&s->params[i];
+        if(s->owner->sqlserver){if(!sqlserver_bind(s->stmt,i+1,p))my_fail_stmt(s,location);continue;}
         my_ulen size=p->length>0?(my_ulen)p->length:1;
         if(!my_ok(my_SQLBindParameter(s->stmt,(my_ushort)i+1,1,p->c_type,p->sql_type,size,0,
             p->value,p->length>0?p->length:0,&p->length)))my_fail_stmt(s,location);
@@ -224,6 +343,10 @@ static void my_execute(my_statement *s,const void *location){
 static int my_read_cell(my_statement *s,int col,size_t *total,const void *location){
     my_column *cell=&s->columns[col];
     int binary=cell->kind==MY_BYTES;
+    if(s->owner->sqlserver){
+        if(!sqlserver_read(s->stmt,(my_ushort)col+1,binary,MY_ROW_LIMIT-*total,&cell->data,&cell->length,&cell->null))my_fail_stmt(s,location);
+        *total+=cell->length;return 1;
+    }
     unsigned char chunk[4097];size_t length=0;
     cell->null=0;cell->length=0;
     for(;;){
@@ -274,7 +397,11 @@ static uint64_t mysql_call(uint32_t op,uint64_t id,uint64_t b,uint64_t value,con
         }else if(op==9){
             void *t=bits_pointer(value);bh_instance(t,location);size_t n=text_length(t);
             if(n>MY_ROW_LIMIT||memchr(text_data(t),0,n))runtime_error(location,"अमान्य MySQL पाठ।");
-            p.value=pg_copy((const char*)text_data(t),n,location);p.length=(my_len)n;
+            if(s->owner->sqlserver){
+                size_t length;p.value=sqlserver_convert(text_data(t),n,&length,1);
+                if(!p.value)runtime_error(location,"अमान्य SQL Server पाठ।");
+                p.length=(my_len)length;p.c_type=-8;p.sql_type=length>8000?-10:-9;
+            }else{p.value=pg_copy((const char*)text_data(t),n,location);p.length=(my_len)n;}
         }else if(op==10){
             bh_collection *buffer=bits_pointer(value);bh_instance(buffer,location);
             if(buffer->size>MY_ROW_LIMIT)runtime_error(location,"MySQL मान सीमा से बाहर है।");
