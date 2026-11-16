@@ -1,19 +1,24 @@
 # Microsoft SQL Server से जुड़ें
 
-JVM लक्ष्य में `डेटा.एसक्यूएलसर्वर(संबंधपाठ)` को Microsoft JDBC का पूरा
-संबंधपाठ दें। अनुप्रयोग इसे विन्यास से पढ़ सकता है या किसी फलन को मापदंड
-के रूप में दे सकता है। [JDBC संबंधपाठ का स्वरूप और मानों का एस्केपिंग](https://learn.microsoft.com/sql/connect/jdbc/building-the-connection-url)
+संबंध खोलने के लिए `डेटा.एसक्यूएलसर्वर(संबंधपाठ)` या
+`असमडेटा.एसक्यूएलसर्वर(संबंधपाठ)` को चुने हुए लक्ष्य का पूरा संबंधपाठ
+दें। अनुप्रयोग यह पाठ बना सकता है, किसी फलन से प्राप्त कर सकता है या
+अपने विन्यास से पढ़ सकता है। नीचे दिए उदाहरण में इसे
+`BHASH_SQLSERVER_URL` से पढ़ा गया है। कूटशब्द सहित संबंधपाठ को स्रोत,
+Git और लॉग से बाहर रखें।
 
-उदाहरण के लिए `BHASH_SQLSERVER_URL` में यह स्वरूप रखें। अपने सर्वर,
-डेटाबेस और अनुप्रयोग उपयोगकर्ता के मान भरें। कूटशब्द सहित संबंधपाठ को
-स्रोत, Git और लॉग से बाहर रखें।
+| लक्ष्य | संबंधपाठ का उदाहरण |
+| --- | --- |
+| JVM | `jdbc:sqlserver://sql.example.org:1433;databaseName=school;user=school_app;password={replace-me};encrypt=true;trustServerCertificate=false` |
+| .NET | `Server=tcp:sql.example.org,1433;Database=school;User ID=school_app;Password=replace-me;Encrypt=true;TrustServerCertificate=false` |
+| नेटिव Linux x64 | `Driver={ODBC Driver 18 for SQL Server};Server=tcp:sql.example.org,1433;Database=school;UID=school_app;PWD=replace-me;Encrypt=yes;TrustServerCertificate=no` |
 
-```text
-jdbc:sqlserver://sql.example.org:1433;databaseName=school;user=school_app;password={replace-me};encrypt=true;trustServerCertificate=false
-```
-
-सर्वर का प्रमाणपत्र Java के विश्वसनीय प्रमाणपत्र भंडार में होना चाहिए और
-उसका नाम संबंधपाठ के मेज़बान से मिलना चाहिए।
+सर्वर का प्रमाणपत्र चालक के विश्वसनीय प्रमाणपत्र भंडार में होना चाहिए और
+उसका नाम संबंधपाठ के मेज़बान से मिलना चाहिए। विशेष चिह्न वाले कूटशब्द
+को उसके चालक के नियमों के अनुसार उद्धृत करें।
+[JDBC संबंधपाठ](https://learn.microsoft.com/sql/connect/jdbc/building-the-connection-url)
+[.NET संबंधपाठ](https://learn.microsoft.com/sql/connect/ado-net/connection-string-syntax)
+[ODBC चालक स्थापना](https://learn.microsoft.com/sql/connect/odbc/linux/installing-the-microsoft-odbc-driver-for-sql-server-on-linux)
 
 ```bhash
 आयात मानक.डेटा;
@@ -36,7 +41,7 @@ jdbc:sqlserver://sql.example.org:1433;databaseName=school;user=school_app;passwo
 ```
 
 तालिका में `id` के लिए `BIGINT` और हिन्दी पाठ के लिए `NVARCHAR` रखें।
-`?` का मान JDBC के माध्यम से अलग जाता है। `संसाधन` संबंध और कथन बंद
+`?` का मान चालक को SQL से अलग भेजा जाता है। `संसाधन` संबंध और कथन बंद
 करता है। `डेटालेनदेन` में `सहेजो()` न चलाने पर बंद करते समय बदलाव
 वापस होते हैं। SQL Server परिणाम के स्तंभ पहली बार `अगला()` चलाने पर
 पहचाने जाते हैं।
@@ -48,6 +53,32 @@ Microsoft JDBC का `jre11` JAR Java 17+ की classpath में रखे�
 ```sh
 java -jar bhash-compiler.jar compile example.bhash --target jvm -o example.jar
 java -cp "example.jar:/path/to/mssql-jdbc-12.10.2.jre11.jar" BhashProgram
+```
+
+### .NET चालक
+
+`Microsoft.Data.SqlClient` और उसकी निर्भरताएँ उसी निर्देशिका में
+प्रकाशित करें। उदाहरण Linux x64 के लिए है। Windows x64 पर
+`linux-x64` की जगह `win-x64` चुनें और `BHASH_SQLSERVER_DOTNET_DRIVER`
+में DLL का पूरा पथ रखें।
+
+```sh
+dotnet new console --framework net10.0 -o sqlserver-driver-project
+dotnet add sqlserver-driver-project package Microsoft.Data.SqlClient --version 6.1.7
+dotnet publish sqlserver-driver-project -r linux-x64 --self-contained false -o sqlserver-driver
+export BHASH_SQLSERVER_DOTNET_DRIVER="$PWD/sqlserver-driver/Microsoft.Data.SqlClient.dll"
+java -jar bhash-compiler.jar compile example.bhash --target clr -o example-clr
+dotnet example-clr/BhashProgram.dll
+```
+
+### नेटिव Linux x64 चालक
+
+चलाने वाले Linux होस्ट पर unixODBC और Microsoft ODBC Driver 18
+स्थापित करें। चालक का पंजीकृत नाम `odbcinst -q -d` से जाँचें।
+
+```sh
+java -jar bhash-compiler.jar compile example.bhash --target native -o example
+./example
 ```
 
 ## ORM से विद्यार्थी और उसकी कक्षा पढ़ें
@@ -75,6 +106,6 @@ SQL Server की named query में सर्वर पर सीमा ल�
 }
 ```
 
-प्रारम्भिक समर्थन JVM पर `SELECT`, `INSERT`, `UPDATE` और `DELETE` को
+SQL Server प्रदाता `SELECT`, `INSERT`, `UPDATE` और `DELETE` को
 कवर करता है। SQL Server schema को SQL Server के अपने साधनों से बनाएँ।
 `मानक.माइग्रेशन` में SQL Server समर्थन अभी शेष है।
