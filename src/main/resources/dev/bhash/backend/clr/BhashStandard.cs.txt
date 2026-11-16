@@ -1080,8 +1080,7 @@ internal static class BhashStandard {
                 break;
             case 2:
                 if(c.Failed)throw new AdError("डेटालेनदेन असफल है; वापस लें।");
-                if(j.Parameters.Length!=1||j.Parameters[0] is not string sql)throw new AdError("अमान्य SQL Server कथन।");
-                var parsed=BhashMysql.Parameters(sql,true);
+                var parsed=BhashMysql.Parameters(j.Text,true);
                 var command=c.Managed.CreateCommand();
                 j.Prepared=new AdStatement{Owner=c,Managed=command,Parameters=parsed.Count,Select=parsed.Select};
                 command.CommandText=parsed.Sql;
