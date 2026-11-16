@@ -12,6 +12,7 @@ Run the compiler JAR with a full JDK 17 or newer. See the [command-line guide](d
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.25.7](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.7) | 2026-11-16 20:14 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.7/bhash-compiler-0.25.7.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.7/bhash-compiler-0.25.7.jar.sha256) |
 | [0.25.6](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.6) | 2026-11-16 17:33 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.6/bhash-compiler-0.25.6.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.6/bhash-compiler-0.25.6.jar.sha256) |
 | [0.25.5](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.5) | 2026-11-16 15:03 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.5/bhash-compiler-0.25.5.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.5/bhash-compiler-0.25.5.jar.sha256) |
 | [0.25.4](https://github.com/bhashitva/bhash/releases/tag/bhash-0.25.4) | 2026-11-15 15:07 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.4/bhash-compiler-0.25.4.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.25.4/bhash-compiler-0.25.4.jar.sha256) |
@@ -31,6 +32,7 @@ Install or update from the [Visual Studio Marketplace](https://marketplace.visua
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.25.7](https://github.com/bhashitva/bhash/releases/tag/vscode-0.25.7) | 2026-11-16 20:17 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.7/bhash-vscode-0.25.7.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.7/bhash-vscode-0.25.7.vsix.sha256) |
 | [0.25.6](https://github.com/bhashitva/bhash/releases/tag/vscode-0.25.6) | 2026-11-16 17:34 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.6/bhash-vscode-0.25.6.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.6/bhash-vscode-0.25.6.vsix.sha256) |
 | [0.25.5](https://github.com/bhashitva/bhash/releases/tag/vscode-0.25.5) | 2026-11-16 15:10 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.5/bhash-vscode-0.25.5.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.5/bhash-vscode-0.25.5.vsix.sha256) |
 | [0.25.4](https://github.com/bhashitva/bhash/releases/tag/vscode-0.25.4) | 2026-11-15 15:07 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.4/bhash-vscode-0.25.4.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.25.4/bhash-vscode-0.25.4.vsix.sha256) |
