@@ -11,14 +11,15 @@ Git और लॉग से बाहर रखें।
 | --- | --- |
 | JVM | `jdbc:sqlserver://sql.example.org:1433;databaseName=school;user=school_app;password={replace-me};encrypt=true;trustServerCertificate=false` |
 | .NET | `Server=tcp:sql.example.org,1433;Database=school;User ID=school_app;Password=replace-me;Encrypt=true;TrustServerCertificate=false` |
-| नेटिव Linux x64 | `Driver={ODBC Driver 18 for SQL Server};Server=tcp:sql.example.org,1433;Database=school;UID=school_app;PWD=replace-me;Encrypt=yes;TrustServerCertificate=no` |
+| नेटिव Linux और Windows x64 | `Driver={ODBC Driver 18 for SQL Server};Server=tcp:sql.example.org,1433;Database=school;UID=school_app;PWD=replace-me;Encrypt=yes;TrustServerCertificate=no` |
 
 सर्वर का प्रमाणपत्र चालक के विश्वसनीय प्रमाणपत्र भंडार में होना चाहिए और
 उसका नाम संबंधपाठ के मेज़बान से मिलना चाहिए। विशेष चिह्न वाले कूटशब्द
 को उसके चालक के नियमों के अनुसार उद्धृत करें।
 [JDBC संबंधपाठ](https://learn.microsoft.com/sql/connect/jdbc/building-the-connection-url)
 [.NET संबंधपाठ](https://learn.microsoft.com/sql/connect/ado-net/connection-string-syntax)
-[ODBC चालक स्थापना](https://learn.microsoft.com/sql/connect/odbc/linux/installing-the-microsoft-odbc-driver-for-sql-server-on-linux)
+[Linux पर ODBC चालक स्थापना](https://learn.microsoft.com/sql/connect/odbc/linux/installing-the-microsoft-odbc-driver-for-sql-server-on-linux)
+[Windows पर ODBC चालक डाउनलोड](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server#download-for-windows)
 
 ```bhash
 आयात मानक.डेटा;
@@ -80,6 +81,22 @@ dotnet example-clr/BhashProgram.dll
 java -jar bhash-compiler.jar compile example.bhash --target native -o example
 ./example
 ```
+
+### नेटिव Windows x64 चालक
+
+जिस Windows मशीन पर अनुप्रयोग चलेगा, वहाँ Microsoft ODBC Driver 18 का
+x64 संस्करण स्थापित करें। Windows का ODBC प्रबंधक अपने आप उपयोग होता है।
+SQL Server लॉगिन के लिए ऊपर दिया ODBC संबंधपाठ उपयोग करें। Windows खाते
+से जुड़े सर्वर के लिए `UID` और `PWD` की जगह `Trusted_Connection=yes` दें।
+
+```powershell
+$env:BHASH_SQLSERVER_URL = 'Driver={ODBC Driver 18 for SQL Server};Server=tcp:sql.example.org,1433;Database=school;Trusted_Connection=yes;Encrypt=yes;TrustServerCertificate=no'
+java -jar bhash-compiler.jar compile example.bhash --target native -o example.exe
+.\example.exe
+```
+
+Windows CI में यही प्रदाता SQL Server 2022 Express LocalDB (16.x) के साथ
+मापदंडयुक्त प्रश्न, डेटा वापसी और जनित ORM भंडार जाँचता है।
 
 ## ORM से विद्यार्थी और उसकी कक्षा पढ़ें
 
