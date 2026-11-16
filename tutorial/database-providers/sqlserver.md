@@ -11,7 +11,7 @@ Git और लॉग से बाहर रखें।
 | --- | --- |
 | JVM | `jdbc:sqlserver://sql.example.org:1433;databaseName=school;user=school_app;password={replace-me};encrypt=true;trustServerCertificate=false` |
 | .NET | `Server=tcp:sql.example.org,1433;Database=school;User ID=school_app;Password=replace-me;Encrypt=true;TrustServerCertificate=false` |
-| नेटिव Linux और Windows x64 | `Driver={ODBC Driver 18 for SQL Server};Server=tcp:sql.example.org,1433;Database=school;UID=school_app;PWD=replace-me;Encrypt=yes;TrustServerCertificate=no` |
+| नेटिव Linux x64, Windows x64 और macOS Apple Silicon | `Driver={ODBC Driver 18 for SQL Server};Server=tcp:sql.example.org,1433;Database=school;UID=school_app;PWD=replace-me;Encrypt=yes;TrustServerCertificate=no` |
 
 सर्वर का प्रमाणपत्र चालक के विश्वसनीय प्रमाणपत्र भंडार में होना चाहिए और
 उसका नाम संबंधपाठ के मेज़बान से मिलना चाहिए। विशेष चिह्न वाले कूटशब्द
@@ -97,6 +97,36 @@ java -jar bhash-compiler.jar compile example.bhash --target native -o example.ex
 
 Windows CI में यही प्रदाता SQL Server 2022 Express LocalDB (16.x) के साथ
 मापदंडयुक्त प्रश्न, डेटा वापसी और जनित ORM भंडार जाँचता है।
+
+### नेटिव macOS Apple Silicon चालक
+
+ARM64 Terminal में Homebrew से Microsoft ODBC Driver 18 स्थापित करें।
+यह चालक unixODBC के साथ काम करता है।
+
+```sh
+brew tap microsoft/mssql-release https://github.com/microsoft/homebrew-mssql-release
+# Homebrew 6 या बाद के संस्करण में
+brew trust microsoft/mssql-release
+brew install msodbcsql18
+export BHASH_UNIXODBC="$(brew --prefix unixodbc)/lib/libodbc.2.dylib"
+java -jar bhash-compiler.jar compile example.bhash --target native -o example
+./example
+```
+
+चालक का पंजीकृत नाम ऊपर वाले ODBC संबंधपाठ में उपयोग करें।
+सामान्य Apple Silicon Homebrew स्थापना में `BHASH_UNIXODBC` देना वैकल्पिक
+है। दूसरे स्थान की unixODBC लाइब्रेरी का पूरा पथ इस चर में दें।
+[Microsoft के macOS स्थापना निर्देश](https://learn.microsoft.com/sql/connect/odbc/linux-mac/install-microsoft-odbc-driver-sql-server-macos)
+
+साप्ताहिक macOS CI पूरे एकीकरण परीक्षण के लिए एक समर्पित SQL Server 2022
+परीक्षण सर्वर उपयोग करता है। रिपॉज़िटरी में `MACOS_SQLSERVER_HOST`,
+`MACOS_SQLSERVER_USER` और `MACOS_SQLSERVER_PASSWORD` Actions secrets
+सेट करें। मेज़बान ऐसा नाम हो जो GitHub runner से पहुँच योग्य हो और TLS
+प्रमाणपत्र से मेल खाए। परीक्षण खाते को अस्थायी डेटाबेस बनाने और अपने बनाए
+डेटाबेस को हटाने की अनुमति चाहिए। CI हर runner के लिए एक नया डेटाबेस
+बनाता है और परीक्षण के बाद उसे हटाता है। तीनों secrets अनुपस्थित हों तो
+CI नेटिव संकलन और ODBC लोड करने की जाँच करता है और लाइव परीक्षण छोड़ने
+की सूचना देता है।
 
 ## ORM से विद्यार्थी और उसकी कक्षा पढ़ें
 
