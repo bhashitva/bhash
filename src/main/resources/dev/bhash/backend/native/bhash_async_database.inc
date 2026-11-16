@@ -14,14 +14,20 @@ typedef struct ad_value {int kind,isnull;uint64_t bits;unsigned char *data;size_
 typedef struct ad_connection ad_connection;
 typedef struct ad_statement {
     uint64_t id;ad_connection *owner;sqlite3_stmt *sqlite;char *sql;PGresult *meta;
+#ifdef __linux__
+    my_handle odbc;int select;
+#endif
     int parameters,closed;struct ad_statement *next;
 } ad_statement;
 struct ad_connection {
     uint64_t id;int postgres,closed,busy,transaction,failed;
     sqlite3 *sqlite;PGconn *pg;ad_statement *statements;
+#ifdef __linux__
+    my_handle odbc;
+#endif
 };
 typedef struct ad_job {
-    uint64_t id,result;int operation,started,claimed,joined,cleanup;
+    uint64_t id,result;int operation,started,claimed,joined,cleanup,sqlserver;
     _Atomic int done,cancelled,setup_done,control_done,dispatch;
     ad_connection *connection,*opened;ad_statement *statement,*prepared;
     char *text;ad_value *parameters;size_t parameter_count;
@@ -50,12 +56,26 @@ static uint64_t ad_clock(void){
 }
 static void ad_error(ad_job *j,const char *message){if(!j->error[0])snprintf(j->error,sizeof j->error,"%s",message);}
 static void ad_value_free(ad_value *v){free(v->data);memset(v,0,sizeof *v);}
+static void ad_statement_close_odbc(ad_statement *s){
+#ifdef __linux__
+    if(s->odbc){my_SQLFreeHandle(MY_STMT,s->odbc);s->odbc=NULL;}
+#else
+    (void)s;
+#endif
+}
 static void ad_connection_close(ad_connection *c){
     if(!c||c->closed)return;
     for(ad_statement *s=c->statements;s;s=s->next){
+        ad_statement_close_odbc(s);
         if(s->sqlite){sqlite3_finalize(s->sqlite);s->sqlite=NULL;}
         if(s->meta){pg_PQclear(s->meta);s->meta=NULL;}s->closed=1;
     }
+#ifdef __linux__
+    if(c->odbc){
+        if(c->transaction)my_SQLEndTran(MY_DBC,c->odbc,1);
+        my_SQLDisconnect(c->odbc);my_SQLFreeHandle(MY_DBC,c->odbc);c->odbc=NULL;
+    }
+#endif
     if(c->sqlite){sqlite3_close_v2(c->sqlite);c->sqlite=NULL;}
     if(c->pg){pg_PQfinish(c->pg);c->pg=NULL;}c->closed=1;c->transaction=0;
 }
@@ -157,9 +177,156 @@ done:
     }
     atomic_store_explicit(&j->done,1,memory_order_release);
 }
+#ifdef __linux__
+static void ad_sqlserver_diagnostic(ad_job *j,my_short kind,my_handle handle,const char *operation){
+    unsigned char state[6]={0},discard[2];
+    int code;my_short length;
+    if(!handle||!my_ok(my_SQLGetDiagRec(kind,handle,1,state,&code,discard,sizeof discard,&length)))return;
+    for(int i=0;i<5;i++)if(!((state[i]>='0'&&state[i]<='9')||(state[i]>='A'&&state[i]<='Z')))return;
+    char message[160];
+    snprintf(message,sizeof message,"SQL Server %s त्रुटि [%.5s, %d]।",operation,state,code);
+    ad_error(j,message);
+}
+static int ad_sqlserver_cell(ad_job *j,my_handle stmt,int index,int kind,ad_value *v){
+    static const int types[]={AD_INTEGER,AD_REAL,AD_BOOL,AD_TEXT,AD_BYTES,AD_DECIMAL,AD_TIME,AD_UNSUPPORTED};
+    unsigned char *data=NULL;size_t length=0;
+    if(j->bytes>DB_LIMIT-8||!sqlserver_read(stmt,(my_ushort)index+1,kind==MY_BYTES,DB_LIMIT-j->bytes-8,&data,&length,&v->isnull))return 0;
+    v->kind=v->isnull?AD_NULL:types[kind];j->bytes+=length+8;
+    if(v->isnull)return 1;
+    char *end,*text=(char *)data;
+    if(kind==MY_INTEGER){errno=0;v->bits=(uint64_t)strtoll(text,&end,10);if(errno||end==text||*end){free(data);return 0;}}
+    else if(kind==MY_REAL){double value=strtod(text,&end);if(end==text||*end||!isfinite(value)){free(data);return 0;}memcpy(&v->bits,&value,8);}
+    else if(kind==MY_BOOL)v->bits=*text=='1';
+    else {v->data=data;v->length=length;return kind!=MY_UNSUPPORTED;}
+    free(data);return 1;
+}
+static int ad_sqlserver_query(ad_job *j){
+    ad_statement *s=j->statement;my_handle stmt=s->odbc;
+    if(j->parameter_count!=(size_t)s->parameters||(j->operation==4)!=s->select)return 0;
+    my_binding *bindings=calloc(j->parameter_count?j->parameter_count:1,sizeof *bindings);
+    if(!bindings)return 0;
+    int ok=0,kinds[DB_COLUMNS];
+    const char *operation="bind";
+    // Describe untyped nulls before binding any values. SQL Server can convert
+    // a Unicode NULL when the driver cannot describe the marker.
+    my_short null_types[999],null_scales[999];
+    my_ulen null_sizes[999];
+    for(size_t i=0;i<j->parameter_count;i++){
+        if(j->parameters[i].kind!=AD_NULL)continue;
+        my_short nullable;
+        if(!my_ok(my_SQLDescribeParam(stmt,(my_ushort)i+1,&null_types[i],&null_sizes[i],&null_scales[i],&nullable))){
+            null_types[i]=-9;null_sizes[i]=1;null_scales[i]=0;
+        }
+    }
+    for(size_t i=0;i<j->parameter_count;i++){
+        ad_value *v=&j->parameters[i];my_binding *p=&bindings[i];size_t bytes;
+        switch(v->kind){
+            case AD_INTEGER:p->c_type=-25;p->sql_type=-5;p->value=&v->bits;p->length=8;break;
+            case AD_REAL:p->c_type=p->sql_type=8;p->value=&v->bits;p->length=8;break;
+            case AD_BOOL:p->c_type=p->sql_type=-7;p->value=&v->bits;p->length=1;break;
+            case AD_NULL:p->c_type=1;p->sql_type=12;p->length=MY_NULL;break;
+            case AD_BYTES:p->c_type=-2;p->sql_type=-3;p->value=v->data;p->length=(my_len)v->length;break;
+            case AD_TEXT:
+                p->value=sqlserver_convert(v->data,v->length,&bytes,1);if(!p->value)goto done;
+                p->c_type=-8;p->sql_type=bytes>8000?-10:-9;p->length=(my_len)bytes;break;
+            default:goto done;
+        }
+        if(v->kind==AD_NULL){
+            if(!my_ok(my_SQLBindParameter(stmt,(my_ushort)i+1,1,-8,null_types[i],null_sizes[i],null_scales[i],NULL,0,&p->length)))goto done;
+        }else if(!sqlserver_bind(stmt,(int)i+1,p))goto done;
+    }
+    operation="execute";
+    my_short executed=my_SQLExecute(stmt);
+    if(!my_ok(executed)&&executed!=MY_NO_DATA)goto done;
+    if(j->operation==3){
+        my_len affected;if(!my_ok(my_SQLRowCount(stmt,&affected)))goto done;
+        j->result=affected<0?0:(uint64_t)affected;ok=1;goto done;
+    }
+    operation="describe columns";
+    my_short columns;
+    if(!my_ok(my_SQLNumResultCols(stmt,&columns))||columns<=0||columns>DB_COLUMNS)goto done;
+    j->columns=(size_t)columns;
+    j->names=calloc(j->columns,sizeof *j->names);if(!j->names)goto done;
+    for(int i=0;i<columns;i++){
+        my_short type;
+        if(!sqlserver_column(stmt,(my_ushort)i+1,&type,&j->names[i]))goto done;
+        kinds[i]=my_kind(type,0,1);
+    }
+    while(!atomic_load(&j->cancelled)){
+        operation="fetch";
+        my_short fetched=my_SQLFetch(stmt);
+        if(fetched==MY_NO_DATA){j->result=j->rows;ok=1;break;}
+        if(!my_ok(fetched)||j->rows>=AD_ROWS)break;
+        ad_value *cells=realloc(j->cells,(j->rows+1)*j->columns*sizeof *cells);
+        if(!cells)break;
+        j->cells=cells;ad_value *row=cells+j->rows++*j->columns;
+        memset(row,0,j->columns*sizeof *row);
+        operation="read row";
+        for(int i=0;i<columns;i++)if(!ad_sqlserver_cell(j,stmt,i,kinds[i],&row[i]))goto done;
+    }
+done:
+    if(!ok&&!atomic_load(&j->cancelled))ad_sqlserver_diagnostic(j,MY_STMT,stmt,operation);
+    my_SQLFreeStmt(stmt,0);my_SQLFreeStmt(stmt,3);
+    for(size_t i=0;i<j->parameter_count;i++)if(bindings[i].c_type==-8)free(bindings[i].value);
+    free(bindings);return ok;
+}
+static int ad_sqlserver_prepare(ad_job *j,ad_connection *c){
+    const char *text=j->text;
+    size_t length=strlen(text);
+    int select=my_sql_type(text,length,1);
+    if(select<0)return 0;
+    ad_statement *s=calloc(1,sizeof *s);if(!s)return 0;
+    j->prepared=s;s->owner=c;s->select=select;my_short parameters;
+    if(!sqlserver_prepare(c->odbc,text,length,&s->odbc,&parameters)){
+        ad_sqlserver_diagnostic(j,s->odbc?MY_STMT:MY_DBC,s->odbc?s->odbc:c->odbc,"prepare");
+        return 0;
+    }
+    s->parameters=parameters;return 1;
+}
+static void ad_sqlserver_run(ad_job *j){
+    ad_connection *c=j->connection;
+    if(j->operation==5){ad_statement_close_odbc(j->statement);j->statement->closed=1;goto finish;}
+    if(j->operation==9){ad_connection_close(c);goto finish;}
+    int expected=0;
+    if(j->operation!=8&&(atomic_load(&j->cancelled)||!atomic_compare_exchange_strong(&j->dispatch,&expected,1)))goto finish;
+    int ok=0;
+    switch(j->operation){
+        case 1:
+            j->opened=calloc(1,sizeof *j->opened);
+            ok=j->opened&&sqlserver_connect(j->text+14,&j->opened->odbc);
+            if(!ok)ad_error(j,"SQL Server संबंध नहीं खुला। ODBC चालक, प्रमाणपत्र और विन्यास जाँचें।");
+            break;
+        case 2:ok=!c->failed&&ad_sqlserver_prepare(j,c);break;
+        case 3:case 4:ok=!c->failed&&ad_sqlserver_query(j);break;
+        case 6:
+            ok=!c->transaction&&my_ok(my_SQLSetConnectAttr(c->odbc,102,NULL,0));
+            if(ok)c->transaction=1;
+            break;
+        case 7:case 8:
+            if(!c->transaction){ok=j->operation==8;break;}
+            if(j->operation==7&&c->failed)break;
+            ok=my_ok(my_SQLEndTran(MY_DBC,c->odbc,j->operation==7?0:1));
+            if(!ok&&j->operation==7)ad_error(j,"लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");
+            if(ok){c->transaction=0;c->failed=0;ok=my_ok(my_SQLSetConnectAttr(c->odbc,102,(void *)(intptr_t)1,0));}
+            if(!ok)ad_connection_close(c);
+            break;
+    }
+    if(!ok){ad_error(j,"SQL Server डेटा क्रिया असफल।");if(c&&c->transaction)c->failed=1;}
+finish:
+    if(j->error[0]||atomic_load(&j->cancelled)){
+        if(j->opened){ad_connection_close(j->opened);free(j->opened);j->opened=NULL;}
+        if(j->prepared){ad_statement_close_odbc(j->prepared);free(j->prepared);j->prepared=NULL;}
+        if(atomic_load(&j->cancelled)&&atomic_load(&j->dispatch)==1&&j->operation!=7)ad_connection_close(c);
+    }
+    atomic_store_explicit(&j->done,1,memory_order_release);
+}
+#endif
 static void ad_worker_body(ad_job *j){
     if(j->thread_kind==2)ad_pg_connect_worker(j);
     else if(j->thread_kind==3)ad_pg_cancel_worker(j);
+#ifdef __linux__
+    else if(j->sqlserver)ad_sqlserver_run(j);
+#endif
     else ad_sqlite_run(j);
 }
 #ifdef _WIN32
@@ -194,7 +361,7 @@ static void ad_drive(void){
     for(size_t i=0;i<AD_JOBS;i++)if(ad_jobs[i])ad_join(ad_jobs[i]);
     for(size_t i=0;i<AD_JOBS;i++){
         ad_job *j=ad_jobs[i];if(!j||atomic_load_explicit(&j->done,memory_order_acquire))continue;
-        if(j->operation==1){
+        if(j->operation==1&&!j->sqlserver){
             if(!j->started){if(ad_launch(j,2,0))j->started=1;continue;}
             if(!atomic_load_explicit(&j->setup_done,memory_order_acquire))continue;
             ad_join(j);ad_pg_poll(j);continue;
@@ -255,7 +422,7 @@ static void ad_reap(void){
 static void ad_abort(ad_job *j){
     if(j->claimed&&atomic_load_explicit(&j->done,memory_order_acquire))return;
     if(j->operation==7){int expected=0;if(!atomic_compare_exchange_strong(&j->dispatch,&expected,2)&&expected==1)return;}
-    if(j->operation==1||(j->connection&&j->connection->postgres)){ad_pg_abort(j);return;}
+    if((j->operation==1&&!j->sqlserver)||(j->connection&&j->connection->postgres)){ad_pg_abort(j);return;}
     if(atomic_load_explicit(&j->done,memory_order_acquire)){
         if(!j->opened&&!j->prepared)return;
         ad_join(j);j->started=0;j->has_thread=0;j->joined=0;atomic_store(&j->done,0);
@@ -271,12 +438,18 @@ static uint64_t ad_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
     if(op==14){for(size_t i=0;i<128;i++)if(ad_statements[i]&&ad_statements[i]->id==a&&!ad_statements[i]->closed)return (uint64_t)ad_statements[i]->parameters;runtime_error(location,"असमकालिक डेटाकथन बंद है।");}
     if(op==0){
         if(a>9)runtime_error(location,"अमान्य असमकालिक डेटा क्रिया।");
+        int sqlserver=0;
         if(a==1){
             void *config=bh_instance(bits_pointer(c),location);
-            if(text_length(config)>=14&&!memcmp(text_data(config),"\nsqlserver-v1\n",14))
-                runtime_error(location,"SQL Server के लिए JVM लक्ष्य चाहिए।");
+            sqlserver=text_length(config)>=14&&!memcmp(text_data(config),"\nsqlserver-v1\n",14);
+            if(sqlserver){
+#ifdef __linux__
+                my_load(location);
+#else
+                runtime_error(location,"मूल SQL Server संबंध के लिए Linux x64 चाहिए।");
+#endif
+            }else if(!pg_load())runtime_error(location,"PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।");
         }
-        if(a==1&&!pg_load())runtime_error(location,"PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।");
         size_t slot=0;while(slot<AD_JOBS&&ad_jobs[slot])slot++;if(slot==AD_JOBS)runtime_error(location,"असमकालिक डेटा क्षमता समाप्त।");
         ad_connection *connection=NULL;ad_statement *statement=NULL;
         if(a==3||a==4||a==5){for(size_t i=0;i<128;i++)if(ad_statements[i]&&ad_statements[i]->id==b)statement=ad_statements[i];if(statement)connection=statement->owner;}
@@ -288,6 +461,10 @@ static uint64_t ad_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
         if(a==2){size_t n=0;for(size_t i=0;i<128;i++)if(ad_statements[i])n++;for(size_t i=0;i<AD_JOBS;i++)if(ad_jobs[i]&&ad_jobs[i]->operation==2&&!ad_jobs[i]->claimed)n++;if(n>=128)runtime_error(location,"असमकालिक डेटा क्षमता समाप्त।");}
         ad_job *j=calloc(1,sizeof *j);if(!j)runtime_error(location,"स्मृति उपलब्ध नहीं है।");
         bh_cleanup guard={cleanups,j,ad_job_free};cleanups=&guard;
+#ifdef __linux__
+        if(connection&&connection->odbc)sqlserver=1;
+#endif
+        j->sqlserver=sqlserver;
         j->operation=(int)a;j->connection=connection;j->statement=statement;j->deadline=ad_clock()+30000;
         j->text=db_string(c,location);ad_snapshot(j,bh_instance(bits_pointer(d),location),location);
         if(absent){j->connection=NULL;j->statement=NULL;atomic_store(&j->done,1);}
@@ -516,7 +693,7 @@ static void ad_shutdown(void){
     for(size_t i=0;i<AD_JOBS;i++)if(ad_jobs[i]){
         ad_job *j=ad_jobs[i];ad_join(j);
         if(!j->claimed){
-            if(j->prepared){if(j->prepared->sqlite)sqlite3_finalize(j->prepared->sqlite);if(j->prepared->meta)pg_PQclear(j->prepared->meta);free(j->prepared->sql);free(j->prepared);}
+            if(j->prepared){ad_statement_close_odbc(j->prepared);if(j->prepared->sqlite)sqlite3_finalize(j->prepared->sqlite);if(j->prepared->meta)pg_PQclear(j->prepared->meta);free(j->prepared->sql);free(j->prepared);}
             if(j->opened){ad_connection_close(j->opened);free(j->opened);}
         }
         if(j->connection)j->connection->busy=0;ad_job_free(j);ad_jobs[i]=NULL;

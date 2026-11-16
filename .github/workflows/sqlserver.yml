@@ -14,7 +14,12 @@ concurrency:
   group: sqlserver-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  jdbc:
+  integration:
+    name: SQL Server 2022 (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [jvm, clr, native]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
@@ -34,13 +39,33 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build Bhash and fetch the JDBC driver
+      - name: Build Bhash
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Fetch the JDBC driver
+        if: matrix.target == 'jvm'
+        run: mvn --batch-mode --no-transfer-progress dependency:copy -Dartifact=com.microsoft.sqlserver:mssql-jdbc:12.10.2.jre11 -DoutputDirectory=target/sqlserver-driver
+      - uses: actions/setup-dotnet@v5
+        if: matrix.target == 'clr'
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish the SqlClient driver and dependencies
+        if: matrix.target == 'clr'
         run: |
-          mvn --batch-mode --no-transfer-progress -DskipTests package
-          mvn --batch-mode --no-transfer-progress dependency:copy -Dartifact=com.microsoft.sqlserver:mssql-jdbc:12.10.2.jre11 -DoutputDirectory=target/sqlserver-driver
-      - name: Run JDBC queries and the generated ORM against SQL Server 2022
+          dotnet new console --framework net10.0 --output target/sqlserver-driver-project
+          dotnet add target/sqlserver-driver-project package Microsoft.Data.SqlClient --version 6.1.7
+          dotnet publish target/sqlserver-driver-project -r linux-x64 --self-contained false -o "$PWD/target/sqlserver-driver"
+      - name: Install LLVM and Microsoft ODBC Driver 18
+        if: matrix.target == 'native'
+        run: |
+          curl -fsSLo /tmp/microsoft-prod.deb https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+          sudo dpkg -i /tmp/microsoft-prod.deb
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y clang-18 llvm-18 unixodbc msodbcsql18
+          odbcinst -q -d -n 'ODBC Driver 18 for SQL Server'
+      - name: Run parameterized queries and the generated ORM against SQL Server 2022
         env:
           SQLSERVER_CONTAINER: ${{ job.services.sqlserver.id }}
+          TARGET: ${{ matrix.target }}
           SQLCMDPASSWORD: 'BhashCi-Only2026!'
         run: |
           sqlcmd=(docker exec -e SQLCMDPASSWORD "$SQLSERVER_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b)
@@ -55,13 +80,25 @@ jobs:
           cp -r src/test/resources/sqlserver target/sqlserver-integration
           python scripts/generate_orm.py target/sqlserver-integration/mapping.json --output target/sqlserver-integration/src/generated.bhash
           java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar deps lock target/sqlserver-integration
-          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar compile target/sqlserver-integration --target jvm -o target/sqlserver-integration.jar
-          export BHASH_SQLSERVER_URL="jdbc:sqlserver://127.0.0.1:1433;databaseName=bhash;user=sa;password=$SQLCMDPASSWORD;encrypt=true;trustServerCertificate=true"
-          set -o pipefail
-          cat > target/sqlserver-logging.properties <<'EOF'
-          handlers=java.util.logging.ConsoleHandler
-          java.util.logging.ConsoleHandler.level=FINE
-          com.microsoft.sqlserver.jdbc.internals.SQLServerException.level=FINE
-          EOF
-          java -Djava.util.logging.config.file=target/sqlserver-logging.properties -cp 'target/sqlserver-integration.jar:target/sqlserver-driver/*' BhashProgram | tee target/sqlserver-output.txt
+          compiler=target/bhash-compiler-0.1.0-SNAPSHOT.jar
+          input=target/sqlserver-integration
+          case "$TARGET" in
+            jvm)
+              export BHASH_SQLSERVER_URL="jdbc:sqlserver://127.0.0.1:1433;databaseName=bhash;user=sa;password=$SQLCMDPASSWORD;encrypt=true;trustServerCertificate=true"
+              java -jar "$compiler" compile "$input" --target jvm -o target/sqlserver-integration.jar
+              java -cp 'target/sqlserver-integration.jar:target/sqlserver-driver/*' BhashProgram
+              ;;
+            clr)
+              export BHASH_SQLSERVER_URL="Server=tcp:127.0.0.1,1433;Database=bhash;User ID=sa;Password=$SQLCMDPASSWORD;Encrypt=true;TrustServerCertificate=true"
+              export BHASH_SQLSERVER_DOTNET_DRIVER="$PWD/target/sqlserver-driver/Microsoft.Data.SqlClient.dll"
+              java -jar "$compiler" compile "$input" --target clr -o target/sqlserver-clr
+              dotnet target/sqlserver-clr/BhashProgram.dll
+              ;;
+            native)
+              export BHASH_SQLSERVER_URL="Driver={ODBC Driver 18 for SQL Server};Server=tcp:127.0.0.1,1433;Database=bhash;UID=sa;PWD=$SQLCMDPASSWORD;Encrypt=yes;TrustServerCertificate=yes"
+              java -jar "$compiler" compile "$input" --target native -o target/sqlserver-native
+              BHASH_GC_STRESS=1 target/sqlserver-native
+              ;;
+          esac | tee target/sqlserver-output.txt
+          grep -Fx SQLSERVER_SYNC_OK target/sqlserver-output.txt
           grep -Fx SQLSERVER_ORM_OK target/sqlserver-output.txt
