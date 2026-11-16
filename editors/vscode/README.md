@@ -16,11 +16,11 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.25.6 / इस रिलीज़ में
+## What's new in 0.25.7 / इस रिलीज़ में
 
-The bundled compiler now supports SQL Server 2022 on native Windows x64. Use a programmatic ODBC connection string for parameterized queries, transactions, and generated ORM repositories. Install Microsoft ODBC Driver 18 x64 on the Windows machine that runs the compiled application. [Hindi SQL Server tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
+The bundled compiler adds native SQL Server support on macOS Apple Silicon. Use an ODBC connection string for parameterized queries, transactions, and generated ORM repositories. Install Microsoft ODBC Driver 18 and unixODBC on the Apple Silicon application host. [Hindi SQL Server tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
 
-**हिन्दी:** SQL Server 2022 अब नेटिव Windows x64 पर भी उपलब्ध है। मापदंडयुक्त प्रश्नों, लेनदेन और जनित ORM भंडारों के लिए ODBC संबंधपाठ दें। जहाँ संकलित अनुप्रयोग चलाएँ वहाँ Microsoft ODBC Driver 18 का x64 संस्करण स्थापित करें। [हिन्दी SQL Server अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
+**हिन्दी:** SQL Server अब नेटिव macOS Apple Silicon पर भी उपलब्ध है। मापदंडयुक्त प्रश्नों, लेनदेन और जनित ORM भंडारों के लिए ODBC संबंधपाठ दें। अनुप्रयोग चलाने वाले Mac पर Microsoft ODBC Driver 18 और unixODBC स्थापित करें। [हिन्दी SQL Server अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
 
 ## MySQL support in 0.25.3 / MySQL समर्थन
 
