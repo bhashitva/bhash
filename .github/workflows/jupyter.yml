@@ -9,6 +9,7 @@ on:
       - 'editors/jupyter/**'
       - 'scripts/package_jupyter.py'
       - 'src/test/resources/mysql/**'
+      - 'src/test/resources/sqlserver/**'
       - '.github/workflows/jupyter.yml'
       - '!**/*.md'
   push:
@@ -91,3 +92,57 @@ jobs:
         with:
           name: jupyter-mysql-wheel
           path: target/jupyter-dist/
+
+  sqlserver:
+    needs: mysql
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: 'BhashCi-Only2026!'
+        ports: ['1433:1433']
+    env:
+      JUPYTER_DATA_DIR: ${{ github.workspace }}/target/jupyter-user
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: jupyter-mysql-wheel
+          path: target/jupyter-dist
+      - name: Install the tested wheel and register both JDBC drivers
+        run: |
+          (cd target/jupyter-dist && sha256sum -c SHA256SUMS)
+          mvn --batch-mode --no-transfer-progress dependency:copy \
+            -Dartifact=com.microsoft.sqlserver:mssql-jdbc:12.10.2.jre11 '-DoutputDirectory=target/jdbc drivers'
+          mvn --batch-mode --no-transfer-progress dependency:copy \
+            -Dartifact=com.mysql:mysql-connector-j:9.3.0 '-DoutputDirectory=target/jdbc drivers'
+          python -m pip install target/jupyter-dist/*.whl
+          python -m bhash_jupyter.install \
+            --sqlserver-driver "target/jdbc drivers/mssql-jdbc-12.10.2.jre11.jar" \
+            --mysql-driver "target/jdbc drivers/mysql-connector-j-9.3.0.jar"
+      - name: Test parameter binding and rollback in Jupyter against SQL Server 2022
+        env:
+          SQLSERVER_CONTAINER: ${{ job.services.sqlserver.id }}
+          SQLCMDPASSWORD: 'BhashCi-Only2026!'
+        run: |
+          sqlcmd=(docker exec -e SQLCMDPASSWORD "$SQLSERVER_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b)
+          for attempt in {1..24}; do
+            if "${sqlcmd[@]}" -Q 'SELECT 1' >/dev/null 2>&1; then break; fi
+            if [[ "$attempt" == 24 ]]; then docker logs "$SQLSERVER_CONTAINER"; exit 1; fi
+            sleep 3
+          done
+          docker cp src/test/resources/sqlserver/schema.sql "$SQLSERVER_CONTAINER:/tmp/bhash-schema.sql"
+          "${sqlcmd[@]}" -i /tmp/bhash-schema.sql
+          export BHASH_SQLSERVER_URL="jdbc:sqlserver://127.0.0.1:1433;databaseName=bhash;user=sa;password=$SQLCMDPASSWORD;encrypt=true;trustServerCertificate=true"
+          python editors/jupyter/test_kernel.py --installed --notebook target/jupyter-dist/hindi-starter.ipynb --sqlserver

@@ -1,11 +1,13 @@
-Version 0.1.10 adds MySQL 8.4 access to Bhash notebooks. Supply a trusted Connector/J JAR with `--mysql-driver` when registering the kernel. See the [Hindi setup and query example](https://github.com/bhashitva/bhash/blob/jupyter-0.1.10/editors/jupyter/README.md#jupyter-में-mysql-84).
+Version 0.1.11 adds SQL Server 2022 access in notebooks using the Microsoft JDBC driver. You can register both SQL Server and MySQL drivers in the same kernel. [Hindi SQL Server setup and example](https://github.com/bhashitva/bhash/blob/jupyter-0.1.11/editors/jupyter/README.md#jupyter-में-sql-server-2022).
 
 Install or upgrade in the Python environment where you run Jupyter. The wheel includes the compiler and needs a full JDK 17 or newer.
 
 ```sh
-python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.10/bhash_jupyter-0.1.10-py3-none-any.whl"
+python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.11/bhash_jupyter-0.1.11-py3-none-any.whl"
 python -m bhash_jupyter.install
-# For MySQL, register with the driver instead:
+# For SQL Server, register with its driver:
+# python -m bhash_jupyter.install --sqlserver-driver "/path/to/mssql-jdbc-12.10.2.jre11.jar"
+# For MySQL, register with its driver:
 # python -m bhash_jupyter.install --mysql-driver "/path/to/mysql-connector-j.jar"
 python -m pip show bhash-jupyter
 ```
