@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0
- * unixODBC 3 ABI on 64-bit Linux. Loading at runtime keeps C development
- * headers and the client driver optional for other Bhash programs. */
+ * ODBC 3 ABI on Linux and Windows x64. Load the system driver manager
+ * only when a program opens an ODBC-backed connection. */
+#ifndef _WIN32
 #include <iconv.h>
+#endif
 typedef int16_t my_short;
 typedef uint16_t my_ushort;
 typedef intptr_t my_len;
@@ -65,19 +67,47 @@ static _Noreturn void my_error(my_connection *c,my_short kind,my_handle handle,c
 }
 static void my_load(const void *location){
     if(my_env)return;
+#ifdef _WIN32
+    HMODULE lib=LoadLibraryExW(L"odbc32.dll",NULL,LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if(!lib)runtime_error(location,"Windows ODBC रनटाइम उपलब्ध नहीं है।");
+#define MY_SYMBOL(name) GetProcAddress(lib,name)
+#define MY_UNLOAD() FreeLibrary(lib)
+    typedef FARPROC my_symbol;
+#else
     void *lib=dlopen("libodbc.so.2",RTLD_NOW|RTLD_LOCAL);
     if(!lib)runtime_error(location,"इस डेटा चालक के लिए unixODBC रनटाइम चाहिए।");
-#define MY_LOAD(name,args) do{void *p=dlsym(lib,#name);if(!p){dlclose(lib);runtime_error(location,"unixODBC रनटाइम असंगत है।");}memcpy(&my_##name,&p,sizeof p);}while(0);
+#define MY_SYMBOL(name) dlsym(lib,name)
+#define MY_UNLOAD() dlclose(lib)
+    typedef void *my_symbol;
+#endif
+#define MY_LOAD(name,args) do{my_symbol p=MY_SYMBOL(#name);if(!p){MY_UNLOAD();runtime_error(location,"ODBC रनटाइम असंगत है।");}memcpy(&my_##name,&p,sizeof p);}while(0);
     MY_API(MY_LOAD)
 #undef MY_LOAD
     my_handle env=NULL;
     if(!my_ok(my_SQLAllocHandle(MY_ENV,NULL,&env))||!my_ok(my_SQLSetEnvAttr(env,200,(void *)(intptr_t)3,0))){
         if(env)my_SQLFreeHandle(MY_ENV,env);
-        dlclose(lib);runtime_error(location,"unixODBC परिवेश नहीं खुला।");
+        MY_UNLOAD();runtime_error(location,"ODBC परिवेश नहीं खुला।");
     }
     my_env=env;
+#undef MY_UNLOAD
+#undef MY_SYMBOL
 }
 static void *sqlserver_convert(const void *text,size_t size,size_t *length,int wide){
+#ifdef _WIN32
+    if(!size){*length=0;return calloc(2,1);}
+    if(size>INT_MAX||(!wide&&size%sizeof(wchar_t)))return NULL;
+    int count=wide?MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text,(int)size,NULL,0):
+        WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text,(int)(size/sizeof(wchar_t)),NULL,0,NULL,NULL);
+    if(!count)return NULL;
+    size_t bytes=(size_t)count*(wide?sizeof(wchar_t):1);
+    char *result=calloc(bytes+2,1);
+    if(!result)return NULL;
+    int converted=wide?MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text,(int)size,(wchar_t *)result,count):
+        WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text,(int)(size/sizeof(wchar_t)),result,count,NULL,NULL);
+    if(converted!=count){free(result);return NULL;}
+    *length=bytes;
+    return result;
+#else
     if(size>(SIZE_MAX-4)/4)return NULL;
     iconv_t converter=iconv_open(wide?"UTF-16LE":"UTF-8",wide?"UTF-8":"UTF-16LE");
     if(converter==(iconv_t)-1)return NULL;
@@ -87,6 +117,7 @@ static void *sqlserver_convert(const void *text,size_t size,size_t *length,int w
     else {*length=(size_t)(out-result);out[0]=out[1]=0;}
     iconv_close(converter);
     return result;
+#endif
 }
 static int sqlserver_connect(const char *config,my_handle *db){
     size_t bytes;
@@ -168,6 +199,7 @@ static int sqlserver_column(my_handle stmt,my_ushort index,my_short *type,char *
     *name=sqlserver_convert(wide,(size_t)chars*2,&length,0);
     return *name!=NULL;
 }
+#ifdef __linux__
 static int my_safe(const char *s,const char *blocked){return !strpbrk(s,blocked);}
 static uint64_t mysql_open(const char *config,size_t length,const void *location){
     my_load(location);
@@ -207,6 +239,7 @@ static uint64_t mysql_open(const char *config,size_t length,const void *location
     *slot=(my_connection){.id=++my_next_conn,.db=db,.timeout=timeout};
     return slot->id;
 }
+#endif
 static my_connection *my_conn(uint64_t id){
     for(size_t i=0;i<32;i++)if(my_connections[i].id==id)return &my_connections[i];
     return NULL;

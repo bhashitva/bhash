@@ -14,7 +14,7 @@ typedef struct ad_value {int kind,isnull;uint64_t bits;unsigned char *data;size_
 typedef struct ad_connection ad_connection;
 typedef struct ad_statement {
     uint64_t id;ad_connection *owner;sqlite3_stmt *sqlite;char *sql;PGresult *meta;
-#ifdef __linux__
+#ifdef BHASH_SQLSERVER_ODBC
     my_handle odbc;int select;
 #endif
     int parameters,closed;struct ad_statement *next;
@@ -22,7 +22,7 @@ typedef struct ad_statement {
 struct ad_connection {
     uint64_t id;int postgres,closed,busy,transaction,failed;
     sqlite3 *sqlite;PGconn *pg;ad_statement *statements;
-#ifdef __linux__
+#ifdef BHASH_SQLSERVER_ODBC
     my_handle odbc;
 #endif
 };
@@ -57,7 +57,7 @@ static uint64_t ad_clock(void){
 static void ad_error(ad_job *j,const char *message){if(!j->error[0])snprintf(j->error,sizeof j->error,"%s",message);}
 static void ad_value_free(ad_value *v){free(v->data);memset(v,0,sizeof *v);}
 static void ad_statement_close_odbc(ad_statement *s){
-#ifdef __linux__
+#ifdef BHASH_SQLSERVER_ODBC
     if(s->odbc){my_SQLFreeHandle(MY_STMT,s->odbc);s->odbc=NULL;}
 #else
     (void)s;
@@ -70,7 +70,7 @@ static void ad_connection_close(ad_connection *c){
         if(s->sqlite){sqlite3_finalize(s->sqlite);s->sqlite=NULL;}
         if(s->meta){pg_PQclear(s->meta);s->meta=NULL;}s->closed=1;
     }
-#ifdef __linux__
+#ifdef BHASH_SQLSERVER_ODBC
     if(c->odbc){
         if(c->transaction)my_SQLEndTran(MY_DBC,c->odbc,1);
         my_SQLDisconnect(c->odbc);my_SQLFreeHandle(MY_DBC,c->odbc);c->odbc=NULL;
@@ -177,7 +177,7 @@ done:
     }
     atomic_store_explicit(&j->done,1,memory_order_release);
 }
-#ifdef __linux__
+#ifdef BHASH_SQLSERVER_ODBC
 static void ad_sqlserver_diagnostic(ad_job *j,my_short kind,my_handle handle,const char *operation){
     unsigned char state[6]={0},discard[2];
     int code;my_short length;
@@ -324,7 +324,7 @@ finish:
 static void ad_worker_body(ad_job *j){
     if(j->thread_kind==2)ad_pg_connect_worker(j);
     else if(j->thread_kind==3)ad_pg_cancel_worker(j);
-#ifdef __linux__
+#ifdef BHASH_SQLSERVER_ODBC
     else if(j->sqlserver)ad_sqlserver_run(j);
 #endif
     else ad_sqlite_run(j);
@@ -443,10 +443,10 @@ static uint64_t ad_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
             void *config=bh_instance(bits_pointer(c),location);
             sqlserver=text_length(config)>=14&&!memcmp(text_data(config),"\nsqlserver-v1\n",14);
             if(sqlserver){
-#ifdef __linux__
+#ifdef BHASH_SQLSERVER_ODBC
                 my_load(location);
 #else
-                runtime_error(location,"मूल SQL Server संबंध के लिए Linux x64 चाहिए।");
+                runtime_error(location,"मूल SQL Server संबंध के लिए Linux या Windows x64 चाहिए।");
 #endif
             }else if(!pg_load())runtime_error(location,"PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।");
         }
@@ -461,7 +461,7 @@ static uint64_t ad_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
         if(a==2){size_t n=0;for(size_t i=0;i<128;i++)if(ad_statements[i])n++;for(size_t i=0;i<AD_JOBS;i++)if(ad_jobs[i]&&ad_jobs[i]->operation==2&&!ad_jobs[i]->claimed)n++;if(n>=128)runtime_error(location,"असमकालिक डेटा क्षमता समाप्त।");}
         ad_job *j=calloc(1,sizeof *j);if(!j)runtime_error(location,"स्मृति उपलब्ध नहीं है।");
         bh_cleanup guard={cleanups,j,ad_job_free};cleanups=&guard;
-#ifdef __linux__
+#ifdef BHASH_SQLSERVER_ODBC
         if(connection&&connection->odbc)sqlserver=1;
 #endif
         j->sqlserver=sqlserver;
