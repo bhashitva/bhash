@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.5
+
+- Extend SQL Server 2022 support to desktop .NET and native Linux x64.
+- Validate parameterized queries, rollback, and generated ORM repositories on JVM, .NET, and native Linux x64, with forced GC on native.
+- Document connection strings and driver setup for each target.
+
 ## 0.25.4
 
 - Bundle SQL Server 2022 support on JVM with Microsoft JDBC.

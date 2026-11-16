@@ -16,11 +16,11 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.25.4 / इस रिलीज़ में
+## What's new in 0.25.5 / इस रिलीज़ में
 
-The bundled compiler supports SQL Server 2022 on the JVM using the Microsoft JDBC driver. Pass a JDBC connection string in Bhash and use prepared statements, transactions, or generated ORM repositories. [Hindi SQL Server tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
+The bundled compiler extends SQL Server 2022 support from JVM to desktop .NET and native Linux x64. Use a target-specific connection string with parameterized queries, transactions, and generated ORM repositories. Install Microsoft.Data.SqlClient for .NET or Microsoft ODBC Driver 18 and unixODBC for native Linux x64. [Hindi SQL Server tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
 
-**हिन्दी:** JVM पर Microsoft JDBC चालक के साथ SQL Server 2022 उपयोग करें। भाष से JDBC संबंधपाठ दें और मापदंडयुक्त कथन, लेनदेन या जनित ORM भंडार उपयोग करें। [हिन्दी SQL Server अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
+**हिन्दी:** SQL Server 2022 अब JVM के साथ डेस्कटॉप .NET और नेटिव Linux x64 पर भी उपलब्ध है। अपने लक्ष्य के संबंधपाठ और चालक के साथ मापदंडयुक्त कथन, लेनदेन और जनित ORM भंडार उपयोग करें। [हिन्दी SQL Server अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
 
 ## MySQL support in 0.25.3 / MySQL समर्थन
 
