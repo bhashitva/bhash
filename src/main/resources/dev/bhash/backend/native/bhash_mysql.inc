@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0
- * ODBC 3 ABI on Linux and Windows x64. Load the system driver manager
+ * ODBC 3 ABI on Linux, Windows x64 and macOS Apple Silicon. Load the system driver manager
  * only when a program opens an ODBC-backed connection. */
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__APPLE__)
 #include <iconv.h>
 #endif
 typedef int16_t my_short;
@@ -74,7 +74,14 @@ static void my_load(const void *location){
 #define MY_UNLOAD() FreeLibrary(lib)
     typedef FARPROC my_symbol;
 #else
+#ifdef __APPLE__
+    const char *path=getenv("BHASH_UNIXODBC");
+    if(path&&*path&&path[0]!='/')
+        runtime_error(location,"BHASH_UNIXODBC में unixODBC का पूरा पथ दें।");
+    void *lib=dlopen(path&&*path?path:"/opt/homebrew/opt/unixodbc/lib/libodbc.2.dylib",RTLD_NOW|RTLD_LOCAL);
+#else
     void *lib=dlopen("libodbc.so.2",RTLD_NOW|RTLD_LOCAL);
+#endif
     if(!lib)runtime_error(location,"इस डेटा चालक के लिए unixODBC रनटाइम चाहिए।");
 #define MY_SYMBOL(name) dlsym(lib,name)
 #define MY_UNLOAD() dlclose(lib)
@@ -107,6 +114,54 @@ static void *sqlserver_convert(const void *text,size_t size,size_t *length,int w
     if(converted!=count){free(result);return NULL;}
     *length=bytes;
     return result;
+#elif defined(__APPLE__)
+    /* unixODBC uses 16-bit SQLWCHAR on Darwin. Keep the executable
+       independent of Homebrew and extra link-time libraries. */
+    if(size>(SIZE_MAX-4)/2)return NULL;
+    if(wide){
+        const unsigned char *utf8=text;
+        if(!valid_utf8(utf8,size))return NULL;
+        uint16_t *utf16=calloc(size+1,sizeof *utf16);
+        if(!utf16)return NULL;
+        size_t units=0;
+        for(size_t i=0;i<size;){
+            uint32_t code=utf8[i++];
+            if(code>=0x80){
+                unsigned rest=code<0xe0?1:code<0xf0?2:3;
+                code&=0x7f>>(rest+1);
+                while(rest--)code=(code<<6)|(utf8[i++]&0x3f);
+            }
+            if(code>0xffff){
+                code-=0x10000;
+                utf16[units++]=(uint16_t)(0xd800+(code>>10));
+                code=0xdc00+(code&0x3ff);
+            }
+            utf16[units++]=(uint16_t)code;
+        }
+        *length=units*sizeof *utf16;
+        return utf16;
+    }
+    if(size%sizeof(uint16_t))return NULL;
+    const uint16_t *utf16=text;
+    size_t units=size/sizeof *utf16,bytes=0;
+    unsigned char *utf8=malloc(units*3+1);
+    if(!utf8)return NULL;
+    for(size_t i=0;i<units;){
+        uint32_t code=utf16[i++];
+        if(code>=0xd800&&code<=0xdfff){
+            if(code>=0xdc00||i==units||utf16[i]<0xdc00||utf16[i]>0xdfff){free(utf8);return NULL;}
+            code=0x10000+((code-0xd800)<<10)+(utf16[i++]-0xdc00);
+        }
+        unsigned rest=code<0x80?0:code<0x800?1:code<0x10000?2:3;
+        if(!rest)utf8[bytes++]=(unsigned char)code;
+        else{
+            utf8[bytes++]=(unsigned char)((0xff<<(7-rest))|(code>>(6*rest)));
+            while(rest--)utf8[bytes++]=(unsigned char)(0x80|((code>>(6*rest))&0x3f));
+        }
+    }
+    utf8[bytes]=0;
+    *length=bytes;
+    return utf8;
 #else
     if(size>(SIZE_MAX-4)/4)return NULL;
     iconv_t converter=iconv_open(wide?"UTF-16LE":"UTF-8",wide?"UTF-8":"UTF-16LE");

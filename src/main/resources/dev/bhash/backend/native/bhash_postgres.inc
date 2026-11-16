@@ -92,7 +92,7 @@ static const char *pg_kind(unsigned int oid){switch(oid){case 20:case 21:case 23
 static const char *pg_cell(pg_statement *s,uint64_t at,const char *want,const void *location){int col=pg_column(s,at,location);if(s->state!=1)runtime_error(location,"PostgreSQL परिणाम की वर्तमान पंक्ति नहीं है।");if(pg_PQgetisnull(s->rows,s->row,col))runtime_error(location,"PostgreSQL स्तंभ रिक्त है।");if(strcmp(pg_kind(pg_PQftype(s->meta,col)),want))runtime_error(location,"PostgreSQL स्तंभ का प्रकार मेल नहीं खाता।");return pg_PQgetvalue(s->rows,s->row,col);}
 static uint64_t pg_text(const char *s,const void *location){if(!s)runtime_error(location,"PostgreSQL कथन असफल।");size_t n=strlen(s);if(!valid_utf8((const unsigned char*)s,n))runtime_error(location,"अमान्य यूनिकोड पाठ।");void *value=new_text(n,location);memcpy(text_data(value),s,n);return pointer_bits(value);}
 static char *pg_copy(const char *s,size_t n,const void *location){char *p=malloc(n+1);if(!p)runtime_error(location,"स्मृति उपलब्ध नहीं है।");memcpy(p,s,n);p[n]=0;return p;}
-#if defined(__linux__) || defined(_WIN64)
+#if defined(__linux__) || defined(_WIN64) || (defined(__APPLE__) && defined(__aarch64__))
 #define BHASH_SQLSERVER_ODBC 1
 #include "bhash_mysql.inc"
 #endif
@@ -107,7 +107,7 @@ static uint64_t pg_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
 #ifdef BHASH_SQLSERVER_ODBC
             return sqlserver_open((const char*)text_data(config)+14,n-14,location);
 #else
-            runtime_error(location,"मूल SQL Server संबंध के लिए Linux या Windows x64 चाहिए।");
+            runtime_error(location,"मूल SQL Server संबंध के लिए Linux x64, Windows x64 या macOS Apple Silicon चाहिए।");
 #endif
         }
         if(n>=10&&!memcmp(text_data(config),"\nmysql-v1\n",10)){
