@@ -178,6 +178,15 @@ done:
     atomic_store_explicit(&j->done,1,memory_order_release);
 }
 #ifdef __linux__
+static void ad_sqlserver_diagnostic(ad_job *j,my_short kind,my_handle handle){
+    unsigned char state[6]={0},discard[2];
+    int code;my_short length;
+    if(!handle||!my_ok(my_SQLGetDiagRec(kind,handle,1,state,&code,discard,sizeof discard,&length)))return;
+    for(int i=0;i<5;i++)if(!((state[i]>='0'&&state[i]<='9')||(state[i]>='A'&&state[i]<='Z')))return;
+    char message[160];
+    snprintf(message,sizeof message,"SQL Server त्रुटि [%.5s, %d]।",state,code);
+    ad_error(j,message);
+}
 static int ad_sqlserver_cell(ad_job *j,my_handle stmt,int index,int kind,ad_value *v){
     static const int types[]={AD_INTEGER,AD_REAL,AD_BOOL,AD_TEXT,AD_BYTES,AD_DECIMAL,AD_TIME,AD_UNSUPPORTED};
     unsigned char *data=NULL;size_t length=0;
@@ -229,7 +238,7 @@ static int ad_sqlserver_query(ad_job *j){
     }
     while(!atomic_load(&j->cancelled)){
         my_short fetched=my_SQLFetch(stmt);
-        if(fetched==MY_NO_DATA){ok=1;break;}
+        if(fetched==MY_NO_DATA){j->result=j->rows;ok=1;break;}
         if(!my_ok(fetched)||j->rows>=AD_ROWS)break;
         ad_value *cells=realloc(j->cells,(j->rows+1)*j->columns*sizeof *cells);
         if(!cells)break;
@@ -238,19 +247,22 @@ static int ad_sqlserver_query(ad_job *j){
         for(int i=0;i<columns;i++)if(!ad_sqlserver_cell(j,stmt,i,kinds[i],&row[i]))goto done;
     }
 done:
+    if(!ok&&!atomic_load(&j->cancelled))ad_sqlserver_diagnostic(j,MY_STMT,stmt);
     my_SQLFreeStmt(stmt,0);my_SQLFreeStmt(stmt,3);
     for(size_t i=0;i<j->parameter_count;i++)if(bindings[i].c_type==-8)free(bindings[i].value);
     free(bindings);return ok;
 }
 static int ad_sqlserver_prepare(ad_job *j,ad_connection *c){
-    if(j->parameter_count!=1||j->parameters[0].kind!=AD_TEXT)return 0;
-    ad_value *sql=&j->parameters[0];
-    const char *text=(const char *)sql->data;
-    int select=my_sql_type(text,sql->length,1);
+    const char *text=j->text;
+    size_t length=strlen(text);
+    int select=my_sql_type(text,length,1);
     if(select<0)return 0;
     ad_statement *s=calloc(1,sizeof *s);if(!s)return 0;
     j->prepared=s;s->owner=c;s->select=select;my_short parameters;
-    if(!sqlserver_prepare(c->odbc,text,sql->length,&s->odbc,&parameters))return 0;
+    if(!sqlserver_prepare(c->odbc,text,length,&s->odbc,&parameters)){
+        ad_sqlserver_diagnostic(j,s->odbc?MY_STMT:MY_DBC,s->odbc?s->odbc:c->odbc);
+        return 0;
+    }
     s->parameters=parameters;return 1;
 }
 static void ad_sqlserver_run(ad_job *j){
