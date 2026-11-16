@@ -98,6 +98,66 @@ jobs:
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
       - name: Verify generated ORM on SQLite with forced GC
         run: python3 examples/orm/verify.py --target native
+      - name: Validate native SQL Server 2022 with forced GC
+        env:
+          BHASH_GC_STRESS: '1'
+          BHASH_CI_MACOS_VERSION: ${{ matrix.os }}
+          SQLCMDSERVER: ${{ secrets.MACOS_SQLSERVER_HOST }}
+          SQLCMDUSER: ${{ secrets.MACOS_SQLSERVER_USER }}
+          SQLCMDPASSWORD: ${{ secrets.MACOS_SQLSERVER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          brew tap microsoft/mssql-release https://github.com/microsoft/homebrew-mssql-release
+          if brew command trust >/dev/null 2>&1; then brew trust microsoft/mssql-release; fi
+          HOMEBREW_ACCEPT_EULA=Y brew install microsoft/mssql-release/msodbcsql18
+          odbc="$(brew --prefix unixodbc)"
+          export BHASH_UNIXODBC="$odbc/lib/libodbc.2.dylib"
+          "$odbc/bin/odbcinst" -q -d -n 'ODBC Driver 18 for SQL Server'
+
+          input=target/macos-sqlserver-integration
+          cp -R src/test/resources/sqlserver "$input"
+          python3 scripts/generate_orm.py "$input/mapping.json" --output "$input/src/generated.bhash"
+          compiler=target/bhash-compiler-0.1.0-SNAPSHOT.jar
+          java -jar "$compiler" deps lock "$input"
+          java -jar "$compiler" compile "$input" --target native -o target/macos-sqlserver
+          file target/macos-sqlserver | grep -F arm64
+
+          if [[ -z "$SQLCMDSERVER" && -z "$SQLCMDUSER" && -z "$SQLCMDPASSWORD" ]]; then
+            export BHASH_SQLSERVER_URL='Driver={ODBC Driver 18 for SQL Server};Server=tcp:127.0.0.1,1;Encrypt=yes;LoginTimeout=2'
+            if target/macos-sqlserver >target/macos-sqlserver-no-endpoint.log 2>&1; then
+              echo 'Unexpected successful connection to an unused loopback port' >&2
+              exit 1
+            fi
+            grep -F 'SQL Server संबंध नहीं खुला।' target/macos-sqlserver-no-endpoint.log
+            echo '::notice::Live SQL Server test requires the MACOS_SQLSERVER_* secrets. The arm64 build and ODBC loader were checked.'
+            exit 0
+          fi
+          : "${SQLCMDSERVER:?Set MACOS_SQLSERVER_HOST}" "${SQLCMDUSER:?Set MACOS_SQLSERVER_USER}" "${SQLCMDPASSWORD:?Set MACOS_SQLSERVER_PASSWORD}"
+          HOMEBREW_ACCEPT_EULA=Y brew install microsoft/mssql-release/mssql-tools18
+          sqlcmd=("$(brew --prefix mssql-tools18)/bin/sqlcmd" -b -l 15 -d master)
+          "${sqlcmd[@]}" -Q "IF CONVERT(int, SERVERPROPERTY('ProductMajorVersion')) <> 16 THROW 50000, 'Expected SQL Server 2022', 1;"
+          db="bhash_ci_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${BHASH_CI_MACOS_VERSION//[^0-9]/}"
+          [[ "$db" =~ ^bhash_ci_[0-9]+_[0-9]+_[0-9]+$ ]]
+          "${sqlcmd[@]}" -Q "CREATE DATABASE [$db]"
+          cleanup() {
+            status=$?
+            "${sqlcmd[@]}" -Q "DROP DATABASE [$db]" || status=1
+            exit "$status"
+          }
+          trap cleanup EXIT
+          sed -e '1,2d' -e "s/^USE bhash;$/USE [$db];/" "$input/schema.sql" | "${sqlcmd[@]}"
+          for value in "$SQLCMDSERVER" "$SQLCMDUSER" "$SQLCMDPASSWORD"; do
+            if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+              echo 'A SQL Server connection setting contains a line break' >&2
+              exit 1
+            fi
+          done
+          export BHASH_SQLSERVER_TEST_DATABASE="$db"
+          export BHASH_SQLSERVER_URL="Driver={ODBC Driver 18 for SQL Server};Server={${SQLCMDSERVER//\}/\}\}}};Database=$db;UID={${SQLCMDUSER//\}/\}\}}};PWD={${SQLCMDPASSWORD//\}/\}\}}};Encrypt=yes;TrustServerCertificate=no"
+          target/macos-sqlserver | tee target/macos-sqlserver.log
+          grep -Fx SQLSERVER_SYNC_OK target/macos-sqlserver.log
+          grep -Fx SQLSERVER_ORM_OK target/macos-sqlserver.log
       - name: Test native WebSocket wire behavior over HTTP/1.1 and HTTP/2 TLS
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         env:
