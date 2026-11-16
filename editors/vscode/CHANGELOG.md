@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.25.7
+
+- Add native Apple Silicon SQL Server support through Microsoft ODBC Driver 18 and unixODBC.
+- Add SQL Server ARM64 build and ODBC smoke checks to the weekly macOS workflow, with live parameterized query, ORM, and rollback tests when a test server is configured.
+
 ## 0.25.6
 
 - Add native Windows x64 SQL Server support through Microsoft ODBC Driver 18.
