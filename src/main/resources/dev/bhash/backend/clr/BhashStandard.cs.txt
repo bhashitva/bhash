@@ -3,6 +3,9 @@ using System;
 using System.IO;
 using System.Text;
 using System.Globalization;
+using System.Data.Common;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Numerics;
 using System.Collections.Generic;
 
@@ -890,8 +893,7 @@ internal static class BhashStandard {
     private static IntPtr pgChecked(PgConnection c,IntPtr r){if(r==IntPtr.Zero||PgNative.PQresultStatus(r)!=1&&PgNative.PQresultStatus(r)!=2)throw pgFailure(c,r);return r;}
     private static string pgQuote(string s)=>"'"+s.Replace("\\","\\\\").Replace("'","\\'")+"'";
     internal static long pgOpen(string config){
-        if(config?.StartsWith("\nsqlserver-v1\n",StringComparison.Ordinal)==true)
-            throw failure("SQL Server के लिए JVM लक्ष्य चाहिए।");
+        if(config?.StartsWith(BhashMysql.SqlServerPrefix,StringComparison.Ordinal)==true)return BhashMysql.OpenSqlServer(config);
         if(config?.StartsWith("\nmysql-v1\n",StringComparison.Ordinal)==true)return BhashMysql.Open(config);
         PgNative.Load();if(pgConnections.Count>=32)throw failure("बहुत अधिक खुले PostgreSQL संबंध।");
         string[] a=config.Split('\n');if(a.Length!=10)throw failure("अमान्य PostgreSQL विन्यास।");
@@ -989,9 +991,10 @@ internal static class BhashStandard {
     private sealed class AdError : Exception {internal readonly int Code;internal AdError(string message,int code=0):base(message){Code=code;}}
     private sealed class AdConnection {
         internal IntPtr Db;internal bool Postgres,Closed,Busy,Transaction,Failed;
+        internal DbConnection Managed;internal DbTransaction ManagedTransaction;
         internal readonly List<AdStatement> Statements=new();
     }
-    private sealed class AdStatement {internal AdConnection Owner;internal IntPtr Query,Meta;internal byte[] Sql;internal int Parameters;internal bool Closed;}
+    private sealed class AdStatement {internal AdConnection Owner;internal IntPtr Query,Meta;internal byte[] Sql;internal DbCommand Managed;internal int Parameters;internal bool Closed,Select;}
     private sealed record AdCell(string Kind,object Value);
     private sealed class AdJob {
         internal int Operation;internal AdConnection Connection,Opened;internal AdStatement Statement,Prepared;
@@ -1019,29 +1022,36 @@ internal static class BhashStandard {
     private static void adExec(AdConnection c,string sql){int code=SqlNative.sqlite3_exec(c.Db,adUtf8(sql),IntPtr.Zero,IntPtr.Zero,out IntPtr error);if(error!=IntPtr.Zero)SqlNative.sqlite3_free(error);adCheck(code);}
     private static void adClose(AdConnection c){
         if(c==null||c.Closed)return;
-        foreach(var s in c.Statements){if(s.Query!=IntPtr.Zero){SqlNative.sqlite3_finalize(s.Query);s.Query=IntPtr.Zero;}if(s.Meta!=IntPtr.Zero){PgNative.PQclear(s.Meta);s.Meta=IntPtr.Zero;}s.Closed=true;}
+        foreach(var s in c.Statements){s.Managed?.Dispose();s.Managed=null;if(s.Query!=IntPtr.Zero){SqlNative.sqlite3_finalize(s.Query);s.Query=IntPtr.Zero;}if(s.Meta!=IntPtr.Zero){PgNative.PQclear(s.Meta);s.Meta=IntPtr.Zero;}s.Closed=true;}
         if(c.Db!=IntPtr.Zero){if(c.Postgres)PgNative.PQfinish(c.Db);else SqlNative.sqlite3_close_v2(c.Db);c.Db=IntPtr.Zero;}
+        if(c.Managed!=null){
+            try {c.ManagedTransaction?.Rollback();}catch(DbException){}
+            try {c.ManagedTransaction?.Dispose();}finally{c.Managed.Dispose();c.Managed=null;}
+        }
         c.Closed=true;c.Transaction=false;
     }
     private static void adDiscardResults(AdJob j){
-        if(j.Prepared!=null){if(j.Prepared.Query!=IntPtr.Zero)SqlNative.sqlite3_finalize(j.Prepared.Query);if(j.Prepared.Meta!=IntPtr.Zero)PgNative.PQclear(j.Prepared.Meta);j.Prepared=null;}
+        if(j.Prepared!=null){j.Prepared.Managed?.Dispose();if(j.Prepared.Query!=IntPtr.Zero)SqlNative.sqlite3_finalize(j.Prepared.Query);if(j.Prepared.Meta!=IntPtr.Zero)PgNative.PQclear(j.Prepared.Meta);j.Prepared=null;}
         if(j.Opened!=null){adClose(j.Opened);j.Opened=null;}
     }
     private static async System.Threading.Tasks.Task adWorker(AdJob j){
         // Always leave the dispatcher before provider initialization or any worker I/O.
         await System.Threading.Tasks.Task.Yield();
-        bool postgres=j.Operation==1||j.Connection?.Postgres==true;
+        bool sqlServer=j.Operation==1?j.Text.StartsWith(BhashMysql.SqlServerPrefix,StringComparison.Ordinal):j.Connection?.Managed!=null;
+        bool postgres=!sqlServer&&(j.Operation==1||j.Connection?.Postgres==true);
         var workers=j.Operation==5||j.Operation==8||j.Operation==9?adControlWorkers:adDataWorkers;
         try{
             if(postgres){await adPostgres(j).ConfigureAwait(false);return;}
             await workers.WaitAsync().ConfigureAwait(false);
-            try{await System.Threading.Tasks.Task.Run(()=>{
+            try{
+                if(sqlServer){await Task.Run(()=>adSqlServer(j)).ConfigureAwait(false);return;}
+                await System.Threading.Tasks.Task.Run(()=>{
                 lock(j.Gate){if(j.Cancel.IsCancellationRequested)return;j.Dispatched=true;}
                 lock(adLoader){SqlNative.Ensure();}
                 adSqlite(j);
             }).ConfigureAwait(false);}finally{workers.Release();}
         }catch(Exception error){
-            j.Error=error is AdError?error.Message:postgres?"PostgreSQL त्रुटि [XXXXX]।":"SQLite कथन असफल।";
+            j.Error=error is AdError?error.Message:sqlServer?adSqlServerError(j,error):postgres?"PostgreSQL त्रुटि [XXXXX]।":"SQLite कथन असफल।";
             if(j.Connection?.Transaction==true)j.Connection.Failed=true;
         }finally{
             if(j.Error!=null||j.Cancel.IsCancellationRequested){
@@ -1051,6 +1061,93 @@ internal static class BhashStandard {
                 }).ConfigureAwait(false);}finally{adControlWorkers.Release();}
             }
         }
+    }
+    private static string adSqlServerError(AdJob j,Exception error) {
+        if(error is BhashRuntime.Failure)return error.Message;
+        if(error is OperationCanceledException)return "कार्य निरस्त किया गया।";
+        if(j.Operation==1)return BhashMysql.SqlServerOpenError;
+        return error is DbException dbError?BhashMysql.SqlServerError(dbError):"SQL Server त्रुटि [XXXXX]।";
+    }
+    private static async Task adSqlServer(AdJob j) {
+        if(j.Operation!=5&&j.Operation!=8&&j.Operation!=9&&!adDispatch(j))return;
+        var c=j.Connection;
+        var token=j.Cancel.Token;
+        switch(j.Operation){
+            case 1:
+                var db=BhashMysql.SqlServerConnection(j.Text);
+                j.Opened=new AdConnection{Managed=db};
+                await db.OpenAsync(token).ConfigureAwait(false);
+                break;
+            case 2:
+                if(c.Failed)throw new AdError("डेटालेनदेन असफल है; वापस लें।");
+                if(j.Parameters.Length!=1||j.Parameters[0] is not string sql)throw new AdError("अमान्य SQL Server कथन।");
+                var parsed=BhashMysql.Parameters(sql,true);
+                var command=c.Managed.CreateCommand();
+                j.Prepared=new AdStatement{Owner=c,Managed=command,Parameters=parsed.Count,Select=parsed.Select};
+                command.CommandText=parsed.Sql;
+                command.CommandTimeout=30;
+                break;
+            case 3:case 4:
+                await adSqlServerQuery(j,token).ConfigureAwait(false);break;
+            case 5:
+                j.Statement.Managed.Dispose();j.Statement.Managed=null;j.Statement.Closed=true;break;
+            case 6:
+                if(c.Transaction)throw new AdError("डेटालेनदेन पहले सक्रिय है।");
+                c.ManagedTransaction=await c.Managed.BeginTransactionAsync(token).ConfigureAwait(false);
+                c.Transaction=true;c.Failed=false;break;
+            case 7:
+                if(c.Failed||!c.Transaction)throw new AdError("डेटालेनदेन सक्रिय नहीं है या असफल है।");
+                try {await c.ManagedTransaction.CommitAsync().ConfigureAwait(false);}
+                catch(DbException){adClose(c);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");}
+                c.ManagedTransaction.Dispose();c.ManagedTransaction=null;c.Transaction=false;break;
+            case 8:
+                if(c.Transaction){
+                    await c.ManagedTransaction.RollbackAsync().ConfigureAwait(false);
+                    c.ManagedTransaction.Dispose();c.ManagedTransaction=null;
+                }
+                c.Transaction=false;c.Failed=false;break;
+            case 9:adClose(c);break;
+        }
+    }
+    private static async Task adSqlServerQuery(AdJob j,CancellationToken token) {
+        var s=j.Statement;
+        if(s.Owner.Failed)throw new AdError("डेटालेनदेन असफल है; वापस लें।");
+        if(s.Parameters!=j.Parameters.Length)throw new AdError("डेटाकथन के सभी मापदंड बाँधें।");
+        if(s.Select!=(j.Operation==4))throw new AdError("डेटाकथन और परिणाम क्रिया मेल नहीं खाते।");
+        var command=s.Managed;
+        command.Transaction=s.Owner.ManagedTransaction;
+        command.Parameters.Clear();
+        for(int i=0;i<j.Parameters.Length;i++)
+            BhashMysql.AddParameter(command,"@p"+(i+1).ToString(CultureInfo.InvariantCulture),j.Parameters[i]);
+        BhashMysql.TypeSqlServerNulls(command);
+        if(j.Operation==3){j.Result=await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);return;}
+        using var reader=await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        int columns=reader.FieldCount;
+        if(columns>256)throw new AdError("डेटा परिणाम की सीमा पार हो गई।");
+        j.Names=new string[columns];var kinds=new string[columns];
+        for(int i=0;i<columns;i++){j.Names[i]=reader.GetName(i);kinds[i]=BhashMysql.Kind(reader,i);}
+        long size=0;
+        while(await reader.ReadAsync(token).ConfigureAwait(false)){
+            if(j.Rows.Count>=1024)throw new AdError("डेटा परिणाम की सीमा १०२४ पंक्तियाँ / ८३८८६०८ बाइट है।");
+            var row=new AdCell[columns];
+            for(int i=0;i<columns;i++){
+                string kind=reader.IsDBNull(i)?"रिक्त":kinds[i];
+                object value=kind switch {
+                    "रिक्त"=>null,
+                    "पूर्णांक"=>Convert.ToInt64(reader.GetValue(i),CultureInfo.InvariantCulture),
+                    "दशमलव"=>Convert.ToDouble(reader.GetValue(i),CultureInfo.InvariantCulture),
+                    "पाठ" or "सटीकदशमलव" or "समय"=>BhashMysql.ReadText(reader,i,kind),
+                    "तार्किक" or "बाइटबफ़र"=>reader.GetValue(i),
+                    _=>throw new AdError("डेटाकथन स्तंभ का प्रकार मेल नहीं खाता।")
+                };
+                if(value is double number&&!double.IsFinite(number))throw new AdError("डेटाकथन में सीमित दशमलव मान दें।");
+                size+=value is string text?Encoding.UTF8.GetByteCount(text):value is byte[] binary?binary.Length:8;
+                if(size>DB_LIMIT)throw new AdError("डेटा परिणाम की सीमा १०२४ पंक्तियाँ / ८३८८६०८ बाइट है।");
+                row[i]=new AdCell(kind,value);
+            }
+            j.Rows.Add(row);
+        }
+        j.Result=j.Rows.Count;
     }
     private static void adSqlite(AdJob j){
         AdConnection c=j.Connection;
@@ -1276,8 +1373,6 @@ internal static class BhashStandard {
         if(error!=null){if(c.Transaction)c.Failed=true;if(j.Operation==7&&(error.Contains("[08",StringComparison.Ordinal)||error.Contains("[XXXXX]",StringComparison.Ordinal)||error.Contains("[40003]",StringComparison.Ordinal)||error.Contains("[57P01]",StringComparison.Ordinal)||error.Contains("[57P02]",StringComparison.Ordinal)||error.Contains("[57P03]",StringComparison.Ordinal))){adClose(c);throw new AdError("लेनदेन का परिणाम अज्ञात है; स्वचालित पुनःप्रयास न करें।");}throw new AdError(error);}
     }
     private static async System.Threading.Tasks.Task adPostgres(AdJob j){
-        if(j.Operation==1&&j.Text.StartsWith("\nsqlserver-v1\n",StringComparison.Ordinal))
-            throw new AdError("SQL Server के लिए JVM लक्ष्य चाहिए।");
         lock(adLoader){PgNative.Load();}
         if(j.Operation==1){
             string[] a=j.Text.Split('\n');if(a.Length!=10)throw new AdError("अमान्य PostgreSQL विन्यास।");

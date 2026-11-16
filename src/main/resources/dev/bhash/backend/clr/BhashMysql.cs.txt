@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.Globalization;
 using System.IO;
@@ -13,6 +14,11 @@ internal static class BhashMysql {
     private sealed class DriverContext : AssemblyLoadContext {
         private readonly string directory;
         internal DriverContext(string directory) { this.directory=directory; }
+        protected override IntPtr LoadUnmanagedDll(string name) {
+            if(Path.GetFileName(name)!=name)return IntPtr.Zero;
+            string file=Path.Combine(directory,name.EndsWith(".dll",StringComparison.OrdinalIgnoreCase)?name:name+".dll");
+            return File.Exists(file)?LoadUnmanagedDllFromPath(file):IntPtr.Zero;
+        }
         protected override Assembly Load(AssemblyName name) {
             string file=Path.Combine(directory,name.Name+".dll");
             return File.Exists(file)?LoadFromAssemblyPath(file):null;
@@ -24,6 +30,7 @@ internal static class BhashMysql {
         internal long token;
         internal bool failed;
         internal int timeout;
+        internal bool sqlServer;
     }
     private sealed class Statement {
         internal Connection owner;
@@ -39,12 +46,15 @@ internal static class BhashMysql {
     private static readonly Dictionary<long,Connection> connections=new();
     private static readonly Dictionary<long,Statement> statements=new();
     private static long nextConnection,nextStatement,nextTransaction;
-    private static Type driver;
+    internal const string SqlServerPrefix = "\nsqlserver-v1\n";
+    internal const string SqlServerOpenError = "SQL Server संबंध नहीं खुला। चालक और संबंधपाठ जाँचें।";
+    private static readonly object driverLock = new();
+    private static Type driver, sqlServerDriver;
     private static BhashRuntime.Failure Error(string message)=>new BhashRuntime.Failure(message);
     private static BhashRuntime.Failure Failure(Connection connection,DbException exception) {
         if(connection?.transaction!=null)connection.failed=true;
         string state=exception.SqlState;
-        return Error("MySQL त्रुटि ["+(state!=null&&Regex.IsMatch(state,@"\A[A-Z0-9]{5}\z")?state:"XXXXX")+"]।");
+        return Error(connection?.sqlServer==true?SqlServerError(exception):"MySQL त्रुटि ["+(state!=null&&Regex.IsMatch(state,@"\A[A-Z0-9]{5}\z")?state:"XXXXX")+"]।");
     }
     private static Connection Conn(long id)=>connections.TryGetValue(id,out var c)?c:throw Error("MySQL संबंध बंद है।");
     private static Statement Stmt(long id)=>statements.TryGetValue(id,out var s)?s:throw Error("MySQL कथन बंद है।");
@@ -90,10 +100,83 @@ internal static class BhashMysql {
             throw Error("MySqlConnector और उसकी रनटाइम निर्भरताएँ स्थापित करें। ("+e.GetBaseException().GetType().Name+")");
         } finally {db?.Dispose();}
     }
-    private static (string Sql,int Count,bool Select) Parameters(string sql) {
+    internal static string SqlServerError(DbException error) {
+        string state=error.SqlState;
+        return "SQL Server त्रुटि ["+(state!=null&&Regex.IsMatch(state,@"\A[A-Z0-9]{5}\z")?state:"XXXXX")+"]।";
+    }
+    internal static DbConnection SqlServerConnection(string config) {
+        try {
+            lock(driverLock) {
+                if(sqlServerDriver==null) {
+                    string path=Environment.GetEnvironmentVariable("BHASH_SQLSERVER_DOTNET_DRIVER");
+                    if(string.IsNullOrEmpty(path)||!Path.IsPathFullyQualified(path))
+                        throw Error("BHASH_SQLSERVER_DOTNET_DRIVER में Microsoft.Data.SqlClient.dll का पूरा पथ दें।");
+                    sqlServerDriver=new DriverContext(Path.GetDirectoryName(path)).LoadFromAssemblyPath(path)
+                        .GetType("Microsoft.Data.SqlClient.SqlConnection",true);
+                }
+            }
+            var db=(DbConnection)Activator.CreateInstance(sqlServerDriver);
+            try {
+                var settings=new DbConnectionStringBuilder { ConnectionString=config.Substring(SqlServerPrefix.Length) };
+                settings["Pooling"]=false;
+                settings["Persist Security Info"]=false;
+                db.ConnectionString=settings.ConnectionString;
+                return db;
+            } catch {db.Dispose();throw;}
+        } catch(BhashRuntime.Failure) {throw;}
+        catch(Exception) {throw Error(SqlServerOpenError);}
+    }
+    internal static long OpenSqlServer(string config) {
+        if(connections.Count>=32)throw Error("बहुत अधिक खुले SQL Server संबंध।");
+        var db=SqlServerConnection(config);
+        try {
+            db.Open();
+            long id=--nextConnection;
+            connections.Add(id,new Connection{db=db,timeout=30,sqlServer=true});
+            return id;
+        } catch(Exception) {db.Dispose();throw Error(SqlServerOpenError);}
+    }
+    internal static void TypeSqlServerNulls(DbCommand command) {
+        bool hasNull=false;
+        foreach(DbParameter parameter in command.Parameters)if(parameter.Value==DBNull.Value){hasNull=true;break;}
+        if(!hasNull)return;
+        using var description=command.Connection.CreateCommand();
+        description.CommandText="sys.sp_describe_undeclared_parameters";
+        description.CommandType=CommandType.StoredProcedure;
+        description.CommandTimeout=command.CommandTimeout;
+        description.Transaction=command.Transaction;
+        AddParameter(description,"@tsql",command.CommandText);
+        using var rows=description.ExecuteReader();
+        int name=rows.GetOrdinal("name"), type=rows.GetOrdinal("suggested_system_type_id");
+        var typed=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while(rows.Read()){
+            string parameterName=rows.GetString(name);
+            if(!command.Parameters.Contains(parameterName)||command.Parameters[parameterName].Value!=DBNull.Value)continue;
+            var parameter=command.Parameters[parameterName];
+            parameter.DbType=rows.GetInt32(type) switch {
+                36=>DbType.Guid,40=>DbType.Date,41=>DbType.Time,42=>DbType.DateTime2,43=>DbType.DateTimeOffset,
+                48=>DbType.Byte,52=>DbType.Int16,56=>DbType.Int32,58 or 61=>DbType.DateTime,
+                59=>DbType.Single,60 or 122=>DbType.Currency,62=>DbType.Double,104=>DbType.Boolean,
+                106 or 108=>DbType.Decimal,127=>DbType.Int64,34 or 165 or 173 or 189=>DbType.Binary,
+                35 or 167 or 175=>DbType.AnsiString,99 or 231 or 239=>DbType.String,241=>DbType.Xml,
+                _=>throw Error("SQL Server के रिक्त मापदंड का प्रकार समर्थित नहीं है।")
+            };
+            typed.Add(parameterName);
+        }
+        foreach(DbParameter parameter in command.Parameters)
+            if(parameter.Value==DBNull.Value&&!typed.Contains(parameter.ParameterName))
+                throw Error("SQL Server के रिक्त मापदंड का प्रकार नहीं मिला।");
+    }
+    internal static void AddParameter(DbCommand command,string name,object value) {
+        var parameter=command.CreateParameter();
+        parameter.ParameterName=name;
+        parameter.Value=value??DBNull.Value;
+        command.Parameters.Add(parameter);
+    }
+    internal static (string Sql,int Count,bool Select) Parameters(string sql,bool sqlServer=false) {
         var first=Regex.Match(sql,@"\A\s*(SELECT|INSERT|UPDATE|DELETE)\b",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant);
-        if(!first.Success||Encoding.UTF8.GetByteCount(sql)>65536||sql.IndexOfAny(new[]{'\0',';','\\'})>=0)
-            throw Error("MySQL में एक SELECT, INSERT, UPDATE या DELETE कथन दें।");
+        if(!first.Success||Encoding.UTF8.GetByteCount(sql)>65536||sql.IndexOf('\0')>=0||!sqlServer&&sql.IndexOfAny(new[]{';','\\'})>=0)
+            throw Error("एक SELECT, INSERT, UPDATE या DELETE कथन दें।");
         var result=new StringBuilder(sql.Length);
         int count=0;
         char quote='\0';
@@ -107,22 +190,23 @@ internal static class BhashMysql {
                 }
                 continue;
             }
-            if(c=='\''||c=='"'||c=='`')quote=c;
-            if(c=='@'||c=='#'||i+1<sql.Length&&(c=='-'&&sql[i+1]=='-'||c=='/'&&sql[i+1]=='*'))
-                throw Error("MySQL कथन में केवल अनाम ? मापदंड उपयोग करें।");
+            if(c=='\''||c=='"'||!sqlServer&&c=='`')quote=c;
+            if(sqlServer&&c=='[')quote=']';
+            if(c=='@'||c=='#'||c==';'||i+1<sql.Length&&(c=='-'&&sql[i+1]=='-'||c=='/'&&sql[i+1]=='*'))
+                throw Error("डेटाकथन में केवल अनाम ? मापदंड उपयोग करें।");
             if(c=='?') {
                 if(++count>999)throw Error("मापदंड सीमा ९९९ है।");
                 result.Append("@p").Append(count.ToString(CultureInfo.InvariantCulture));
             } else result.Append(c);
         }
-        if(quote!='\0')throw Error("अमान्य MySQL उद्धरण।");
+        if(quote!='\0')throw Error("अमान्य डेटाकथन उद्धरण।");
         return (result.ToString(),count,first.Groups[1].Value.Equals("SELECT",StringComparison.OrdinalIgnoreCase));
     }
     internal static long Prepare(long id,string sql) {
         var c=Conn(id);
         Healthy(c);
         if(statements.Count>=128)throw Error("बहुत अधिक खुले MySQL कथन।");
-        var parsed=Parameters(sql);
+        var parsed=Parameters(sql,c.sqlServer);
         DbCommand command=c.db.CreateCommand();
         try {
             command.CommandText=parsed.Sql;
@@ -134,7 +218,7 @@ internal static class BhashMysql {
                 param.Value=DBNull.Value;
                 command.Parameters.Add(param);
             }
-            command.Prepare();
+            if(!c.sqlServer)command.Prepare();
             long key=--nextStatement;
             statements.Add(key,new Statement{owner=c,command=command,bound=new bool[parsed.Count],select=parsed.Select});
             command=null;
@@ -178,7 +262,9 @@ internal static class BhashMysql {
             for(int i=0;i<bytes.Length;i++)bytes[i]=(byte)original.get(i);
             value=bytes;
         }
-        s.command.Parameters[(int)index-1].Value=value??DBNull.Value;
+        var parameter=s.command.Parameters[(int)index-1];
+        if(s.owner.sqlServer)parameter.ResetDbType();
+        parameter.Value=value??DBNull.Value;
         s.bound[(int)index-1]=true;
     }
     private static void Bound(Statement s) {
@@ -191,7 +277,7 @@ internal static class BhashMysql {
         Ready(s);
         if(s.select)throw Error("MySQL पंक्तियाँ पढ़ने के लिए अगला उपयोग करें।");
         Bound(s);
-        try {long result=s.command.ExecuteNonQuery();s.state=2;return result;}
+        try {if(s.owner.sqlServer)TypeSqlServerNulls(s.command);long result=s.command.ExecuteNonQuery();s.state=2;return result;}
         catch(DbException e) {s.state=3;throw Failure(s.owner,e);}
     }
     internal static bool Next(long id) {
@@ -203,6 +289,7 @@ internal static class BhashMysql {
         if(s.state==0)Bound(s);
         try {
             if(s.state==0) {
+                if(s.owner.sqlServer)TypeSqlServerNulls(s.command);
                 s.reader=s.command.ExecuteReader();
                 int count=s.reader.FieldCount;
                 if(count>256)throw Error("MySQL स्तंभ सीमा से बाहर हैं।");
@@ -232,24 +319,27 @@ internal static class BhashMysql {
         } catch(DbException e) {EndRows(s,3);throw Failure(s.owner,e);}
         catch(BhashRuntime.Failure) {EndRows(s,3);throw;}
     }
-    private static string ReadText(DbDataReader reader,int column,string kind) {
-        if(kind=="पाठ")return reader.GetString(column);
+    internal static string ReadText(DbDataReader reader,int column,string kind) {
+        if(kind=="पाठ")return reader.GetFieldType(column)==typeof(Guid)?reader.GetGuid(column).ToString():reader.GetString(column);
         if(kind=="सटीकदशमलव") {
             // MySqlConnector's decimal value can exceed System.Decimal's precision.
             if(reader.GetDataTypeName(column)=="DECIMAL") {
                 var method=reader.GetType().GetMethod("GetMySqlDecimal",new[]{typeof(int)});
                 if(method!=null)return method.Invoke(reader,new object[]{column}).ToString();
             }
+            var sqlDecimal=reader.GetType().GetMethod("GetSqlDecimal",new[]{typeof(int)});
+            if(sqlDecimal!=null&&(reader.GetDataTypeName(column).ToLowerInvariant() is "decimal" or "numeric"))
+                return sqlDecimal.Invoke(reader,new object[]{column}).ToString();
             return Convert.ToString(reader.GetValue(column),CultureInfo.InvariantCulture);
         }
         object value=reader.GetValue(column);
         if(value is DateTime date)return date.ToString(reader.GetDataTypeName(column)=="DATE"?"yyyy-MM-dd":"yyyy-MM-dd HH:mm:ss.FFFFFF",CultureInfo.InvariantCulture);
         return Convert.ToString(value,CultureInfo.InvariantCulture);
     }
-    private static string Kind(DbDataReader reader,int column) {
+    internal static string Kind(DbDataReader reader,int column) {
         string type=reader.GetDataTypeName(column).ToUpperInvariant();
-        if(type is "DECIMAL" or "NEWDECIMAL")return "सटीकदशमलव";
-        if(type is "DATE" or "DATETIME" or "TIMESTAMP" or "TIME")return "समय";
+        if(type is "DECIMAL" or "NEWDECIMAL" or "NUMERIC" or "MONEY" or "SMALLMONEY")return "सटीकदशमलव";
+        if(type is "DATE" or "DATETIME" or "DATETIME2" or "DATETIMEOFFSET" or "SMALLDATETIME" or "TIME" || type=="TIMESTAMP"&&reader.GetFieldType(column)!=typeof(byte[]))return "समय";
         Type field=reader.GetFieldType(column);
         if(field==typeof(ulong))return type=="BIT"?"तार्किक":"सटीकदशमलव";
         if(field==typeof(bool))return "तार्किक";
@@ -257,7 +347,7 @@ internal static class BhashMysql {
            field==typeof(int)||field==typeof(uint)||field==typeof(long))return "पूर्णांक";
         if(field==typeof(float)||field==typeof(double))return "दशमलव";
         if(field==typeof(byte[]))return "बाइटबफ़र";
-        if(field==typeof(string))return "पाठ";
+        if(field==typeof(string)||field==typeof(Guid))return "पाठ";
         return "असमर्थित";
     }
     internal static void Reset(long id)=>EndRows(Stmt(id),0);
