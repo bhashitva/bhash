@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.25.6
+
+- Add native Windows x64 SQL Server support through Microsoft ODBC Driver 18.
+- Verify parameterized Unicode queries, ORM operations, and rollback against SQL Server 2022 Express LocalDB with forced GC.
+
 ## 0.25.5
 
 - Extend SQL Server 2022 support to desktop .NET and native Linux x64.
