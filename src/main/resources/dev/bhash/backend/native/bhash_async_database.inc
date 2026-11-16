@@ -446,7 +446,7 @@ static uint64_t ad_call(uint32_t op,uint64_t a,uint64_t b,uint64_t c,uint64_t d,
 #ifdef BHASH_SQLSERVER_ODBC
                 my_load(location);
 #else
-                runtime_error(location,"मूल SQL Server संबंध के लिए Linux या Windows x64 चाहिए।");
+                runtime_error(location,"मूल SQL Server संबंध के लिए Linux x64, Windows x64 या macOS Apple Silicon चाहिए।");
 #endif
             }else if(!pg_load())runtime_error(location,"PostgreSQL libpq 14+ रनटाइम उपलब्ध नहीं है।");
         }
