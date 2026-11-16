@@ -178,13 +178,13 @@ done:
     atomic_store_explicit(&j->done,1,memory_order_release);
 }
 #ifdef __linux__
-static void ad_sqlserver_diagnostic(ad_job *j,my_short kind,my_handle handle){
+static void ad_sqlserver_diagnostic(ad_job *j,my_short kind,my_handle handle,const char *operation){
     unsigned char state[6]={0},discard[2];
     int code;my_short length;
     if(!handle||!my_ok(my_SQLGetDiagRec(kind,handle,1,state,&code,discard,sizeof discard,&length)))return;
     for(int i=0;i<5;i++)if(!((state[i]>='0'&&state[i]<='9')||(state[i]>='A'&&state[i]<='Z')))return;
     char message[160];
-    snprintf(message,sizeof message,"SQL Server त्रुटि [%.5s, %d]।",state,code);
+    snprintf(message,sizeof message,"SQL Server %s त्रुटि [%.5s, %d]।",operation,state,code);
     ad_error(j,message);
 }
 static int ad_sqlserver_cell(ad_job *j,my_handle stmt,int index,int kind,ad_value *v){
@@ -206,6 +206,18 @@ static int ad_sqlserver_query(ad_job *j){
     my_binding *bindings=calloc(j->parameter_count?j->parameter_count:1,sizeof *bindings);
     if(!bindings)return 0;
     int ok=0,kinds[DB_COLUMNS];
+    const char *operation="bind";
+    // Describe untyped nulls before binding any values. SQL Server can convert
+    // a Unicode NULL when the driver cannot describe the marker.
+    my_short null_types[999],null_scales[999];
+    my_ulen null_sizes[999];
+    for(size_t i=0;i<j->parameter_count;i++){
+        if(j->parameters[i].kind!=AD_NULL)continue;
+        my_short nullable;
+        if(!my_ok(my_SQLDescribeParam(stmt,(my_ushort)i+1,&null_types[i],&null_sizes[i],&null_scales[i],&nullable))){
+            null_types[i]=-9;null_sizes[i]=1;null_scales[i]=0;
+        }
+    }
     for(size_t i=0;i<j->parameter_count;i++){
         ad_value *v=&j->parameters[i];my_binding *p=&bindings[i];size_t bytes;
         switch(v->kind){
@@ -219,14 +231,18 @@ static int ad_sqlserver_query(ad_job *j){
                 p->c_type=-8;p->sql_type=bytes>8000?-10:-9;p->length=(my_len)bytes;break;
             default:goto done;
         }
-        if(!sqlserver_bind(stmt,(int)i+1,p))goto done;
+        if(v->kind==AD_NULL){
+            if(!my_ok(my_SQLBindParameter(stmt,(my_ushort)i+1,1,-8,null_types[i],null_sizes[i],null_scales[i],NULL,0,&p->length)))goto done;
+        }else if(!sqlserver_bind(stmt,(int)i+1,p))goto done;
     }
+    operation="execute";
     my_short executed=my_SQLExecute(stmt);
     if(!my_ok(executed)&&executed!=MY_NO_DATA)goto done;
     if(j->operation==3){
         my_len affected;if(!my_ok(my_SQLRowCount(stmt,&affected)))goto done;
         j->result=affected<0?0:(uint64_t)affected;ok=1;goto done;
     }
+    operation="describe columns";
     my_short columns;
     if(!my_ok(my_SQLNumResultCols(stmt,&columns))||columns<=0||columns>DB_COLUMNS)goto done;
     j->columns=(size_t)columns;
@@ -237,6 +253,7 @@ static int ad_sqlserver_query(ad_job *j){
         kinds[i]=my_kind(type,0,1);
     }
     while(!atomic_load(&j->cancelled)){
+        operation="fetch";
         my_short fetched=my_SQLFetch(stmt);
         if(fetched==MY_NO_DATA){j->result=j->rows;ok=1;break;}
         if(!my_ok(fetched)||j->rows>=AD_ROWS)break;
@@ -244,10 +261,11 @@ static int ad_sqlserver_query(ad_job *j){
         if(!cells)break;
         j->cells=cells;ad_value *row=cells+j->rows++*j->columns;
         memset(row,0,j->columns*sizeof *row);
+        operation="read row";
         for(int i=0;i<columns;i++)if(!ad_sqlserver_cell(j,stmt,i,kinds[i],&row[i]))goto done;
     }
 done:
-    if(!ok&&!atomic_load(&j->cancelled))ad_sqlserver_diagnostic(j,MY_STMT,stmt);
+    if(!ok&&!atomic_load(&j->cancelled))ad_sqlserver_diagnostic(j,MY_STMT,stmt,operation);
     my_SQLFreeStmt(stmt,0);my_SQLFreeStmt(stmt,3);
     for(size_t i=0;i<j->parameter_count;i++)if(bindings[i].c_type==-8)free(bindings[i].value);
     free(bindings);return ok;
@@ -260,7 +278,7 @@ static int ad_sqlserver_prepare(ad_job *j,ad_connection *c){
     ad_statement *s=calloc(1,sizeof *s);if(!s)return 0;
     j->prepared=s;s->owner=c;s->select=select;my_short parameters;
     if(!sqlserver_prepare(c->odbc,text,length,&s->odbc,&parameters)){
-        ad_sqlserver_diagnostic(j,s->odbc?MY_STMT:MY_DBC,s->odbc?s->odbc:c->odbc);
+        ad_sqlserver_diagnostic(j,s->odbc?MY_STMT:MY_DBC,s->odbc?s->odbc:c->odbc,"prepare");
         return 0;
     }
     s->parameters=parameters;return 1;
