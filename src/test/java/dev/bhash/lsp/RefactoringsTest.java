@@ -36,6 +36,16 @@ class RefactoringsTest {
         var alias=r.rename(b,at(b,"विद्यार्थी;"),"पाठक",root);
         assertEquals(3,alias.get(b.uri).size());assertFalse(alias.containsKey(a.uri));
     }
+    @Test void aliasNavigationFollowsTargetWhileRenameKeepsAliasIdentity()throws Exception {
+        var a=source("library.bhash","संकुल गणित; सार्वजनिक फलन दुगुना(अ: पूर्णांक)->पूर्णांक {लौटाओ अ*२;}");
+        var b=source("use.bhash","आयात गणित.दुगुना उपनाम दो; फलन मुख्य()->शून्य {लिखो(दो(३));}");
+        var project=List.of(a,b);var at=at(b,"दो(३)");
+        assertEquals(b.uri,b.resolve(at,project).get(0).uri());
+        assertEquals(a.uri,b.navigation(at,project).get(0).uri());
+        assertEquals("दुगुना",b.navigation(at,project).get(0).name());
+        var edits=new Refactorings(project).rename(b,at,"दोगुना",root);
+        assertEquals(Set.of(b.uri),edits.keySet());assertEquals(2,edits.get(b.uri).size());
+    }
     @Test void overrideAndInterfaceNamesChangeTogetherButUnrelatedTypesDoNot()throws Exception {
         var i=source("members.bhash","अनुबंध नामित {फलन नाम()->पाठ;} वर्ग क पालन नामित {फलन नाम()->पाठ {लौटाओ \"क\";}} वर्ग ख विस्तार क {अधिलेखन फलन नाम()->पाठ {लौटाओ \"ख\";}} वर्ग अन्य {फलन नाम()->पाठ {लौटाओ \"अन्य\";}} फलन मुख्य()->शून्य {स्थिर व: नामित=नया ख(); लिखो(व.नाम()); स्थिर अ=नया अन्य(); लिखो(अ.नाम());}");
         var r=new Refactorings(List.of(i));var edits=r.rename(i,at(i,"नाम()->पाठ"),"विवरण",root);

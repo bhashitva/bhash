@@ -257,11 +257,11 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
     }
     @Override public CompletableFuture<Either<List<? extends Location>,List<? extends LocationLink>>> definition(DefinitionParams params) {
         return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
-            return Either.forLeft(index==null?List.of():index.resolve(params.getPosition(),project.indexes.values()).stream().map(SourceIndex.Symbol::location).toList());});
+            return Either.forLeft(index==null?List.of():index.navigation(params.getPosition(),project.indexes.values()).stream().map(SourceIndex.Symbol::location).toList());});
     }
     @Override public CompletableFuture<Hover> hover(HoverParams params) {
         return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());if(index==null)return null;
-            var symbols=index.resolve(params.getPosition(),project.indexes.values());if(symbols.isEmpty())return null;
+            var symbols=index.navigation(params.getPosition(),project.indexes.values());if(symbols.isEmpty())return null;
             String text=String.join("\n\n",symbols.stream().map(s->"```bhash\n"+(s.detail().isBlank()?s.name():s.detail())+"\n```\n\n"+s.qualified()).distinct().toList());
             return new Hover(new MarkupContent(MarkupKind.MARKDOWN,text));});
     }

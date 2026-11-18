@@ -157,6 +157,18 @@ final class SourceIndex {
         String full=name.contains(".")?name:imports.getOrDefault(name,pkg.isEmpty()?name:pkg+"."+name);
         return project.stream().flatMap(i->i.symbols.stream()).filter(s->s.global && (!typeReference||s.kind!=SymbolKind.Function) && s.qualified.equals(full) && (s.exported || pkg.equals(packageOf(s.qualified)))).toList();
     }
+    List<Symbol> navigation(Position position,Collection<SourceIndex> project) {
+        // Refactorings bind an import alias separately; F12/hover follow its target.
+        var result=new LinkedHashSet<Symbol>();
+        for(var symbol:resolve(position,project)) {
+            if(aliases.containsValue(symbol)) {
+                String target=imports.get(key(symbol.name));
+                project.stream().flatMap(i->i.symbols.stream()).filter(s->s.global&&s.qualified.equals(target)
+                        &&(s.exported||pkg.equals(packageOf(s.qualified)))).forEach(result::add);
+            } else result.add(symbol);
+        }
+        return List.copyOf(result);
+    }
     static String packageOf(String qualified) { int dot=qualified.lastIndexOf('.');return dot<0?"":qualified.substring(0,dot); }
     List<CompletionItem> completions(Position position, Collection<SourceIndex> project) {
         int offset=coordinates.offset(position), start=offset;
