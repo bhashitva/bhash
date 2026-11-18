@@ -112,6 +112,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private ClassInfo currentClass;
     private boolean fieldInitializer, baseArguments, constructorBody, currentStatic;
     private boolean asyncBody;
+    private final Map<ParserRuleContext, Field> constructorFields = new IdentityHashMap<>();
     private int variableId, loopDepth, methodId, fieldId, switchId, constructorId;
     private static final class BreakTarget {
         final String label;
@@ -236,13 +237,24 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private static ProgramContext prepare(String source,ProjectResolver.Resolution resolution,ManagedEmitter emitter,boolean requireEntry)throws CompilationException {
-        var tree=ClosureExpander.expand(source,GenericExpander.expand(source,resolution.tree()),emitter.callableTypes);
+        var tree=ClosureExpander.expand(source,GenericExpander.expand(source,resolution.tree(),emitter.notebook==null?null:emitter.notebook.storage()),emitter.callableTypes);
+        tree.start=resolution.tree().start;tree.stop=resolution.tree().stop;
         if(!AsyncSourceLowering.needed(tree))return tree;
         var checker=new ManagedEmitter(source,Target.JVM);checker.callableTypes.addAll(emitter.callableTypes);
         checker.notebook=emitter.notebook;
         checker.analysis=new Analysis();checker.analysis.exceptionClass=checker.exceptionClass;
         checker.program(tree,requireEntry);
         return AsyncSourceLowering.lower(tree,checker.analysis,resolution.names());
+    }
+
+    /** Static notebook inference; no user code is executed and no values cross the cell boundary. */
+    public static Map<String,String> notebookBindingTypes(String source,String storage)throws CompilationException {
+        var resolution=ProjectResolver.resolve(List.of(new SourceFile("notebook-inference.bhash",source)));
+        String lowered=resolution.names().entrySet().stream().filter(e->e.getValue().equals(storage)).map(Map.Entry::getKey).findFirst().orElse(storage);
+        var tree=GenericExpander.expand("notebook-inference.bhash",resolution.tree(),lowered);var types=new LinkedHashMap<String,String>();
+        for(var f:tree.functionDecl())if(resolution.names().getOrDefault(f.IDENTIFIER().getText(),f.IDENTIFIER().getText()).equals("मुख्य")&&f.block()!=null)
+            for(var statement:f.block().statement())if(statement.variableDecl()!=null){var v=statement.variableDecl();types.put(Identifiers.key(v.IDENTIFIER().getText()),v.valueType().getText());}
+        return types;
     }
 
     private Invalid error(ParserRuleContext at, String message) {
@@ -495,7 +507,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                         throw error(member, "Duplicate or hidden member: " + declaration.IDENTIFIER().getText());
                     // Notebook slots are initialized by the worker after prior cell values are restored.
                     boolean notebookSlot = shared && definition == notebookStorageClass();
-                    if (declaration.CONST() != null && declaration.expression() == null && !notebookSlot)
+                    if (shared && declaration.CONST() != null && declaration.expression() == null && !notebookSlot)
                         throw error(declaration, "An immutable field requires an initializer.");
                     definition.fields.put(name, new Field("p" + fieldId++, type(declaration.valueType()),
                             declaration.LET() != null, access, definition, declaration,shared));
@@ -687,7 +699,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             output.append(typeName(field.type)).append(' ').append(field.java);
             if (field.shared) staticInitializers.put(field,value.java);
             output.append(";\n");
-            if (!field.shared) initializers.put(field, value.java);
+            if (!field.shared && (field.mutable || field.declaration.expression()!=null)) initializers.put(field, value.java);
         });
         // Bhash owns initialization, rather than inheriting incompatible JVM/CLR
         // failed-class wrappers, constant inlining, and beforefieldinit behavior.
@@ -741,8 +753,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         for (var initializer : initializers.entrySet()) output.append("this.").append(initializer.getKey().java)
                 .append('=').append(initializer.getValue()).append(";\n");
         constructorBody = true;
+        constructorFields.clear();
         if (declaration != null) statements(declaration.block());
         constructorBody = false;
+        ConstructorInitialization.check(at, declaration==null?null:declaration.block(), definition, constructorFields,
+                (where,message)->error(where,message));
         output.append("}\n");
         scopes.pop();
     }
@@ -1545,8 +1560,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         checkAccess(at, field.owner, field.access, object);
         if (analysis != null) analysis.fields.put(at, field);
         String receiver=field.shared?field.owner.java:memberReceiver(object, field.owner, field.access);
+        boolean constructorTarget=constructorBody && !field.shared && field.owner==currentClass && object.java.equals("this");
+        if(constructorTarget)constructorFields.put(at,field);
+        if(constructorTarget)receiver="this";
         if(field.shared && field.owner.enumeration==null)return new Expr(field.type,receiver+".bhashGet_"+field.java+"()",new Location(field.mutable,receiver+".bhashSet_"+field.java+"("));
-        return new Expr(field.type, receiver + "." + field.java, new Location(field.mutable));
+        return new Expr(field.type, receiver + "." + field.java, new Location(field.mutable || constructorTarget && field.declaration.expression()==null));
     }
     private Expr callMethod(ParserRuleContext at, Expr object, String name, List<Expr> arguments) {
         if (object.type.collection!=null) return collectionCall(at,object,name,arguments);

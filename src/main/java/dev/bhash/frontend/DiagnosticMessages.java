@@ -21,6 +21,10 @@ public final class DiagnosticMessages {
         if (message.startsWith("Unknown import:")) return new Entry("BH2003", "यह आयात नहीं मिला। संकुल, सार्वजनिक घोषणा और परियोजना की स्रोत फ़ाइलें जाँचें।");
         if (message.startsWith("Undefined")) return new Entry("BH2004", "यह सदस्य या फलन नहीं मिला। नाम और प्राप्तकर्ता का प्रकार जाँचें।");
         if (message.startsWith("Expected ") && message.contains(", found ")) return new Entry("BH3001", "मान का प्रकार अपेक्षित प्रकार से अलग है। उपयुक्त मान या स्पष्ट परिवर्तन का उपयोग करें।");
+        if(message.startsWith("Cannot infer this binding"))return new Entry("BH3002","आरंभक से एक निश्चित प्रकार नहीं मिला। बंधन का प्रकार स्पष्ट लिखें।");
+        if(message.startsWith("Generic constraint")||message.startsWith("Cyclic generic")||message.startsWith("Generic override/interface contract")||message.startsWith("Missing public generic interface"))return new Entry("BH3003","सामान्य प्रकार की सीमा और अनुबंध जाँचें; आवश्यक अनुबंध का पालन और समान हस्ताक्षर चाहिए।");
+        if(message.startsWith("Immutable field"))return new Entry("BH4004","अचल क्षेत्र को हर सफल निर्माता-पथ पर ठीक एक बार, पढ़ने से पहले भरें।");
+        if(message.startsWith("Cannot infer a unique generic call"))return new Entry("BH7001","एक सामान्य कॉल नहीं चुनी जा सकी। स्पष्ट प्रकार तर्क या स्पष्ट मापदंड वाला lambda दें।");
         if (message.startsWith("Cannot assign to an immutable")) return new Entry("BH4001", "स्थिर बंधन या क्षेत्र को दोबारा मान नहीं दे सकते। परिवर्तन चाहिए तो मान का उपयोग करें।");
         if (message.startsWith("Function must return") || message.startsWith("Return value required") || message.startsWith("Void function"))
             return new Entry("BH4002", "फलन के लौटाए जाने वाले मान और सभी वापसी पथ जाँचें।");

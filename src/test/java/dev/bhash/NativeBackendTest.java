@@ -617,6 +617,11 @@ class NativeBackendTest {
         for(String source:List.of(
             "अनुबंध अ { फलन न<त>(व: त) -> त; } फलन मुख्य() -> शून्य {}",
             "वर्ग अ { फलन न<त>(व: त) -> त { लौटाओ व; } } फलन मुख्य() -> शून्य {}")){
+            assertDoesNotThrow(()->core(source));
+        }
+        for(String source:List.of(
+            "अनुबंध अ { फलन न<त: पूर्णांक>(व: त) -> त; } फलन मुख्य() -> शून्य {}",
+            "वर्ग अ { फलन न<त: पूर्णांक>(व: त) -> त { लौटाओ व; } } फलन मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(source));
             assertTrue(error.getMessage().contains("native.bhash:1:"),error.getMessage());
             assertTrue(error.getMessage().contains("Generic"),error.getMessage());
@@ -2514,6 +2519,7 @@ class NativeBackendTest {
         requireNumericTargets();for(var fixture:NativeGenericFixtures.cases()){
             var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
             if(fixture.name().equals("gc-stress")){assertTrue(stats(result).get("allocations")>4000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());}
+            if(fixture.name().equals("safer-everyday")){assertTrue(stats(result).get("allocations")>200,result.err());assertTrue(stats(result).get("collections")>100,result.err());}
         }
     }
     @Test void coreSpecializesGenericLayoutsAndReusesClosedDefinitions()throws Exception{

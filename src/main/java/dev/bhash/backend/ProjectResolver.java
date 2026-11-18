@@ -230,7 +230,12 @@ public final class ProjectResolver {
                 || scopes.stream().anyMatch(s -> s.contains(name));
     }
     private void walk(ParseTree node, Unit unit, Deque<Set<String>> scopes, Set<String> typeParameters, Members members) throws CompilationException {
-        if (node instanceof PackageDeclContext || node instanceof ImportDeclContext || node instanceof TypeParametersContext) return;
+        if (node instanceof PackageDeclContext || node instanceof ImportDeclContext) return;
+        if (node instanceof TypeParametersContext parameters) {
+            var scope=parameters(parameters,typeParameters);
+            for(var constraint:parameters.typeConstraint())walk(constraint,unit,scopes,scope,members);
+            return;
+        }
         if (node instanceof ClassDeclContext c) {
             typeParameters = parameters(c.typeParameters(),typeParameters);
             members = members(unit,c,new HashSet<>());
@@ -359,9 +364,6 @@ public final class ProjectResolver {
             String value=unit.replacements.getOrDefault(token.getTokenIndex(),token.getText());
             text.append(value).append(' ');unit.renderedCodePoints+=value.codePointCount(0,value.length())+1;
         } else {
-            if (node instanceof PostfixPartContext part && part.typeArguments()!=null
-                    && !unit.removed.contains(part.IDENTIFIER().getSymbol().getTokenIndex()))
-                throw error(part.start,"Generic member methods are not supported; import the generic type or function.");
             for (int i=0;i<node.getChildCount();i++) render(node.getChild(i),unit,text,origins);
         }
     }

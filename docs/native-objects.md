@@ -9,7 +9,7 @@ Applications require neither JVM nor .NET; the compiler still uses Java and LLVM
 
 - Ordinary nongeneric classes, including empty classes and mutually referring classes.
 - Integer, boolean, text and concrete class instance fields; mutable fields and
-  immutable fields with existing constant initializers.
+  immutable fields with constant initializers or definite constructor assignment.
 - Default and overloaded constructors, and overloaded instance methods.
 - Single class inheritance and virtual dispatch, detailed in [native inheritance](native-inheritance.md).
 - Interface references and runtime tests/casts in [native interfaces](native-interfaces.md).

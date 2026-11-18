@@ -9,6 +9,8 @@ programs while you edit.
 
 ## Hindi documentation / हिन्दी प्रलेखन
 
+- [सुरक्षित दैनिक प्रोग्रामिंग (Safer everyday programming)](https://github.com/bhashitva/bhash/blob/main/tutorial/safer-everyday/README.md): constructor-assigned immutable fields, local/call inference, generic methods/constraints, **F2** rename and **Shift+F12** references. नाम बदलने से पहले बदलाव की editor preview देखें; shadowing या dependency edits पर परिवर्तन अस्वीकार हो सकता है।
+
 - [भाष में प्रोग्रामिंग (Hindi book)](https://github.com/bhashitva/bhash/blob/main/book/README.md) has guided chapters, a downloadable PDF, and an offline companion ZIP.
 - [मानक पुस्तकालय का हिन्दी API संदर्भ (Standard library API reference)](https://github.com/bhashitva/bhash/blob/main/tutorial/standard-library/reference/README.md) lists types, constructors, methods, parameters, return values, and examples.
 

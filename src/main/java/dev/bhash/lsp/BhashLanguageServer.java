@@ -50,6 +50,7 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
             capabilities.setSignatureHelpProvider(new SignatureHelpOptions(List.of("(", ","),List.of(")")));
             capabilities.setCodeActionProvider(new CodeActionOptions(List.of(CodeActionKind.QuickFix)));
             capabilities.setHoverProvider(true);capabilities.setDefinitionProvider(true);capabilities.setDocumentSymbolProvider(true);capabilities.setWorkspaceSymbolProvider(true);
+            capabilities.setReferencesProvider(true);capabilities.setRenameProvider(new RenameOptions(true));
             var folders = new WorkspaceFoldersOptions();folders.setSupported(true);folders.setChangeNotifications(true);
             capabilities.setWorkspace(new WorkspaceServerCapabilities(folders));
             return new InitializeResult(capabilities,new ServerInfo("Bhash","0.3.0"));
@@ -256,13 +257,41 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
     }
     @Override public CompletableFuture<Either<List<? extends Location>,List<? extends LocationLink>>> definition(DefinitionParams params) {
         return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
-            return Either.forLeft(index==null?List.of():index.resolve(params.getPosition(),project.indexes.values()).stream().map(SourceIndex.Symbol::location).toList());});
+            return Either.forLeft(index==null?List.of():index.navigation(params.getPosition(),project.indexes.values()).stream().map(SourceIndex.Symbol::location).toList());});
     }
     @Override public CompletableFuture<Hover> hover(HoverParams params) {
         return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());if(index==null)return null;
-            var symbols=index.resolve(params.getPosition(),project.indexes.values());if(symbols.isEmpty())return null;
+            var symbols=index.navigation(params.getPosition(),project.indexes.values());if(symbols.isEmpty())return null;
             String text=String.join("\n\n",symbols.stream().map(s->"```bhash\n"+(s.detail().isBlank()?s.name():s.detail())+"\n```\n\n"+s.qualified()).distinct().toList());
             return new Hover(new MarkupContent(MarkupKind.MARKDOWN,text));});
+    }
+    private Path refactoringRoot(ProjectState project) {
+        return Files.isDirectory(project.input)?project.input:project.input.getParent();
+    }
+    @Override public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
+        return submit(()->{var project=state(params.getTextDocument().getUri());
+            var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
+            return index==null?List.of():new Refactorings(project.indexes.values()).references(index,params.getPosition(),params.getContext().isIncludeDeclaration());});
+    }
+    @Override public CompletableFuture<org.eclipse.lsp4j.jsonrpc.messages.Either3<Range,PrepareRenameResult,PrepareRenameDefaultBehavior>> prepareRename(PrepareRenameParams params) {
+        return submit(()->{var project=state(params.getTextDocument().getUri());
+            var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
+            var range=index==null?null:new Refactorings(project.indexes.values()).prepare(index,params.getPosition(),refactoringRoot(project));
+            return range==null?null:org.eclipse.lsp4j.jsonrpc.messages.Either3.forFirst(range);});
+    }
+    @Override public CompletableFuture<WorkspaceEdit> rename(RenameParams params) {
+        return submit(()->{try {var project=state(params.getTextDocument().getUri());
+            var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());
+            if(index==null)throw new IllegalArgumentException("पहले भाष परियोजना खोलें।");
+            if(project.diagnostics.values().stream().flatMap(List::stream).anyMatch(d->d.getSeverity()==DiagnosticSeverity.Error))throw new IllegalArgumentException("नाम बदलने से पहले परियोजना की त्रुटियाँ ठीक करें।");
+            var edits=new Refactorings(project.indexes.values()).rename(index,params.getPosition(),params.getNewName(),refactoringRoot(project));
+            var changes=new ArrayList<Either<TextDocumentEdit,ResourceOperation>>();
+            edits.forEach((uri,list)->{var buffer=buffers.get(path(uri));changes.add(Either.forLeft(new TextDocumentEdit(new VersionedTextDocumentIdentifier(uri,buffer==null?null:buffer.version),list)));});
+            var result=new WorkspaceEdit();result.setDocumentChanges(changes);return result;
+        } catch(Exception invalid) {
+            throw new org.eclipse.lsp4j.jsonrpc.ResponseErrorException(new org.eclipse.lsp4j.jsonrpc.messages.ResponseError(
+                org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode.InvalidParams,"नाम बदलना सुरक्षित नहीं है: "+invalid.getMessage(),null));
+        }});
     }
     @Override public CompletableFuture<List<Either<SymbolInformation,DocumentSymbol>>> documentSymbol(DocumentSymbolParams params) {
         return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());

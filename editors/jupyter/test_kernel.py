@@ -148,6 +148,28 @@ def test_language(execute_case):
     assert_keyword_coverage(successful_sources)
 
 
+def test_safer_everyday(run):
+    run("""अनुबंध सुरक्षितनामित { फलन नाम()->पाठ; }
+        वर्ग सुरक्षितव्यक्ति पालन सुरक्षितनामित {
+            स्थिर पाठ्य: पाठ;
+            निर्माता(नाम: पाठ) { पाठ्य=नाम; }
+            फलन नाम()->पाठ { लौटाओ पाठ्य; }
+            फलन पहचान<त>(व: त)->त { लौटाओ व; }
+        }
+        फलन सुरक्षितनाम<त: सुरक्षितनामित>(व: त)->पाठ {लौटाओ व.नाम();}
+    """)
+    run('लिखो("अनुमान"); मान सुरक्षितगिनती=२; स्थिर सुरक्षितपाठ=सुरक्षितनाम(नया सुरक्षितव्यक्ति("सीमा"));', streams="अनुमान\n")
+    run('सुरक्षितगिनती=सुरक्षितगिनती+१; सुरक्षितगिनती', expected="३")
+    run('सुरक्षितपाठ', expected="सीमा")
+    run('स्थिर सुरक्षितअगला=सुरक्षितगिनती+१; सुरक्षितअगला', expected="४")
+    run('यदि (सुरक्षितगिनती>०) {लौटाओ;} स्थिर सुरक्षितछूटा=१;')
+    run('सुरक्षितछूटा', status="error")
+    run('{ स्थिर सुरक्षितअंदर=९; लिखो(सुरक्षितअंदर); }', streams="९\n")
+    run('सुरक्षितअंदर', status="error")
+    run('लिखो(नया सुरक्षितव्यक्ति("क").पहचान(७));', streams="७\n")
+    run('सुरक्षितनाम(१)', status="error")
+
+
 def test_ordered_bindings(run):
     console_cell = """लिखो("० से २० तक एक पूर्णांक लिखें:");
         स्थिर संख्या: पूर्णांक = पढ़ो();
@@ -272,6 +294,7 @@ def main():
             execute(client, "पाठपढ़ो()", expected="भारत😀", stdin="भारत😀")
             test_language(lambda source, **expected: execute(client, source, **expected))
             test_ordered_bindings(lambda source, **expected: execute(client, source, **expected))
+            test_safer_everyday(lambda source, **expected: execute(client, source, **expected))
             execute(client, 'लिखो("आरम्भ"); स्‍थिर क्‍षमा: पूर्‍णांक = ७;', streams="आरम्भ\n")
             execute(client, "क्षमा", expected="७")
             example = Path(__file__).resolve().parents[2] / "tutorial/unicode-identifiers/identifiers.bhash"

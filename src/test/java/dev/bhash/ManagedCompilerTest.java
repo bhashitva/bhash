@@ -656,7 +656,7 @@ abstract class ManagedCompilerTest {
 
     @Test void rejectsUnsafeConstructorsAndNonconstantFieldInitializers() {
         String main = " फलन मुख्य() -> शून्य {}";
-        reject("वर्ग वस्तु { स्थिर सीमा: पूर्णांक; }" + main, "requires an initializer");
+        reject("वर्ग वस्तु { स्थिर सीमा: पूर्णांक; }" + main, "every successful constructor path");
         reject("वर्ग वस्तु { मान संख्या: पूर्णांक = पढ़ो(); }" + main, "constant expressions");
         reject("वर्ग वस्तु { मान अन्य: वस्तु = नया वस्तु(); }" + main, "constant expressions");
         reject("वर्ग वस्तु { मान संख्या: पूर्णांक = यह.संख्या; }" + main, "Instance access");

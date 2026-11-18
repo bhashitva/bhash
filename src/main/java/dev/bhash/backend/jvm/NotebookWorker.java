@@ -202,6 +202,16 @@ public final class NotebookWorker {
         }
         var statements = new ArrayList<ParserRuleContext>(cell.variableDecl());
         statements.addAll(cell.statement());
+        var inferred=Map.<String,String>of();
+        if(statements.stream().anyMatch(item->{var v=item instanceof BhashParser.VariableDeclContext d?d:((BhashParser.StatementContext)item).variableDecl();return v!=null&&v.valueType()==null;})) {
+            var probe=new StringBuilder();nextImports.forEach(x->probe.append(x).append('\n'));
+            nextTypes.values().forEach(x->probe.append(x).append('\n'));nextFunctions.values().forEach(x->probe.append(x.source).append('\n'));
+            probe.append("वर्ग ").append(STORAGE).append(" { ");
+            nextSlots.values().forEach(x->probe.append("साझा मान ").append(x.name).append(": ").append(x.type).append("; "));
+            probe.append("} ");if(statements.stream().anyMatch(NotebookWorker::hasAsync))probe.append("असमकालिक ");
+            probe.append("फलन मुख्य()->शून्य { ");for(var item:statements)probe.append(source(item)).append('\n');probe.append("}");
+            inferred=ManagedEmitter.notebookBindingTypes(probe.toString(),STORAGE);
+        }
         for (var item : statements) {
             var declaration = item instanceof BhashParser.VariableDeclContext binding ? binding
                     : ((BhashParser.StatementContext) item).variableDecl();
@@ -211,7 +221,7 @@ public final class NotebookWorker {
             }
             String name = declaration.IDENTIFIER().getText();
             String key = Identifiers.key(name);
-            String type = Identifiers.key(declaration.valueType().getText());
+            String type = declaration.valueType()==null?inferred.get(key):Identifiers.key(declaration.valueType().getText());
             boolean mutable = declaration.LET() != null;
             if (!declared.add(key)) throw new IllegalArgumentException("Duplicate binding: " + name);
             if (!TYPES.contains(type)) {
