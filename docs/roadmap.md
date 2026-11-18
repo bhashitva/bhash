@@ -86,8 +86,10 @@ deployment/toolchain improvements remain follow-ups.
 
 ## Later language growth
 
-Abstract/final members, generic member methods, constraints/inference, constructor-assigned
-immutable fields, record bodies/patterns, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, broader standard
+Generic member methods, constraints, local/call inference, constructor-assigned immutable fields,
+and project-scoped rename/references are implemented; see [the Hindi tutorial](../tutorial/safer-everyday/README.md).
+[Null safety](null-safety-design.md) is a review proposal, not implemented syntax.
+Abstract/final members, record bodies/patterns, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, broader standard
 library coverage, debugger support, editor tooling, dependency package management and FFI. Changes require a spec update,
 examples and tests. Generated code, JVM JARs, CLR deployment folders and browser bundles remain build products.
 

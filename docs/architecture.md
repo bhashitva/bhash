@@ -120,6 +120,17 @@ replacement of output with added or modified files. See [browser target](wasm-br
 
 ## Interfaces, generics, overloads and static storage
 
+The [safer everyday milestone](../tutorial/safer-everyday/README.md) adds source-located
+local inference, argument-based generic call inference, method specialization and nominal
+constraints before closure conversion. Generic interface/override declarations are validated
+even without call sites. Instantiated method names share virtual slots across each family.
+Constructor definite-assignment uses resolved field identities, including abrupt completion
+and finally paths; managed and native backends consume the same checked result.
+
+**हिन्दी:** नया pass स्थानीय/कॉल प्रकार-अनुमान और generic method specialization करता है।
+अनुबंध, override और constraints की जाँच सभी targets में साझा है। Constructors में अचल
+क्षेत्रों की initialization और reference edits के लिए वास्तविक binding identities उपयोग होती हैं।
+
 `GenericExpander` specializes used generic classes, interfaces and global functions before
 semantic checking, preserving original token locations for diagnostics. Repeated closed types
 share their specialization; an expansion limit rejects recursively growing templates. Each

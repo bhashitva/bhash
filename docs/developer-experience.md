@@ -43,9 +43,12 @@ main.bhash:2:11: [BH2001] यह नाम घोषित नहीं है�
 | BH2003 | Unknown import |
 | BH2004 | Undefined member/function |
 | BH3001 | Expected/actual type mismatch |
+| BH3002 | Local type cannot be inferred; add an annotation |
+| BH3003 | Generic constraint or interface/override contract mismatch |
 | BH4001 | Assignment to an immutable binding/field |
 | BH4002 | Return value/path error |
 | BH4003 | Invalid/unreachable control flow |
+| BH4004 | Immutable instance field initialization is missing, repeated or read too early |
 | BH5001 | Inaccessible declaration/member |
 | BH6001 | Duplicate, reserved or conflicting declaration |
 | BH7001 | Argument/overload mismatch or ambiguity |
@@ -78,8 +81,8 @@ Toolchain/environment failures retain their own messages.
   packages, execute code or cross independent workspace project boundaries.
 - Hover/F12 can follow resolved members; overload navigation lists declarations.
 
-Semantic rename/references, source debugging, full receiver inference, incremental
-semantic compilation and a separate compiler-wide typed AST remain future work.
+Project-scoped rename/references are now available; see [the Hindi guide](../tutorial/safer-everyday/README.md).
+Full receiver inference, incremental semantic compilation and a separate compiler-wide typed AST remain future work.
 
 ## Playground
 

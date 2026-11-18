@@ -65,12 +65,13 @@ implementations are errors. Fields, default methods and static interface members
 
 Classes, interfaces and global functions can declare one or more type parameters:
 `वर्ग जोड़ी<क, ख> { ... }` or `फलन पहचान<त>(मूल्य: त) -> त { ... }`.
-Supply explicit type arguments at every use: `जोड़ी<पूर्णांक, पाठ>` and `पहचान<पाठ>("नमस्ते")`.
-There is no type-argument inference or raw generic type. Parameters can stand for any existing
+Supply explicit arguments for generic types: `जोड़ी<पूर्णांक, पाठ>`. Generic function and member
+calls can infer arguments from values: `पहचान("नमस्ते")`; explicit `पहचान<पाठ>("नमस्ते")` remains valid.
+There is no raw generic type. Parameters can stand for any existing
 value type, including integers, reals, booleans, text, classes, interfaces and nested generic types.
 `शून्य` and `रिक्त` are not type arguments.
 
-**हिन्दी:** वर्ग, अनुबंध और वैश्विक फलन एक या अधिक प्रकार मापदंड घोषित कर सकते हैं। हर उपयोग में `जोड़ी<पूर्णांक, पाठ>` या `पहचान<पाठ>("नमस्ते")` जैसे स्पष्ट प्रकार तर्क दें। अनुमान और बिना तर्क का सामान्य प्रकार उपलब्ध नहीं हैं। मापदंड आदिम, वर्ग, अनुबंध या भीतर के सामान्य प्रकार हो सकते हैं। `शून्य` और `रिक्त` प्रकार तर्क नहीं हैं।
+**हिन्दी:** सामान्य प्रकार के तर्क स्पष्ट दें। Global और member generic calls में value arguments से अनुमान हो सकता है। `फलन नामलो<त: नामित>(व: त)->पाठ` से सीमा दें। [नए नियम और उदाहरण](../tutorial/safer-everyday/README.md) देखें।
 
 Generic types are invariant: `पात्र<बच्चा>` cannot be assigned to `पात्र<मूल>`, even when
 `बच्चा` extends `मूल`. Generic classes can extend generic base classes and implement generic
@@ -84,11 +85,11 @@ semantic checking. Each instantiated body must type-check for its actual argumen
 a template that uses numeric operators is rejected when instantiated with text. Unused template
 bodies are parsed but not type-checked. Recursive references to the same closed type reuse its
 specialization; more than 256 distinct specializations produces a diagnostic rather than unbounded
-expansion. Generic method declarations inside classes/interfaces, bounds/constraints, variance,
-wildcards, default type arguments and generic reflection are deferred. Generic classes can contain
+expansion. Generic methods inside classes/interfaces and nominal constraints are supported.
+Variance, wildcards, default type arguments and generic reflection are deferred. Generic classes can contain
 ordinary methods and overloaded/static members that use their class type parameters.
 
-**हिन्दी:** संकलक अर्थ जाँच से पहले हर उपयोग किए प्रकार और फलन की ठोस प्रति बनाता है। प्रत्येक प्रति वास्तविक प्रकारों के साथ सही होनी चाहिए। संख्यात्मक संक्रिया वाला template पाठ के साथ असफल हो सकता है। अप्रयुक्त शरीर parse होता है लेकिन प्रकार जाँचे नहीं जाते। पुनरावृत्त समान प्रकार अपनी प्रति साझा करता है। २५६ से अधिक अलग विशेषीकरण पर निदान मिलता है। विधि के अपने सामान्य मापदंड, constraints, variance, wildcards, default प्रकार तर्क और reflection आगे के विषय हैं। सामान्य वर्ग की साधारण और साझा विधियाँ वर्ग के प्रकार मापदंड ले सकती हैं।
+**हिन्दी:** उपयोग किए सामान्य प्रकार, फलन और विधि की ठोस प्रति जाँची जाती है। अप्रयुक्त शरीर parse होता है लेकिन पूरा type-check नहीं होता। समान closed specialization साझा होती है; कुल २५६ से अधिक पर निदान है। विधि के अपने generic parameters, constraints और call inference उपलब्ध हैं। Variance, wildcards, default type arguments और reflection आगे के विषय हैं।
 
 ## Overloads
 

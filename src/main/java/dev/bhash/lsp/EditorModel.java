@@ -35,6 +35,7 @@ final class EditorModel {
     private final SourceIndex index;
     private final Collection<SourceIndex> project;
     private final Map<String,Definition> types=new LinkedHashMap<>();
+    private final Set<SourceIndex.Symbol> inferring=new HashSet<>();
     EditorModel(SourceIndex index, Collection<SourceIndex> project) {
         this.index=index;this.project=project;
         for(var source:project)for(var symbol:source.symbols)if(symbol.global()&&symbol.kind()!=SymbolKind.Function)
@@ -154,15 +155,17 @@ final class EditorModel {
         for(Type base:bases(receiver))members(base,result,seen);
     }
     private Member member(SourceIndex.Symbol symbol, ParserRuleContext node, SourceIndex source, String owner, Map<String,Type> env) {
+        var boundEnv=new HashMap<>(env);
+        if(node instanceof FunctionDeclContext f)for(var parameter:formals(f))boundEnv.putIfAbsent(parameter,new Type(parameter));
         Type result=null;ParametersContext parameters=null;boolean callable=false,shared=false;String access="सार्वजनिक";
-        if(node instanceof FunctionDeclContext c){if(c.returnType()==null)return null;result=type(c.returnType().getText(),source,env);parameters=c.parameters();callable=true;}
+        if(node instanceof FunctionDeclContext c){if(c.returnType()==null)return null;result=type(c.returnType().getText(),source,boundEnv);parameters=c.parameters();callable=true;}
         else if(node instanceof FieldDeclContext c)result=type(c.valueType(),source,env);
         else if(node instanceof EnumMemberContext){result=new Type(owner);shared=true;}
         else return null;
         if(node.getParent() instanceof ClassMemberContext c){shared=c.STATIC()!=null;if(c.visibility()!=null)access=c.visibility().getText();}
         if(result==null)return null;
         List<String> names=parameters==null?List.of():parameters.parameter().stream().map(p->p.IDENTIFIER().getText()).toList();
-        List<Type> types=parameters==null?List.of():parameters.parameter().stream().map(p->type(p.valueType(),source,env)).toList();
+        List<Type> types=parameters==null?List.of():parameters.parameter().stream().map(p->type(p.valueType(),source,boundEnv)).toList();
         if(types.stream().anyMatch(Objects::isNull))return null;
         return new Member(symbol.name(),result,names,types,callable,shared,access,owner,symbol);
     }
@@ -210,8 +213,8 @@ final class EditorModel {
             if(!symbol.global()||!symbol.qualified().equals(full)||!symbol.exported()&&!source.pkg.equals(index.pkg)||!(e.getValue() instanceof FunctionDeclContext f))continue;
             var env=new HashMap<String,Type>();var names=formals(f);
             var actual=arguments==null?List.<ValueTypeContext>of():arguments.valueType();
-            if(names.size()!=actual.size())continue;
-            for(int i=0;i<names.size();i++)env.put(names.get(i),type(actual.get(i),index,Map.of()));
+            if(arguments!=null&&names.size()!=actual.size())continue;
+            for(int i=0;i<names.size();i++)env.put(names.get(i),arguments==null?new Type(names.get(i)):type(actual.get(i),index,Map.of()));
             var member=member(symbol,f,source,"",env);if(member!=null)result.add(member);
         }
         if(!result.isEmpty())return result;
@@ -233,15 +236,47 @@ final class EditorModel {
         return builtin==null?List.of():List.of(builtin);
     }
     private Type selected(List<Member> candidates, ArgumentsContext args, Position position, int depth) {
+        return selected(candidates,args,position,depth,null);
+    }
+    private List<String> variables(Member member) {
+        if(member.symbol==null)return List.of();
+        for(var source:project)if(source.uri.equals(member.symbol.uri()))return formals(source.declarations.get(member.symbol));
+        return List.of();
+    }
+    private Type substitute(Type t,Map<String,Type> env) {
+        if(t.args.isEmpty()&&env.containsKey(t.name))return env.get(t.name);
+        return new Type(t.name,t.args.stream().map(a->substitute(a,env)).toList());
+    }
+    private boolean unify(Type formal,Type actual,List<String> variables,Map<String,Type> env,Set<Type> seen) {
+        if(actual==null||actual.name.equals("रिक्त"))return true;
+        if(variables.contains(formal.name)&&formal.args.isEmpty()){var old=env.putIfAbsent(formal.name,actual);return old==null||old.equals(actual);}
+        if(formal.name.equals(actual.name)&&formal.args.size()==actual.args.size()) {
+            for(int i=0;i<formal.args.size();i++)if(!unify(formal.args.get(i),actual.args.get(i),variables,env,new HashSet<>()))return false;return true;
+        }
+        if(seen.add(actual)&&seen.size()<64)for(var parent:bases(actual)){var copy=new HashMap<>(env);if(unify(formal,parent,variables,copy,seen)){env.clear();env.putAll(copy);return true;}}
+        return !hasVariable(formal,variables);
+    }
+    private boolean hasVariable(Type t,List<String> variables){return variables.contains(t.name)||t.args.stream().anyMatch(a->hasVariable(a,variables));}
+    private Type selected(List<Member> candidates, ArgumentsContext args, Position position, int depth,TypeArgumentsContext explicit) {
         var actual=args==null?List.<ExpressionContext>of():args.expression();
         var values=actual.stream().map(a->infer(a,position,depth+1)).toList();
         if(values.stream().anyMatch(Objects::isNull))return null;
-        var matching=candidates.stream().filter(m->m.callable&&m.parameters.size()==values.size()).filter(m->{
+        var instantiated=new ArrayList<Member>();
+        for(var m:candidates) {
+            if(!m.callable||m.parameters.size()!=values.size())continue;
+            var names=variables(m);var env=new HashMap<String,Type>();boolean valid=true;
+            if(explicit!=null){if(explicit.valueType().size()!=names.size())continue;for(int i=0;i<names.size();i++)env.put(names.get(i),type(explicit.valueType(i),index,Map.of()));}
+            for(int i=0;i<values.size();i++)if(!unify(m.parameters.get(i),values.get(i).type,names,env,new HashSet<>()))valid=false;
+            if(!valid)continue;
+            instantiated.add(new Member(m.name,substitute(m.result,env),m.names,m.parameters.stream().map(t->substitute(t,env)).toList(),m.callable,m.shared,m.access,m.owner,m.symbol));
+        }
+        var matching=instantiated.stream().filter(m->{
             for(int i=0;i<values.size();i++)if(!subtype(values.get(i).type,m.parameters.get(i),new HashSet<>()))return false;return true;
         }).toList();
-        var best=matching.stream().filter(m->matching.stream().allMatch(other->{
+        var best=new ArrayList<>(matching.stream().filter(m->matching.stream().allMatch(other->{
             for(int i=0;i<m.parameters.size();i++)if(!subtype(m.parameters.get(i),other.parameters.get(i),new HashSet<>()))return false;return true;
-        })).toList();
+        })).toList());
+        var tied=List.copyOf(best);best.removeIf(m->!variables(m).isEmpty()&&tied.stream().anyMatch(other->variables(other).isEmpty()&&other.parameters.equals(m.parameters)));
         return best.size()==1?best.get(0).result:null;
     }
     private Value variable(String name, Position position) {
@@ -251,6 +286,10 @@ final class EditorModel {
             var s=found.stream().filter(v->v.scopeEnd()-v.scopeStart()==width).findFirst().orElseThrow();
             var t=type(s.detail(),index,Map.of());
             if(t!=null)return new Value(t);
+            if(index.declarations.get(s) instanceof VariableDeclContext v&&v.valueType()==null&&inferring.add(s)) {
+                try{return infer(v.expression(),index.range(v.start.getStartIndex(),v.start.getStartIndex()).getStart(),0);}
+                finally{inferring.remove(s);}
+            }
         }
         String here=currentOwner(position);
         if(here!=null) {
@@ -285,7 +324,7 @@ final class EditorModel {
                 } else {
                     String member=SourceIndex.key(part.IDENTIFIER().getText());
                     var candidates=members(value,position).stream().filter(m->SourceIndex.key(m.name).equals(member)).toList();
-                    Type result=part.LPAREN()!=null?selected(candidates,part.arguments(),position,depth+1):candidates.stream().filter(m->!m.callable).map(Member::result).findFirst().orElse(null);
+                    Type result=part.LPAREN()!=null?selected(candidates,part.arguments(),position,depth+1,part.typeArguments()):candidates.stream().filter(m->!m.callable).map(Member::result).findFirst().orElse(null);
                     value=result==null?null:new Value(result);
                 }
             }

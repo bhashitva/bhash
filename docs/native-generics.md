@@ -30,7 +30,7 @@ Existing `सर्ववस्तु` conversions की जरूरत हो
 - Generic types invariant हैं: `पात्र<पाठ>` और `पात्र<सर्ववस्तु>` अलग nominal types हैं।
   Casts, type tests, safe casts और collection element type checks यह अंतर रखते हैं।
 - Generic base classes, interface inheritance/implementation, overloads और virtual
-  overrides existing managed rules रखते हैं। Generic member methods अभी समर्थित नहीं हैं।
+  overrides existing managed rules रखते हैं। Generic member methods अब साझा specialization और constraints के नियम उपयोग करती हैं।
 - Record equality/hash उसी closed record type के fields पर structural हैं। अलग closed
   arguments वाले records समान नहीं होते, भले field values समान दिखें। Shallow
   immutability का [existing contract](native-records.md) लागू रहता है।
@@ -57,8 +57,9 @@ Expanding recursive definitions के लिए shared limit **256 distinct spe
 यह functions और types का combined limit है, प्रत्येक प्रकार के लिए अलग नहीं।
 
 Specialization generated code का आकार बढ़ा सकती है। Runtime generic reflection, dynamic
-instantiation, constraints/bounds, generic member methods और separate generic library
-compilation इस milestone का हिस्सा नहीं हैं। Existing source packages build के समय expand होते हैं।
+instantiation और separate generic library compilation अभी उपलब्ध नहीं हैं। Constraints,
+generic member methods और call inference अब [सुरक्षित दैनिक प्रोग्रामिंग](../tutorial/safer-everyday/README.md)
+के साझा नियम उपयोग करते हैं। Existing source packages build के समय expand होते हैं।
 
 [पूरा उदाहरण](../examples/native/generics.bhash) generic records, functions और अलग closed
 static storage को failures तथा allocating finally blocks के साथ चलाता है। Shared JVM/CLR/

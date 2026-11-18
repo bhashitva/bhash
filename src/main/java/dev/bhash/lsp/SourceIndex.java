@@ -23,6 +23,8 @@ final class SourceIndex {
     final Map<String,String> imports = new LinkedHashMap<>();
     final List<Token> tokens = new ArrayList<>();
     final Map<Integer,String> typeReferences = new HashMap<>(), importReferences = new HashMap<>();
+    final Map<String,Symbol> aliases = new HashMap<>();
+    final Set<Integer> qualifiers = new HashSet<>();
 
     SourceIndex(SourceFile source) {
         uri = java.nio.file.Path.of(source.name()).toUri().toASCIIString();
@@ -32,8 +34,13 @@ final class SourceIndex {
         pkg = tree.packageDecl() == null ? "" : key(tree.packageDecl().qualifiedName().getText());
         for (var imp : tree.importDecl()) {
             String full = key(imp.qualifiedName().getText());
-            for(var id:imp.qualifiedName().IDENTIFIER())importReferences.put(id.getSymbol().getStartIndex(),full);
-            if(imp.IDENTIFIER()!=null)importReferences.put(imp.IDENTIFIER().getSymbol().getStartIndex(),full);
+            var ids=imp.qualifiedName().IDENTIFIER();
+            for(var id:ids){importReferences.put(id.getSymbol().getStartIndex(),full);if(id!=ids.get(ids.size()-1))qualifiers.add(id.getSymbol().getStartIndex());}
+            if(imp.IDENTIFIER()!=null) {
+                var id=imp.IDENTIFIER();var selected=range(id.getSymbol().getStartIndex(),id.getSymbol().getStopIndex()+1);
+                var alias=new Symbol(id.getText(),key(id.getText()),uri,SymbolKind.Namespace,"आयात उपनाम",selected,selected,false,false,0,text.codePointCount(0,text.length()),0);
+                aliases.put(key(id.getText()),alias);symbols.add(alias);
+            }
             imports.put(imp.IDENTIFIER() == null ? full.substring(full.lastIndexOf('.') + 1) : key(imp.IDENTIFIER().getText()),full);
         }
         // Syntax recovery can produce missing declaration identifiers; keep the rest of the editor functional.
@@ -60,7 +67,7 @@ final class SourceIndex {
         if(context instanceof ConstructorDeclContext c && c.block()!=null)return end(c.block());
         return context.stop == null ? start(context) : Math.max(start(context),context.stop.getStopIndex() + 1);
     }
-    private Range range(int start, int end) {
+    Range range(int start, int end) {
         // AST token offsets exclude an initial BOM.
         int shift = text.startsWith("\uFEFF") ? 1 : 0;
         return coordinates.range(start + shift,end + shift);
@@ -80,6 +87,10 @@ final class SourceIndex {
             String full=value.IDENTIFIER().getText();for(var part:value.typeQualifier())full+="."+part.IDENTIFIER().getText();
             typeReferences.put(value.IDENTIFIER().getSymbol().getStartIndex(),key(full));
             for(var part:value.typeQualifier())typeReferences.put(part.IDENTIFIER().getSymbol().getStartIndex(),key(full));
+            if(!value.typeQualifier().isEmpty()) {
+                qualifiers.add(value.IDENTIFIER().getSymbol().getStartIndex());
+                for(int i=0;i<value.typeQualifier().size()-1;i++)qualifiers.add(value.typeQualifier(i).IDENTIFIER().getSymbol().getStartIndex());
+            }
         }
         if(context instanceof TypeParametersContext parameters)for(var parameter:parameters.IDENTIFIER()) {
             if(parameter.getSymbol().getStartIndex()<0)continue;
@@ -112,7 +123,12 @@ final class SourceIndex {
     }
     Token token(Position position) {
         int offset = text.codePointCount(0,coordinates.offset(position)) - (text.startsWith("\uFEFF")?1:0);
-        return tokens.stream().filter(t->t.getStartIndex()<=offset && t.getStopIndex()>=offset).findFirst().orElse(null);
+        var token=tokens.stream().filter(t->t.getStartIndex()<=offset && t.getStopIndex()>=offset).findFirst().orElse(null);
+        if(token==null||token.getType()!=dev.bhash.parser.BhashLexer.IDENTIFIER) {
+            var previous=tokens.stream().filter(t->t.getType()==dev.bhash.parser.BhashLexer.IDENTIFIER&&t.getStopIndex()+1==offset).findFirst();
+            if(previous.isPresent())return previous.get();
+        }
+        return token;
     }
     List<Symbol> visibleLexical(Position position) {
         int offset=text.codePointCount(0,coordinates.offset(position)) - (text.startsWith("\uFEFF")?1:0);
@@ -122,6 +138,7 @@ final class SourceIndex {
         Token token=token(position);
         if (token==null || token.getType()!=dev.bhash.parser.BhashLexer.IDENTIFIER) return List.of();
         String name=key(token.getText());
+        for(var symbol:symbols)if(symbol.selection.equals(range(token.getStartIndex(),token.getStopIndex()+1)))return List.of(symbol);
         String imported=importReferences.get(token.getStartIndex());
         if(imported!=null)return project.stream().flatMap(i->i.symbols.stream()).filter(s->s.global&&s.qualified.equals(imported)&&(s.exported||pkg.equals(packageOf(s.qualified)))).toList();
         boolean typeReference=typeReferences.containsKey(token.getStartIndex());
@@ -136,6 +153,7 @@ final class SourceIndex {
             int narrowest=lexical.stream().mapToInt(s->s.scopeEnd-s.scopeStart).min().orElse(0);
             return lexical.stream().filter(s->s.scopeEnd-s.scopeStart==narrowest).toList();
         }
+        if(aliases.containsKey(key(token.getText()))&&!qualifiers.contains(token.getStartIndex()))return List.of(aliases.get(key(token.getText())));
         String full=name.contains(".")?name:imports.getOrDefault(name,pkg.isEmpty()?name:pkg+"."+name);
         return project.stream().flatMap(i->i.symbols.stream()).filter(s->s.global && (!typeReference||s.kind!=SymbolKind.Function) && s.qualified.equals(full) && (s.exported || pkg.equals(packageOf(s.qualified)))).toList();
     }

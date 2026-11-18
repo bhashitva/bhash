@@ -147,14 +147,15 @@ Arguments evaluate left to right and must match the signature in count and type.
 
 ## 4. Bindings, scope and control flow
 
-Local bindings require a type and initializer. Class fields follow the object-model
+Local bindings require an initializer; an omitted type is inferred from it. Public signatures and fields
+retain explicit types. Class fields follow the object-model
 initialization rules. `मान` allows later assignment;
 `स्थिर` prevents rebinding but is not restricted to compile-time constants.
 Blocks introduce lexical scopes. Duplicate names within one scope, including
 parameters in a function's outermost body scope, are errors. A nested block may
 shadow an outer binding. A variable is not in scope within its own initializer.
 
-**हिन्दी:** स्थानीय बंधन को प्रकार और आरंभक चाहिए। `मान` दोबारा लिखा जा सकता है। `स्थिर` का आरंभक केवल compile-time constant होना जरूरी नहीं। ब्लॉक अपना दायरा बनाता है। एक ही दायरे में समान नाम, मापदंड समेत, त्रुटि है। अंदर का ब्लॉक बाहरी नाम ढक सकता है। आरंभक में उसका अपना नाम नहीं दिखता।
+**हिन्दी:** स्थानीय बंधन में आरंभक आवश्यक है। प्रकार छोड़ने पर उससे अनुमान होता है; केवल `रिक्त` पर्याप्त नहीं है। `मान` दोबारा लिखा जा सकता है; `स्थिर` नहीं। ब्लॉक अपना दायरा बनाता है और आरंभक में उसका अपना नाम नहीं दिखता। [निर्माता, generic methods और inference के नियम](../tutorial/safer-everyday/README.md) देखें।
 
 Conditions must be `तार्किक`; integers are not truthy. `विराम` exits the nearest
 loop or selection. `जारी` is legal only within a loop and continues the innermost loop. A void function may
@@ -379,7 +380,7 @@ stream ownership, GC-root handling and target restrictions.
 ## 14. Deferred design questions
 
 Confirm vocabulary; choose exact real formatting; extend dependency package distribution;
-extend records and generic member methods; extend exception metadata; settle WASI vs browser environments and native OS/ABI support; define
+extend record bodies/patterns and generic variance; extend exception metadata; settle WASI vs browser environments and native OS/ABI support; define
 foreign-function interfaces separately for each platform. Do not grow the grammar
 to cover these until their semantics and tests are agreed.
 

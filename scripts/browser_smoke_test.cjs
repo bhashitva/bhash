@@ -76,6 +76,7 @@ compile('foundations-browser', `
 build('multi-file', path.resolve('examples/multi-file'));
 build('source-packages', path.resolve('examples/packages/app'));
 compile('closures', fs.readFileSync('tutorial/functions/callbacks.bhash', 'utf8'));
+compile('safer-everyday', fs.readFileSync('examples/safer-everyday.bhash', 'utf8'));
 compile('exceptions', fs.readFileSync('examples/exceptions.bhash', 'utf8'));
 compile('exception-semantics', fs.readFileSync('src/test/resources/exceptions/browser.bhash', 'utf8'));
 build('collections', path.resolve('examples/collections'));
@@ -239,6 +240,7 @@ const server = http.createServer((request, response) => {
         await run('networking-browser', '', '');
         await run('sqlite-browser', '', '');
         await run('closures', '', fs.readFileSync('tutorial/functions/callbacks.expected.txt', 'utf8').replaceAll('\r\n', '\n'));
+        await run('safer-everyday', '', fs.readFileSync('examples/safer-everyday.expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('types', '', fs.readFileSync('examples/types/expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('unicode-identifiers', '', '५ ५ ५ ६ ७ ८ ९ ६\n३.०\n६\nक्‍ष असत्य\n');
         await run('typed-api-models', '', '{"id":1,"title":"भारत😀","priority":3,"done":false}\n');

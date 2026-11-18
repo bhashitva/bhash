@@ -50,7 +50,8 @@ classDecl : CLASS IDENTIFIER typeParameters? (EXTENDS valueType)? (IMPLEMENTS ty
 enumDecl : ENUM IDENTIFIER LBRACE enumMember (COMMA enumMember)* COMMA? RBRACE ;
 enumMember : IDENTIFIER (ASSIGN (PLUS | MINUS)? INTEGER_LITERAL)? ;
 interfaceDecl : INTERFACE IDENTIFIER typeParameters? (EXTENDS typeList)? LBRACE functionDecl* RBRACE ;
-typeParameters : LT IDENTIFIER (COMMA IDENTIFIER)* GT ;
+typeParameters : LT IDENTIFIER typeConstraint? (COMMA IDENTIFIER typeConstraint?)* GT ;
+typeConstraint : COLON valueType (BIT_AND valueType)* ;
 typeArguments : LT (valueType | VOID) (COMMA (valueType | VOID))* GT ;
 typeList : valueType (COMMA valueType)* ;
 classMember : visibility? STATIC? (fieldDecl | constructorDecl | OVERRIDE? functionDecl) ;
@@ -90,7 +91,7 @@ statement
 resourceStatement : ASYNC? RESOURCE LPAREN parameter ASSIGN expression RPAREN block ;
 tryStatement : TRY block (catchClause+ (FINALLY block)? | FINALLY block) ;
 catchClause : CATCH LPAREN parameter RPAREN block ;
-variableDecl : (LET | CONST) IDENTIFIER COLON valueType ASSIGN expression SEMI ;
+variableDecl : (LET | CONST) IDENTIFIER (COLON valueType)? ASSIGN expression SEMI ;
 assignment : postfix ASSIGN expression SEMI ;
 ifStatement : IF LPAREN expression RPAREN block (ELSE (ifStatement | block))? ;
 foreachStatement : FOREACH LPAREN expression IN parameter (COMMA parameter)? RPAREN block ;

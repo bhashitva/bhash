@@ -2514,6 +2514,7 @@ class NativeBackendTest {
         requireNumericTargets();for(var fixture:NativeGenericFixtures.cases()){
             var result=numericExact(fixture.source());assertEquals(0,result.exit(),fixture.name()+result.err());assertEquals(fixture.expected(),result.out(),fixture.name());
             if(fixture.name().equals("gc-stress")){assertTrue(stats(result).get("allocations")>4000,result.err());assertTrue(stats(result).get("peak")<100000,result.err());}
+            if(fixture.name().equals("safer-everyday")){assertTrue(stats(result).get("allocations")>200,result.err());assertTrue(stats(result).get("collections")>100,result.err());}
         }
     }
     @Test void coreSpecializesGenericLayoutsAndReusesClosedDefinitions()throws Exception{

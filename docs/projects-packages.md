@@ -137,7 +137,8 @@ Qualified references need no import:
 The second line assumes a public class `उपयोगिता` with a static method `उत्तर`;
 the third assumes a public generic top-level function `प्रतिलिपि`.
 Qualified generic type receivers, such as `संस्था.संग्रह.पात्र<पूर्णांक>.गिनती`,
-are supported. Generic member methods remain unsupported.
+are supported. Generic member methods, constraints and call inference follow the
+[safer everyday rules](../tutorial/safer-everyday/README.md).
 Names and every package segment use the existing Devanagari identifier profile;
 NFC-equivalent spellings identify the same package/type/function. Keywords cannot
 be package segments. Strings and filesystem names are not rewritten or normalized.

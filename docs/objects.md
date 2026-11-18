@@ -88,16 +88,15 @@ mutation, base calls and inheritance with a small account model.
 
   **हिन्दी:** पहले मूल निर्माता पूरा होता है, फिर वर्तमान वर्ग के क्षेत्र घोषणा क्रम में आरंभ होते हैं, फिर उसका निर्माता शरीर चलता है। दोनों backend यही क्रम लागू करते हैं।
 - Mutable fields without an initializer default to `०`, `०.०`, `असत्य`, empty text,
-  or `रिक्त`, according to type. Immutable fields require an initializer and cannot
-  be reassigned, including in constructors.
+  or `रिक्त`, according to type. Immutable instance fields have either a declaration
+  initializer or exactly one assignment on every successful constructor path.
 
-  **हिन्दी:** बिना आरंभक के बदलने वाले क्षेत्र को प्रकार अनुसार `०`, `०.०`, `असत्य`, खाली पाठ या `रिक्त` मिलता है। अचल क्षेत्र को आरंभक चाहिए और निर्माता भी उसे दोबारा नहीं लिख सकता।
+  **हिन्दी:** बदलने वाले क्षेत्र का प्रकार अनुसार default है। अचल instance क्षेत्र को घोषणा में आरंभक दें या हर सफल constructor path पर ठीक एक बार भरें। पहले पढ़ना और दोबारा लिखना अमान्य है।
 - Field initializers support constant expressions, not names, calls, `यह`, `आधार`
   or `नया`. Put object construction and parameter-dependent initialization in the
-  constructor using mutable fields. Blank immutable fields assigned in constructors
-  are not yet supported.
+  constructor using mutable fields or constructor-assigned immutable fields.
 
-  **हिन्दी:** क्षेत्र आरंभक में स्थिर व्यंजक लिखें। नाम, कॉल, `यह`, `आधार` और `नया` नहीं हैं। मापदंड पर निर्भर काम निर्माता में बदलने वाले क्षेत्र से करें। खाली अचल क्षेत्र को निर्माता में भरना अभी उपलब्ध नहीं है।
+  **हिन्दी:** घोषणा के क्षेत्र आरंभक में स्थिर व्यंजक दें। मापदंड, calls और नया object चाहिए तो constructor में initialization करें। [सुरक्षित दैनिक प्रोग्रामिंग](../tutorial/safer-everyday/README.md) में flow rules देखें।
 - Constructor parameters are immutable locals, just like function parameters.
   They may shadow field names; `यह.नाम = नाम;` disambiguates them.
 

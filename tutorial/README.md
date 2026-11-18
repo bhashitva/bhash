@@ -9,6 +9,7 @@
 
 | ट्यूटोरियल | क्या मिलेगा |
 | --- | --- |
+| [सुरक्षित दैनिक प्रोग्रामिंग (Safer Everyday Programming)](safer-everyday/README.md) | निर्माता में अचल क्षेत्र, प्रकार-अनुमान, generic methods/constraints और सुरक्षित rename/references |
 | [पहला Android ऐप (Android Starter Kit)](android/README.md) | प्रोजेक्ट बनाना, SDK जाँचना, APK बनाना और फ़ोन या एमुलेटर पर चलाना |
 | [असमकालिक कार्य (Async tasks)](async/README.md) | प्रतीक्षा, विलंब, निरस्तीकरण, समयसीमा, संसाधन-सफ़ाई और browser व्यवहार |
 | [पहचानकर्ता और हिन्दी टंकण (Unicode identifiers)](unicode-identifiers/README.md) | नुक़्ता, संयुक्त अक्षर, अदृश्य जोड़-चिह्न, समतुल्य नाम और संपादक सहायता |
