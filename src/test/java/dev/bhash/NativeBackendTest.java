@@ -617,6 +617,11 @@ class NativeBackendTest {
         for(String source:List.of(
             "अनुबंध अ { फलन न<त>(व: त) -> त; } फलन मुख्य() -> शून्य {}",
             "वर्ग अ { फलन न<त>(व: त) -> त { लौटाओ व; } } फलन मुख्य() -> शून्य {}")){
+            assertDoesNotThrow(()->core(source));
+        }
+        for(String source:List.of(
+            "अनुबंध अ { फलन न<त: पूर्णांक>(व: त) -> त; } फलन मुख्य() -> शून्य {}",
+            "वर्ग अ { फलन न<त: पूर्णांक>(व: त) -> त { लौटाओ व; } } फलन मुख्य() -> शून्य {}")){
             var error=assertThrows(CompilationException.class,()->core(source));
             assertTrue(error.getMessage().contains("native.bhash:1:"),error.getMessage());
             assertTrue(error.getMessage().contains("Generic"),error.getMessage());
