@@ -32,6 +32,8 @@ public final class ProjectResolver {
     private int next;
 
     public static Resolution resolve(List<SourceFile> sources) throws CompilationException {
+        if(sources.stream().anyMatch(SourceFile::strictNulls)&&sources.stream().anyMatch(s->!s.strictNulls()))
+            throw new CompilationException("[BH3105] परियोजना और स्रोत निर्भरताओं में समान nullSafety विकल्प रखें। — Strict and legacy source packages cannot be mixed; migrate dependency manifests and regenerate the lockfile.");
         var trees = new ArrayList<ProgramContext>();
         var errors = new ArrayList<String>();
         for (var source : sources) {

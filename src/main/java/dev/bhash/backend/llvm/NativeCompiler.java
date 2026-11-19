@@ -20,7 +20,7 @@ public final class NativeCompiler {
     public NativeCompiler(boolean sanitize,boolean debug,Path sourceRoot){this.sanitize=sanitize;this.debug=debug;this.sourceRoot=sourceRoot;}
     public static List<SourceFile> normalizeSources(List<SourceFile> sources,Path root)throws IOException{
         Path base=root.toRealPath();var mapped=new ArrayList<SourceFile>();
-        for(var source:sources){Path file=Path.of(source.name()).toRealPath();if(!file.startsWith(base))throw new IOException("Native source is outside --source-root: "+source.name());mapped.add(new SourceFile("/bhash/source/"+base.relativize(file).toString().replace('\\','/'),source.text()));}
+        for(var source:sources){Path file=Path.of(source.name()).toRealPath();if(!file.startsWith(base))throw new IOException("Native source is outside --source-root: "+source.name());mapped.add(new SourceFile("/bhash/source/"+base.relativize(file).toString().replace('\\','/'),source.text(),source.strictNulls()));}
         return List.copyOf(mapped);
     }
     private static List<String> mapped(Path work,Path sdk,List<String> command){

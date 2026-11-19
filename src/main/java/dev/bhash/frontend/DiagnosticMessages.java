@@ -9,6 +9,9 @@ public final class DiagnosticMessages {
     private DiagnosticMessages() {}
     private record Entry(String code, String hindi) {}
     private static Entry entry(String message) {
+        if(message.startsWith("यह मान रिक्त हो सकता")||message.startsWith("Nullable value"))return new Entry("BH3201","इस मान की रिक्त-जाँच करें, ?. उपयोग करें या ?? से वैकल्पिक मान दें।");
+        if(message.startsWith("Null assignment"))return new Entry("BH3202","गैर-रिक्त प्रकार में रिक्त नहीं रख सकते; अनुपस्थिति चाहिए तो T? लिखें।");
+        if(message.startsWith("Non-null field")||message.startsWith("Non-null reference arrays"))return new Entry("BH3203","गैर-रिक्त संदर्भ को उपयोग से पहले हर पथ पर भरें; वैकल्पिक मान के लिए T? चुनें।");
         if(message.startsWith("प्रतीक्षा केवल"))return new Entry("BH8001","इस स्थान पर असमकालिक निलम्बन उपलब्ध नहीं है।");
         if(message.startsWith("प्रतीक्षा के लिए"))return new Entry("BH8002","प्रतीक्षा का मान कार्यफल होना चाहिए।");
         if(message.startsWith("कार्यफल को संग्रहित"))return new Entry("BH8003","कार्य का परिणाम सम्भालें ताकि उसकी विफलता अनदेखी न हो।");

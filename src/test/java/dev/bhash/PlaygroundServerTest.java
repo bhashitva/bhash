@@ -14,6 +14,15 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PlaygroundServerTest {
+    @Test void scratchProfilePreservesStrictSafetyAndDiagnosticLineOffset()throws Exception {
+        var captured=new AtomicReference<String>();
+        try(var app=create((file,out)->{captured.set(Files.readString(file));output(out);},100)) {
+            app.start();var response=post(app,form("// bhash:null-safety=strict\nस्थिर व:पूर्णांक?=रिक्त; लिखो(व??७);","scratch"));
+            assertTrue(finished(app,id(response.body())).contains("\"ready\""));
+            assertTrue(new dev.bhash.frontend.SourceFile("playground.bhash",captured.get()).strictNulls());
+            assertEquals("स्थिर व:पूर्णांक?=रिक्त; लिखो(व??७);",captured.get().lines().toList().get(2));
+        }
+    }
     @TempDir Path directory;
     final HttpClient client=HttpClient.newHttpClient();
     PlaygroundServer create(PlaygroundServer.Builder builder,int limit) throws Exception {

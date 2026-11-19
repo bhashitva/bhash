@@ -15,6 +15,7 @@ final class SourceIndex {
         Location location() { return new Location(uri,selection); }
     }
     final String uri, text, pkg;
+    final boolean strictNulls;
     final TextCoordinates coordinates;
     final List<Symbol> symbols = new ArrayList<>();
     final Map<Symbol,ParserRuleContext> declarations = new LinkedHashMap<>();
@@ -27,6 +28,7 @@ final class SourceIndex {
     final Set<Integer> qualifiers = new HashSet<>();
 
     SourceIndex(SourceFile source) {
+        strictNulls=source.strictNulls();
         uri = java.nio.file.Path.of(source.name()).toUri().toASCIIString();
         text = source.text(); coordinates = new TextCoordinates(text);
         var parsed = source.parse();
@@ -147,7 +149,7 @@ final class SourceIndex {
         for (var symbol:symbols) if (symbol.selection.equals(range(token.getStartIndex(),token.getStopIndex()+1))) return List.of(symbol);
         // Member navigation uses the same conservative declaration/type model as completion.
         int at=tokens.indexOf(token);
-        if (!typeReference && at>0 && tokens.get(at-1).getText().equals(".")) return new EditorModel(this,project).resolveMember(position);
+        if (!typeReference && at>0 && Set.of(".","?.").contains(tokens.get(at-1).getText())) return new EditorModel(this,project).resolveMember(position);
         var lexical=visibleLexical(position).stream().filter(s->key(s.name).equals(lookupName) && (!typeReference||s.kind==SymbolKind.TypeParameter)).toList();
         if (!lexical.isEmpty()) {
             int narrowest=lexical.stream().mapToInt(s->s.scopeEnd-s.scopeStart).min().orElse(0);

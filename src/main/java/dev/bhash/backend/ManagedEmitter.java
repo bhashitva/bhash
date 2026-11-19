@@ -28,15 +28,20 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         final ClassInfo object;
         final CollectionKind collection;
         final List<Type> arguments;
+        final Type nullableBase;
         Type(String java, String bhash) { this(java,bhash,(ClassInfo)null); }
         Type(String java, String bhash, ClassInfo object) {
-            this.java=java; this.bhash=bhash; this.object=object; this.collection=null; this.arguments=List.of();
+            this.java=java; this.bhash=bhash; this.object=object; this.collection=null; this.arguments=List.of();this.nullableBase=null;
         }
         Type(String java,String bhash,CollectionKind collection,List<Type> arguments) {
-            this.java=java; this.bhash=bhash; this.object=null; this.collection=collection; this.arguments=arguments;
+            this.java=java; this.bhash=bhash; this.object=null; this.collection=collection; this.arguments=arguments;this.nullableBase=null;
         }
+        Type(Type base) { java="nullable:"+base.java;bhash=base.bhash+"?";object=base.object;collection=base.collection;arguments=base.arguments;nullableBase=base; }
+        boolean nullable() { return nullableBase!=null; }
+        Type nonNull() { return nullable()?nullableBase:this; }
+        boolean scalar() { return this==INT||this==REAL||this==BOOL||this==BYTE||this==INT32; }
         static Type[] values() { return new Type[]{INT, REAL, BOOL, TEXT, BYTE, INT32, OBJECT, BUFFER, VOID}; }
-        boolean reference() { return object != null || collection != null || this == NULL || this == OBJECT; }
+        boolean reference() { return nullable() || object != null || collection != null || this == NULL || this == OBJECT; }
     }
     record Location(boolean mutable,String setter) { Location(boolean mutable) { this(mutable,null); } }
     record Expr(Type type, String java, boolean call, Location location, boolean base, boolean typeReceiver) {
@@ -103,6 +108,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private final Map<String, ClassInfo> classes = new LinkedHashMap<>();
     private final List<ClassInfo> classOrder = new ArrayList<>();
     private final Map<CollectionKey,Type> collectionTypes = new HashMap<>();
+    private final Map<Type,Type> nullableTypes = new IdentityHashMap<>();
+    private boolean strictNulls;
+    private final Map<Binding,Type> nonNullBindings=new HashMap<>();
+    private final Map<String,Binding> stableFields=new HashMap<>();
+    private final Map<org.antlr.v4.runtime.tree.ParseTree,Expr> checkedExpressions=new IdentityHashMap<>();
+    private boolean assignmentTarget;
+    private Type nullable(Type type) { return type.nullable()?type:nullableTypes.computeIfAbsent(type,Type::new); }
+    private static boolean strict(ParserRuleContext at) { return at.start instanceof LocatedToken token&&token.strictNulls(); }
     private final Map<String,ArrayFactory> arrayFactories = new LinkedHashMap<>();
     private final Deque<Map<String, Binding>> scopes = new ArrayDeque<>();
     private final StringBuilder output = new StringBuilder();
@@ -131,20 +144,28 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         final Map<org.antlr.v4.runtime.tree.ParseTree, Expr> expressions = new IdentityHashMap<>();
         final Map<ParserRuleContext, Binding> bindings = new IdentityHashMap<>();
         final Map<PrimaryContext, Binding> reads = new IdentityHashMap<>();
+        final Map<PrimaryContext, Type> narrowedReads = new IdentityHashMap<>();
+        final Map<ParserRuleContext, Type> narrowedFields = new IdentityHashMap<>();
         final Map<ParserRuleContext, Function> calls = new IdentityHashMap<>();
         final Map<ParserRuleContext, Field> fields = new IdentityHashMap<>();
         final Map<Constructor, Constructor> baseConstructors = new IdentityHashMap<>();
         final Set<ParserRuleContext> baseCalls = Collections.newSetFromMap(new IdentityHashMap<>());
         final Map<PrimaryContext, Constructor> constructors = new IdentityHashMap<>();
         final Map<PrimaryContext, Type> conversions = new IdentityHashMap<>();
+        final Map<PrimaryContext, Type> conversionSources = new IdentityHashMap<>();
         final Map<ParserRuleContext, Object> constants = new IdentityHashMap<>();
     }
     private Analysis analysis;
 
     @Override public Expr visit(org.antlr.v4.runtime.tree.ParseTree tree) {
-        Expr result = super.visit(tree);
-        if (analysis != null && result != null) analysis.expressions.put(tree, result);
-        return result;
+        boolean previous=strictNulls;
+        if(tree instanceof ParserRuleContext ctx)strictNulls=strict(ctx);
+        try {
+            Expr result = super.visit(tree);
+            if(result!=null)checkedExpressions.put(tree,result);
+            if (analysis != null && result != null) analysis.expressions.put(tree, result);
+            return result;
+        } finally { strictNulls=previous; }
     }
 
     /** Native typed core, using the same checker and overload decisions as managed targets. */
@@ -249,7 +270,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     /** Static notebook inference; no user code is executed and no values cross the cell boundary. */
     public static Map<String,String> notebookBindingTypes(String source,String storage)throws CompilationException {
-        var resolution=ProjectResolver.resolve(List.of(new SourceFile("notebook-inference.bhash",source)));
+        return notebookBindingTypes(source,storage,false);
+    }
+    public static Map<String,String> notebookBindingTypes(String source,String storage,boolean strictNulls)throws CompilationException {
+        var resolution=ProjectResolver.resolve(List.of(new SourceFile("notebook-inference.bhash",source,strictNulls)));
         String lowered=resolution.names().entrySet().stream().filter(e->e.getValue().equals(storage)).map(Map.Entry::getKey).findFirst().orElse(storage);
         var tree=GenericExpander.expand("notebook-inference.bhash",resolution.tree(),lowered);var types=new LinkedHashMap<String,String>();
         for(var f:tree.functionDecl())if(resolution.names().getOrDefault(f.IDENTIFIER().getText(),f.IDENTIFIER().getText()).equals("मुख्य")&&f.block()!=null)
@@ -284,11 +308,15 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 result=found.type;
             }
         }
-        for (var ignored:value.arraySuffix()) result=array(result);
+        for(var child:value.children) {
+            if(child instanceof ArraySuffixContext)result=array(result);
+            else if(child instanceof NullableSuffixContext)result=nullable(result);
+        }
         return result;
     }
 
     private String typeName(Type type) {
+        if(type.nullable())return type.nullableBase.scalar()?(target==Target.JVM?"Object":"object"):typeName(type.nullableBase);
         if (type==Type.BUFFER) return "BhashRuntime.BBuffer";
         if (target==Target.CLR && type==Type.BYTE) return "byte";
         if (target==Target.CLR && type==Type.OBJECT) return "object";
@@ -379,6 +407,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     private void emitFunction(Function function) {
         if(function.intrinsic!=null)return;
+        nonNullBindings.clear();
         var declaration = function.declaration;
         notebookDisplay = declaration.IDENTIFIER().getText().equals(notebookDisplayFunction);
         currentClass = function.owner;
@@ -434,6 +463,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         var overloads=map.computeIfAbsent(Identifiers.key(name),k->new ArrayList<>());
         if (overloads.stream().anyMatch(f->f.parameters.equals(function.parameters)))
             throw error(at,"Duplicate function signature (return types do not distinguish overloads): " + name);
+        if(strict(at)&&overloads.stream().anyMatch(f->f.parameters.stream().map(Type::nonNull).toList().equals(function.parameters.stream().map(Type::nonNull).toList())))
+            throw error(at,"Overloads cannot differ only by nullability: "+name);
         overloads.add(function);
     }
     private String slot(String name,List<Type> signature) {
@@ -473,6 +504,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             TypeListContext list=definition.isInterface()?definition.contract.typeList():definition.declaration.typeList();
             if (list!=null) for (var entry:list.valueType()) {
                 Type contract=type(entry);
+                if(contract.nullable())throw error(entry,"An implemented interface must be non-null.");
                 if (contract.object==null || !contract.object.isInterface()) throw error(entry,"Expected an interface type.");
                 if (definition.contracts.contains(contract.object)) throw error(entry,"Duplicate interface.");
                 definition.contracts.add(contract.object);
@@ -509,6 +541,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     boolean notebookSlot = shared && definition == notebookStorageClass();
                     if (shared && declaration.CONST() != null && declaration.expression() == null && !notebookSlot)
                         throw error(declaration, "An immutable field requires an initializer.");
+                    var declaredType=type(declaration.valueType());
+                    if(strict(declaration)&&shared&&!notebookSlot&&declaration.expression()==null&&!declaredType.nullable()&&declaredType.reference())
+                        throw error(declaration,"Non-null field requires an initializer: "+name);
                     definition.fields.put(name, new Field("p" + fieldId++, type(declaration.valueType()),
                             declaration.LET() != null, access, definition, declaration,shared));
                 } else if (member.constructorDecl() != null) {
@@ -554,7 +589,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private void validateContracts(ClassInfo definition) {
         for (var contract:definition.contracts) for (String name:methodNames(contract)) for (Function required:methods(contract,name)) {
             Function actual=methods(definition,name).stream().filter(f->!f.owner.isInterface() && f.parameters.equals(required.parameters)).findFirst().orElse(null);
-            if (actual==null || actual.shared || actual.access!=Access.PUBLIC || actual.result!=required.result)
+            if (actual==null || actual.shared || actual.access!=Access.PUBLIC || actual.result!=required.result&&!(required.result.nullable()&&!actual.result.scalar()&&required.result.nonNull()==actual.result))
                 throw error(definition.at(),"Class must implement public interface method with exact types: " + name);
         }
     }
@@ -636,6 +671,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private boolean compatible(Type expected, Type actual) {
+        if(expected.nullable())return actual==Type.NULL||compatible(expected.nonNull(),actual.nonNull());
+        if(actual.nullable())return !strictNulls&&compatible(expected,actual.nonNull());
+        if(strictNulls&&actual==Type.NULL)return expected==Type.NULL;
         return expected == actual || (expected==Type.OBJECT && actual!=Type.VOID) || (expected.reference() && actual==Type.NULL)
                 || (expected.object != null && subclass(actual.object,expected.object));
     }
@@ -727,6 +765,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private void emitConstructor(ClassInfo definition, Constructor constructor, Map<Field, String> initializers) {
+        nonNullBindings.clear();
         currentClass = definition;
         returnType = Type.VOID;
         var declaration = constructor.declaration;
@@ -851,33 +890,44 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private EnumSet<Flow> statement(StatementContext statement) {
+        boolean previous=strictNulls;strictNulls=strict(statement);
+        try { return statementBody(statement); } finally { strictNulls=previous; }
+    }
+    private EnumSet<Flow> statementBody(StatementContext statement) {
         if (statement.variableDecl() != null) {
             var declaration = statement.variableDecl();
             var value = visit(declaration.expression());
             var declaredType = type(declaration.valueType());
             require(declaration, declaredType, value.type);
             var binding = declare(declaration, declaration.IDENTIFIER().getText(), declaredType, declaration.LET() != null);
+            if(strictNulls&&declaredType.nullable()&&!value.type.nullable()&&value.type!=Type.NULL)nonNullBindings.put(binding,declaredType.nonNull());
             output.append(binding.mutable || target == Target.CLR ? "" : "final ").append(typeName(declaredType)).append(' ')
                     .append(binding.java).append('=').append(value.java).append(";\n");
         } else if (statement.assignment() != null) {
             var assignment = statement.assignment();
-            var destination = visit(assignment.postfix());
+            Expr destination;assignmentTarget=assignment.postfix().postfixPart().isEmpty();
+            try { destination=visit(assignment.postfix()); } finally { assignmentTarget=false; }
             if (destination.location == null) throw error(assignment, "Assignment requires a variable or field.");
             if (!destination.location.mutable) throw error(assignment, "Cannot assign to an immutable binding or field.");
             var value = visit(assignment.expression());
             require(assignment, destination.type, value.type);
+            // Writes invalidate earlier proofs, even when the new expression looks non-null.
+            for(var read:nonNullBindings.keySet().stream().filter(b->b.java.equals(destination.java)).toList())nonNullBindings.remove(read);
+            var assigned=find(assignment.postfix().getText());
+            if(strictNulls&&assigned!=null&&assigned.type.nullable()&&!value.type.nullable()&&value.type!=Type.NULL)nonNullBindings.put(assigned,assigned.type.nonNull());
             if (destination.location.setter!=null) output.append(destination.location.setter).append(value.java).append(");\n");
             else output.append(destination.java).append('=').append(value.java).append(";\n");
         } else if (statement.resourceStatement()!=null) {
             var resource=statement.resourceStatement();
             var value=visit(resource.expression());var parameter=resource.parameter();var declared=type(parameter.valueType());
             require(resource,declared,value.type);
+            if(strictNulls&&declared.nullable())throw error(resource,"यह मान रिक्त हो सकता है; संसाधन से पहले रिक्त जाँचें।");
             if(declared.object==null)throw error(resource,"संसाधन requires an object with बंदकरो() -> शून्य.");
             scopes.push(new HashMap<>());
             var binding=declare(parameter,parameter.IDENTIFIER().getText(),declared,false);
             var close=callMethod(resource,new Expr(declared,binding.java),"बंदकरो",List.of());
             if(resource.ASYNC()!=null) {
-                if(!asyncBody || taskPayload(close.type)!=Type.VOID)throw error(resource,"असमकालिक संसाधन के बंदकरो() का परिणाम कार्यफल<शून्य> होना चाहिए।");
+                if(!asyncBody || close.type.nullable() || taskPayload(close.type)!=Type.VOID)throw error(resource,"असमकालिक संसाधन के बंदकरो() का परिणाम कार्यफल<शून्य> होना चाहिए।");
             }else require(resource,Type.VOID,close.type);
             output.append("{ ").append(typeName(declared)).append(' ').append(binding.java).append("=BhashRuntime.instance((").append(typeName(declared)).append(")(").append(value.java).append(")); try ");
             var flow=block(resource.block());
@@ -891,6 +941,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 if (caughtExceptions.isEmpty()) throw error(statement,"Bare फेंको requires an enclosing पकड़ो.");
                 var binding=caughtExceptions.peek(); value=new Expr(binding.type,binding.java);
             } else value=visit(statement.expression());
+            if(strictNulls&&value.type.nullable())throw error(statement,"यह मान रिक्त हो सकता है; फेंको से पहले रिक्त जाँचें।");
             if (value.type.object==null || !subclass(value.type.object,exceptionClass))
                 throw error(statement,"फेंको requires an अपवाद instance.");
             output.append("throw BhashRuntime.instance(").append(value.java).append(");\n");
@@ -898,19 +949,25 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         } else if (statement.ifStatement() != null) {
             return ifStatement(statement.ifStatement());
         } else if (statement.switchStatement() != null) {
-            return switchStatement(statement.switchStatement());
+            var before=new HashMap<>(nonNullBindings);nonNullBindings.clear();
+            try{return switchStatement(statement.switchStatement());}finally{nonNullBindings.clear();nonNullBindings.putAll(before);nonNullBindings.keySet().removeIf(Binding::mutable);}
         } else if (statement.foreachStatement()!=null) {
-            return foreachStatement(statement.foreachStatement());
+            var before=new HashMap<>(nonNullBindings);nonNullBindings.keySet().removeIf(Binding::mutable);
+            try{return foreachStatement(statement.foreachStatement());}finally{nonNullBindings.clear();nonNullBindings.putAll(before);nonNullBindings.keySet().removeIf(Binding::mutable);}
         } else if (statement.whileStatement() != null) {
             var loop = statement.whileStatement();
+            nonNullBindings.keySet().removeIf(Binding::mutable);
+            var beforeLoop=new HashMap<>(nonNullBindings);
             var condition = visit(loop.expression());
             require(loop, Type.BOOL, condition.type);
             output.append("while (BhashRuntime.truth(").append(condition.java).append(")) ");
             loopDepth++;
             breakTargets.push(new BreakTarget(null));
+            refine(loop.expression(),true);
             var body = block(loop.block());
             breakTargets.pop();
             loopDepth--;
+            nonNullBindings.clear();nonNullBindings.putAll(beforeLoop);
             var flow = EnumSet.of(Flow.NORMAL); // Conservative: loops may execute zero times.
             if (body.contains(Flow.RETURN)) flow.add(Flow.RETURN);
             if (body.contains(Flow.THROW)) flow.add(Flow.THROW);
@@ -961,6 +1018,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private EnumSet<Flow> tryStatement(TryStatementContext statement) {
+        nonNullBindings.keySet().removeIf(Binding::mutable);
+        var beforeTry=new HashMap<>(nonNullBindings);
         output.append("try ");
         boolean handlers=!statement.catchClause().isEmpty();
         if (handlers) output.append("{ try ");
@@ -973,6 +1032,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         }
         var previous=new ArrayList<Type>();
         for (var clause:statement.catchClause()) {
+            nonNullBindings.clear();nonNullBindings.putAll(beforeTry);
             var parameter=clause.parameter();
             Type caught=type(parameter.valueType());
             if (caught.object==null || !subclass(caught.object,exceptionClass))
@@ -988,6 +1048,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             caughtExceptions.pop(); scopes.pop();
         }
         if (statement.FINALLY()!=null) {
+            nonNullBindings.clear();nonNullBindings.putAll(beforeTry);
             output.append("finally ");
             finallyContexts.push(new int[]{breakTargets.size(),loopDepth});
             var cleanup=block(statement.block(1));
@@ -995,6 +1056,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (!cleanup.contains(Flow.NORMAL)) flow=cleanup;
             else { cleanup.remove(Flow.NORMAL); flow.addAll(cleanup); }
         }
+        nonNullBindings.clear();nonNullBindings.putAll(beforeTry);
         return flow;
     }
 
@@ -1079,25 +1141,79 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private EnumSet<Flow> switchBody(SwitchSectionContext section) {
+        var before=new HashMap<>(nonNullBindings);
         scopes.push(new HashMap<>());
         output.append("{\n");
         var flow=statements(section.statement());
         output.append("}\n");
         scopes.pop();
+        nonNullBindings.clear();nonNullBindings.putAll(before);
         return flow;
     }
 
     private EnumSet<Flow> ifStatement(IfStatementContext statement) {
+        var before=new HashMap<>(nonNullBindings);
         var condition = visit(statement.expression());
         require(statement, Type.BOOL, condition.type);
         output.append("if (").append(condition.java).append(") ");
+        refine(statement.expression(),true);
         var flow = block(statement.block(0));
+        var yes=new HashMap<>(nonNullBindings);boolean yesNormal=flow.contains(Flow.NORMAL);
+        nonNullBindings.clear();nonNullBindings.putAll(before);refine(statement.expression(),false);
         if (statement.ELSE() == null) flow.add(Flow.NORMAL);
         else {
             output.append("else ");
-            flow.addAll(statement.ifStatement() != null ? ifStatement(statement.ifStatement()) : block(statement.block(1)));
+            var other=statement.ifStatement() != null ? ifStatement(statement.ifStatement()) : block(statement.block(1));
+            if(other.contains(Flow.NORMAL)&&yesNormal)nonNullBindings.entrySet().removeIf(e->yes.get(e.getKey())!=e.getValue());
+            else if(!other.contains(Flow.NORMAL)&&yesNormal){nonNullBindings.clear();nonNullBindings.putAll(yes);}
+            flow.addAll(other);
+            return flow;
         }
+        if(yesNormal)nonNullBindings.entrySet().removeIf(e->yes.get(e.getKey())!=e.getValue());
         return flow;
+    }
+
+    private void refine(org.antlr.v4.runtime.tree.ParseTree expression,boolean truth) {
+        if(expression.getChildCount()==1){refine(expression.getChild(0),truth);return;}
+        if(expression instanceof UnaryContext u&&u.NOT()!=null){refine(u.unary(),!truth);return;}
+        if(expression instanceof PrimaryContext p&&p.TYPE_TEST()!=null) {
+            var binding=find(p.expression().getText());
+            if(truth&&binding!=null)nonNullBindings.put(binding,type(p.valueType()).nonNull());
+            return;
+        }
+        if(expression instanceof PrimaryContext p&&p.expression()!=null){refine(p.expression(),truth);return;}
+        if(expression instanceof EqualityContext equality&&equality.getChildCount()==3) {
+            String op=equality.getChild(1).getText();if(!Set.of("==","!=").contains(op))return;
+            var left=equality.getChild(0);var right=equality.getChild(2);
+            if(left.getText().equals("रिक्त")){var temp=left;left=right;right=temp;}
+            if(!right.getText().equals("रिक्त")||truth==op.equals("=="))return;
+            var binding=find(left.getText());
+            if(binding!=null&&binding.type.nullable())nonNullBindings.put(binding,binding.type.nonNull());
+            else {
+                var value=checkedExpressions.get(left);
+                if(value!=null&&value.type.nullable()&&value.location!=null&&!value.location.mutable&&stable(left)) {
+                    var proof=stableFields.computeIfAbsent(value.java,k->new Binding(k,value.type,false));
+                    nonNullBindings.put(proof,value.type.nonNull());
+                }
+            }
+        }
+        if(truth&&expression instanceof LogicalAndContext||!truth&&expression instanceof LogicalOrContext)
+            for(int i=0;i<expression.getChildCount();i+=2)refine(expression.getChild(i),truth);
+    }
+    private boolean stable(org.antlr.v4.runtime.tree.ParseTree node) {
+        if(node instanceof PrimaryContext p) {
+            if(p.NEW()!=null||p.CONVERT()!=null||p.SAFE_CAST()!=null||p.TYPE_TEST()!=null||p.LPAREN()!=null&&p.IDENTIFIER()!=null)return false;
+            if(p.IDENTIFIER()!=null) {
+                var local=find(p.IDENTIFIER().getText());if(local!=null)return !local.mutable;
+                var field=field(currentClass,p.IDENTIFIER().getText());if(field!=null)return !field.mutable;
+            }
+        }
+        if(node instanceof PostfixPartContext p) {
+            if(p.LPAREN()!=null||p.LBRACK()!=null)return false;
+            var value=checkedExpressions.get(p);if(value!=null&&value.location!=null&&value.location.mutable)return false;
+        }
+        for(int i=0;i<node.getChildCount();i++)if(!stable(node.getChild(i)))return false;
+        return true;
     }
 
     private Type collection(CollectionKind kind, List<Type> arguments) {
@@ -1123,6 +1239,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return target==Target.JVM?"BhashRuntime.<"+args+">"+name:"BhashRuntime."+name+"<"+args+">";
     }
     private String defaultValue(Type type) {
+        if(type.nullable())return "null";
         return type==Type.BYTE?(target==Target.JVM?"((short)0)":"((byte)0)"):type==Type.INT32?"0":type==Type.TEXT?"\"\"":type==Type.BOOL?"false":type.reference()?"null":type==Type.REAL?"0.0":"0L";
     }
     private boolean enumeration(Type type) { return type.object!=null && type.object.enumeration!=null; }
@@ -1192,10 +1309,12 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 .append(String.join(",",fields.stream().map(f->f.java).toList())).append("}; }\n}\n");
     }
     private String tagCode(Type type,String code) {
+        type=type.nonNull();
         return type.collection!=null && type!=Type.BUFFER?"BhashRuntime.typed("+code+","+hostString(type.java)+")":code;
     }
     private Expr tagged(Expr value) { return new Expr(value.type,tagCode(value.type,value.java),value.call,value.location,value.base,value.typeReceiver); }
     private String typeClass(Type type) {
+        if(type.nullable())return typeClass(type.nonNull());
         String name=type.collection!=null?"BhashRuntime."+switch(type.collection) {case ARRAY->"BArray";case LIST->"BList";case MAP->"BMap";case BUFFER->"BBuffer";}:typeName(type);
         if (target==Target.JVM) {
             if (type==Type.INT) name="Long"; else if (type==Type.INT32) name="Integer"; else if (type==Type.BYTE) name="Short";
@@ -1207,8 +1326,15 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
     private Expr conversion(PrimaryContext ctx) {
         Type destination=type(ctx.valueType());
+        if(ctx.TYPE_TEST()!=null&&destination.nullable())throw error(ctx,"Type tests require a non-null target type; compare to रिक्त separately.");
         if(analysis!=null)analysis.conversions.put(ctx,destination);
         Expr source=visit(ctx.expression()); valueRequired(ctx,source.type);
+        if(destination.nullable()&&destination.nonNull()==source.type)return new Expr(destination,source.java,true);
+        if(source.type.nullable()&&ctx.CONVERT()!=null&&!destination.nullable()) {
+            Type underlying=source.type.nonNull();
+            if(analysis!=null)analysis.conversionSources.put(ctx,underlying);
+            source=new Expr(underlying,runtimeGeneric("checkedCast",List.of(underlying))+"("+source.java+",\"\","+typeClass(underlying)+",false)",true);
+        }
         String tag=destination.collection!=null && destination!=Type.BUFFER?destination.java:"";
         String check=source.java+","+hostString(tag)+","+typeClass(destination);
         if (ctx.TYPE_TEST()!=null) return new Expr(Type.BOOL,"BhashRuntime.isType("+check+")",true);
@@ -1240,7 +1366,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 return new Expr(Type.TEXT,"BhashRuntime.scalarText("+source.java+")",true);
             }
         }
-        return new Expr(destination,runtimeGeneric("checkedCast",List.of(destination))+"("+check+","+(destination.reference()?"true":"false")+")",true);
+        return new Expr(destination,runtimeGeneric("checkedCast",List.of(destination))+"("+check+","+((destination.nullable()||!strictNulls&&destination.reference())?"true":"false")+")",true);
     }
 
     private boolean integral(Type type) { return type==Type.INT || type==Type.INT32 || type==Type.BYTE; }
@@ -1357,6 +1483,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return new Expr(type,"new "+typeName(type)+"()",true);
     }
     private Expr allocateArray(ParserRuleContext at,Type element,List<Expr> sizes) {
+        if(strict(at)&&!element.nullable()&&element.reference())throw error(at,"Non-null reference arrays require initialized elements; use T? elements or an array literal.");
         Type result=element;
         for (var ignored:sizes) result=array(result);
         String key=result.java+":"+sizes.size();
@@ -1379,6 +1506,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
     private EnumSet<Flow> foreachStatement(ForeachStatementContext loop) {
         var source=visit(loop.expression());
+        if(strict(loop)&&source.type.nullable())throw error(loop,"यह मान रिक्त हो सकता है; प्रत्येक से पहले रिक्त जाँचें।");
         if (standardSet(source.type)) source=callMethod(loop,source,SET_ELEMENTS,List.of());
         if (source.type.collection==null) throw error(loop,"Collection iteration requires an array, list, map or set.");
         boolean pair=loop.parameter().size()==2, map=source.type.collection==CollectionKind.MAP;
@@ -1425,7 +1553,12 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
     private String join(List<Expr> args) { return String.join(",", args.stream().map(Expr::java).toList()); }
     private void require(ParserRuleContext at, Type expected, Type actual) {
-        if (!compatible(expected, actual)) throw error(at, "Expected " + expected.bhash + ", found " + actual.bhash + ".");
+        boolean previous=strictNulls;strictNulls|=strict(at);
+        try {
+            if(strictNulls&&actual==Type.NULL&&!expected.nullable()&&expected!=Type.NULL)throw error(at,"Null assignment is invalid. Expected "+expected.bhash+", found रिक्त.");
+            if(strictNulls&&actual.nullable()&&!expected.nullable())throw error(at,"Nullable value requires a null check. Expected "+expected.bhash+", found "+actual.bhash+".");
+            if (!compatible(expected, actual)) throw error(at, "Expected " + expected.bhash + ", found " + actual.bhash + ".");
+        }finally{strictNulls=previous;}
     }
     private void valueRequired(ParserRuleContext at, Type type) {
         if (type == Type.VOID) throw error(at, "A void function does not produce a value.");
@@ -1434,7 +1567,29 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (!integral(type) && type != Type.REAL) throw error(at, "Numeric operand required.");
     }
 
-    @Override public Expr visitExpression(ExpressionContext ctx) { return visit(ctx.logicalOr()); }
+    private Type declaredOperand(org.antlr.v4.runtime.tree.ParseTree node,Type fallback) {
+        if(analysis==null)return fallback;
+        if(node instanceof PrimaryContext p) {
+            if(analysis.reads.containsKey(p))return analysis.reads.get(p).type;
+            if(analysis.fields.containsKey(p))return analysis.fields.get(p).type;
+            if(p.expression()!=null&&p.CONVERT()==null&&p.SAFE_CAST()==null&&p.TYPE_TEST()==null)return declaredOperand(p.expression(),fallback);
+        }
+        if(node instanceof PostfixContext p&&!p.postfixPart().isEmpty()) {
+            var part=p.postfixPart(p.postfixPart().size()-1);
+            if(analysis.fields.containsKey(part))return analysis.fields.get(part).type;
+        }
+        return node.getChildCount()==1?declaredOperand(node.getChild(0),fallback):fallback;
+    }
+    @Override public Expr visitExpression(ExpressionContext ctx) {
+        var left=visit(ctx.logicalOr());if(ctx.COALESCE()==null)return left;
+        Type declared=declaredOperand(ctx.logicalOr(),left.type);
+        if(!declared.nullable())throw error(ctx,"?? requires a nullable left operand.");
+        var before=new HashMap<>(nonNullBindings);var right=visit(ctx.expression());
+        if(!left.type.nullable()){nonNullBindings.clear();nonNullBindings.putAll(before);}
+        valueRequired(ctx,right.type);require(ctx,nullable(declared.nonNull()),right.type);
+        Type result=right.type.nullable()||right.type==Type.NULL?declared:declared.nonNull();
+        return new Expr(result,defaultValue(result));
+    }
     @Override public Expr visitLogicalOr(LogicalOrContext ctx) { return binary(ctx); }
     @Override public Expr visitLogicalAnd(LogicalAndContext ctx) { return binary(ctx); }
     @Override public Expr visitBitwiseOr(BitwiseOrContext ctx) { return binary(ctx); }
@@ -1448,11 +1603,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     private Expr binary(ParserRuleContext ctx) {
         var result = visit(ctx.getChild(0));
+        var incoming=new HashMap<>(nonNullBindings);
+        boolean shortCircuit=ctx instanceof LogicalAndContext||ctx instanceof LogicalOrContext;
         for (int i = 1; i < ctx.getChildCount(); i += 2) {
             String operator = ctx.getChild(i).getText();
+            if(operator.equals("&&")||operator.equals("||"))refine(ctx.getChild(i-1),operator.equals("&&"));
             var right = visit(ctx.getChild(i + 1));
             valueRequired(ctx, result.type);
-            if ((operator.equals("==") || operator.equals("!=")) && (result.type.reference() && right.type.reference() || result.type==Type.OBJECT || right.type==Type.OBJECT)) {
+            if ((operator.equals("==") || operator.equals("!=")) && (result.type.reference() && right.type.reference() || result.type==Type.OBJECT || right.type==Type.OBJECT || result.type.nullable()||right.type.nullable()||result.type==Type.NULL||right.type==Type.NULL)) {
                 valueRequired(ctx,right.type);
                 if (result.type != Type.NULL && right.type != Type.NULL
                         && !compatible(result.type, right.type) && !compatible(right.type, result.type))
@@ -1491,6 +1649,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 java = "unchecked(" + java + ")";
             result = new Expr(type, java);
         }
+        if(shortCircuit)nonNullBindings.entrySet().removeIf(e->incoming.get(e.getKey())!=e.getValue());
         return result;
     }
 
@@ -1498,8 +1657,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (ctx.postfix() != null) return visit(ctx.postfix());
         if(ctx.AWAIT()!=null) {
             if(!asyncBody)throw error(ctx,"प्रतीक्षा केवल असमकालिक फलन में उपलब्ध है।");
-            var task=visit(ctx.unary());var payload=taskPayload(task.type);
+            var task=visit(ctx.unary());
+            if(strictNulls&&task.type.nullable())throw error(ctx,"यह मान रिक्त हो सकता है; प्रतीक्षा से पहले कार्यफल जाँचें।");
+            var payload=taskPayload(task.type);
             if(payload==null)throw error(ctx,"प्रतीक्षा के लिए कार्यफल चाहिए।");
+            nonNullBindings.keySet().removeIf(Binding::mutable);
             return new Expr(payload,"async_pending",true);
         }
         String op = ctx.getChild(0).getText();
@@ -1563,8 +1725,14 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         boolean constructorTarget=constructorBody && !field.shared && field.owner==currentClass && object.java.equals("this");
         if(constructorTarget)constructorFields.put(at,field);
         if(constructorTarget)receiver="this";
-        if(field.shared && field.owner.enumeration==null)return new Expr(field.type,receiver+".bhashGet_"+field.java+"()",new Location(field.mutable,receiver+".bhashSet_"+field.java+"("));
-        return new Expr(field.type, receiver + "." + field.java, new Location(field.mutable || constructorTarget && field.declaration.expression()==null));
+        String code=field.shared&&field.owner.enumeration==null?receiver+".bhashGet_"+field.java+"()":receiver+"."+field.java;
+        var proof=stableFields.get(code);Type narrowed=assignmentTarget?null:nonNullBindings.get(proof);
+        if(narrowed!=null) {
+            if(analysis!=null)analysis.narrowedFields.put(at,narrowed);
+            return new Expr(narrowed,narrowed.scalar()?runtimeGeneric("checkedCast",List.of(narrowed))+"("+code+",\"\","+typeClass(narrowed)+",false)":code);
+        }
+        if(field.shared && field.owner.enumeration==null)return new Expr(field.type,code,new Location(field.mutable,receiver+".bhashSet_"+field.java+"("));
+        return new Expr(field.type,code,new Location(field.mutable || constructorTarget && field.declaration.expression()==null));
     }
     private Expr callMethod(ParserRuleContext at, Expr object, String name, List<Expr> arguments) {
         if (object.type.collection!=null) return collectionCall(at,object,name,arguments);
@@ -1586,6 +1754,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
     private Expr classReceiver(ClassInfo definition) { return new Expr(definition.type,definition.java,false,null,false,true); }
     private Expr callValue(ParserRuleContext at,Expr receiver,List<Expr> arguments) {
+        if(strictNulls&&receiver.type.nullable())throw error(at,"यह मान रिक्त हो सकता है; callback बुलाने से पहले रिक्त जाँचें।");
         if(callableTypes.stream().noneMatch(name->subclass(receiver.type.object,classes.get(name))))
             throw error(at,"Expression is not a function value.");
         return callMethod(at,receiver,"आह्वान",arguments);
@@ -1597,6 +1766,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (ctx.postfixPart().isEmpty() && constructorBody && value.java.equals("this"))
             throw error(ctx, "Constructors may use यह only as a direct field receiver; the new object cannot escape early.");
         for (var part : ctx.postfixPart()) {
+            boolean safe=part.SAFE_DOT()!=null;
+            if(safe)value=new Expr(value.type.nonNull(),value.java,value.call,null,value.base,value.typeReceiver);
+            else if(strictNulls&&value.type.nullable())throw error(part,"यह मान रिक्त हो सकता है; पहले रिक्त जाँचें या ?. का उपयोग करें।");
             if (part.LBRACK()!=null) { value=indexed(part,value,visit(part.expression())); if(analysis!=null)analysis.expressions.put(part,value); continue; }
             if(part.LPAREN()!=null && part.IDENTIFIER()==null) {
                 value=callValue(part,value,arguments(part.arguments()));
@@ -1609,6 +1781,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 value=callValue(part,readField(part,value,member),arguments(part.arguments()));
             else value = part.LPAREN() == null ? readField(part, value, member)
                     : callMethod(part, value, member, arguments(part.arguments()));
+            if(safe)value=new Expr(value.type==Type.VOID?Type.VOID:nullable(value.type),value.java,value.call);
             if(analysis!=null)analysis.expressions.put(part,value);
         }
         return value;
@@ -1631,6 +1804,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (ctx.NEW() != null) {
             if (fieldInitializer) throw error(ctx, "Field initializers must be constant expressions, without calls or new objects.");
             var constructedType=type(ctx.valueType());
+            if(constructedType.nullable()&&ctx.arrayDimension().isEmpty())throw error(ctx,"Construct the non-null underlying type, then assign it to T?.");
             var collectionValue=newCollection(ctx,constructedType);
             if (collectionValue!=null) return tagged(collectionValue);
             var definition = classes.get(Identifiers.key(ctx.valueType().getText()));
@@ -1654,6 +1828,11 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 var local = find(name);
                 if (local != null) {
                     if (analysis != null) analysis.reads.put(ctx, local);
+                    Type narrowed=assignmentTarget?null:nonNullBindings.get(local);
+                    if(narrowed!=null) {
+                        if(analysis!=null)analysis.narrowedReads.put(ctx,narrowed);
+                        return new Expr(narrowed,narrowed.scalar()||narrowed!=local.type.nonNull()?runtimeGeneric("checkedCast",List.of(narrowed))+"("+local.java+",\"\","+typeClass(narrowed)+",false)":local.java);
+                    }
                     return new Expr(local.type, local.java, new Location(local.mutable));
                 }
                 var member=field(currentClass,name);
@@ -1679,8 +1858,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var function = functions.get(Identifiers.key(name));
             if (function == null) throw error(ctx, "Undefined function: " + name);
             var args = arguments(ctx.arguments());
-            if (Identifiers.key(name).equals(Identifiers.key("लंबाई")) && args.size()==1 && args.get(0).type.collection!=null)
+            if (Identifiers.key(name).equals(Identifiers.key("लंबाई")) && args.size()==1 && args.get(0).type.collection!=null) {
+                if(strictNulls&&args.get(0).type.nullable())throw error(ctx,"यह मान रिक्त हो सकता है; लंबाई से पहले रिक्त जाँचें।");
                 return new Expr(Type.INT,"BhashRuntime.instance("+args.get(0).java+").size()",true);
+            }
             var chosen=select(ctx,function,args,name);
             if (analysis != null) analysis.calls.put(ctx, chosen);
             return new Expr(chosen.result, chosen.java + "(" + join(args) + ")", true);

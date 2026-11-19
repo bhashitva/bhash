@@ -10,9 +10,13 @@ public final class LocatedToken extends CommonToken {
         super(source, type, channel, start, stop);
     }
     private String originalText;
+    private boolean strictNulls;
+    public boolean strictNulls() { return strictNulls; }
+    public void strictNulls(boolean value) { strictNulls = value; }
     public String originalText() { return originalText == null ? getText() : originalText; }
     public void locate(Token origin) {
         originalText = origin instanceof LocatedToken token ? token.originalText() : origin.getText();
+        strictNulls = origin instanceof LocatedToken token && token.strictNulls();
         // Cache lowered spelling before changing its backing input stream.
         setText(getText());
         source = new Pair<>(origin.getTokenSource(), origin.getInputStream());

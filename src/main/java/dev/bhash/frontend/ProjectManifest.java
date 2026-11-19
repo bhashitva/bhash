@@ -10,9 +10,9 @@ import java.util.*;
 
 /** Declarative UTF-8 source-package metadata. No build scripts or lifecycle hooks. */
 public record ProjectManifest(Path input, String name, String version, boolean library,
-        List<String> roots, SortedMap<String,Dependency> dependencies, String digest) {
+        List<String> roots, SortedMap<String,Dependency> dependencies, String digest,boolean strictNulls) {
     public record Dependency(String alias, String version, String path, String git, String revision, String directory) {}
-    private static final Set<String> BASE=Set.of("name","sources","version","kind");
+    private static final Set<String> BASE=Set.of("name","sources","version","kind","nullSafety");
     private static final Set<String> FIELDS=Set.of("path","git","rev","dir","version");
     public static ProjectManifest read(Path requested,Map<Path,String> overlays) throws IOException {
         Path input=requested.toAbsolutePath().normalize();
@@ -38,6 +38,8 @@ public record ProjectManifest(Path input, String name, String version, boolean l
         String kind=props.getProperty("kind","application").strip();
         if(!Set.of("application","library").contains(kind))throw failure(input,"kind must be application or library.");
         String version=props.getProperty("version","").strip();
+        String nullSafety=props.getProperty("nullSafety","legacy").strip();
+        if(!Set.of("legacy","strict").contains(nullSafety))throw failure(input,"nullSafety must be legacy or strict.");
         if(!version.isEmpty())version(input,version);
         if(kind.equals("library")&&(!props.containsKey("name")||version.isEmpty()))throw failure(input,"A library requires explicit name and version properties.");
         var roots=new ArrayList<String>();
@@ -68,7 +70,7 @@ public record ProjectManifest(Path input, String name, String version, boolean l
         for(String key:props.stringPropertyNames())canonical.put(key,props.getProperty(key).strip());
         canonical.putIfAbsent("sources","src");canonical.putIfAbsent("kind","application");
         return new ProjectManifest(input,name,version,kind.equals("library"),List.copyOf(roots),Collections.unmodifiableSortedMap(deps),
-                SourcePackages.sha(new Gson().toJson(canonical)));
+                SourcePackages.sha(new Gson().toJson(canonical)),nullSafety.equals("strict"));
     }
     private static Path path(Path input,String value) throws IOException {
         try{return Path.of(value);}catch(InvalidPathException invalid){throw failure(input,"Invalid package path: "+invalid.getMessage());}

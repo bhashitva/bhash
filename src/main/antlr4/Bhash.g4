@@ -33,7 +33,7 @@ grammar Bhash;
                     && token != INT_TYPE && token != REAL_TYPE && token != BOOL_TYPE && token != TEXT_TYPE
                     && token != BYTE_TYPE && token != INT32_TYPE && token != OBJECT_TYPE && token != BUFFER_TYPE
                     && token != LBRACK && token != RBRACK && token != FUNCTION && token != LPAREN
-                    && token != RPAREN && token != ARROW && token != VOID)
+                    && token != RPAREN && token != ARROW && token != VOID && token != QUESTION)
                 return false;
         }
     }
@@ -64,7 +64,8 @@ parameter : IDENTIFIER COLON valueType ;
 returnType : valueType | VOID ;
 functionType : FUNCTION LPAREN (valueType (COMMA valueType)*)? RPAREN ARROW returnType ;
 lambdaExpression : ASYNC? FUNCTION LPAREN parameters? RPAREN ARROW returnType block ;
-valueType : (functionType | LPAREN functionType RPAREN | INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | BYTE_TYPE | INT32_TYPE | OBJECT_TYPE | BUFFER_TYPE | IDENTIFIER typeQualifier* typeArguments?) arraySuffix* ;
+valueType : (functionType | LPAREN functionType RPAREN | INT_TYPE | REAL_TYPE | BOOL_TYPE | TEXT_TYPE | BYTE_TYPE | INT32_TYPE | OBJECT_TYPE | BUFFER_TYPE | IDENTIFIER typeQualifier* typeArguments?) nullableSuffix? (arraySuffix nullableSuffix?)* ;
+nullableSuffix : QUESTION ;
 arraySuffix : LBRACK RBRACK ;
 arrayDimension : LBRACK expression RBRACK ;
 collectionInitializer : LBRACE (mapEntry (COMMA mapEntry)* | arguments)? RBRACE ;
@@ -102,7 +103,7 @@ caseValue : (PLUS | MINUS)? INTEGER_LITERAL | STRING_LITERAL | TRUE | FALSE | qu
 arguments : expression (COMMA expression)* ;
 
 // Layered rules make precedence and left associativity explicit.
-expression : logicalOr ;
+expression : logicalOr (COALESCE expression)? ;
 logicalOr : logicalAnd (OR logicalAnd)* ;
 logicalAnd : bitwiseOr (AND bitwiseOr)* ;
 bitwiseOr : bitwiseXor (BIT_OR bitwiseXor)* ;
@@ -120,7 +121,7 @@ additive : multiplicative ((PLUS | MINUS) multiplicative)* ;
 multiplicative : unary ((STAR | SLASH | PERCENT) unary)* ;
 unary : (NOT | BIT_NOT | MINUS | PLUS | AWAIT) unary | postfix ;
 postfix : primary postfixPart* ;
-postfixPart : DOT IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)? | LBRACK expression RBRACK | LPAREN arguments? RPAREN ;
+postfixPart : (DOT | SAFE_DOT) IDENTIFIER ({genericPrimaryAhead()}? typeArguments)? (LPAREN arguments? RPAREN)? | LBRACK expression RBRACK | LPAREN arguments? RPAREN ;
 primary
     : lambdaExpression
     | INTEGER_LITERAL
@@ -202,6 +203,7 @@ LT : '<' ; GT : '>' ; ASSIGN : '=' ;
 PLUS : '+' ; MINUS : '-' ; STAR : '*' ; SLASH : '/' ; PERCENT : '%' ;
 LPAREN : '(' ; RPAREN : ')' ; LBRACE : '{' ; RBRACE : '}' ;
 COLON : ':' ; COMMA : ',' ; SEMI : ';' ;
+COALESCE : '??' ; SAFE_DOT : '?.' ; QUESTION : '?' ;
 DOT : '.' ;
 LBRACK : '[' ; RBRACK : ']' ;
 

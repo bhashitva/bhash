@@ -43,8 +43,9 @@ See [SUPPORT.md](SUPPORT.md) for help and bug-report guidance.
 
 नए [सुरक्षित दैनिक प्रोग्रामिंग ट्यूटोरियल](tutorial/safer-everyday/README.md) में
 constructor-assigned immutable fields, local/call type inference, generic methods,
-constraints और VS Code rename/find references देखें। [रिक्त-सुरक्षा प्रस्ताव](docs/null-safety-design.md)
-समीक्षा के लिए है; nullable syntax अभी लागू नहीं है।
+constraints और VS Code rename/find references देखें। [रिक्त-सुरक्षा ट्यूटोरियल](tutorial/null-safety/README.md)
+में opt-in `T?`, सुरक्षित `?.`/`??`, flow analysis और GC सुरक्षा है।
+[स्वीकृत डिज़ाइन](docs/null-safety-design.md) इसके निर्णय दर्ज करता है।
 
 Read [भाष में प्रोग्रामिंग (Programming with Bhash)](book/README.md), a Hindi
 book that follows a task list from the first program to a tested web API.

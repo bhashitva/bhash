@@ -120,7 +120,7 @@ public final class PlaygroundServer implements AutoCloseable {
                 if(source.isBlank() || source.length()>MAX_SOURCE) throw new Rejected(400,"Enter between 1 and "+MAX_SOURCE+" source characters");
                 if(!Set.of("scratch","program").contains(mode)) throw new Rejected(400,"Unknown editor mode");
                 if(fields.size()!=2) throw new Rejected(400,"Only source and mode are accepted");
-                String full=mode.equals("scratch")?"फलन मुख्य() -> शून्य {\n"+source+"\n}\n":source;
+                String full=mode.equals("scratch")?scratchSource(source):source;
                 Job job=submit(full,mode.equals("scratch"));
                 json(exchange,202,jobJson(job));return;
             }
@@ -162,6 +162,15 @@ public final class PlaygroundServer implements AutoCloseable {
             catch(RejectedExecutionException busy) {jobs.remove(job.id);throw new Rejected(503,"Compilation queue is full; try again shortly");}
             return job;
         }
+    }
+    private static String scratchSource(String source) {
+        if(source.startsWith("\uFEFF"))source=source.substring(1);
+        String header="फलन मुख्य() -> शून्य {\n";
+        if(dev.bhash.frontend.SourceFile.strictDirective(source)) {
+            var marker=Pattern.compile("^(\\s*)(//[ \\t]*bhash:null-safety=strict)(?:\\r?\\n|$)").matcher(source);
+            if(marker.find())return marker.group(2)+"\n"+marker.group(1)+header+source.substring(marker.end())+"\n}\n";
+        }
+        return header+source+"\n}\n";
     }
     private void build(Job job,String source) {
         job.startedAt=System.nanoTime();job.status="compiling"; Path directory=work.resolve(job.id),destination=artifacts.resolve(job.id);

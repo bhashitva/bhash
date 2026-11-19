@@ -90,6 +90,7 @@ void *bh_data_json_read(const void *, const void *);
 void *bh_data_json_write(void *, const void *);
 void *bh_collection_new(const bh_collection_info *, int64_t, const void *);
 void *bh_array_dimensions(const bh_collection_info *, uint64_t, const int64_t *, const void *);
+void *bh_array_dimensions_optional_text(const bh_collection_info *, uint64_t, const int64_t *, const void *);
 void *bh_collection_literal(const bh_collection_info *, uint64_t, const uint64_t *, const void *);
 uint64_t bh_collection_call(void *, uint32_t, uint64_t, uint64_t, const bh_collection_info *, const void *);
 /* Only compiler-proven BH_ARRAY with non-reference elements; errors can collect. */
