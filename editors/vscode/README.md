@@ -19,7 +19,17 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.26.0 / इस रिलीज़ में
+## What's new in 0.27.0 / इस रिलीज़ में
+
+The bundled compiler adds closed tagged unions (`विकल्पसमूह`), exhaustive pattern matching (`मिलान`), nested case/record patterns, guards, and typed `मानक.परिणाम<त, द>` / `मानक.इकाई`. Match expressions and statements work across JVM, .NET, native and browser targets, including async guards and resource cleanup. Editor assistance includes case factories, pattern bindings, navigation/rename, and missing-case Quick Fixes with explicit placeholders.
+
+**हिन्दी:** `विकल्पसमूह` में किसी मान के सम्भव रूप घोषित करें और `मिलान` में हर रूप सँभालें। संकलक छूटी या पहुँच से बाहर शाखाएँ बताता है। `मानक.परिणाम<त, द>` सफलता और अपेक्षित विफलता को प्रकारयुक्त रूप में रखता है। [हिन्दी विकल्पसमूह और परिणाम अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/tagged-unions/README.md) में चलने योग्य उदाहरण हैं।
+
+Native runtime ABI is now 18. Rebuild native libraries when linking them with the updated runtime. Direct tagged-union C/JNI exports are rejected; use the documented supported wrapper types.
+
+**हिन्दी:** नेटिव रनटाइम ABI अब 18 है। अद्यतन रनटाइम से जोड़ते समय अपनी नेटिव लाइब्रेरी फिर बनाएँ। C/JNI सीमा पर विकल्पसमूह सीधे export करने के लिए उपलब्ध नहीं हैं; समर्थित wrapper प्रकार उपयोग करें।
+
+## Null safety in 0.26.0 / रिक्त-सुरक्षा
 
 The bundled compiler adds opt-in null safety: nullable types (`T?`), safe access (`?.`), lazy fallback (`??`), flow checks, and GC-safe nullable scalars. Set `nullSafety=strict` in `bhash.project`, or put `// bhash:null-safety=strict` at the start of a single file. Existing projects keep legacy behavior. Also includes constructor-assigned immutable fields, type inference, constrained generic member methods, and rename/find references.
 
