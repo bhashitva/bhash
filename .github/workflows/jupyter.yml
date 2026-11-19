@@ -70,7 +70,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: mvn --batch-mode --no-transfer-progress package -DskipTests
-      - run: mvn --batch-mode --no-transfer-progress dependency:copy -Dartifact=com.mysql:mysql-connector-j:9.3.0 -DoutputDirectory=target/mysql-driver
+      - run: mvn --batch-mode --no-transfer-progress org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy -Dartifact=com.mysql:mysql-connector-j:9.3.0 -DoutputDirectory=target/mysql-driver
       - name: Package and install the wheel
         run: |
           python -m pip install build
@@ -123,9 +123,9 @@ jobs:
       - name: Install the tested wheel and register both JDBC drivers
         run: |
           (cd target/jupyter-dist && sha256sum -c SHA256SUMS)
-          mvn --batch-mode --no-transfer-progress dependency:copy \
+          mvn --batch-mode --no-transfer-progress org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
             -Dartifact=com.microsoft.sqlserver:mssql-jdbc:12.10.2.jre11 '-DoutputDirectory=target/jdbc drivers'
-          mvn --batch-mode --no-transfer-progress dependency:copy \
+          mvn --batch-mode --no-transfer-progress org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
             -Dartifact=com.mysql:mysql-connector-j:9.3.0 '-DoutputDirectory=target/jdbc drivers'
           python -m pip install target/jupyter-dist/*.whl
           python -m bhash_jupyter.install \
