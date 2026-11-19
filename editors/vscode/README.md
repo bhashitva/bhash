@@ -19,7 +19,13 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.25.7 / इस रिलीज़ में
+## What's new in 0.26.0 / इस रिलीज़ में
+
+The bundled compiler adds opt-in null safety: nullable types (`T?`), safe access (`?.`), lazy fallback (`??`), flow checks, and GC-safe nullable scalars. Set `nullSafety=strict` in `bhash.project`, or put `// bhash:null-safety=strict` at the start of a single file. Existing projects keep legacy behavior. Also includes constructor-assigned immutable fields, type inference, constrained generic member methods, and rename/find references.
+
+**हिन्दी:** अनुपस्थिति को `T?` में स्पष्ट लिखें। `?.` से सुरक्षित सदस्य पहुँच और `??` से केवल आवश्यकता पर वैकल्पिक मान लें। परियोजना में `nullSafety=strict` चुनें; मौजूदा परियोजनाओं का default legacy व्यवहार बना रहता है। स्थिर fields को निर्माता में भरना, प्रकार अनुमान, constrained generic methods, F2 नाम परिवर्तन और Shift+F12 संदर्भ खोज भी शामिल हैं। [हिन्दी रिक्त-सुरक्षा अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/null-safety/README.md) पढ़ें।
+
+## Apple Silicon SQL Server support in 0.25.7
 
 The bundled compiler adds native SQL Server support on macOS Apple Silicon. Use an ODBC connection string for parameterized queries, transactions, and generated ORM repositories. Install Microsoft ODBC Driver 18 and unixODBC on the Apple Silicon application host. [Hindi SQL Server tutorial](https://github.com/bhashitva/bhash/blob/main/tutorial/database-providers/sqlserver.md)
 
