@@ -1,15 +1,13 @@
-Version 0.1.11 adds SQL Server 2022 access in notebooks using the Microsoft JDBC driver. You can register both SQL Server and MySQL drivers in the same kernel. [Hindi SQL Server setup and example](https://github.com/bhashitva/bhash/blob/jupyter-0.1.11/editors/jupyter/README.md#jupyter-में-sql-server-2022).
+Version 0.1.12 bundles compiler 0.26.0 with opt-in null safety and the safer everyday programming features. A strict first-cell directive selects the profile for the notebook session, including nullable scalar bindings that persist across cells. Restart the kernel before selecting strict mode in an existing session.
 
-Install or upgrade in the Python environment where you run Jupyter. The wheel includes the compiler and needs a full JDK 17 or newer.
+**हिन्दी:** यह कर्नेल nullable प्रकार (`T?`), सुरक्षित पहुँच (`?.`), lazy विकल्प (`??`) और flow diagnostics वाला संकलक देता है। कर्नेल को फिर शुरू करके पहले कक्ष की शुरुआत में `// bhash:null-safety=strict` लिखें। [हिन्दी रिक्त-सुरक्षा ट्यूटोरियल](https://github.com/bhashitva/bhash/blob/jupyter-0.1.12/tutorial/null-safety/README.md) पढ़ें।
+
+Install or upgrade in the Python environment where you run Jupyter. A full JDK 17+ is required; Maven is not required.
 
 ```sh
-python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.11/bhash_jupyter-0.1.11-py3-none-any.whl"
+python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.12/bhash_jupyter-0.1.12-py3-none-any.whl"
 python -m bhash_jupyter.install
-# For SQL Server, register with its driver:
-# python -m bhash_jupyter.install --sqlserver-driver "/path/to/mssql-jdbc-12.10.2.jre11.jar"
-# For MySQL, register with its driver:
-# python -m bhash_jupyter.install --mysql-driver "/path/to/mysql-connector-j.jar"
 python -m pip show bhash-jupyter
 ```
 
-Restart the notebook kernel and select **Bhash (भाष)**. For a fresh copy of the Hindi starter notebook, download `hindi-starter.ipynb` below or pass `--notebook Hindi-Starter.ipynb` to the installer. The installer needs a new filename when copying the notebook. Use `--java` when your JDK is outside `PATH`.
+Re-register any external database drivers with `--mysql-driver` or `--sqlserver-driver` as before. Restart the notebook kernel and select **Bhash (भाष)**. Download `hindi-starter.ipynb` directly from the release assets. To copy it with the installer, pass `--notebook Hindi-Starter.ipynb` together with the same `--mysql-driver`, `--sqlserver-driver` and `--java` options used when registering the kernel; the installer replaces the kernelspec on every invocation. Use a new destination filename. Use `--java` for a JDK outside PATH.

@@ -1,0 +1,146 @@
+name: Release null safety packages
+on:
+  workflow_dispatch:
+env:
+  RELEASE_SHA: 08c44d5527caca408b1af4580e328bacf36bd5b9
+permissions:
+  contents: read
+concurrency:
+  group: release-null-safety
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      - run: npm run package --prefix editors/vscode
+      - run: npm test --prefix editors/vscode
+      - run: python -m pip install build
+      - run: python scripts/package_jupyter.py
+      - run: python scripts/stage_null_safety_release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: null-safety-release
+          path: target/null-safety-release/
+          if-no-files-found: error
+  verify:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: '1'
+      JUPYTER_DATA_DIR: ${{ github.workspace }}/target/jupyter-user
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: null-safety-release
+          path: target/null-safety-release
+      - name: Verify checksums and standalone null safety
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, pathlib, subprocess
+          root = pathlib.Path('target/null-safety-release')
+          for row in (root / 'SHA256SUMS').read_text().splitlines():
+              digest, name = row.split()
+              assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest, name
+          compiler = ['java', '-jar', str(root / 'bhash-compiler-0.26.0.jar')]
+          fixture = pathlib.Path('tutorial/null-safety/null-safety.bhash')
+          actual = subprocess.check_output(compiler + ['run', str(fixture), '--target', 'jvm']).decode('utf-8').replace('\r\n', '\n')
+          expected = fixture.with_suffix('.expected.txt').read_text(encoding='utf-8')
+          assert actual == expected, actual
+          unsafe = root / 'unsafe.bhash'
+          unsafe.write_text('// bhash:null-safety=strict\nवर्ग क{} फलन मुख्य()->शून्य {स्थिर व:क=रिक्त;}', encoding='utf-8')
+          result = subprocess.run(compiler + ['compile', str(unsafe), '-o', str(root / 'unsafe.jar')], capture_output=True)
+          assert result.returncode != 0 and b'BH3202' in result.stderr, result.stderr
+          PY
+      - run: python -m pip install target/null-safety-release/bhash_jupyter-0.1.12-py3-none-any.whl
+      - run: python -m bhash_jupyter.install --notebook target/hindi-starter.ipynb
+      - run: python editors/jupyter/test_kernel.py --installed --notebook target/hindi-starter.ipynb
+  publish:
+    needs: verify
+    if: github.ref == 'refs/heads/release/null-safety-0.26.0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: null-safety-release
+          path: target/null-safety-release
+      - name: Publish verified GitHub assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd target/null-safety-release
+          sha256sum -c SHA256SUMS
+          # Resolve annotated and lightweight tags before any publication.
+          for tag in bhash-0.26.0 vscode-0.26.0 jupyter-0.1.12; do
+            if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
+              test "$(git rev-parse "$tag^{commit}")" = "$RELEASE_SHA" || { echo "Conflicting source tag: $tag"; exit 1; }
+            fi
+          done
+          publish_release() {
+            local tag="$1"; shift
+            if gh release view "$tag" >/dev/null 2>&1; then
+              local saved
+              saved=$(mktemp -d)
+              gh release download "$tag" --dir "$saved"
+              test "$(find "$saved" -maxdepth 1 -type f | wc -l)" -eq "$ASSETS_COUNT" || { echo "Unexpected assets: $tag"; exit 1; }
+              for asset in $ASSETS; do
+                cmp "$asset" "$saved/$asset" || { echo "Conflicting asset: $tag/$asset"; exit 1; }
+              done
+              echo "Verified existing release: $tag"
+            else
+              # Asset names are fixed above, with no whitespace or wildcards.
+              # shellcheck disable=SC2086
+              gh release create "$tag" --target "$RELEASE_SHA" "$@" $ASSETS
+            fi
+          }
+          ASSETS="bhash-compiler-0.26.0.jar bhash-compiler-0.26.0.jar.sha256"; ASSETS_COUNT=2
+          publish_release bhash-0.26.0 --latest --title "Bhash standalone compiler 0.26.0" --notes "Opt-in null safety (T?, ?., ??), flow diagnostics and GC-safe nullable scalars across targets. Also includes constructor-assigned immutable fields, inference and constrained generic methods. Full JDK 17+ required. See the [Hindi null-safety tutorial](https://github.com/bhashitva/bhash/blob/$RELEASE_SHA/tutorial/null-safety/README.md)."
+          ASSETS="bhash-vscode-0.26.0.vsix bhash-vscode-0.26.0.vsix.sha256"; ASSETS_COUNT=2
+          publish_release vscode-0.26.0 --latest=false --title "Bhash VS Code extension 0.26.0" --notes "Bundles compiler 0.26.0 with opt-in null safety, nullable-aware editor assistance, rename/find references and safer everyday programming. See the [changelog](https://github.com/bhashitva/bhash/blob/$RELEASE_SHA/editors/vscode/CHANGELOG.md)."
+          sha256sum bhash_jupyter-0.1.12-py3-none-any.whl hindi-starter.ipynb > SHA256SUMS
+          ASSETS="bhash_jupyter-0.1.12-py3-none-any.whl SHA256SUMS hindi-starter.ipynb"; ASSETS_COUNT=3
+          publish_release jupyter-0.1.12 --latest=false --title "Bhash Jupyter kernel 0.1.12" --notes-file ../../editors/jupyter/RELEASE.md

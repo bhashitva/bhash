@@ -6,11 +6,17 @@ worker and speaks the standard Jupyter kernel protocol.
 
 **हिन्दी:** भाष कर्नेल अदिश और पाठ बंधन, नामित फलन, आयात, कथन और अंतिम व्यंजक का परिणाम देता है। वह स्थानीय JVM worker में भाष चलाता और मानक Jupyter कर्नेल प्रोटोकॉल उपयोग करता है।
 
+## Null safety / रिक्त-सुरक्षा
+
+Kernel 0.1.12 bundles compiler 0.26.0. Restart the kernel, then put `// bhash:null-safety=strict` in the first cell before defining bindings. The strict profile persists across later cells; top-level nullable scalar bindings also persist. See the [Hindi null-safety tutorial](../../tutorial/null-safety/README.md).
+
+**हिन्दी:** कर्नेल को फिर शुरू करें और पहले कक्ष के आरम्भ में `// bhash:null-safety=strict` लिखें। बाद के कक्षों में भी यही profile रहता है। `मान विकल्प: पूर्णांक? = रिक्त;` के बाद अगले कक्ष में `विकल्प ?? ७` का परिणाम `७` होगा। पूर्ण व्यवहार और सीमाएँ [हिन्दी ट्यूटोरियल](../../tutorial/null-safety/README.md) में पढ़ें।
+
 ## Install
 
-For the prebuilt compiler and notebook, follow the [0.1.8 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.8). The source build below is for development.
+For the prebuilt compiler and notebook, follow the [0.1.12 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.12). The source build below is for development.
 
-**हिन्दी:** पहले से बना संकलक और नोटबुक स्थापित करने के लिए [Jupyter 0.1.8 के रिलीज़ निर्देश](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.8) देखें। नीचे का स्रोत निर्माण विकास के लिए है।
+**हिन्दी:** पहले से बना संकलक और नोटबुक स्थापित करने के लिए [Jupyter 0.1.12 के रिलीज़ निर्देश](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.12) देखें। नीचे का स्रोत निर्माण विकास के लिए है।
 
 For Devanagari name equivalence, joiner diagnostics, and examples, see the [Hindi identifier guide](../../tutorial/unicode-identifiers/README.md).
 

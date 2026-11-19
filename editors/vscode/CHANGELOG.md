@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.0
+
+- Bundle the null-safety compiler: opt-in strict profile, nullable types, safe access, coalescing, flow checks, and GC-safe nullable scalars.
+- Preserve nullable types in completion, signature help, imports, and navigation.
+- Include constructor-assigned immutable fields, inference, constrained generic member methods, rename and find references.
+- Link the Hindi null-safety tutorial and document profile selection.
+
+
 ## 0.25.7
 
 - Add native Apple Silicon SQL Server support through Microsoft ODBC Driver 18 and unixODBC.
