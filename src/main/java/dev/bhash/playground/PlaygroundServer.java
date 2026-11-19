@@ -164,6 +164,7 @@ public final class PlaygroundServer implements AutoCloseable {
         }
     }
     private static String scratchSource(String source) {
+        if(source.startsWith("\uFEFF"))source=source.substring(1);
         String header="फलन मुख्य() -> शून्य {\n";
         if(dev.bhash.frontend.SourceFile.strictDirective(source)) {
             var marker=Pattern.compile("^(\\s*)(//[ \\t]*bhash:null-safety=strict)(?:\\r?\\n|$)").matcher(source);

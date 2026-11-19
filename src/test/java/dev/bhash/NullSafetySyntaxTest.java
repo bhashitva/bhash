@@ -10,6 +10,14 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NullSafetySyntaxTest {
+    @Test void bomScratchDirectiveStaysAheadOfTheGeneratedEntryPoint()throws Exception {
+        var method=dev.bhash.playground.PlaygroundServer.class.getDeclaredMethod("scratchSource",String.class);
+        method.setAccessible(true);
+        String text=(String)method.invoke(null,"\uFEFF// bhash:null-safety=strict\nस्थिर व:पूर्णांक?=रिक्त; लिखो(व??७);");
+        assertTrue(SourceFile.strictDirective(text));assertFalse(text.contains("\uFEFF"));
+        assertEquals("स्थिर व:पूर्णांक?=रिक्त; लिखो(व??७);",text.lines().toList().get(2));
+        dev.bhash.backend.ManagedEmitter.core(List.of(new SourceFile("scratch.bhash",text)));
+    }
     @TempDir Path root;
     @Test void nullableLayersAndFunctionTypesParseIndependently() {
         var parsed=Frontend.parse("nullable.bhash","फलन मुख्य()->शून्य {मान अ: पूर्णांक?[]?=रिक्त; मान ब: (फलन()->पूर्णांक)?=रिक्त; मान क: फलन()->पूर्णांक?=रिक्त;}");
@@ -61,6 +69,9 @@ class NullSafetySyntaxTest {
         Path source=root.resolve("unsafe.bhash");Files.writeString(source,"वर्ग क{} फलन मुख्य()->शून्य{स्थिर व:क=रिक्त;}");
         var output=new java.io.ByteArrayOutputStream();var stream=new java.io.PrintStream(output,true,java.nio.charset.StandardCharsets.UTF_8);
         int status=dev.bhash.cli.Main.run(new String[]{"compile",source.toString(),"--null-safety","strict","-o",root.resolve("unsafe.jar").toString()},stream,stream);
+        assertNotEquals(0,status);assertTrue(output.toString(java.nio.charset.StandardCharsets.UTF_8).contains("BH3202"));
+        Files.writeString(source,"// bhash:null-safety=strict\n"+Files.readString(source));output.reset();
+        status=dev.bhash.cli.Main.run(new String[]{"compile",source.toString(),"--null-safety","legacy","-o",root.resolve("unsafe.jar").toString()},stream,stream);
         assertNotEquals(0,status);assertTrue(output.toString(java.nio.charset.StandardCharsets.UTF_8).contains("BH3202"));
     }
 }

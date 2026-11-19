@@ -256,7 +256,10 @@ final class EditorModel {
         return List.of();
     }
     private Type substitute(Type t,Map<String,Type> env) {
-        if(t.args.isEmpty()&&env.containsKey(t.name))return env.get(t.name);
+        if(t.args.isEmpty()&&env.containsKey(t.name)) {
+            var replacement=env.get(t.name);
+            return t.nullable?new Type(replacement.name,replacement.args,true):replacement;
+        }
         return new Type(t.name,t.args.stream().map(a->substitute(a,env)).toList(),t.nullable);
     }
     private boolean unify(Type formal,Type actual,List<String> variables,Map<String,Type> env,Set<Type> seen) {
@@ -314,6 +317,7 @@ final class EditorModel {
         if(node==null||depth>128)return null;
         if(node instanceof ExpressionContext e&&e.COALESCE()!=null) {
             var left=infer(e.logicalOr(),position,depth+1);var right=infer(e.expression(),position,depth+1);
+            if(left!=null&&left.type.name.equals("रिक्त"))return right;
             return left==null||right==null?null:new Value(right.type.nullable||right.type.name.equals("रिक्त")?left.type:left.type.nonNull());
         }
         if(node instanceof PostfixContext p) {
@@ -461,6 +465,10 @@ final class EditorModel {
         if(index.tree.packageDecl()!=null)insert=index.coordinates.fromCodePoint(index.tree.packageDecl().stop.getStopIndex()+1+(index.text.startsWith("\uFEFF")?1:0));
         for(var imp:index.tree.importDecl())if(imp.stop!=null)insert=Math.max(insert,index.coordinates.fromCodePoint(imp.stop.getStopIndex()+1+(index.text.startsWith("\uFEFF")?1:0)));
         if(insert==0 && index.text.startsWith("\uFEFF"))insert=1;
+        if(insert<2&&dev.bhash.frontend.SourceFile.strictDirective(index.text)) {
+            var directive=java.util.regex.Pattern.compile("^(?:\\uFEFF)?\\s*//[ \\t]*bhash:null-safety=strict").matcher(index.text);
+            if(directive.find())insert=directive.end();
+        }
         String newline=index.text.contains("\r\n")?"\r\n":"\n";
         for(var source:project)for(var symbol:source.symbols) {
             String name=SourceIndex.key(symbol.name());
@@ -504,7 +512,7 @@ final class EditorModel {
                         break;
                     }
                 } else if(t.equals(","))commas.add(i);
-                else if(kind!=BhashLexer.IDENTIFIER && !Set.of(".","[","]").contains(t)
+                else if(kind!=BhashLexer.IDENTIFIER && !Set.of(".","[","]","?","(",")","->","फलन","शून्य").contains(t)
                         && !BUILTIN_TYPES.contains(t))break;
             }
         }

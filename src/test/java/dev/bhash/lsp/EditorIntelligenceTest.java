@@ -9,6 +9,30 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EditorIntelligenceTest {
+    @Test void nullableGenericCommasDoNotCountAsCallArguments() {
+        var main=source("nullable-signature.bhash","फलन दो(अ:सर्ववस्तु,ब:पूर्णांक)->शून्य{} फलन मुख्य()->शून्य { दो(नया मानचित्र<पाठ?,पूर्णांक?>(), ");
+        var help=new EditorModel(main,List.of(main)).signatureHelp(main.coordinates.position(main.text.length()));
+        assertNotNull(help);assertEquals(1,help.getActiveParameter());
+    }
+    @Test void inferredNullableGenericResultsAndNullFallbackKeepMembers() {
+        var main=source("nullable-result.bhash","वर्ग क {सार्वजनिक स्थिर अंक:पूर्णांक=१;} फलन लो<त>(व:त)->त?{लौटाओ व;} फलन मुख्य()->शून्य {स्थिर अ=लो(नया क()); अ.}");
+        var items=new EditorModel(main,List.of(main)).memberCompletions(after(main,"अ."));
+        assertEquals(List.of("अंक"),labels(items));
+        var call=source("nullable-generic.bhash","वर्ग क {} फलन लो<त>(व:त)->त?{लौटाओ व;} फलन मुख्य()->शून्य {लो<क>(");
+        var help=new EditorModel(call,List.of(call)).signatureHelp(call.coordinates.position(call.text.length()));
+        assertNotNull(help);assertTrue(help.getSignatures().get(0).getLabel().endsWith("-> क?"),help.toString());
+        var fallback=source("fallback.bhash","वर्ग क {सार्वजनिक स्थिर अंक:पूर्णांक=१;} फलन मुख्य()->शून्य {स्थिर अ=रिक्त ?? नया क(); अ.}");
+        assertEquals(List.of("अंक"),labels(new EditorModel(fallback,List.of(fallback)).memberCompletions(after(fallback,"अ."))));
+    }
+    @Test void autoImportKeepsStrictDirectiveAtTheStart() {
+        var lib=source("library.bhash","संकुल पुस्तक; सार्वजनिक वर्ग बिंदु {}");
+        var main=source("strict-import.bhash","// bhash:null-safety=strict\r\nफलन मुख्य()->शून्य {बिं}");
+        var item=new EditorModel(main,List.of(main,lib)).autoImports(after(main,"बिं")).get(0);
+        var edit=item.getAdditionalTextEdits().get(0);int at=main.coordinates.offset(edit.getRange().getStart());
+        String text=main.text.substring(0,at)+edit.getNewText()+main.text.substring(at);
+        assertTrue(text.startsWith("// bhash:null-safety=strict\r\nआयात पुस्तक.बिंदु;\r\n"),text);
+        assertTrue(SourceFile.strictDirective(text));
+    }
     @Test void nullableReceiversOfferMembersAndKeepNullableDetails() {
         var main=source("nullable-editor.bhash","वर्ग क {सार्वजनिक मान अंक: पूर्णांक?;} फलन मुख्य()->शून्य {स्थिर व:क?=रिक्त; व?.}");
         var items=new EditorModel(main,List.of(main)).memberCompletions(after(main,"व?."));

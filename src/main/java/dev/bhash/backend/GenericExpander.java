@@ -203,7 +203,14 @@ final class GenericExpander {
         return result;
     }
     private List<Ty> arguments(TypeArgumentsContext p,Map<String,Ty> s)throws CompilationException {var r=new ArrayList<Ty>();if(p!=null)for(var c:p.children)if(c instanceof ValueTypeContext t)r.add(type(t,s));else if(c instanceof TerminalNode n&&n.getText().equals("शून्य"))r.add(VOID);return r;}
-    private List<Ty> signature(ParametersContext p,Map<String,Ty> s)throws CompilationException {var r=new ArrayList<Ty>();if(p!=null)for(var a:p.parameter())r.add(type(a.valueType(),s));return r;}
+    private List<Ty> signature(ParametersContext p,Map<String,Ty> s)throws CompilationException {
+        var r=new ArrayList<Ty>();
+        if(p!=null)for(var a:p.parameter()) {
+            Ty value=type(a.valueType(),s);
+            r.add(strictProfile&&standard(a)&&value.equals(ANY)?value.optionalType():value);
+        }
+        return r;
+    }
     private Template template(Ty t){return t==null||t.rank>0?null:types.get(t.name);}
     private Map<String,Ty> classSubst(Ty t,ParserRuleContext at)throws CompilationException {var c=template(t);return c==null?Map.of():bind(c.parameters,t.args,Map.of(),at);}
     private List<Ty> parents(Ty t,Set<Ty> seen)throws CompilationException {
@@ -380,7 +387,11 @@ final class GenericExpander {
                 if(!match||!subst.keySet().containsAll(vars))continue;
             }
             var params=signature(f.parameters(),subst);if(params.size()!=actual.size())continue;boolean valid=true;
-            for(int i=0;i<params.size();i++)if(!assignable(params.get(i),actual.get(i))){valid=false;break;}
+            // Selection precedes flow checking. Keep a candidate whose outer
+            // nullable argument may be narrowed; the semantic pass must still
+            // prove that argument non-null at the actual call site.
+            for(int i=0;i<params.size();i++)if(!assignable(params.get(i),actual.get(i))
+                    &&!(strictProfile&&actual.get(i).optional()&&assignable(params.get(i),actual.get(i).nonNull()))){valid=false;break;}
             if(valid)candidates.add(new Call(f,subst,params,result(f.returnType(),subst),method));
         }
         var best=new ArrayList<Call>();

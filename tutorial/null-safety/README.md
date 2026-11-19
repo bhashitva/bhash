@@ -23,7 +23,7 @@ nullSafety=strict
 बिना opt-in के `legacy` व्यवहार रखती हैं।
 
 CLI से एक build के लिए `--null-safety strict` भी चुन सकते हैं। फ़ाइल में लिखा
-strict directive सुरक्षा चालू रखता है। उदाहरण चलाएँ:
+strict directive सुरक्षा चालू रखता है; `--null-safety legacy` भी उस directive को बंद नहीं करता। उदाहरण चलाएँ:
 
 ```sh
 java -jar bhash-compiler.jar run tutorial/null-safety/null-safety.bhash --target jvm

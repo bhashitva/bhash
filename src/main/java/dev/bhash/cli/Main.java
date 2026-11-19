@@ -141,6 +141,7 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar native inspect <executable> [--json] [--require-runtime-match]");
         err.println("       java -jar bhash-compiler.jar native package <source|project> -o <archive.tar.gz|archive.zip> --name NAME --version VERSION [--debug] [--source-root ROOT] [--max-glibc VERSION]");
         err.println("       Native compile/run also accept --source-root ROOT for reproducible source paths.");
+        err.println("       Compile/run accept --null-safety strict|legacy; a strict source directive always remains enabled.");
         err.println("       java -jar bhash-compiler.jar targets");
         err.println("       java -jar bhash-compiler.jar test <file.bhash|directory> [--target jvm|clr|native] [--timeout SECONDS]");
         err.println("       java -jar bhash-compiler.jar language-server  (LSP over stdio)");

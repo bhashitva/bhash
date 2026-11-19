@@ -17,6 +17,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void legacyNullTextConcatenationThrowsAndCleansRoots()throws Exception {
+        requireTools();
+        var source="फलन मुख्य()->शून्य {स्थिर व:पाठ?=रिक्त; प्रयास {लिखो(\"अ\"+व);} पकड़ो(ग:अपवाद){लिखो(ग.संदेश);} }";
+        var result=nativeOnlyRun(List.of(new SourceFile("legacy-null-text.bhash",source)),GC_STRESS);
+        assertEquals(0,result.exit(),result.err());assertEquals("रिक्त पाठ जोड़ा नहीं जा सकता।\n",result.out());
+        assertEquals(0L,stats(result).get("live"));
+    }
     @Test void nullableScalarsAndLazyAccessSurviveForcedGc()throws Exception {
         requireTools();
         var result=nativeOnlyRun(List.of(new SourceFile("nulls.bhash",NullSafetyTest.PROGRAM,true)),GC_STRESS);

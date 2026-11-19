@@ -369,6 +369,7 @@ static uint64_t scalar_byte(const void *s, int64_t at, const void *location) {
     return i;
 }
 void *bh_text_concat(const void *a, const void *b, const void *location) {
+    if (!a || !b) runtime_error(location, "रिक्त पाठ जोड़ा नहीं जा सकता।");
     void *slots[2] = {(void *)a, (void *)b}; bh_root_frame frame;
     bh_roots_push(&frame, slots, 2);
     uint64_t na = text_length(a), nb = text_length(b);

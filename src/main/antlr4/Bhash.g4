@@ -33,7 +33,7 @@ grammar Bhash;
                     && token != INT_TYPE && token != REAL_TYPE && token != BOOL_TYPE && token != TEXT_TYPE
                     && token != BYTE_TYPE && token != INT32_TYPE && token != OBJECT_TYPE && token != BUFFER_TYPE
                     && token != LBRACK && token != RBRACK && token != FUNCTION && token != LPAREN
-                    && token != RPAREN && token != ARROW && token != VOID)
+                    && token != RPAREN && token != ARROW && token != VOID && token != QUESTION)
                 return false;
         }
     }

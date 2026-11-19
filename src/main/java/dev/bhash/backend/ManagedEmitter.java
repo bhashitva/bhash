@@ -1603,12 +1603,12 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
 
     private Expr binary(ParserRuleContext ctx) {
         var result = visit(ctx.getChild(0));
+        var incoming=new HashMap<>(nonNullBindings);
+        boolean shortCircuit=ctx instanceof LogicalAndContext||ctx instanceof LogicalOrContext;
         for (int i = 1; i < ctx.getChildCount(); i += 2) {
             String operator = ctx.getChild(i).getText();
-            var before=new HashMap<>(nonNullBindings);
             if(operator.equals("&&")||operator.equals("||"))refine(ctx.getChild(i-1),operator.equals("&&"));
             var right = visit(ctx.getChild(i + 1));
-            nonNullBindings.clear();nonNullBindings.putAll(before);
             valueRequired(ctx, result.type);
             if ((operator.equals("==") || operator.equals("!=")) && (result.type.reference() && right.type.reference() || result.type==Type.OBJECT || right.type==Type.OBJECT || result.type.nullable()||right.type.nullable()||result.type==Type.NULL||right.type==Type.NULL)) {
                 valueRequired(ctx,right.type);
@@ -1649,6 +1649,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 java = "unchecked(" + java + ")";
             result = new Expr(type, java);
         }
+        if(shortCircuit)nonNullBindings.entrySet().removeIf(e->incoming.get(e.getKey())!=e.getValue());
         return result;
     }
 
@@ -1857,8 +1858,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             var function = functions.get(Identifiers.key(name));
             if (function == null) throw error(ctx, "Undefined function: " + name);
             var args = arguments(ctx.arguments());
-            if (Identifiers.key(name).equals(Identifiers.key("लंबाई")) && args.size()==1 && args.get(0).type.collection!=null)
+            if (Identifiers.key(name).equals(Identifiers.key("लंबाई")) && args.size()==1 && args.get(0).type.collection!=null) {
+                if(strictNulls&&args.get(0).type.nullable())throw error(ctx,"यह मान रिक्त हो सकता है; लंबाई से पहले रिक्त जाँचें।");
                 return new Expr(Type.INT,"BhashRuntime.instance("+args.get(0).java+").size()",true);
+            }
             var chosen=select(ctx,function,args,name);
             if (analysis != null) analysis.calls.put(ctx, chosen);
             return new Expr(chosen.result, chosen.java + "(" + join(args) + ")", true);
