@@ -10,7 +10,9 @@ python -m bhash_jupyter.install
 python -m pip show bhash-jupyter
 ```
 
-Restart the notebook kernel and select **Bhash (भाष)**. Re-register external database drivers with `--mysql-driver` or `--sqlserver-driver` as before. Download `hindi-starter.ipynb`, or use `python -m bhash_jupyter.install --notebook Hindi-Starter.ipynb` with a new destination filename. Use `--java` for a JDK outside PATH.
+Restart the notebook kernel and select **Bhash (भाष)**. Re-register external database drivers with `--mysql-driver` or `--sqlserver-driver` as before. Download `hindi-starter.ipynb` directly from the release assets. To copy it with `python -m bhash_jupyter.install --notebook Hindi-Starter.ipynb`, include the same `--java`, `--mysql-driver` and `--sqlserver-driver` options used for your existing kernel, since every installer invocation replaces the kernelspec. Use a new destination filename; use `--java` for a JDK outside PATH.
+
+**हिन्दी:** नोटबुक को installer से कॉपी करते समय पहले चुने गए `--java`, `--mysql-driver` और `--sqlserver-driver` विकल्प उसी आदेश में दोहराएँ। हर बार installer कर्नेल का पंजीकरण बदलता है; विकल्प छोड़ने पर पुराने driver और Java स्थान की सेटिंग हट सकती है। केवल नोटबुक चाहिए तो release assets से सीधे डाउनलोड करें।
 
 पहले कक्ष में यह उदाहरण चलाएँ। Strict profile के लिए directive सबसे पहले रखें:
 

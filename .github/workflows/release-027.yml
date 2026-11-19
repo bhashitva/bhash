@@ -1,11 +1,9 @@
 name: Release tagged unions packages
 on:
-  push:
-    branches: [release/tagged-unions-0.27.0]
-    paths: ['.github/workflows/release-027.yml']
   workflow_dispatch:
 env:
-  RELEASE_SHA: ${{ github.sha }}
+  # Published payloads and source archives remain pinned when this workflow is maintained.
+  RELEASE_SHA: 31dad739d099b7358286a65544ee805c7479650b
 permissions:
   contents: read
 concurrency:
@@ -125,33 +123,54 @@ jobs:
           set -euo pipefail
           cd target/tagged-unions-release
           sha256sum -c SHA256SUMS
-          # Resolve annotated and lightweight tags before any publication.
+          # Establish tags remotely without force; reject concurrent conflicting tags.
+          verify_source_tag() {
+            local tag="$1"
+            local remote_ref="refs/release-verification/$tag"
+            git fetch --no-tags origin "+refs/tags/$tag:$remote_ref"
+            test "$(git rev-parse "$remote_ref^{commit}")" = "$RELEASE_SHA" || { echo "Conflicting source tag: $tag"; exit 1; }
+          }
           for tag in bhash-0.27.0 vscode-0.27.0 jupyter-0.1.13; do
-            if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
-              test "$(git rev-parse "$tag^{commit}")" = "$RELEASE_SHA" || { echo "Conflicting source tag: $tag"; exit 1; }
+            if ! git ls-remote --exit-code --refs origin "refs/tags/$tag" >/dev/null; then
+              # A concurrent creation is safe only if the fetched commit agrees.
+              git push origin "$RELEASE_SHA:refs/tags/$tag" || echo "Checking concurrently created tag: $tag"
             fi
+            verify_source_tag "$tag"
           done
           publish_release() {
             local tag="$1"; shift
             if gh release view "$tag" >/dev/null 2>&1; then
-              local saved
+              local saved existing asset
               saved=$(mktemp -d)
-              gh release download "$tag" --dir "$saved"
-              test "$(find "$saved" -maxdepth 1 -type f | wc -l)" -eq "$ASSETS_COUNT" || { echo "Unexpected assets: $tag"; exit 1; }
-              for asset in $ASSETS; do
+              existing=$(gh release view "$tag" --json assets --jq '.assets[].name')
+              while IFS= read -r asset; do
+                test -n "$asset" || continue
+                case " $ASSETS " in
+                  *" $asset "*) ;;
+                  *) echo "Unexpected asset: $tag/$asset"; exit 1 ;;
+                esac
+                gh release download "$tag" --pattern "$asset" --dir "$saved"
                 cmp "$asset" "$saved/$asset" || { echo "Conflicting asset: $tag/$asset"; exit 1; }
+              done <<< "$existing"
+              # Compare all existing files before uploading any missing asset.
+              for asset in $ASSETS; do
+                if ! test -f "$saved/$asset"; then gh release upload "$tag" "$asset"; fi
               done
+              verify_source_tag "$tag"
+              if test "$(gh release view "$tag" --json isDraft --jq .isDraft)" = true; then
+                gh release edit "$tag" --draft=false
+              fi
               echo "Verified existing release: $tag"
             else
               # Asset names are fixed above, with no whitespace or wildcards.
               # shellcheck disable=SC2086
-              gh release create "$tag" --target "$RELEASE_SHA" "$@" $ASSETS
+              gh release create "$tag" --verify-tag "$@" $ASSETS
             fi
           }
-          ASSETS="bhash-compiler-0.27.0.jar bhash-compiler-0.27.0.jar.sha256"; ASSETS_COUNT=2
+          ASSETS="bhash-compiler-0.27.0.jar bhash-compiler-0.27.0.jar.sha256"
           publish_release bhash-0.27.0 --latest --title "Bhash standalone compiler 0.27.0" --notes "Tagged unions (विकल्पसमूह), exhaustive pattern matching (मिलान), typed Result and Unit across JVM, .NET, native and browser targets. Includes async matching and GC-safe payloads. Full JDK 17+ required; native runtime ABI 18. See the [Hindi tutorial](https://github.com/bhashitva/bhash/blob/$RELEASE_SHA/tutorial/tagged-unions/README.md)."
-          ASSETS="bhash-vscode-0.27.0.vsix bhash-vscode-0.27.0.vsix.sha256"; ASSETS_COUNT=2
+          ASSETS="bhash-vscode-0.27.0.vsix bhash-vscode-0.27.0.vsix.sha256"
           publish_release vscode-0.27.0 --latest=false --title "Bhash VS Code extension 0.27.0" --notes "Bundles compiler 0.27.0 with tagged unions, exhaustive matching, typed Result, contextual highlighting, case-factory assistance, pattern-binding hover and missing-case Quick Fixes. See the [changelog](https://github.com/bhashitva/bhash/blob/$RELEASE_SHA/editors/vscode/CHANGELOG.md)."
           sha256sum bhash_jupyter-0.1.13-py3-none-any.whl hindi-starter.ipynb > SHA256SUMS
-          ASSETS="bhash_jupyter-0.1.13-py3-none-any.whl SHA256SUMS hindi-starter.ipynb"; ASSETS_COUNT=3
+          ASSETS="bhash_jupyter-0.1.13-py3-none-any.whl SHA256SUMS hindi-starter.ipynb"
           publish_release jupyter-0.1.13 --latest=false --title "Bhash Jupyter kernel 0.1.13" --notes-file ../../editors/jupyter/RELEASE.md
