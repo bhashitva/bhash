@@ -5,8 +5,8 @@ Baseline: the language contracts released in compiler/VS Code 0.26.0 and Jupyter
 [हिन्दी संस्करण (Hindi version)](tagged-unions-pattern-matching-design.md)
 
 This is the English companion to the Hindi proposal, with the same 23 sections,
-decisions, examples and review boundary. All new syntax shown here is **proposed**;
-these examples do not run in the current compiler. Bhash keywords, identifiers,
+decisions, examples and review boundary. These are design examples; runnable programs
+are available in the [Hindi tutorial](../tutorial/tagged-unions/README.md). Bhash keywords, identifiers,
 strings and example comments remain in Hindi. English explanations do not introduce
 English keyword aliases.
 

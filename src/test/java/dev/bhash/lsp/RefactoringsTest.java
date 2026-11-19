@@ -10,6 +10,18 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RefactoringsTest {
+    @Test void matchQuickFixUsesTheAnalyzedBufferVersionAndHoverShowsPayloadType()throws Exception {
+        var file=root.resolve("match.bhash");java.nio.file.Files.writeString(file,"फलन मुख्य()->शून्य {}");
+        String text="विकल्पसमूह व{अ(मूल्य:पूर्णांक);ब();} फलन मुख्य()->शून्य {स्थिर क=व.अ(१);स्थिर र=मिलान(क){विकल्प व.अ(स्थिर न)=>न};}";
+        try(var server=new BhashLanguageServer()){
+            var init=new InitializeParams();init.setWorkspaceFolders(List.of(new WorkspaceFolder(root.toUri().toString(),"test")));server.initialize(init).get(30,java.util.concurrent.TimeUnit.SECONDS);
+            String uri=file.toUri().toString();server.didOpen(new DidOpenTextDocumentParams(new TextDocumentItem(uri,"bhash",9,text)));
+            var coordinates=new TextCoordinates(text);var at=coordinates.position(text.indexOf("मिलान(क)"));var diagnostic=new Diagnostic(new Range(at,at),"incomplete match");diagnostic.setCode("BH3312");
+            var actions=server.codeAction(new CodeActionParams(new TextDocumentIdentifier(uri),diagnostic.getRange(),new CodeActionContext(List.of(diagnostic)))).get(120,java.util.concurrent.TimeUnit.SECONDS);
+            var change=actions.get(0).getRight().getEdit().getDocumentChanges().get(0).getLeft();assertEquals(9,change.getTextDocument().getVersion());assertTrue(change.getEdits().get(0).getNewText().contains("व.ब()"));
+            for(String needle:List.of("न)=>","न};")){var hover=server.hover(new HoverParams(new TextDocumentIdentifier(uri),coordinates.position(text.indexOf(needle)))).get(120,java.util.concurrent.TimeUnit.SECONDS);assertNotNull(hover);assertTrue(hover.getContents().getRight().getValue().contains("न: पूर्णांक"),hover.toString());}
+        }
+    }
     @Test void unionCasesAndPatternBindingsHaveIndependentRenameScopes()throws Exception {
         var source=source("union.bhash","विकल्पसमूह खोज {मिला(अंक:पूर्णांक);नहीं();} फलन मुख्य()->शून्य {स्थिर व=खोज.मिला(७); मिलान(व){विकल्प खोज.मिला(स्थिर अंक):{लिखो(अंक);} विकल्प खोज.नहीं():{}}}");
         var refactorings=new Refactorings(List.of(source));

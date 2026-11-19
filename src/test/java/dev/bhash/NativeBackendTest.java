@@ -17,6 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void reviewedMatchEdgeCasesSurviveForcedGc()throws Exception {
+        requireTools();var result=nativeOnlyRun(TaggedUnionTest.sources(TaggedUnionTest.EDGES),GC_STRESS);
+        assertEquals(0,result.exit(),result.out()+result.err());assertEquals(TaggedUnionTest.EDGES_OUTPUT,result.out());
+        assertTrue(stats(result).get("collections")>0,result.err());assertEquals(0L,stats(result).get("live"),result.err());
+    }
     @Test void nativeTaggedUnionTutorialsSurviveForcedGc()throws Exception {
         requireTools();for(var name:List.of("results","async-result","unit")){
             var source=Path.of("tutorial/tagged-unions/"+name+".bhash");var result=nativeOnlyRun(List.of(new SourceFile(source.toString(),Files.readString(source))),GC_STRESS);

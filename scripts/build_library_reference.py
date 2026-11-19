@@ -24,7 +24,6 @@ INTRO = "<!-- scripts/build_library_reference.py से बनाया गय�
 
 # Source names are supplied by the compiler's catalog loader.
 GROUPS = {
-    "__bhash_results__.bhash": ("विकल्पसमूह और प्रकारयुक्त परिणाम", "tutorial/tagged-unions/README.md"),
     "__bhash_standard_library__.bhash": ("मूल फलन और रनटाइम बंधन", "tutorial/standard-library/README.md"),
     "__bhash_foundations__.bhash": ("संग्रह और अनुप्रयोग का आधार", "tutorial/application-foundations/README.md"),
     "__bhash_networking__.bhash": ("HTTP क्लाइंट", "tutorial/networking/README.md"),
@@ -37,6 +36,7 @@ GROUPS = {
     "__bhash_async_database__.bhash": ("असमकालिक डेटाबेस", "tutorial/async-io/README.md"),
     "__bhash_async_web__.bhash": ("असमकालिक HTTP सर्वर और धाराएँ", "docs/async-http-server.md"),
     "__bhash_websocket__.bhash": ("WebSocket सर्वर और संदेश", "docs/websocket.md"),
+    "__bhash_results__.bhash": ("विकल्पसमूह और प्रकारयुक्त परिणाम", "tutorial/tagged-unions/README.md"),
 }
 GUIDES = {
     "पाठस्वरूप": "tutorial/standard-library/08-formatting.md",

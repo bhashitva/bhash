@@ -10,6 +10,15 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 class TaggedUnionTest {
     @TempDir Path temporary;
+    private static String processOutput(Process process)throws Exception {
+        var output=java.util.concurrent.CompletableFuture.supplyAsync(()->{
+            try{return new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);}
+            catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
+        });
+        boolean exited=process.waitFor(60,java.util.concurrent.TimeUnit.SECONDS);
+        if(!exited){process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();process.waitFor(10,java.util.concurrent.TimeUnit.SECONDS);}
+        String text=output.get(10,java.util.concurrent.TimeUnit.SECONDS);assertTrue(exited,"Fixture exceeded 60 seconds: "+text);return text;
+    }
     static final String PROGRAM="""
         विकल्पसमूह खोज<त> { मिला(मूल्य:त); अनुपस्थित(); }
         अभिलेख छात्र(नाम:पाठ, अंक:पूर्णांक);
@@ -29,10 +38,42 @@ class TaggedUnionTest {
     static List<SourceFile> sources(String text){return List.of(new SourceFile("unions.bhash",text,true));}
     static String check(String text)throws Exception{return ManagedEmitter.emit(sources(text),Target.JVM);}
     @Test void closedFamiliesAndNestedPatterns()throws Exception {check(PROGRAM);}
+    @Test void strictSubtypePatternsDoNotCompleteOpenClassDomains()throws Exception {
+        var prefix="वर्ग आधारवर्ग {} वर्ग उपवर्ग विस्तार आधारवर्ग {} फलन मुख्य()->शून्य {स्थिर व:आधारवर्ग=नया आधारवर्ग(); स्थिर र=मिलान(व){विकल्प स्थिर क:उपवर्ग=>१";
+        var e=assertThrows(CompilationException.class,()->check(prefix+"};}"));assertTrue(e.getMessage().contains("BH3312"),e.getMessage());
+        check(prefix+",शेष=>२};}");
+    }
+    @Test void recursiveWildcardColumnsDoNotConsumeTheCoverageBudget()throws Exception {
+        String prefix="विकल्पसमूह पेड़ {शाखा(अगली:पेड़,ध्वज:तार्किक); अंत();} फलन मुख्य()->शून्य {स्थिर व=पेड़.अंत();स्थिर र=मिलान(व){विकल्प पेड़.शाखा(_,सत्य)=>१,";
+        check(prefix+"विकल्प पेड़.शाखा(_,असत्य)=>२, विकल्प पेड़.अंत()=>३};}");
+        var e=assertThrows(CompilationException.class,()->check(prefix+"विकल्प पेड़.अंत()=>३};}"));assertTrue(e.getMessage().contains("BH3312"),e.getMessage());
+    }
+    @Test void assignmentAndApplicableOverloadSupplyMatchTypes()throws Exception {
+        check("फलन लो(अ:सर्ववस्तु,ब:तार्किक)->शून्य{} फलन लो(अ:पूर्णांक,ब:पाठ)->शून्य{} फलन मुख्य()->शून्य{मान र:सर्ववस्तु=०;र=मिलान(सत्य){विकल्प सत्य=>१,विकल्प असत्य=>\"अ\"}; लो(मिलान(सत्य){विकल्प सत्य=>१,विकल्प असत्य=>\"अ\"},सत्य);}");
+    }
+    @Test void integralPatternBoundsFollowTheSelector()throws Exception {
+        check("फलन मुख्य()->शून्य {स्थिर ब:बाइट=परिवर्तित<बाइट>(०); स्थिर र=मिलान(ब){विकल्प ०=>१,विकल्प २५५=>२,शेष=>३};}");
+        for(String type:List.of("बाइट","लघुपूर्णांक")){String number=type.equals("बाइट")?"-१":"२१४७४८३६४८";var e=assertThrows(CompilationException.class,()->check("फलन मुख्य()->शून्य {स्थिर ब:"+type+"=परिवर्तित<"+type+">(०); स्थिर र=मिलान(ब){विकल्प "+number+"=>१,शेष=>२};}"));assertTrue(e.getMessage().contains("BH3310"),e.getMessage());}
+    }
+    @Test void caseNamesMayCoincideWithFamilyAndTypeParameterNames()throws Exception {
+        check("विकल्पसमूह व<त>{व();त(मूल्य:त);} फलन मुख्य()->शून्य {व<पूर्णांक>.व();व<पूर्णांक>.त(१);}");
+    }
+    @Test void caseLayoutDoesNotConsumeThePublicSpecializationLimit()throws Exception {
+        var source=new StringBuilder("वर्ग पात्र<त> {} विकल्पसमूह व<त>{अ(मूल्य:त);} ");
+        for(int i=0;i<256;i++)source.append("वर्ग प्रकार").append(i).append(" {} ");
+        source.append("फलन मुख्य()->शून्य {");for(int i=0;i<255;i++)source.append("नया पात्र<प्रकार").append(i).append(">();");
+        source.append("व<पूर्णांक>.अ(१);");check(source+"}");
+        var e=assertThrows(CompilationException.class,()->check(source+"नया पात्र<प्रकार255>();}"));assertTrue(e.getMessage().contains("specialization limit"),e.getMessage());
+    }
+    @Test void genericPatternOwnerStopsBeforeTheCaseDespitePackageCollisions()throws Exception {
+        var app=new SourceFile("app.bhash","संकुल उपयोग; सार्वजनिक वर्ग प {} सार्वजनिक विकल्पसमूह व<त>{अ(मूल्य:त);} फलन मुख्य()->शून्य {स्थिर क=व<प>.अ(नया प());स्थिर र=मिलान(क){विकल्प व<प>.अ(_)=>१};}",true);
+        var unrelated=new SourceFile("unrelated.bhash","संकुल व; वर्ग अ {}",true);
+        ManagedEmitter.emit(List.of(app,unrelated),Target.JVM);
+    }
     @Test void jvmExecution()throws Exception {
         Path jar=temporary.resolve("unions.jar");new JvmCompiler().compile(sources(PROGRAM),jar);
         var p=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()).redirectErrorStream(true).start();
-        String output=new String(p.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,p.waitFor(),output);assertEquals("आशा नहीं\nसत्य\n७\n",output.replace("\r\n","\n"));
+        String output=processOutput(p);assertEquals(0,p.waitFor(),output);assertEquals("आशा नहीं\nसत्य\n७\n",output.replace("\r\n","\n"));
     }
     @Test void missingCaseIsRejected(){var e=assertThrows(CompilationException.class,()->check("विकल्पसमूह व { अ(); ब(); } फलन मुख्य()->शून्य {स्थिर क=व.अ(); स्थिर र=मिलान(क){विकल्प व.अ()=>१};}"));assertTrue(e.getMessage().contains("BH3312"),e.getMessage());assertTrue(e.getMessage().contains(".ब()"),e.getMessage());}
     @Test void guardedArmsDoNotCover(){var e=assertThrows(CompilationException.class,()->check("फलन मुख्य()->शून्य {स्थिर व=मिलान(सत्य){विकल्प _ यदि(सत्य)=>१};}"));assertTrue(e.getMessage().contains("BH3312"),e.getMessage());}
@@ -48,10 +89,26 @@ class TaggedUnionTest {
             लिखो(ब);
         }
         """;
+    static final String EDGES="""
+        विकल्पसमूह पेड़ {शाखा(अगली:पेड़,ध्वज:तार्किक);अंत();}
+        वर्ग आधारवर्ग {} वर्ग उपवर्ग विस्तार आधारवर्ग {}
+        फलन लो(अ:सर्ववस्तु,ब:तार्किक)->पाठ{लौटाओ "ठीक";}
+        फलन लो(अ:पूर्णांक,ब:पाठ)->पाठ{लौटाओ "गलत";}
+        फलन मुख्य()->शून्य {
+            मान र:सर्ववस्तु=०;र=मिलान(सत्य){विकल्प सत्य=>१,विकल्प असत्य=>"अ"};लिखो(परिवर्तित<पूर्णांक>(र));
+            लिखो(लो(मिलान(सत्य){विकल्प सत्य=>१,विकल्प असत्य=>"अ"},सत्य));
+            स्थिर ब:आधारवर्ग=नया आधारवर्ग();लिखो(मिलान(ब){विकल्प स्थिर स:उपवर्ग=>१,शेष=>२});
+            स्थिर प=पेड़.शाखा(पेड़.अंत(),असत्य);
+            लिखो(मिलान(प){विकल्प पेड़.शाखा(_,सत्य)=>१,विकल्प पेड़.शाखा(_,असत्य)=>२,विकल्प पेड़.अंत()=>३});
+            स्थिर छोटा:बाइट=परिवर्तित<बाइट>(२५५);लिखो(मिलान(छोटा){विकल्प ०=>०,विकल्प २५५=>२५५,शेष=>१});
+        }
+        """;
+    static final String EDGES_OUTPUT="१\nठीक\n२\n२\n२५५\n";
+    @Test void reviewedEdgeCasesExecuteOnJvm()throws Exception {assertEquals(EDGES_OUTPUT,runJvm(EDGES));}
     String runJvm(String source)throws Exception {
         Path jar=temporary.resolve("run.jar");new JvmCompiler().compile(sources(source),jar);
         var p=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","java").toString(),"-jar",jar.toString()).redirectErrorStream(true).start();
-        String output=new String(p.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,p.waitFor(),output);return output.replace("\r\n","\n");
+        String output=processOutput(p);assertEquals(0,p.waitFor(),output);return output.replace("\r\n","\n");
     }
     @Test void awaitingGuardAndArmStayInTheCallerTask()throws Exception {assertEquals("१४\n",runJvm(ASYNC));}
     @Test void nullableAndFiniteNestedCoverage()throws Exception {
@@ -62,11 +119,11 @@ class TaggedUnionTest {
     @Test void unitResult()throws Exception {check("फलन मुख्य()->शून्य {स्थिर र=मानक.परिणाम<मानक.इकाई,पाठ>.सफल(नया मानक.इकाई()); मिलान(र){विकल्प मानक.परिणाम.सफल(मानक.इकाई()):{} विकल्प मानक.परिणाम.असफल(स्थिर दोष):{लिखो(दोष);}}}");}
     @Test void clrExecution()throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(ClrCompilerTest.dotnetAvailable());
-        for(var source:List.of(PROGRAM,ASYNC,DEEP,CLEANUP,CANCELLATION,FLOW)) {
+        for(var source:List.of(PROGRAM,ASYNC,DEEP,CLEANUP,CANCELLATION,FLOW,EDGES)) {
             Path directory=temporary.resolve("clr"+Math.abs(source.hashCode()));new dev.bhash.backend.clr.ClrCompiler().compile(sources(source),directory);
             var p=new ProcessBuilder(dev.bhash.backend.clr.ClrCompiler.executable(),directory.resolve("BhashProgram.dll").toString()).redirectErrorStream(true).start();
-            String output=new String(p.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,p.waitFor(),output);
-            assertEquals(source.equals(PROGRAM)?"आशा नहीं\nसत्य\n७\n":source.equals(ASYNC)?"१४\n":source.equals(DEEP)?"सत्य साझा\nसत्य ९\n":source.equals(CLEANUP)?"भारत😀\nसाफ\nजीवित\nसाफ\nखाली\n२\nतीन\n३\n":source.equals(FLOW)?"७ ०\n":"बंद\nनिरस्त\nअपेक्षित\n",output.replace("\r\n","\n"));
+            String output=processOutput(p);assertEquals(0,p.waitFor(),output);
+            assertEquals(source.equals(EDGES)?EDGES_OUTPUT:source.equals(PROGRAM)?"आशा नहीं\nसत्य\n७\n":source.equals(ASYNC)?"१४\n":source.equals(DEEP)?"सत्य साझा\nसत्य ९\n":source.equals(CLEANUP)?"भारत😀\nसाफ\nजीवित\nसाफ\nखाली\n२\nतीन\n३\n":source.equals(FLOW)?"७ ०\n":"बंद\nनिरस्त\nअपेक्षित\n",output.replace("\r\n","\n"));
         }
     }
     static final String DEEP="""
@@ -101,7 +158,7 @@ class TaggedUnionTest {
     @Test void escapingCapturesReturnsCleanupAndLoopControl()throws Exception {assertEquals("भारत😀\nसाफ\nजीवित\nसाफ\nखाली\n२\nतीन\n३\n",runJvm(CLEANUP));}
     @Test void tutorialsCompileForBothManagedTargets()throws Exception {
         for(var name:List.of("results","async-result","unit")){var source=Files.readString(Path.of("tutorial/tagged-unions/"+name+".bhash"));assertEquals(name.equals("unit")?"पूरा\n":Files.readString(Path.of("tutorial/tagged-unions/"+name+".expected.txt")).replace("\r\n","\n"),runJvm(source));ManagedEmitter.emit(sources(source),Target.CLR);
-            if(ClrCompilerTest.dotnetAvailable()){var directory=temporary.resolve("tutorial-"+name);new dev.bhash.backend.clr.ClrCompiler().compile(sources(source),directory);var process=new ProcessBuilder(dev.bhash.backend.clr.ClrCompiler.executable(),directory.resolve("BhashProgram.dll").toString()).redirectErrorStream(true).start();String output=new String(process.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,process.waitFor(),output);assertEquals(Files.readString(Path.of("tutorial/tagged-unions/"+name+".expected.txt")).replace("\r\n","\n"),output.replace("\r\n","\n"));}
+            if(ClrCompilerTest.dotnetAvailable()){var directory=temporary.resolve("tutorial-"+name);new dev.bhash.backend.clr.ClrCompiler().compile(sources(source),directory);var process=new ProcessBuilder(dev.bhash.backend.clr.ClrCompiler.executable(),directory.resolve("BhashProgram.dll").toString()).redirectErrorStream(true).start();String output=processOutput(process);assertEquals(0,process.waitFor(),output);assertEquals(Files.readString(Path.of("tutorial/tagged-unions/"+name+".expected.txt")).replace("\r\n","\n"),output.replace("\r\n","\n"));}
         }
     }
     @Test void typedUniversalPatternsCoverTheirLiterals(){var e=assertThrows(CompilationException.class,()->check("फलन मुख्य()->शून्य {स्थिर व:सर्ववस्तु=१; स्थिर र=मिलान(व){विकल्प स्थिर अ:पूर्णांक=>१, विकल्प २=>२,शेष=>३};}".replace("शेष","शेष")));assertTrue(e.getMessage().contains("BH3311"),e.getMessage());}

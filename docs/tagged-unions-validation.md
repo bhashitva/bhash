@@ -29,11 +29,18 @@ Browser CLR generation/type-checking सफल है, लेकिन इस se
 
 ## फिर चलाना (Reproduction)
 
+### समीक्षा के सीमांत मामले (Review regressions)
+
+अतिरिक्त regression tests strict base-class selector पर subtype-only शाखा को अपूर्ण मानते हैं, recursive payload के wildcard columns को छोड़कर शेष finite columns जाँचते हैं, और assignment तथा लागू overload से match का अपेक्षित प्रकार लेते हैं। बाइट/लघुपूर्णांक literal सीमा, २५६वीं generic family के private case layout, तथा generic pattern और समान नाम वाले असंबंधित package का मामला भी जाँचा गया है। `reviewedEdgeCasesExecuteOnJvm`, CLR fixture और `reviewedMatchEdgeCasesSurviveForcedGc` वही executable edge cases साझा करते हैं।
+
+Editor tests nested match की ठीक diagnostic position, आंशिक case coverage के साथ अछूते cases के placeholders, generic pattern type-argument navigation, समान owner/case नामों की अलग पहचान, inferred binding hover और rename scope जाँचते हैं। Quick Fix document version से जुड़ा है। Generated reference में पुराने topic anchors सुरक्षित हैं। Family या type parameter के समान case नाम वास्तव में वैध हैं; regression test उन्हें स्वीकार करता है।
+
 ```sh
 mvn -Dtest=TaggedUnionTest,NativeReleaseTest,NativeEmbeddingTest,RefactoringsTest,EditorIntelligenceTest test
 mvn '-Dtest=NativeBackendTest#taggedUnionsAndAwaitedMatchingSurviveForcedGc+nativeTaggedUnionTutorialsSurviveForcedGc+nativeRecordFixturesMatchJvmClrAndForcedGc' test
 python scripts/build_library_reference.py --check
 python scripts/check_book.py
+mvn -DskipTests package
 python editors/jupyter/test_kernel.py target/bhash-compiler-0.1.0-SNAPSHOT.jar --notebook editors/jupyter/पहली-नोटबुक.ipynb
 node scripts/browser_smoke_test.cjs
 ```

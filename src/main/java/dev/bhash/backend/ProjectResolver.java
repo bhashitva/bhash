@@ -247,7 +247,7 @@ public final class ProjectResolver {
         if(node instanceof PatternNameContext pattern) {
             var ids=new ArrayList<TerminalNode>();ids.add(pattern.IDENTIFIER(0));
             for(var q:pattern.typeQualifier())ids.add(q.IDENTIFIER());
-            if(pattern.IDENTIFIER().size()>1)ids.add(pattern.IDENTIFIER(1));
+            if(pattern.typeArguments()==null&&pattern.IDENTIFIER().size()>1)ids.add(pattern.IDENTIFIER(1));
             if(ids.size()!=1||!ids.get(0).getText().equals("_")) {
                 Symbol found=null;int length=0;
                 for(int count=ids.size();count>0;count--){String name=String.join(".",ids.subList(0,count).stream().map(ParseTree::getText).toList());found=lookup(unit,name,Kind.TYPE,pattern.start);if(found!=null){length=count;break;}}

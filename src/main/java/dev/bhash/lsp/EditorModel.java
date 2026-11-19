@@ -310,6 +310,12 @@ final class EditorModel {
         if(pattern.getParent() instanceof MatchStatementArmContext arm&&arm.getParent() instanceof MatchStatementContext match)selector=match.expression();
         if(selector==null)return null;var value=infer(selector,index.range(selector.start.getStartIndex(),selector.start.getStartIndex()).getStart(),0);return value==null?null:value.type;
     }
+    String hoverDetail(SourceIndex.Symbol symbol,Position position) {
+        for(var source:project)if(source.uri.equals(symbol.uri())&&source.declarations.get(symbol) instanceof MatchPatternContext pattern){
+            var model=source==index?this:new EditorModel(source,project);var inferred=model.patternType(pattern,position,0);
+            if(inferred!=null)return symbol.name()+": "+inferred;
+        }return symbol.detail();
+    }
     private Value variable(String name, Position position) {
         var found=index.visibleLexical(position).stream().filter(s->SourceIndex.key(s.name()).equals(SourceIndex.key(name))).toList();
         if(!found.isEmpty()) {
@@ -508,8 +514,9 @@ final class EditorModel {
     List<TextEdit> missingMatchArms(Position position){return missingMatchArms(index.tree,position);}
     private List<TextEdit> missingMatchArms(ParseTree node,Position position) {
         ExpressionContext selector=null;Token close=null;boolean expression=false;List<MatchPatternContext> patterns=new ArrayList<>();
-        if(node instanceof MatchExpressionContext m){selector=m.expression();close=m.RBRACE().getSymbol();expression=true;for(var arm:m.matchExpressionArm()){if(arm.DEFAULT()!=null)return List.of();if(arm.guard==null)patterns.add(arm.matchPattern());}}
-        if(node instanceof MatchStatementContext m){selector=m.expression();close=m.RBRACE().getSymbol();for(var arm:m.matchStatementArm()){if(arm.DEFAULT()!=null)return List.of();if(arm.guard==null)patterns.add(arm.matchPattern());}}
+        int diagnostic=index.coordinates.offset(position);
+        if(node instanceof MatchExpressionContext m&&index.coordinates.offset(index.range(m.start.getStartIndex(),m.start.getStartIndex()).getStart())==diagnostic){selector=m.expression();close=m.RBRACE().getSymbol();expression=true;for(var arm:m.matchExpressionArm()){if(arm.DEFAULT()!=null)return List.of();if(arm.guard==null)patterns.add(arm.matchPattern());}}
+        if(node instanceof MatchStatementContext m&&index.coordinates.offset(index.range(m.start.getStartIndex(),m.start.getStartIndex()).getStart())==diagnostic){selector=m.expression();close=m.RBRACE().getSymbol();for(var arm:m.matchStatementArm()){if(arm.DEFAULT()!=null)return List.of();if(arm.guard==null)patterns.add(arm.matchPattern());}}
         if(selector!=null){var context=(ParserRuleContext)node;var range=index.range(context.start.getStartIndex(),context.stop.getStopIndex()+1);int at=index.coordinates.offset(position);
             if(index.coordinates.offset(range.getStart())>at||at>index.coordinates.offset(range.getEnd()))return List.of();
             var value=infer(selector,index.range(selector.start.getStartIndex(),selector.start.getStartIndex()).getStart(),0);if(value==null)return List.of();
@@ -519,7 +526,6 @@ final class EditorModel {
             if(value.type.nullable||!index.strictNulls&&definition!=null)expected.put("रिक्त","रिक्त");
             for(var p:patterns){if(p==null)return List.of();if(p.NULL()!=null){expected.remove("रिक्त");continue;}if(p.TRUE()!=null){expected.remove("सत्य");continue;}if(p.FALSE()!=null){expected.remove("असत्य");continue;}
                 if(p.CONST()!=null||p.WILDCARD()!=null)return List.of();if(p.patternName()==null||p.LPAREN()==null)return List.of();
-                if(p.matchPattern().stream().anyMatch(child->child.WILDCARD()==null&&(child.CONST()==null||child.valueType()!=null)))return List.of();
                 var name=p.patternName().getText();expected.remove(SourceIndex.key(name.substring(name.lastIndexOf('.')+1)));
             }
             if(expected.isEmpty())return List.of();var text=new StringBuilder();
@@ -539,7 +545,9 @@ final class EditorModel {
             if(owner==null){int dot=spelling.lastIndexOf('.');if(dot<0)return List.of();owner=type(spelling.substring(0,dot),index,Map.of());option=spelling.substring(dot+1);}
             if(owner==null)return List.of();var definition=types.get(owner.name);if(definition==null)return List.of();
             var token=index.token(position);if(token==null)return List.of();
-            if(option!=null&&SourceIndex.key(token.getText()).equals(SourceIndex.key(option))){String selected=option;return definition.index.declarations.entrySet().stream().filter(e->e.getValue() instanceof UnionCaseContext c&&owner(c)==definition.node&&SourceIndex.key(c.IDENTIFIER().getText()).equals(SourceIndex.key(selected))||e.getValue() instanceof EnumMemberContext enumeration&&owner(enumeration)==definition.node&&SourceIndex.key(enumeration.IDENTIFIER().getText()).equals(SourceIndex.key(selected))).map(Map.Entry::getKey).toList();}
+            Token caseToken=p.IDENTIFIER().size()>1?p.IDENTIFIER(1).getSymbol():p.typeQualifier().isEmpty()?null:p.typeQualifier(p.typeQualifier().size()-1).IDENTIFIER().getSymbol();
+            if(option!=null&&caseToken!=null&&token.getStartIndex()==caseToken.getStartIndex()){String selected=option;return definition.index.declarations.entrySet().stream().filter(e->e.getValue() instanceof UnionCaseContext c&&owner(c)==definition.node&&SourceIndex.key(c.IDENTIFIER().getText()).equals(SourceIndex.key(selected))||e.getValue() instanceof EnumMemberContext enumeration&&owner(enumeration)==definition.node&&SourceIndex.key(enumeration.IDENTIFIER().getText()).equals(SourceIndex.key(selected))).map(Map.Entry::getKey).toList();}
+            if(token.getStartIndex()!=p.IDENTIFIER(0).getSymbol().getStartIndex()&&p.typeQualifier().stream().noneMatch(q->q.IDENTIFIER().getSymbol().getStartIndex()==token.getStartIndex()))return List.of();
             if(index.aliases.containsKey(SourceIndex.key(token.getText())))return List.of(index.aliases.get(SourceIndex.key(token.getText())));
             return List.of(definition.symbol);
         }

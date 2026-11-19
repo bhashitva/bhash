@@ -254,7 +254,7 @@ final class GenericExpander {
     private long specializationCount(){return uses.size()+instances.values().stream().filter(i->!(i.template.name instanceof LocatedToken t)||t.unionKind()!=2).count();}
     private String instantiate(String key,Template template,Map<String,Ty> subst,Ty ty,ParserRuleContext at)throws CompilationException {
         var old=instances.get(key);if(old!=null)return old.name;
-        if(specializationCount()>=256)throw error(at,"Generic specialization limit exceeded (256); check expanding recursive types.");
+        if(!(template.name instanceof LocatedToken token&&token.unionKind()==2)&&specializationCount()>=256)throw error(at,"Generic specialization limit exceeded (256); check expanding recursive types.");
         var instance=new Instance(template,Map.copyOf(subst),fresh(),ty);instances.put(key,instance);pending.add(instance);return instance.name;
     }
     private List<FunctionDeclContext> declaredMethods(ParserRuleContext c){return c instanceof ClassDeclContext d?d.classMember().stream().filter(x->x.functionDecl()!=null).map(ClassMemberContext::functionDecl).toList():((InterfaceDeclContext)c).functionDecl();}
@@ -728,7 +728,7 @@ final class GenericExpander {
             if(p.valueType()!=null){if(!reference(t)&&!enums.containsKey(t.name)&&!Set.of(INT,BOOL,TEXT,REAL,new Ty("बाइट"),new Ty("लघुपूर्णांक")).contains(t)||t.optional())throw error(p,"[BH3310] प्रकार प्रतिरूप के लिए non-null प्रकार चाहिए।");
                 if(!selector.nonNull().equals(ANY)&&!assignable(selector.nonNull(),t)&&!assignable(t,selector.nonNull()))throw error(p,"[BH3310] प्रतिरूप का प्रकार चयनकर्ता से असंगत है।");
                 test="प्रकारहै<"+typeName(t,p)+">("+value+")";extract="परिवर्तित<"+typeName(t,p)+">("+value+")";
-                coverage=assignable(t,selector.nonNull())?wrap(selector,Pat.any()):typedCoverage(selector,t,Pat.any());
+                coverage=assignable(t,selector.nonNull())?wrap(selector,Pat.any()):wrap(selector,new Pat(new Shape("type:"+t,List.of(knownNonNull(t)),List.of(),t),List.of(Pat.any())));
             }
             vars.put(key(name),t);declarations.add("स्थिर "+name+":"+typeName(t,p)+"="+extract+";");return new Pattern(coverage,test,vars,declarations);
         }
@@ -737,7 +737,11 @@ final class GenericExpander {
         String literal=null,tag=null;
         if(p.TRUE()!=null||p.FALSE()!=null){if(!selector.nonNull().equals(BOOL)&&!selector.nonNull().equals(ANY))throw error(p,"[BH3310] तार्किक प्रतिरूप का प्रकार असंगत है।");literal=p.getText();tag=p.TRUE()!=null?"true":"false";}
         if(p.STRING_LITERAL()!=null){if(!selector.nonNull().equals(TEXT)&&!selector.nonNull().equals(ANY))throw error(p,"[BH3310] पाठ प्रतिरूप का प्रकार असंगत है।");literal=p.getText();tag="text:"+decodePatternText(literal);}
-        if(p.INTEGER_LITERAL()!=null){if(!Set.of(INT,ANY,new Ty("बाइट"),new Ty("लघुपूर्णांक")).contains(selector.nonNull()))throw error(p,"[BH3310] पूर्णांक प्रतिरूप का प्रकार असंगत है।");literal=p.getText();var digits=new StringBuilder();for(int cp:literal.codePoints().toArray())digits.appendCodePoint(Character.isDigit(cp)?'0'+Character.digit(cp,10):cp);try{tag="int:"+new java.math.BigInteger(digits.toString());}catch(NumberFormatException bad){throw error(p,"Invalid integer pattern.");}}
+        if(p.INTEGER_LITERAL()!=null){if(!Set.of(INT,ANY,new Ty("बाइट"),new Ty("लघुपूर्णांक")).contains(selector.nonNull()))throw error(p,"[BH3310] पूर्णांक प्रतिरूप का प्रकार असंगत है।");literal=p.getText();var digits=new StringBuilder();for(int cp:literal.codePoints().toArray())digits.appendCodePoint(Character.isDigit(cp)?'0'+Character.digit(cp,10):cp);try{var number=new java.math.BigInteger(digits.toString());var selected=selector.nonNull();
+            long min=selected.name.equals("बाइट")?0:selected.name.equals("लघुपूर्णांक")?Integer.MIN_VALUE:Long.MIN_VALUE;
+            long max=selected.name.equals("बाइट")?255:selected.name.equals("लघुपूर्णांक")?Integer.MAX_VALUE:Long.MAX_VALUE;
+            if(number.compareTo(java.math.BigInteger.valueOf(min))<0||number.compareTo(java.math.BigInteger.valueOf(max))>0)throw error(p,"[BH3310] पूर्णांक प्रतिरूप चयनकर्ता की सीमा के बाहर है।");
+            tag="int:"+number;}catch(NumberFormatException bad){throw error(p,"Invalid integer pattern.");}}
         if(literal!=null){Ty actual=p.STRING_LITERAL()!=null?TEXT:p.TRUE()!=null||p.FALSE()!=null?BOOL:INT;return new Pattern(typedCoverage(selector,actual,new Pat(new Shape(tag,List.of(),List.of(),null),List.of())),value+"=="+literal,vars,declarations);}
         var pn=p.patternName();var ids=new ArrayList<String>();for(var child:pn.children){if(child instanceof TerminalNode n&&n.getSymbol().getType()==dev.bhash.parser.BhashParser.IDENTIFIER)ids.add(n.getText());if(child instanceof TypeQualifierContext q)ids.add(q.IDENTIFIER().getText());}
         String name=ids.get(0);var args=arguments(pn.typeArguments(),s);Ty owner=new Ty(name,args,0);Shape shape=null;
@@ -763,6 +767,7 @@ final class GenericExpander {
     private boolean useful(List<List<Pat>> rows,List<Pat> vector,List<Ty> ts,ParserRuleContext at,int depth)throws CompilationException {
         if(++coverageBudget>10000||depth>64)throw error(at,"[BH3313] प्रतिरूप जाँच बहुत जटिल है; प्रतिरूप सरल करें।");
         if(vector.isEmpty())return rows.isEmpty();if(rows.isEmpty())return true;if(rows.stream().anyMatch(row->row.stream().allMatch(p->p.shape==null)))return false;Pat head=vector.get(0);var tail=vector.subList(1,vector.size());var rest=ts.subList(1,ts.size());
+        if(head.shape==null&&rows.stream().allMatch(row->row.get(0).shape==null))return useful(rows.stream().map(row->row.subList(1,row.size())).toList(),tail,rest,at,depth+1);
         if(head.shape!=null)return usefulSpecial(rows,head.shape,head.children,tail,rest,at,depth);
         var domain=domain(ts.get(0),at);if(domain!=null){for(var c:domain)if(usefulSpecial(rows,c,Collections.nCopies(c.fields.size(),Pat.any()),tail,rest,at,depth))return true;return false;}
         var defaults=new ArrayList<List<Pat>>();for(var row:rows)if(row.get(0).shape==null)defaults.add(row.subList(1,row.size()));
@@ -784,10 +789,13 @@ final class GenericExpander {
             for(var m:ms)candidates.add(new ExpectedCall(m.tree.parameters(),m.tree.typeParameters(),m.subst,explicit));for(var f:fs)candidates.add(new ExpectedCall(f.parameters(),f.typeParameters(),Map.of(),explicit));
         }
         Ty expected=null;
-        for(var c:candidates){var formal=signature(c.parameters,c.outer);if(formal.size()!=args.expression().size())continue;var subst=new HashMap<>(c.outer);var variables=parameterNames(c.variables);
+        for(var c:candidates){var formal=signature(c.parameters,c.outer);if(formal.size()!=args.expression().size())continue;var subst=new HashMap<>(c.outer);var variables=parameterNames(c.variables);boolean applicable=true;
             if(c.explicit!=null){var actual=arguments(c.explicit,s);if(actual.size()!=variables.size())continue;subst.putAll(bind(c.variables,actual,c.outer,args));}
-            else for(int i=0;i<formal.size();i++)if(i!=slot&&!hasMatch(args.expression(i)))unify(formal.get(i),infer(args.expression(i),s),variables,subst);
-            var target=signature(c.parameters,subst).get(slot);if(containsVariable(target,variables.stream().filter(v->!subst.containsKey(v)).collect(java.util.stream.Collectors.toSet())))return null;
+            else for(int i=0;i<formal.size();i++)if(i!=slot&&!hasMatch(args.expression(i))&&!unify(formal.get(i),infer(args.expression(i),s),variables,subst)){applicable=false;break;}
+            if(!applicable)continue;var resolved=signature(c.parameters,subst);
+            for(int i=0;i<resolved.size();i++)if(i!=slot&&!hasMatch(args.expression(i))){var actual=infer(args.expression(i),s);if(actual!=null&&!assignable(resolved.get(i),actual)&&!(strictProfile&&actual.optional()&&assignable(resolved.get(i),actual.nonNull()))){applicable=false;break;}}
+            if(!applicable)continue;
+            var target=resolved.get(slot);if(containsVariable(target,variables.stream().filter(v->!subst.containsKey(v)).collect(java.util.stream.Collectors.toSet())))return null;
             if(expected!=null&&!expected.equals(target))return null;expected=target;
         }return expected;
     }
@@ -798,6 +806,7 @@ final class GenericExpander {
             if(parent instanceof UnaryContext u&&u.postfix()==null||parent instanceof PostfixContext postfix&&!postfix.postfixPart().isEmpty()||parent instanceof PrimaryContext primary&&(primary.CONVERT()!=null||primary.SAFE_CAST()!=null||primary.TYPE_TEST()!=null)||parent instanceof ExpressionContext e&&e.COALESCE()!=null)return null;
             if((parent instanceof LogicalOrContext||parent instanceof LogicalAndContext||parent instanceof BitwiseOrContext||parent instanceof BitwiseXorContext||parent instanceof BitwiseAndContext||parent instanceof EqualityContext||parent instanceof ComparisonContext||parent instanceof ShiftContext||parent instanceof AdditiveContext||parent instanceof MultiplicativeContext)&&parent.getChildCount()>1)return null;
             if(parent instanceof VariableDeclContext v)return v.valueType()==null?null:type(v.valueType(),s);
+            if(parent instanceof AssignmentContext assignment)return assignment.expression()==child?infer(assignment.postfix(),s):null;
             if(parent instanceof StatementContext st){if(st.RETURN()==null)return null;
                 for(var f=st.getParent();f!=null;f=f.getParent()){if(f instanceof FunctionDeclContext d){var r=result(d.returnType(),s);return d.ASYNC()!=null?r.element():r;}if(f instanceof LambdaExpressionContext l){var r=result(l.returnType(),s);return l.ASYNC()!=null?r.element():r;}}return null;}
         }return null;
