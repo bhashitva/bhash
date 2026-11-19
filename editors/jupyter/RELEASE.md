@@ -10,4 +10,4 @@ python -m bhash_jupyter.install
 python -m pip show bhash-jupyter
 ```
 
-Re-register any external database drivers with `--mysql-driver` or `--sqlserver-driver` as before. Restart the notebook kernel and select **Bhash (भाष)**. Download `hindi-starter.ipynb`, or use `python -m bhash_jupyter.install --notebook Hindi-Starter.ipynb` with a new destination filename. Use `--java` for a JDK outside PATH.
+Re-register any external database drivers with `--mysql-driver` or `--sqlserver-driver` as before. Restart the notebook kernel and select **Bhash (भाष)**. Download `hindi-starter.ipynb` directly from the release assets. To copy it with the installer, pass `--notebook Hindi-Starter.ipynb` together with the same `--mysql-driver`, `--sqlserver-driver` and `--java` options used when registering the kernel; the installer replaces the kernelspec on every invocation. Use a new destination filename. Use `--java` for a JDK outside PATH.
