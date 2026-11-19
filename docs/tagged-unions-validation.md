@@ -27,6 +27,10 @@ Browser CLR generation/type-checking सफल है, लेकिन इस se
 
 इस session का Git `github.com` resolve नहीं कर पाता। Linux native और अन्य remote CI results अभी इस स्थानीय अभिलेख में शामिल नहीं हैं। Existing Linux/Windows native workflows और full Jupyter matrix बदलावों पर चलेंगे। Apple Silicon native tests existing weekly/manual workflow में ही हैं; per-PR macOS native trigger नहीं जोड़ा गया है।
 
+## GitHub Actions परिणाम (Remote validation)
+
+[PR #141](https://github.com/bhashitva/bhash/pull/141) के अंतिम revision `3fc143c` पर सभी ५० लागू checks सफल रहे। इसमें JVM/.NET, Linux/Windows native forced-GC और वितरण, standalone/prebuilt browser host तथा Linux/Windows/macOS पर पूर्ण वास्तविक-client Jupyter परीक्षण शामिल हैं। तीन release-only jobs अपेक्षानुसार skip हुए। ऊपर दी गई स्थानीय host सीमाओं की भरपाई इन remote checks से हुई।
+
 ## फिर चलाना (Reproduction)
 
 ### समीक्षा के सीमांत मामले (Review regressions)
@@ -37,7 +41,7 @@ Editor tests nested match की ठीक diagnostic position, आंशिक 
 
 ```sh
 mvn -Dtest=TaggedUnionTest,NativeReleaseTest,NativeEmbeddingTest,RefactoringsTest,EditorIntelligenceTest test
-mvn '-Dtest=NativeBackendTest#taggedUnionsAndAwaitedMatchingSurviveForcedGc+nativeTaggedUnionTutorialsSurviveForcedGc+nativeRecordFixturesMatchJvmClrAndForcedGc' test
+mvn '-Dtest=NativeBackendTest#taggedUnionsAndAwaitedMatchingSurviveForcedGc+nativeTaggedUnionTutorialsSurviveForcedGc+nativeRecordFixturesMatchJvmClrAndForcedGc+reviewedMatchEdgeCasesSurviveForcedGc' test
 python scripts/build_library_reference.py --check
 python scripts/check_book.py
 mvn -DskipTests package

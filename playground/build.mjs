@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import {build} from 'esbuild';
 import {readFile, mkdir, cp, rm, writeFile} from 'node:fs/promises';
+import {contextualKeywords} from './src/keywords.mjs';
 const grammar = await readFile('../src/main/antlr4/Bhash.g4', 'utf8');
 const words = [...grammar.matchAll(/^([A-Z][A-Z_0-9]*)\s*:\s*'([^']+)'/gm)]
   .filter(([, , value]) => /\p{L}/u.test(value)).map(([, token, value]) => ({token, value}));
+words.push(...contextualKeywords);
 await rm('dist', {recursive: true, force: true});
 await mkdir('dist', {recursive: true});
 await cp('public', 'dist', {recursive: true});

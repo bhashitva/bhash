@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.27.0
+
+- Bundle compiler 0.27.0 with tagged unions, exhaustive matching, typed Result and Unit.
+- Preserve contextual keyword highlighting in the packaged extension.
+- Provide case-factory assistance, inferred pattern-binding hover, navigation/rename and versioned missing-case Quick Fixes.
+- Verify async matching, resource cleanup, structural equality and native precise-GC layouts (ABI 18).
+- Link the Hindi tutorial and document native-library rebuild requirements.
+
 ## 0.26.0
 
 - Bundle the null-safety compiler: opt-in strict profile, nullable types, safe access, coalescing, flow checks, and GC-safe nullable scalars.

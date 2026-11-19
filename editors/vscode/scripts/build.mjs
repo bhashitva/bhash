@@ -38,6 +38,7 @@ await writeFile('language-configuration.json', languageConfig.replace(/("wordPat
 const syntax = {name:'Bhash',scopeName:'source.bhash',patterns:[
     {name:'comment.line.double-slash.bhash',begin:'//',end:'$'},
     {name:'comment.block.bhash',begin:'/\\*',end:'\\*/'},
+    {name:'keyword.control.bhash',match:'(?<![\\p{L}\\p{M}\\p{N}_])(?:विकल्पसमूह(?=\\s+[\\p{L}])|मिलान(?=\\s*\\([^()\\r\\n]*\\)\\s*\\{))(?![\\p{L}\\p{M}\\p{N}_])'},
     {name:'string.quoted.double.bhash',begin:'"',end:'"|$',patterns:[{name:'constant.character.escape.bhash',match:'\\\\(?:["\\\\nrt]|u[0-9a-fA-F]{4})'}]},
     {match:`(${bounded(['वर्ग','अनुबंध','अभिलेख','परिगणना'])})\\s+(${identifier}+)`,captures:{1:{name:'keyword.declaration.bhash'},2:{name:'entity.name.type.bhash'}}},
     {match:`(${bounded(words.filter(([,token])=>token==='FUNCTION').map(([, ,word])=>word))})\\s+(${identifier}+)`,captures:{1:{name:'keyword.declaration.function.bhash'},2:{name:'entity.name.function.bhash'}}},

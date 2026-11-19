@@ -5,6 +5,7 @@ import {autocompletion, snippetCompletion} from '@codemirror/autocomplete';
 import {setDiagnostics, lintGutter} from '@codemirror/lint';
 import {compilerDiagnostics} from './diagnostics.mjs';
 import {identifierWord, identifierKey} from './identifier-profile.js';
+import {keywordStyle} from './keywords.mjs';
 const $ = id => document.getElementById(id);
 const track = (name, values) => window.bhashAnalytics?.(name, values);
 const keywordData = BHASH_KEYWORDS;
@@ -19,7 +20,7 @@ const language = StreamLanguage.define({
     if (stream.eat('"')) { let escaped = false, next; while ((next = stream.next()) !== undefined) { if (next === '"' && !escaped) break; escaped = next === '\\' && !escaped; } return 'string'; }
     if (stream.match(/^[0-9०-९]+(?:\.[0-9०-९]+)?/u)) return 'number';
     const name = stream.match(new RegExp('^' + identifierWord.source, 'u'));
-    if (name) { const kind = words.get(identifierKey(name[0])); return kind ? kind.endsWith('_TYPE') ? 'typeName' : 'keyword' : 'variableName'; }
+    if (name) return keywordStyle(words.get(identifierKey(name[0])), stream.string.slice(stream.pos));
     stream.next(); return 'operator';
   }, languageData: {commentTokens: {line: '//', block: {open: '/*', close: '*/'}}}
 });

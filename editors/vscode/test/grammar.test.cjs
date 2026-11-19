@@ -6,6 +6,9 @@ test('TextMate honors Devanagari word boundaries, declarations, strings, comment
     const registry=new textmate.Registry({onigLib:Promise.resolve({createOnigScanner:p=>new oniguruma.OnigScanner(p),createOnigString:s=>new oniguruma.OnigString(s)}),loadGrammar:async()=>textmate.parseRawGrammar(fs.readFileSync(path.join(__dirname,'../syntaxes/bhash.tmLanguage.json'),'utf8'),'bhash.json')});
     const grammar=await registry.loadGrammar('source.bhash');
     const scopes=line=>grammar.tokenizeLine(line).tokens.map(t=>[line.slice(t.startIndex,t.endIndex),t.scopes.join(' ')]);
+    assert.ok(scopes('विकल्पसमूह खोज {').some(([word,s])=>word==='विकल्पसमूह'&&s.includes('keyword')));
+    assert.ok(scopes('मिलान (उत्तर) {').some(([word,s])=>word==='मिलान'&&s.includes('keyword')));
+    assert.ok(!scopes('मिलान(१);').some(([word,s])=>word==='मिलान'&&s.includes('keyword')));
     assert.ok(scopes('फलन जोड़ो() -> शून्य {}').some(([word,s])=>word==='जोड़ो'&&s.includes('entity.name.function')));
     assert.ok(scopes('फलन जोड़ो() -> शून्य {}').some(([word,s])=>word==='फलन'&&s.includes('keyword')));
     assert.ok(!scopes('कार्य फलनमान').some(([,s])=>s.includes('keyword')));
