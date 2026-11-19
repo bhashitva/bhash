@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Read-only Bhash ABI 17 inspection. Loaded explicitly, never by ELF auto-load.
+"""Read-only Bhash ABI 18 inspection. Loaded explicitly, never by ELF auto-load.
 
 No inferior calls, writes, allocations or retained managed addresses. Printers are
 rebuilt by GDB for each value update; only immutable executable metadata is cached.
@@ -39,7 +39,7 @@ def schema():
         if not 0 < length <= MAX_SCHEMA:
             raise ValueError('invalid Bhash debug schema length')
         data = json.loads(memory(address + 8, length).decode('utf-8'))
-        if data.get('version') != 1 or data.get('abi') != 17:
+        if data.get('version') != 1 or data.get('abi') != 18:
             raise ValueError('unsupported Bhash debug schema/runtime ABI')
         _schemas[key] = data
     return _schemas[key]
@@ -336,7 +336,7 @@ class WatchReader:
             for item in (left, right):
                 _, _, count, ids = self.info(item)
                 membership = self.read(ids, count * 8)
-                if any(signed(struct.unpack_from('<Q', membership, i * 8)[0]) == -9 for i in range(count)):
+                if any(signed(struct.unpack_from('<Q', membership, i * 8)[0]) in (-9, -10) for i in range(count)):
                     raise WatchError('अभिलेख की structural equality Watch में अभी समर्थित नहीं है।')
             return False
         if left.kind in WatchEvaluator.INTEGRAL and right.kind in WatchEvaluator.INTEGRAL or left.kind == right.kind and left.kind in ('BOOL', 'REAL'):

@@ -17,6 +17,26 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void reviewedMatchEdgeCasesSurviveForcedGc()throws Exception {
+        requireTools();var result=nativeOnlyRun(TaggedUnionTest.sources(TaggedUnionTest.EDGES),GC_STRESS);
+        assertEquals(0,result.exit(),result.out()+result.err());assertEquals(TaggedUnionTest.EDGES_OUTPUT,result.out());
+        assertTrue(stats(result).get("collections")>0,result.err());assertEquals(0L,stats(result).get("live"),result.err());
+    }
+    @Test void nativeTaggedUnionTutorialsSurviveForcedGc()throws Exception {
+        requireTools();for(var name:List.of("results","async-result","unit")){
+            var source=Path.of("tutorial/tagged-unions/"+name+".bhash");var result=nativeOnlyRun(List.of(new SourceFile(source.toString(),Files.readString(source))),GC_STRESS);
+            assertEquals(0,result.exit(),result.err());assertEquals(Files.readString(Path.of("tutorial/tagged-unions/"+name+".expected.txt")).replace("\r\n","\n"),result.out());assertEquals(0L,stats(result).get("live"));assertTrue(stats(result).get("collections")>0);
+        }
+    }
+
+    @Test void taggedUnionsAndAwaitedMatchingSurviveForcedGc()throws Exception {
+        requireTools();for(var fixture:List.of(TaggedUnionTest.PROGRAM,TaggedUnionTest.ASYNC,TaggedUnionTest.DEEP,TaggedUnionTest.CLEANUP,TaggedUnionTest.CANCELLATION,TaggedUnionTest.FLOW)) {
+            var result=nativeOnlyRun(TaggedUnionTest.sources(fixture),GC_STRESS);
+            assertEquals(0,result.exit(),result.out()+result.err());assertEquals(fixture.equals(TaggedUnionTest.PROGRAM)?"आशा नहीं\nसत्य\n७\n":fixture.equals(TaggedUnionTest.ASYNC)?"१४\n":fixture.equals(TaggedUnionTest.DEEP)?"सत्य साझा\nसत्य ९\n":fixture.equals(TaggedUnionTest.CLEANUP)?"भारत😀\nसाफ\nजीवित\nसाफ\nखाली\n२\nतीन\n३\n":fixture.equals(TaggedUnionTest.FLOW)?"७ ०\n":"बंद\nनिरस्त\nअपेक्षित\n",result.out());
+            assertTrue(stats(result).get("collections")>0,result.err());assertEquals(0L,stats(result).get("live"),result.err());
+        }
+    }
+
     @Test void legacyNullTextConcatenationThrowsAndCleansRoots()throws Exception {
         requireTools();
         var source="फलन मुख्य()->शून्य {स्थिर व:पाठ?=रिक्त; प्रयास {लिखो(\"अ\"+व);} पकड़ो(ग:अपवाद){लिखो(ग.संदेश);} }";
@@ -2088,7 +2108,7 @@ class NativeBackendTest {
     }
     @Test void corePreservesInt32TypeIdentityBoxMetadataAndScalarCollectionKinds()throws Exception{
         var program=core("वर्ग पात्र { सार्वजनिक मान क: लघुपूर्णांक; } फलन मुख्य() -> शून्य { स्थिर अ: लघुपूर्णांक[] = नया लघुपूर्णांक[२]; स्थिर ब: सर्ववस्तु = परिवर्तित<लघुपूर्णांक>(१); लिखो(प्रकारहै<लघुपूर्णांक>(ब),परिवर्तित<लघुपूर्णांक>(ब)); }");
-        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v17"));
+        String ir=LlvmEmitter.emit(program);assertTrue(ir.contains("@box_info8"));assertTrue(ir.contains("@bh_to_int32"));assertTrue(ir.contains("internal ABI v18"));
         assertTrue(program.collections().stream().anyMatch(c->c.valueKind()==8));
     }
     @Test void nativeInt32FixturesMatchJvmClrAndForcedGc()throws Exception{
@@ -2588,7 +2608,7 @@ class NativeBackendTest {
         var p=core("अभिलेख पात्र(नाम: पाठ, न: पूर्णांक, व: सर्ववस्तु); फलन मुख्य() -> शून्य { स्थिर क: पात्र=नया पात्र(\"क\",१,रिक्त); लिखो(क==नया पात्र(\"क\",१,रिक्त)); }");
         var c=p.classes().get(0);assertEquals(List.of(CoreProgram.Type.TEXT,CoreProgram.Type.INT,CoreProgram.Type.ANY),c.fields().stream().map(CoreProgram.ObjectField::type).toList());
         assertTrue(c.assignableTypes().contains(-9));assertTrue(c.virtualMethods().isEmpty());assertTrue(p.initializations().isEmpty());
-        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v17"));
+        String ir=LlvmEmitter.emit(p);assertTrue(ir.contains("%RecordInfo"));assertTrue(ir.contains("@bh_value_same"));assertTrue(ir.contains("internal ABI v18"));
     }
     @Test void nativeRecordDiagnosticsMatchManaged(){
         for(String declaration:List.of(

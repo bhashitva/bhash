@@ -36,6 +36,7 @@ GROUPS = {
     "__bhash_async_database__.bhash": ("असमकालिक डेटाबेस", "tutorial/async-io/README.md"),
     "__bhash_async_web__.bhash": ("असमकालिक HTTP सर्वर और धाराएँ", "docs/async-http-server.md"),
     "__bhash_websocket__.bhash": ("WebSocket सर्वर और संदेश", "docs/websocket.md"),
+    "__bhash_results__.bhash": ("विकल्पसमूह और प्रकारयुक्त परिणाम", "tutorial/tagged-unions/README.md"),
 }
 GUIDES = {
     "पाठस्वरूप": "tutorial/standard-library/08-formatting.md",
@@ -43,7 +44,7 @@ GUIDES = {
     "कूटशब्द": "tutorial/authentication/README.md",
     "सुरक्षा": "tutorial/authentication/README.md",
 }
-KINDS = {"class": "वर्ग", "interface": "अनुबंध", "record": "अभिलेख"}
+KINDS = {"class": "वर्ग", "interface": "अनुबंध", "record": "अभिलेख", "union": "विकल्पसमूह"}
 
 
 @dataclass(order=True)

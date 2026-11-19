@@ -82,6 +82,7 @@ final class AsyncSourceLowering {
         void register(ParseTree node){if(node instanceof ParserRuleContext p){var b=analysis.bindings.get(p);if(b!=null)binding(b);}for(int i=0;i<node.getChildCount();i++)register(node.getChild(i));}
         String binding(ManagedEmitter.Binding b){return bindings.computeIfAbsent(b,k->field(type(k.type())));}
         String field(String type){String n=fresh();fields.put(n,type);return n;}
+        String returnDestination;
         String ref(String name){return arg+"."+name;}
         String type(ManagedEmitter.Type t){return t==ManagedEmitter.Type.NULL?"सर्ववस्तु":t.bhash;}
         String temp(ParseTree expression){var e=analysis.expressions.get(expression);if(e==null)throw new IllegalStateException("No checked expression: "+expression.getText());return field(type(e.type()));}
@@ -139,7 +140,11 @@ final class AsyncSourceLowering {
         int assign(String destination,String value,int next,Flow flow,Token at){return action((destination==null?value:destination+"="+value)+";",next,flow,at);}
         int expression(ParseTree node,String destination,int next,Flow flow)throws CompilationException {
             var at=((ParserRuleContext)node).start;
-            if(!awaits(node))return assign(destination,raw(node),next,flow,at);
+            if(!awaits(node)&&!BlockValues.needed(node))return assign(destination,raw(node),next,flow,at);
+            if(node instanceof BlockValueContext b) {
+                String saved=returnDestination;returnDestination=destination;
+                try{return block(b.block(),next,new Flow(flow.failed,next,flow.broken,flow.continued,flow.caught));}finally{returnDestination=saved;}
+            }
             if(node instanceof ExpressionContext e&&e.COALESCE()!=null) {
                 String left=temp(e.logicalOr());
                 int absent=expression(e.expression(),destination,next,flow);
@@ -158,6 +163,7 @@ final class AsyncSourceLowering {
             }
             if(node instanceof PostfixContext p)return postfix(p,p.postfixPart().size(),destination,next,flow);
             if(node instanceof PrimaryContext p) {
+                if(p.blockValue()!=null)return expression(p.blockValue(),destination,next,flow);
                 var operands=new ArrayList<ExpressionContext>();collectArguments(p,operands);
                 var replacement=new IdentityHashMap<ParseTree,String>();var temps=new ArrayList<String>();
                 for(var e:operands){String t=temp(e);temps.add(t);replacement.put(e,ref(t));}
@@ -216,7 +222,7 @@ final class AsyncSourceLowering {
         int statements(List<StatementContext> list,int next,Flow flow)throws CompilationException {for(int i=list.size()-1;i>=0;i--)next=statement(list.get(i),next,flow);return next;}
         int statement(StatementContext s,int next,Flow flow)throws CompilationException {
             if(s.variableDecl()!=null){var v=s.variableDecl();return expression(v.expression(),ref(binding(analysis.bindings.get(v))),next,flow);}
-            if(s.RETURN()!=null)return s.expression()==null?flow.returned:expression(s.expression(),arg+".आंतरिकमूल्य",flow.returned,flow);
+            if(s.RETURN()!=null)return s.expression()==null?flow.returned:expression(s.expression(),returnDestination==null?arg+".आंतरिकमूल्य":returnDestination,flow.returned,flow);
             if(s.THROW()!=null){
                 int throwing=state("फेंको "+(s.expression()==null?flow.caught:ref(error))+";",flow.failed,s.start);
                 return s.expression()==null?throwing:expression(s.expression(),ref(error),throwing,flow);

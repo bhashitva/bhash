@@ -60,6 +60,7 @@ def assert_keyword_coverage(sources):
     grammar = Path(__file__).resolve().parents[2] / "src/main/antlr4/Bhash.g4"
     keywords = set(re.findall(r"(?m)^[A-Z][A-Z_0-9]*\s*:\s*'([\u0900-\u097f]+)'\s*;",
                               grammar.read_text(encoding="utf-8")))
+    keywords.update(("विकल्पसमूह", "मिलान"))
     assert keywords, "No Bhash keyword rules found"
     seen = set()
     for source in sources:
@@ -145,6 +146,9 @@ def test_language(execute_case):
         } पकड़ो (ग: अपवाद) { लिखो(ग.संदेश); }
         अंततः { लिखो("अंत"); }
     """, streams="बंद\nदोष\nअंत\n")
+    run("विकल्पसमूह नोटउत्तर { मिला(व:पूर्णांक); नहीं(); }")
+    run("फलन नोटलो()->नोटउत्तर {लौटाओ नोटउत्तर.मिला(७);}")
+    run("मिलान(नोटलो()){विकल्प नोटउत्तर.मिला(स्थिर व)=>व, विकल्प नोटउत्तर.नहीं()=>०, विकल्प रिक्त=>-१}", expected="७")
     assert_keyword_coverage(successful_sources)
 
 
@@ -318,6 +322,13 @@ def main():
             execute(client, "कुल", status="error")
             execute(client, "नया गणक(०)", status="error")
             execute(client, "// bhash:null-safety=strict\nमान विकल्पमान: पूर्णांक? = रिक्त;")
+            execute(client, "विकल्पसमूह खोज<त> { मिला(मूल्य:त); अनुपस्थित(); }")
+            execute(client, "फलन खोजलो()->खोज<पूर्णांक> {लौटाओ खोज<पूर्णांक>.मिला(७);}")
+            execute(client, "मिलान(खोजलो()){विकल्प खोज.मिला(स्थिर व)=>व, विकल्प खोज.अनुपस्थित()=>०}", expected="७")
+            execute(client, "फलन परिणामलो()->मानक.परिणाम<पूर्णांक,पाठ> {लौटाओ मानक.परिणाम<पूर्णांक,पाठ>.असफल(\"दोष\");}")
+            execute(client, "मिलान(परिणामलो()){विकल्प मानक.परिणाम.सफल(स्थिर व)=>अंकपाठ(व), विकल्प मानक.परिणाम.असफल(स्थिर दोष)=>दोष}", expected="दोष")
+            execute(client, "मिलान(खोजलो()){विकल्प खोज.मिला(स्थिर व)=>व, विकल्प खोज.अनुपस्थित()=>०}", expected="७")
+            execute(client, "मिलान(खोजलो()){विकल्प खोज.मिला(स्थिर व)=>व}", status="error")
             execute(client, "विकल्पमान ?? ७", expected="७")
             execute(client, "विकल्पमान = ०;")
             execute(client, "विकल्पमान ?? ७", expected="०")

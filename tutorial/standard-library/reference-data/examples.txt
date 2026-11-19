@@ -12,3 +12,5 @@
 असमवेबउन्नयन|examples/live-task-board/src/main.bhash::सर्वर.उन्नयनचलाओ|src/main/resources/dev/bhash/stdlib/async-web.bhash::उन्नयन.चुनो(
 असमएचटीटीपीसर्वर|examples/async-web/server.bhash::नया असमएचटीटीपीसर्वर|examples/live-task-board/src/main.bhash::सर्वर.उन्नयनचलाओ
 माईएसक्यूएलविन्यास|src/test/resources/mysql/integration.bhash::स्थिर व:|src/test/resources/mysql/integration.bhash::व.मेज़बान=
+परिणाम|tutorial/tagged-unions/results.bhash|tutorial/tagged-unions/async-result.bhash
+इकाई|tutorial/tagged-unions/results.bhash|tutorial/tagged-unions/unit.bhash

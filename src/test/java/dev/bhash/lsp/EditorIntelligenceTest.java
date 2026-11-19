@@ -9,6 +9,33 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EditorIntelligenceTest {
+    @Test void nestedAndPartiallyCoveredMatchesOfferUntouchedCases(){
+        var source=source("nested-fix.bhash","विकल्पसमूह व{अ(ध्वज:तार्किक);ब();} फलन मुख्य()->शून्य{स्थिर क=व.ब();स्थिर र=मिलान(सत्य){विकल्प सत्य=>मिलान(क){विकल्प व.अ(सत्य)=>१,विकल्प व.अ(असत्य)=>२},विकल्प असत्य=>०};}");
+        var model=new EditorModel(source,List.of(source));var edits=model.missingMatchArms(source.coordinates.position(source.text.indexOf("मिलान(क)")));
+        assertEquals(1,edits.size());assertTrue(edits.get(0).getNewText().contains("व.ब()"));assertFalse(edits.get(0).getNewText().contains("व.अ("));
+    }
+    @Test void patternTypeArgumentsAndRepeatedNamesResolveByTokenPosition(){
+        var source=source("pattern-names.bhash","अभिलेख छात्र(नाम:पाठ); विकल्पसमूह व<त>{व(मूल्य:त);} फलन मुख्य()->शून्य{स्थिर क=व<छात्र>.व(नया छात्र(\"अ\")); मिलान(क){विकल्प व<छात्र>.व(स्थिर न):{लिखो(न);}}}");
+        var model=new EditorModel(source,List.of(source));
+        var type=source.resolve(after(source,"विकल्प व<छा"),List.of(source));assertEquals(1,type.size());assertEquals("छात्र",type.get(0).name());
+        var family=source.resolve(after(source,"विकल्प व"),List.of(source));var option=source.resolve(after(source,"विकल्प व<छात्र>.व"),List.of(source));
+        assertEquals(1,family.size());assertEquals(1,option.size());assertNotEquals(family.get(0).selection(),option.get(0).selection());
+        var binding=source.resolve(after(source,"स्थिर न"),List.of(source)).get(0);assertTrue(model.hoverDetail(binding,after(source,"स्थिर न")).contains("छात्र"));
+        var use=source.resolve(after(source,"लिखो(न"),List.of(source)).get(0);assertTrue(model.hoverDetail(use,after(source,"लिखो(न")).contains("छात्र"));
+    }
+    @Test void missingUnionCasesHaveAnExplicitPlaceholderQuickFix(){
+        var source=source("missing-union.bhash","विकल्पसमूह खोज { मिला(मूल्य:पूर्णांक); नहीं(); } फलन मुख्य()->शून्य {स्थिर व=खोज.मिला(१); स्थिर र=मिलान(व){विकल्प खोज.मिला(_)=>१};}");
+        var edits=new EditorModel(source,List.of(source)).missingMatchArms(source.coordinates.position(source.text.indexOf("मिलान")));
+        assertEquals(1,edits.size());assertTrue(edits.get(0).getNewText().contains("खोज.नहीं() => शाखा_पूरी_करें()"));
+    }
+
+    @Test void unionFactoriesAndPayloadBindingsKeepClosedGenericTypes() {
+        var main=source("union-completion.bhash","विकल्पसमूह खोज<त> {मिला(मूल्य:त); नहीं();} फलन मुख्य()->शून्य {खोज<पूर्णांक>.}");
+        assertEquals(List.of("मिला","नहीं").stream().sorted().toList(),labels(new EditorModel(main,List.of(main)).memberCompletions(after(main,"खोज<पूर्णांक>."))).stream().sorted().toList());
+        var nested=source("union-payload.bhash","अभिलेख छात्र(नाम:पाठ); विकल्पसमूह खोज<त>{मिला(मूल्य:त);नहीं();} फलन मुख्य()->शून्य {स्थिर व=खोज<छात्र>.मिला(नया छात्र(\"अ\")); मिलान(व){विकल्प खोज.मिला(स्थिर विद्यार्थी):{विद्यार्थी.} विकल्प खोज.नहीं():{}}}");
+        assertEquals(List.of("नाम"),labels(new EditorModel(nested,List.of(nested)).memberCompletions(after(nested,"विद्यार्थी."))));
+    }
+
     @Test void nullableGenericCommasDoNotCountAsCallArguments() {
         var main=source("nullable-signature.bhash","फलन दो(अ:सर्ववस्तु,ब:पूर्णांक)->शून्य{} फलन मुख्य()->शून्य { दो(नया मानचित्र<पाठ?,पूर्णांक?>(), ");
         var help=new EditorModel(main,List.of(main)).signatureHelp(main.coordinates.position(main.text.length()));

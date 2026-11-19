@@ -96,7 +96,7 @@ public final class LlvmEmitter {
                 .append(String.join(", ",c.interfaceMethods().stream().map(id->id<0?"ptr null":"ptr @bfn"+id).toList())).append("], align 8\n");
             globals.append("@types").append(c.id()).append(" = private constant [").append(c.assignableTypes().size()).append(" x i64] [")
                 .append(String.join(", ",c.assignableTypes().stream().map(id->"i64 "+id).toList())).append("]\n");
-            boolean record=c.assignableTypes().contains(-9);
+            boolean record=c.assignableTypes().contains(-9)||c.assignableTypes().contains(-10);
             if(record)globals.append("@record_kinds").append(c.id()).append(" = private constant [").append(c.fields().size()).append(" x i64] [")
                 .append(String.join(", ",c.fields().stream().map(f->"i64 "+valueKind(f.type())).toList())).append("]\n");
             globals.append("@typeinfo").append(c.id()).append(" = private constant ").append(record?"%RecordInfo { %ClassInfo {":"%ClassInfo {")
@@ -147,7 +147,7 @@ public final class LlvmEmitter {
         String configuration = "  call void @bh_exception_configure(ptr @class-5, ptr @typeinfo-5)\n"+dataInit+
             "  call void @bh_static_roots_configure(ptr @static_roots, i64 "+staticRoots.size()+")\n";
         if (embedded) emitLibraryThunks(configuration);
-        return "; Bhash native: direct LLVM IR, internal ABI v17\n"+
+        return "; Bhash native: direct LLVM IR, internal ABI v18\n"+
             "target triple = \""+target+"\"\n%TraceFrame = type { ptr, ptr, ptr }\n%RootFrame = type { ptr, ptr, i64 }\n%ClassInfo = type { ptr, ptr, i64, ptr }\n%RecordInfo = type { %ClassInfo, i64, ptr }\n%CollectionInfo = type { %ClassInfo, i64, i64, i64, ptr, ptr, ptr }\n%DataInfo = type { ptr, ptr, ptr, [4 x ptr], [4 x ptr] }\n"+
             globals+"\ndeclare void @"+NativeBuildInfo.GUARD+"()\ndeclare i32 @bh_print_build_info_if_requested(i32, ptr, ptr)\ndeclare void @bh_trace_enter(ptr, ptr, ptr)\ndeclare void @bh_trace_at(ptr)\ndeclare void @bh_trace_leave()\ndeclare void @bh_static_roots_configure(ptr, i64)\ndeclare void @bh_static_reference_store(ptr, ptr)\ndeclare void @bh_class_initialize(ptr, ptr, ptr)\ndeclare void @bh_roots_push(ptr, ptr, i64)\ndeclare void @bh_roots_pop(ptr)\n"+
             "declare ptr @bh_alloc(ptr, i64)\ndeclare ptr @bh_instance(ptr, ptr)\ndeclare void @bh_reference_store(ptr, i64, ptr)\n"+

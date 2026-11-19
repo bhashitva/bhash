@@ -13,6 +13,10 @@
       "end": "\\*/"
     },
     {
+      "name": "keyword.control.bhash",
+      "match": "(?<![\\p{L}\\p{M}\\p{N}_])(?:विकल्पसमूह(?=\\s+[\\p{L}])|मिलान(?=\\s*\\([^()\\r\\n]*\\)\\s*\\{))(?![\\p{L}\\p{M}\\p{N}_])"
+    },
+    {
       "name": "string.quoted.double.bhash",
       "begin": "\"",
       "end": "\"|$",

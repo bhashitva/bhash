@@ -316,8 +316,8 @@ int64_t bh_remainder(int64_t a, int64_t b, const void *location) {
     return a == INT64_MIN && b == -1 ? 0 : a % b;
 }
 
-_Static_assert(BHASH_NATIVE_ABI_VERSION==17,"Compiler/runtime ABI mismatch");
-void bh_runtime_abi_v17(void) {}
+_Static_assert(BHASH_NATIVE_ABI_VERSION==18,"Compiler/runtime ABI mismatch");
+void bh_runtime_abi_v18(void) {}
 int bh_print_build_info_if_requested(int argc,char **argv,const char *info){
     if(argc!=2 || strcmp(argv[1],"--bhash-build-info"))return 0;
     fputs(info,stdout);fputc('\n',stdout);return 1;
@@ -850,7 +850,7 @@ static uint64_t box_payload(const void *value) { uint64_t bits; memcpy(&bits, (c
 static const bh_record_info *record_info(const void *value) {
     if(!value)return NULL;
     const bh_class_info *info;memcpy(&info,value,8);
-    for(uint64_t i=0;i<info->type_count;++i)if(info->type_ids[i]==-9)return (const bh_record_info *)info;
+    for(uint64_t i=0;i<info->type_count;++i)if(info->type_ids[i]==-9||info->type_ids[i]==-10)return (const bh_record_info *)info;
     return NULL;
 }
 static void *record_value(uint64_t kind,uint64_t bits) {

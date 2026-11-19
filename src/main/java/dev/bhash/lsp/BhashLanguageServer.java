@@ -220,6 +220,11 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
             var actions=new ArrayList<Either<Command,CodeAction>>();
             for(var diagnostic:params.getContext().getDiagnostics()) {
                 String code=diagnostic.getCode()==null||!diagnostic.getCode().isLeft()?"":diagnostic.getCode().getLeft();
+                if(code.equals("BH3312")) {
+                    var edits=new EditorModel(index,project.indexes.values()).missingMatchArms(diagnostic.getRange().getStart());
+                    if(!edits.isEmpty()){var action=new CodeAction("छूटी मिलान शाखाएँ जोड़ें");action.setKind(CodeActionKind.QuickFix);action.setDiagnostics(List.of(diagnostic));var buffer=buffers.get(path(index.uri));var edit=new WorkspaceEdit();edit.setDocumentChanges(List.of(Either.forLeft(new TextDocumentEdit(new VersionedTextDocumentIdentifier(index.uri,buffer==null?null:buffer.version),edits))));action.setEdit(edit);actions.add(Either.forRight(action));}
+                    continue;
+                }
                 if (code.equals("BH1003")) {
                     int at = index.coordinates.offset(diagnostic.getRange().getStart());
                     if (at >= index.text.length() || !Set.of(0x200C,0x200D).contains(index.text.codePointAt(at))) continue;
@@ -262,7 +267,8 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
     @Override public CompletableFuture<Hover> hover(HoverParams params) {
         return submit(()->{var project=state(params.getTextDocument().getUri());var index=project==null?null:project.indexes.get(path(params.getTextDocument().getUri()).toUri().toASCIIString());if(index==null)return null;
             var symbols=index.navigation(params.getPosition(),project.indexes.values());if(symbols.isEmpty())return null;
-            String text=String.join("\n\n",symbols.stream().map(s->"```bhash\n"+(s.detail().isBlank()?s.name():s.detail())+"\n```\n\n"+s.qualified()).distinct().toList());
+            var model=new EditorModel(index,project.indexes.values());
+            String text=String.join("\n\n",symbols.stream().map(s->{String detail=model.hoverDetail(s,params.getPosition());return "```bhash\n"+(detail.isBlank()?s.name():detail)+"\n```\n\n"+s.qualified();}).distinct().toList());
             return new Hover(new MarkupContent(MarkupKind.MARKDOWN,text));});
     }
     private Path refactoringRoot(ProjectState project) {

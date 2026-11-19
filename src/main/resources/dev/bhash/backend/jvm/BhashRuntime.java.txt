@@ -298,12 +298,30 @@ final class BhashRuntime {
     static abstract class BRecord {
         protected abstract Object[] dataFields();
         @Override public final boolean equals(Object other) {
-            if (other==null || other.getClass()!=getClass()) return false;
-            Object[] a=dataFields(),b=((BRecord)other).dataFields();
-            for(int i=0;i<a.length;i++) if (!collectionSame(a[i],b[i])) return false;
-            return true;
+            var work=new java.util.ArrayDeque<Object[]>();work.push(new Object[]{this,other});
+            var seen=new java.util.IdentityHashMap<BRecord,java.util.Set<BRecord>>();
+            while(!work.isEmpty()) {
+                var pair=work.pop();Object left=pair[0],right=pair[1];if(left==right)continue;
+                if(left instanceof BRecord a) {
+                    if(!(right instanceof BRecord b)||a.getClass()!=b.getClass())return false;
+                    var partners=seen.computeIfAbsent(a,k->java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+                    if(!partners.add(b))continue;Object[] af=a.dataFields(),bf=b.dataFields();
+                    for(int i=0;i<af.length;i++)work.push(new Object[]{af[i],bf[i]});
+                }else if(!collectionSame(left,right))return false;
+            }return true;
         }
-        @Override public final int hashCode() { int hash=getClass().hashCode(); for(Object item:dataFields()) hash=31*hash+collectionHash(item); return hash; }
+        @Override public final int hashCode() {
+            var memo=new java.util.IdentityHashMap<BRecord,Integer>();var work=new java.util.ArrayDeque<Object[]>();
+            work.push(new Object[]{this,dataFields(),0,getClass().hashCode()});
+            while(!work.isEmpty()) {
+                var frame=work.peek();var value=(BRecord)frame[0];var fields=(Object[])frame[1];int index=(Integer)frame[2],hash=(Integer)frame[3];
+                if(index==fields.length){memo.put(value,hash);work.pop();continue;}
+                Object field=fields[index];int child;
+                if(field instanceof BRecord record){var cached=memo.get(record);if(cached==null){work.push(new Object[]{record,record.dataFields(),0,record.getClass().hashCode()});continue;}child=cached;}
+                else child=collectionHash(field);
+                frame[2]=index+1;frame[3]=31*hash+child;
+            }return memo.get(this);
+        }
     }
     static final class BBuffer extends BSeq<Short> {
         private final byte[] items;

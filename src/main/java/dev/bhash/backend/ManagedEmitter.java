@@ -59,6 +59,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         EnumDeclContext enumeration;
         final Map<String,Long> enumValues = new LinkedHashMap<>();
         boolean record() { return declaration!=null && declaration.RECORD()!=null; }
+        int unionKind() { return declaration!=null&&declaration.start instanceof LocatedToken t?t.unionKind():0; }
+        boolean unionFamily() { return unionKind()==1; }
+        boolean unionCase() { return unionKind()==2; }
         final List<ClassInfo> contracts = new ArrayList<>();
         ParserRuleContext at() { return enumeration!=null?enumeration:declaration == null ? contract : declaration; }
         boolean isInterface() { return contract != null; }
@@ -258,14 +261,15 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private static ProgramContext prepare(String source,ProjectResolver.Resolution resolution,ManagedEmitter emitter,boolean requireEntry)throws CompilationException {
-        var tree=ClosureExpander.expand(source,GenericExpander.expand(source,resolution.tree(),emitter.notebook==null?null:emitter.notebook.storage()),emitter.callableTypes);
+        var tree=ClosureExpander.expand(source,GenericExpander.expand(source,UnionExpander.expand(source,resolution.tree()),emitter.notebook==null?null:emitter.notebook.storage()),emitter.callableTypes);
         tree.start=resolution.tree().start;tree.stop=resolution.tree().stop;
-        if(!AsyncSourceLowering.needed(tree))return tree;
+        if(!AsyncSourceLowering.needed(tree)&&!BlockValues.needed(tree))return tree;
         var checker=new ManagedEmitter(source,Target.JVM);checker.callableTypes.addAll(emitter.callableTypes);
         checker.notebook=emitter.notebook;
         checker.analysis=new Analysis();checker.analysis.exceptionClass=checker.exceptionClass;
         checker.program(tree,requireEntry);
-        return AsyncSourceLowering.lower(tree,checker.analysis,resolution.names());
+        if(AsyncSourceLowering.needed(tree))tree=AsyncSourceLowering.lower(tree,checker.analysis,resolution.names());
+        return ClosureExpander.expand(source,BlockValues.lower(source,tree),emitter.callableTypes);
     }
 
     /** Static notebook inference; no user code is executed and no values cross the cell boundary. */
@@ -275,7 +279,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     public static Map<String,String> notebookBindingTypes(String source,String storage,boolean strictNulls)throws CompilationException {
         var resolution=ProjectResolver.resolve(List.of(new SourceFile("notebook-inference.bhash",source,strictNulls)));
         String lowered=resolution.names().entrySet().stream().filter(e->e.getValue().equals(storage)).map(Map.Entry::getKey).findFirst().orElse(storage);
-        var tree=GenericExpander.expand("notebook-inference.bhash",resolution.tree(),lowered);var types=new LinkedHashMap<String,String>();
+        var tree=GenericExpander.expand("notebook-inference.bhash",UnionExpander.expand("notebook-inference.bhash",resolution.tree()),lowered);var types=new LinkedHashMap<String,String>();
         for(var f:tree.functionDecl())if(resolution.names().getOrDefault(f.IDENTIFIER().getText(),f.IDENTIFIER().getText()).equals("मुख्य")&&f.block()!=null)
             for(var statement:f.block().statement())if(statement.variableDecl()!=null){var v=statement.variableDecl();types.put(Identifiers.key(v.IDENTIFIER().getText()),v.valueType().getText());}
         return types;
@@ -499,6 +503,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 definition.parent = classes.get(Identifiers.key(name));
                 if (definition.parent == null) throw error(definition.at(), "Unknown base class: " + name);
                 if (definition.parent.record() || definition.parent.enumeration!=null) throw error(definition.at(),"Cannot extend a record or enum.");
+                if(definition.parent.unionCase() || definition.parent.unionFamily()&&!definition.unionCase())throw error(definition.at(),"[BH3301] विकल्पसमूह बन्द है। — A union cannot be extended outside its declared cases.");
                 if (definition.parent.isInterface()) throw error(definition.at(),"Use पालन to implement an interface.");
             }
             TypeListContext list=definition.isInterface()?definition.contract.typeList():definition.declaration.typeList();
@@ -714,8 +719,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             }
             output.append("}\n"); currentClass=null; return;
         }
-        output.append(target == Target.JVM ? "static class " : "public class ").append(definition.java);
+        output.append(target == Target.JVM ? (definition.unionFamily()?"static abstract class ":definition.unionCase()?"static final class ":"static class ") : (definition.unionFamily()?"public abstract class ":definition.unionCase()?"public sealed class ":"public class ")).append(definition.java);
         if (definition.parent != null) output.append(target == Target.JVM ? " extends " : " : ").append(definition.parent.java);
+        else if(definition.unionFamily())output.append(target==Target.JVM?" extends BhashRuntime.BRecord":" : BhashRuntime.BRecord");
         if (!definition.contracts.isEmpty()) output.append(target==Target.JVM?" implements ":definition.parent==null?" : ":",")
                 .append(String.join(",",definition.contracts.stream().map(c->c.java).toList()));
         output.append(" {\n");
@@ -760,6 +766,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         currentStatic=false;
         for (Constructor constructor:definition.constructors) recover(() -> emitConstructor(definition,constructor,initializers));
         for (var overloads:definition.methods.values()) for (Function method:overloads) recover(() -> emitFunction(method));
+        if(definition.unionCase())output.append(target==Target.JVM?"protected Object[] dataFields(){return new Object[]{":"protected override object[] dataFields(){return new object[]{")
+            .append(String.join(",",definition.fields.values().stream().filter(f->!f.shared).map(Field::java).toList())).append("};}\n");
         output.append("}\n");
         currentClass = null;
     }
@@ -1329,6 +1337,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if(ctx.TYPE_TEST()!=null&&destination.nullable())throw error(ctx,"Type tests require a non-null target type; compare to रिक्त separately.");
         if(analysis!=null)analysis.conversions.put(ctx,destination);
         Expr source=visit(ctx.expression()); valueRequired(ctx,source.type);
+        if(ctx.start instanceof LocatedToken token&&token.unionKind()==4&&source.type.nullable())throw error(ctx,"[BH3312] मिलान अपूर्ण है; रिक्त शाखा जोड़ें या चयनकर्ता की रिक्त-जाँच करें।");
         if(destination.nullable()&&destination.nonNull()==source.type)return new Expr(destination,source.java,true);
         if(source.type.nullable()&&ctx.CONVERT()!=null&&!destination.nullable()) {
             Type underlying=source.type.nonNull();
@@ -1788,6 +1797,16 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     @Override public Expr visitPrimary(PrimaryContext ctx) {
+        if(ctx.blockValue()!=null) {
+            var b=ctx.blockValue();
+            if(!(b.start instanceof LocatedToken token)||token.unionKind()!=3)throw error(b,"Compiler-owned matching expression cannot be written directly.");
+            var result=type(b.valueType());var savedReturn=returnType;boolean savedConstructor=constructorBody;int savedLoop=loopDepth;
+            var savedFinally=new ArrayDeque<>(finallyContexts);var savedBreaks=new ArrayDeque<>(breakTargets);var savedFacts=new HashMap<>(nonNullBindings);int length=output.length();
+            try {returnType=result;loopDepth=0;finallyContexts.clear();breakTargets.clear();
+                var flow=block(b.block());if(flow.contains(Flow.NORMAL))throw error(b,"Matching expression must produce a value.");
+            }finally{returnType=savedReturn;constructorBody=savedConstructor;loopDepth=savedLoop;finallyContexts.clear();finallyContexts.addAll(savedFinally);breakTargets.clear();breakTargets.addAll(savedBreaks);nonNullBindings.clear();nonNullBindings.putAll(savedFacts);nonNullBindings.keySet().removeIf(Binding::mutable);output.setLength(length);}
+            return new Expr(result,"null");
+        }
         if (ctx.INTEGER_LITERAL() != null) return integer(ctx, digits(ctx.getText()));
         if (ctx.REAL_LITERAL() != null) {
             double value = Double.parseDouble(digits(ctx.getText()));
@@ -1811,6 +1830,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (definition == null) throw error(ctx, "Unknown class: " + ctx.valueType().getText());
             if (definition.enumeration!=null) throw error(ctx,"Enum values must be named members or explicit numeric conversions.");
             if (definition.isInterface()) throw error(ctx,"Cannot construct an interface.");
+            if(definition.unionFamily())throw error(ctx,"[BH3302] नामित विकल्प बनाएँ। — Construct a union using its case factory.");
             var arguments = arguments(ctx.arguments());
             var constructor=selectConstructor(ctx,definition,arguments);
             if (constructor.access != Access.PUBLIC && currentClass != definition)
