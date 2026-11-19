@@ -29,6 +29,7 @@ public final class NativeExports {
             var text = line.strip();
             if (text.isEmpty() || text.startsWith("#")) continue;
             String location = path + ":" + number;
+            if(text.contains("?"))throw new CompilationException(location+": Nullable native exports require a versioned presence/payload ABI; the current export ABI accepts non-null signatures only.");
             var fields = LINE.matcher(text);
             if (!fields.matches())
                 throw new CompilationException(location + ": Expected bhash_symbol = फलन(प्रकार) -> प्रकार");

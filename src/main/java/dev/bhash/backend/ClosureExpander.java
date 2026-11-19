@@ -83,7 +83,12 @@ final class ClosureExpander {
             for(var q:t.typeQualifier())base+=q.getText();
             if(t.typeArguments()!=null)base+="<"+String.join(",",t.typeArguments().valueType().stream().map(this::type).toList())+">";
         }
-        return key(base+"[]".repeat(t.arraySuffix().size()));
+        var result=new StringBuilder(base);
+        for(var child:t.children) {
+            if(child instanceof NullableSuffixContext)result.append('?');
+            else if(child instanceof ArraySuffixContext)result.append("[]");
+        }
+        return key(result.toString());
     }
     private String result(ReturnTypeContext r){return r.VOID()!=null?"शून्य":type(r.valueType());}
     private String signature(List<String> args,String result,Token origin) {
@@ -176,7 +181,7 @@ final class ClosureExpander {
         return b.cell!=null?b.storage:b.name;
     }
     private String read(Binding b){return storage(b)+(b.cell!=null?".मूल्य":"");}
-    private boolean callable(String type){return signatures.values().stream().anyMatch(s->s.name.equals(type));}
+    private boolean callable(String type){String base=type.endsWith("?")?type.substring(0,type.length()-1):type;return signatures.values().stream().anyMatch(s->s.name.equals(base));}
     private boolean callableField(String owner,String name) {
         return callable(fieldType(owner,name));
     }

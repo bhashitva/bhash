@@ -33,8 +33,8 @@ final class AsyncSourceLowering {
         for(var c:tree.classDecl())for(var m:c.classMember())if(m.functionDecl()!=null && m.functionDecl().ASYNC()!=null)p.add(m.functionDecl(),c,m.STATIC()!=null);
         for(var f:p.ordered)f.build();
         p.render(tree);
-        for(var f:p.ordered)p.append(f.frameClass(),f.tree.start);
-        if(p.root!=null)p.entry(tree.start);
+        for(var f:p.ordered)p.trustedAppend(f.frameClass(),f.tree.start);
+        if(p.root!=null)p.entry(p.trusted(tree.start));
         var parsed=Frontend.parse("async-lowering",p.output.toString());
         if(!parsed.valid())throw new CompilationException(parsed.diagnostics().toString());
         ProjectResolver.remap(parsed.tree(),p.origins);return parsed.tree();
@@ -44,6 +44,12 @@ final class AsyncSourceLowering {
     private String standard(String name){var n=names.get("मानक."+name);if(n==null)throw new IllegalStateException("Missing async runtime declaration: "+name);return n;}
     private void add(FunctionDeclContext f,ClassDeclContext c,boolean shared){var frame=new Frame(f,c,shared);frames.put(f,frame);ordered.add(frame);if(c!=null)members.computeIfAbsent(c,k->new ArrayList<>()).add(frame);}
     private void append(String value,Token origin){origins.put(offset,origin);output.append(value).append(' ');offset+=value.codePointCount(0,value.length())+1;}
+    // User code was checked before lowering. Frame defaults and reference clearing are runtime operations.
+    private Token trusted(Token origin) {
+        var token=new LocatedToken(new org.antlr.v4.runtime.misc.Pair<>(origin.getTokenSource(),origin.getInputStream()),origin.getType(),origin.getChannel(),origin.getStartIndex(),origin.getStopIndex());
+        token.setText(origin.getText());token.locate(origin);token.strictNulls(false);return token;
+    }
+    private void trustedAppend(String value,Token origin){append(value,trusted(origin));}
     private void render(ParseTree n)throws CompilationException {
         if(n instanceof FunctionDeclContext f && frames.containsKey(f)) {var frame=frames.get(f);append(frame.factory(),f.IDENTIFIER().getSymbol());if(frame.owner==null)frame.emitHelper();return;}
         if(n instanceof ClassDeclContext c && c.RECORD()==null) {for(int i=0;i<c.getChildCount()-1;i++)render(c.getChild(i));for(var f:members.getOrDefault(c,List.of()))f.emitHelper();render(c.getChild(c.getChildCount()-1));return;}
@@ -82,10 +88,24 @@ final class AsyncSourceLowering {
         String raw(ParseTree n){return text(n,Map.of());}
         String text(ParseTree n,Map<ParseTree,String> replaced) {
             var replacement=replaced.get(n);if(replacement!=null)return replacement;
+            if(n instanceof PostfixContext p) {
+                String value=text(p.primary(),replaced);
+                for(var part:p.postfixPart()) {
+                    value+=text(part,replaced);var narrowed=analysis.narrowedFields.get(part);
+                    if(narrowed!=null)value="(परिवर्तित<"+type(narrowed)+">("+value+"))";
+                }
+                return value;
+            }
             if(n instanceof PrimaryContext p && analysis.reads.containsKey(p)) {
                 String value=ref(binding(analysis.reads.get(p)));
+                var narrowed=analysis.narrowedReads.get(p);
+                if(narrowed!=null)value="(परिवर्तित<"+type(narrowed)+">("+value+"))";
                 if(p.LPAREN()!=null)value+="("+(p.arguments()==null?"":text(p.arguments(),replaced))+")";
                 return value;
+            }
+            if(n instanceof PrimaryContext p&&analysis.narrowedFields.containsKey(p)) {
+                var text=new StringBuilder();for(var child:p.children)text.append(text(child,replaced)).append(' ');
+                return "(परिवर्तित<"+type(analysis.narrowedFields.get(p))+">("+text+"))";
             }
             if(n instanceof ShiftOperatorContext)return n.getText();
             if(n instanceof TerminalNode t)return t.getSymbol().getType()==Token.EOF?"":t.getText();
@@ -120,6 +140,14 @@ final class AsyncSourceLowering {
         int expression(ParseTree node,String destination,int next,Flow flow)throws CompilationException {
             var at=((ParserRuleContext)node).start;
             if(!awaits(node))return assign(destination,raw(node),next,flow,at);
+            if(node instanceof ExpressionContext e&&e.COALESCE()!=null) {
+                String left=temp(e.logicalOr());
+                int absent=expression(e.expression(),destination,next,flow);
+                String present="परिवर्तित<"+type(analysis.expressions.get(e).type().nonNull())+">("+ref(left)+")";
+                int available=assign(destination,present,next,flow,at);
+                int choose=state("यदि("+ref(left)+"!=रिक्त){"+go(available)+"}"+go(absent),flow.failed,at);
+                return expression(e.logicalOr(),ref(left),choose,flow);
+            }
             if(node instanceof UnaryContext u && u.AWAIT()!=null) {
                 var task=temp(u.unary());var payload=analysis.expressions.get(u).type();
                 String get=ref(task)+".आंतरिकमूल्यलो()";
@@ -169,12 +197,20 @@ final class AsyncSourceLowering {
             var part=p.postfixPart(count-1);ParseTree previous=count==1?p.primary():p.postfixPart(count-2);
             var checked=analysis.expressions.get(previous);boolean direct=checked.typeReceiver()||checked.base();
             String receiverValue=direct?raw(previous):ref(temp(previous));
+            String receiverStorage=receiverValue;
+            boolean safe=part.SAFE_DOT()!=null;
+            if(safe)receiverValue="(परिवर्तित<"+type(checked.type().nonNull())+">("+receiverStorage+"))";
             var operands=new ArrayList<ExpressionContext>();if(part.expression()!=null)operands.add(part.expression());if(part.arguments()!=null)operands.addAll(part.arguments().expression());
             var replacements=new IdentityHashMap<ParseTree,String>();var temps=new ArrayList<String>();
             for(var e:operands){var t=temp(e);temps.add(t);replacements.put(e,ref(t));}
-            int start=assign(destination,receiverValue+text(part,replacements),next,flow,part.start);
+            String suffix=text(part,replacements);if(safe)suffix=suffix.replaceFirst("\\?\\.",".");
+            int start=assign(destination,receiverValue+suffix,next,flow,part.start);
             for(int i=operands.size()-1;i>=0;i--)start=expression(operands.get(i),ref(temps.get(i)),start,flow);
-            return direct?start:postfix(p,count-1,receiverValue,start,flow);
+            if(safe) {
+                int absent=destination==null?next:assign(destination,"रिक्त",next,flow,part.start);
+                start=state("यदि("+receiverStorage+"!=रिक्त){"+go(start)+"}"+go(absent),flow.failed,part.start);
+            }
+            return direct?start:postfix(p,count-1,receiverStorage,start,flow);
         }
         int block(BlockContext b,int next,Flow flow)throws CompilationException {return statements(b.statement(),next,flow);}
         int statements(List<StatementContext> list,int next,Flow flow)throws CompilationException {for(int i=list.size()-1;i>=0;i--)next=statement(list.get(i),next,flow);return next;}
@@ -262,12 +298,12 @@ final class AsyncSourceLowering {
             b.append(ref(pc)).append('=').append(entry).append(';').append(standard("कार्यतंत्र")).append(".आरम्भ(").append(arg).append("); लौटाओ ").append(arg).append(";}");return b.toString();
         }
         void emitHelper() {
-            append((owner==null?"":"सार्वजनिक "+(shared?"साझा ":""))+"फलन "+helper+"("+arg+":"+name+")->शून्य { जबतक(सत्य){",tree.IDENTIFIER().getSymbol());
-            append(standard("कार्यतंत्र")+".मालिकरखो("+arg+".आंतरिकसीमा,"+arg+".आंतरिकआवरण);",tree.start);
+            trustedAppend((owner==null?"":"सार्वजनिक "+(shared?"साझा ":""))+"फलन "+helper+"("+arg+":"+name+")->शून्य { जबतक(सत्य){",tree.IDENTIFIER().getSymbol());
+            trustedAppend(standard("कार्यतंत्र")+".मालिकरखो("+arg+".आंतरिकसीमा,"+arg+".आंतरिकआवरण);",tree.start);
             for(int i=0;i<states.size();i++){var s=states.get(i);var b=new StringBuilder("यदि(").append(ref(pc)).append("==").append(i).append("){");if(s.failure>=0)b.append("प्रयास{");
                 for(var f:clearAt.get(i))b.append(ref(f)).append('=').append(fields.get(f).equals("पाठ")?"\"\"":"रिक्त").append(';');
-                b.append(s.code);if(s.failure>=0)b.append("}पकड़ो(दोष:अपवाद){").append(ref(error)).append("=दोष;").append(go(s.failure)).append('}');b.append('}');append(b.toString(),s.origin);}
-            append("फेंको नया अपवाद(\"अमान्य कार्यचरण।\"); }}",tree.stop);
+                b.append(s.code);if(s.failure>=0)b.append("}पकड़ो(दोष:अपवाद){").append(ref(error)).append("=दोष;").append(go(s.failure)).append('}');b.append('}');trustedAppend(b.toString(),s.origin);}
+            trustedAppend("फेंको नया अपवाद(\"अमान्य कार्यचरण।\"); }}",tree.stop);
         }
         String frameClass() {
             var b=new StringBuilder("वर्ग ").append(name).append(" विस्तार ").append(resultType).append(" {");fields.forEach((n,t)->b.append("सार्वजनिक मान ").append(n).append(':').append(t).append(';'));

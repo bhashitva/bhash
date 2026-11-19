@@ -62,6 +62,9 @@ class SaferEverydayTest {
         var types=ManagedEmitter.notebookBindingTypes("वर्ग भंडार {साझा मान पिछला: पूर्णांक;} फलन पहचान<त>(व: त)->त {लौटाओ व;} फलन मुख्य()->शून्य {लिखो(पिछला); स्थिर अगला=पहचान(पिछला+१); {स्थिर अंदर=\"क\";} स्थिर पाठ्य=\"ख\";}","भंडार");
         assertEquals(java.util.Map.of("अगला","पूर्णांक","पाठ्य","पाठ"),types);
     }
+    @Test void exceptionMessagesSupportInferenceAndExplicitGenericCalls()throws Exception {
+        check("वर्ग दोष विस्तार अपवाद {} फलन पहचान<त>(व: त)->त {लौटाओ व;} फलन मुख्य()->शून्य {प्रयास {फेंको नया अपवाद(\"जाँच\");} पकड़ो(ग: अपवाद){स्थिर संदेश=ग.संदेश; लिखो(पहचान<पाठ>(ग.संदेश),संदेश);} स्थिर ग=नया दोष(); स्थिर संदेश=ग.संदेश; लिखो(पहचान(संदेश));}");
+    }
     @Test void genericContractsAreValidatedEvenWithoutCalls() {
         reject("अनुबंध क {फलन लो<त>(व: त)->त;} वर्ग ख पालन क {} फलन मुख्य()->शून्य {}","generic interface implementation");
         reject("वर्ग क {फलन लो<त>(व: त)->त {लौटाओ व;} फलन लो<ख>(व: ख)->ख {लौटाओ व;}} फलन मुख्य()->शून्य {}","Duplicate generic");

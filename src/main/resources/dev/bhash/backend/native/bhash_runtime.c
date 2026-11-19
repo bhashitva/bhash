@@ -274,6 +274,7 @@ void bh_print_text(const void *text) {
         fatal("आउटपुट लिखा नहीं जा सका।");
 }
 int bh_text_equal(const void *left, const void *right) {
+    if (!left || !right) return left == right;
     uint64_t a = text_length(left), b = text_length(right);
     return a == b && (!a || memcmp((const unsigned char *)left + 8,
                                  (const unsigned char *)right + 8, (size_t)a) == 0);
@@ -1029,11 +1030,15 @@ void *bh_collection_new(const bh_collection_info *info, int64_t length, const vo
     c->size = size;
     bh_roots_pop(&frame); return c;
 }
-static void *array_dimensions(const bh_collection_info *info, uint64_t count, const int64_t *sizes, const void *location) {
+static void *array_dimensions(const bh_collection_info *info, uint64_t count, const int64_t *sizes, const void *location, int optional_text) {
     void *slots[2] = {bh_collection_new(info, sizes[0], location), NULL};
     bh_root_frame frame; bh_roots_push(&frame, slots, 2);
+    if (optional_text && info->value_kind == BH_TEXT) {
+        bh_collection *c = slots[0];
+        for (uint64_t i=0; i<c->size; ++i) storage_store(c->data, i, 0, 1);
+    }
     if (count > 1) for (uint64_t i=0; i<((bh_collection *)slots[0])->size; ++i) {
-        slots[1] = array_dimensions(info->element, count-1, sizes+1, location);
+        slots[1] = array_dimensions(info->element, count-1, sizes+1, location, optional_text);
         bh_collection *c = slots[0]; storage_store(c->data, i, pointer_bits(slots[1]), 1);
         slots[1] = NULL;
     }
@@ -1042,7 +1047,12 @@ static void *array_dimensions(const bh_collection_info *info, uint64_t count, co
 void *bh_array_dimensions(const bh_collection_info *info, uint64_t count, const int64_t *sizes, const void *location) {
     if (!count) fatal("आंतरिक सरणी आयाम अमान्य है।");
     for (uint64_t i=0; i<count; ++i) checked_length(sizes[i], location);
-    return array_dimensions(info, count, sizes, location);
+    return array_dimensions(info, count, sizes, location, 0);
+}
+void *bh_array_dimensions_optional_text(const bh_collection_info *info, uint64_t count, const int64_t *sizes, const void *location) {
+    if (!count) fatal("आंतरिक सरणी आयाम अमान्य है।");
+    for (uint64_t i=0; i<count; ++i) checked_length(sizes[i], location);
+    return array_dimensions(info, count, sizes, location, 1);
 }
 static uint64_t map_find(bh_collection *c, uint64_t key, uint64_t hash) {
     if (!c->capacity) return UINT64_MAX;
@@ -1407,6 +1417,7 @@ static void json_write_string(json_writer *w,void *text) {
 static void json_write_value(json_writer *w,uint64_t kind,uint64_t bits,unsigned depth) {
     void *slots[2]={reference_kind(kind)?bits_pointer(bits):NULL,NULL};bh_root_frame frame;bh_roots_push(&frame,slots,2);
     if(depth>64)runtime_error(w->location,"जेसन की गहराई सीमा पार हो गई।");
+    if(reference_kind(kind)&&!bits){buffer_bytes(&w->buffer,"null",4,4);bh_roots_pop(&frame);return;}
     if(kind==BH_ANY){
         if(!slots[0]){buffer_bytes(&w->buffer,"null",4,4);bh_roots_pop(&frame);return;}
         kind=boxed_kind(slots[0]);if(kind!=BH_REFERENCE){bits=box_payload(slots[0]);if(kind==BH_TEXT)slots[1]=bits_pointer(bits);}
@@ -1431,8 +1442,9 @@ static void json_write_value(json_writer *w,uint64_t kind,uint64_t bits,unsigned
                 if(map){
                     uint64_t key=c->data[i*4];
                     if(c->info->key_kind==BH_TEXT)slots[1]=bits_pointer(key);
-                    else if(c->info->key_kind==BH_ANY&&boxed_kind(bits_pointer(key))==BH_TEXT)slots[1]=bits_pointer(box_payload(bits_pointer(key)));
+                    else if(c->info->key_kind==BH_ANY&&key&&boxed_kind(bits_pointer(key))==BH_TEXT)slots[1]=bits_pointer(box_payload(bits_pointer(key)));
                     else runtime_error(w->location,"जेसन मानचित्र की कुंजी पाठ होनी चाहिए।");
+                    if(!slots[1])runtime_error(w->location,"जेसन मानचित्र की कुंजी पाठ होनी चाहिए।");
                     json_write_string(w,slots[1]);slots[1]=NULL;buffer_bytes(&w->buffer,":",1,1);c=slots[0];
                 }
                 uint64_t value=c->info->kind==BH_BUFFER?((unsigned char *)c->data)[i]:c->data[map?i*4+1:i],value_kind=c->info->value_kind;

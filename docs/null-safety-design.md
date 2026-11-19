@@ -1,7 +1,8 @@
 # रिक्त-सुरक्षा का प्रस्ताव (Null-safety design)
 
-स्थिति: **समीक्षा के लिए प्रस्ताव; अभी लागू नहीं है।** यह दस्तावेज़ अनुमोदन के बाद
-अलग milestone का अनुबंध बनेगा। वर्तमान `रिक्त` व्यवहार इस परिवर्तन में नहीं बदला है।
+स्थिति: **स्वीकृत डिज़ाइन; opt-in कार्यान्वयन स्रोत में उपलब्ध है।** Legacy default
+बना रहता है। प्रकाशित compiler, extension और kernel में उपलब्धता उनके अगले
+package release पर निर्भर है।
 
 ## उद्देश्य (Goals)
 
@@ -116,7 +117,31 @@ source locations सुरक्षित रखें।
 - Native forced GC, boxing/unboxing, async cleanup तथा browser isolation।
 - Existing legacy projects और strict-mode Hindi tutorial, JVM/CLR/native/browser/Jupyter।
 
-## समीक्षा के निर्णय (Decisions requested)
+## कार्यान्वयन के व्यावहारिक निर्णय (Implementation decisions)
+
+Project profile के साथ एक build के लिए `--null-safety strict` और single-file/
+notebook के लिए `// bhash:null-safety=strict` उपलब्ध हैं। Nullable scalar मौजूद
+होने पर मौजूदा typed boxing और अनुपस्थित होने पर null pointer उपयोग करता है।
+`?.`, lazy `??` और lifted conversions source-located helpers/closures में उतरते
+हैं; सभी targets वही checked control flow और native GC root machinery उपयोग
+करते हैं। Awaiting fallback और member arguments सीधे caller के async states में
+शाखा बनाते हैं; skipped branch कोई अतिरिक्त await या task नहीं बनाती। मौजूदा
+always-yielding await तथा cancellation के नियम अपने वास्तविक execution path पर
+ही लागू होते हैं।
+
+इस आरम्भिक opt-in में एक compilation के source packages का profile समान होना
+आवश्यक है। Bundled library के JSON/अनुपस्थित-result signatures अलग audit से
+nullable होते हैं। SQL के typed getters और explicit `रिक्तहै()` policy यथावत हैं।
+मौजूदा C/JNI export ABI nullable signatures अस्वीकार करता है; कोई नया presence
+या ownership representation अनुमान से नहीं बनाया गया है। यह प्रतिबंध हिन्दी
+ट्यूटोरियल में migration के साथ स्पष्ट है।
+
+Mutable fields/captures पर unsafe smart casts नहीं हैं। Stable immutable field
+chains को जाँच के बाद narrow किया जा सकता है। Loops और exception paths पर
+conservative proofs के कारण कभी-कभी explicit स्थानीय snapshot फिर जाँचना पड़ता
+है। [उपयोगकर्ता ट्यूटोरियल](../tutorial/null-safety/README.md) चलने योग्य नियम देता है।
+
+## स्वीकृत निर्णय (Approved decisions)
 
 १. Non-null defaults, `T?` और flow analysis को स्वीकार करें।
 २. Nullable scalars तथा `?.`/`??` को प्रथम milestone में शामिल करें।

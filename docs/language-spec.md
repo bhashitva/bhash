@@ -393,6 +393,17 @@ Function types, capture semantics and cross-target lowering are specified in [fu
 
 **हिन्दी:** [फलन मान](function-values.md) में फलन प्रकार, capture और विभिन्न लक्ष्य की lowering है। [हिन्दी ट्यूटोरियल](../tutorial/functions/README.md) चलाएँ।
 
+## रिक्त-सुरक्षा (Null safety)
+
+परियोजना में `nullSafety=strict`, single-file build में `--null-safety strict`, अथवा
+फ़ाइल के आरम्भ में `// bhash:null-safety=strict` से opt-in करें। `T` गैर-रिक्त और
+`T?` वैकल्पिक है; scalar भी वैकल्पिक हो सकते हैं। `?.` receiver एक बार पढ़ता है और
+`??` केवल अनुपस्थिति में fallback चलाता है। स्थानीय बंधनों की जाँच से flow narrowing
+होती है; writes, suspension और exception paths पुरानी mutable जानकारी को अमान्य
+करते हैं। [हिन्दी ट्यूटोरियल](../tutorial/null-safety/README.md) में grammar,
+initialization, collections और migration है। [स्वीकृत डिज़ाइन](null-safety-design.md)
+इस अनुबंध का आधार है। Legacy default अभी बना रहता है।
+
 ## Async functions and tasks
 
 The task-core contract is specified in [task-core-implementation.md](task-core-implementation.md).

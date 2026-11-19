@@ -2,6 +2,7 @@
 package dev.bhash.backend;
 
 import dev.bhash.parser.BhashParser.*;
+import dev.bhash.frontend.LocatedToken;
 import java.util.*;
 import java.util.function.BiFunction;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -20,7 +21,10 @@ final class ConstructorInitialization {
     private ConstructorInitialization(ClassInfo owner,Map<ParserRuleContext,Field> fields,
             BiFunction<ParserRuleContext,String,? extends RuntimeException> error) {
         required=new LinkedHashSet<>();
-        for(var f:owner.fields.values())if(!f.shared()&&!f.mutable()&&f.declaration().expression()==null)required.add(f);
+        for(var f:owner.fields.values())if(!f.shared()&&f.declaration()!=null&&f.declaration().expression()==null) {
+            boolean strict=f.declaration().start instanceof LocatedToken token&&token.strictNulls();
+            if(!f.mutable()||strict&&!f.type().nullable()&&f.type().reference())required.add(f);
+        }
         this.fields=fields;this.error=error;
     }
     static void check(ParserRuleContext at,BlockContext body,ClassInfo owner,Map<ParserRuleContext,Field> fields,
@@ -31,7 +35,7 @@ final class ConstructorInitialization {
         var results=body==null?List.of(initial):checker.block(body,List.of(initial),false);
         for(var result:results)if(result.completion==Flow.NORMAL||result.completion==Flow.RETURN)
             for(var field:checker.required)if(!result.definite.contains(field))
-                throw error.apply(at,"Immutable field must be initialized on every successful constructor path: "+field.declaration().IDENTIFIER().getText());
+                throw error.apply(at,(field.mutable()?"Non-null field":"Immutable field")+" must be initialized on every successful constructor path: "+field.declaration().IDENTIFIER().getText());
     }
     private void reads(ParseTree tree,State state) {
         if(tree==null)return;
@@ -76,7 +80,7 @@ final class ConstructorInitialization {
                 // Evaluate the receiver and RHS before performing the write.
                 if(target!=p.primary()) { reads(p.primary(),state);for(var part:p.postfixPart())if(part!=target)reads(part,state); }
                 reads(a.expression(),state);
-                if(loop||state.possible.contains(field))throw error.apply(a,"Immutable field may already be initialized: "+field.declaration().IDENTIFIER().getText());
+                if(!field.mutable()&&(loop||state.possible.contains(field)))throw error.apply(a,"Immutable field may already be initialized: "+field.declaration().IDENTIFIER().getText());
                 state.definite.add(field);state.possible.add(field);return List.of(state);
             }
         }

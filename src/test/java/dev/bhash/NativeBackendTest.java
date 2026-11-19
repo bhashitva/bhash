@@ -17,6 +17,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class NativeBackendTest {
+    @Test void nullableScalarsAndLazyAccessSurviveForcedGc()throws Exception {
+        requireTools();
+        var result=nativeOnlyRun(List.of(new SourceFile("nulls.bhash",NullSafetyTest.PROGRAM,true)),GC_STRESS);
+        assertEquals(0,result.exit(),result.out()+result.err());assertEquals(NullSafetyTest.OUTPUT,result.out());
+        assertTrue(stats(result).get("collections")>0);assertEquals(0L,stats(result).get("live"));
+    }
     @Test void genericSetsSurviveForcedGc() throws Exception {
         requireTools();
         var source = StandardLibraryTest.SET_FIXTURE;

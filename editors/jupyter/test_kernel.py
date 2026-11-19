@@ -317,6 +317,17 @@ def main():
             client.wait_for_ready(timeout=30)
             execute(client, "कुल", status="error")
             execute(client, "नया गणक(०)", status="error")
+            execute(client, "// bhash:null-safety=strict\nमान विकल्पमान: पूर्णांक? = रिक्त;")
+            execute(client, "विकल्पमान ?? ७", expected="७")
+            execute(client, "विकल्पमान = ०;")
+            execute(client, "विकल्पमान ?? ७", expected="०")
+            execute(client, "विकल्पमान = रिक्त;")
+            execute(client, "स्थिर गलती: पूर्णांक = विकल्पमान;", status="error")
+            execute(client, "विकल्पमान ?? ९", expected="९")
+            execute(client, "असमकालिक फलन वैकल्पिकउत्तर()->पूर्णांक { प्रतीक्षा मानक.कार्य.विलंब(१); लौटाओ ८; }")
+            execute(client, "विकल्पमान ?? प्रतीक्षा वैकल्पिकउत्तर()", expected="८")
+            manager.restart_kernel()
+            client.wait_for_ready(timeout=30)
             if args.notebook:
                 notebook = json.loads(args.notebook.read_text(encoding="utf-8"))
                 code = ["".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"]

@@ -13,11 +13,14 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 /** Read-only declaration/type model for incomplete editor buffers. Never executes or lowers
  * user code. Unknown or ambiguous receivers deliberately produce no member suggestions. */
 final class EditorModel {
-    record Type(String name, List<Type> args) {
+    record Type(String name, List<Type> args,boolean nullable) {
+        Type(String name,List<Type> args){this(name,args,false);}
         Type(String name) { this(name,List.of()); }
+        Type optional(){return new Type(name,args,true);}
+        Type nonNull(){return new Type(name,args,false);}
         @Override public String toString() {
-            if(name.equals("सरणी") && args.size()==1)return args.get(0)+"[]";
-            return name+(args.isEmpty()?"":"<"+String.join(", ",args.stream().map(Object::toString).toList())+">");
+            if(name.equals("सरणी") && args.size()==1)return args.get(0)+"[]"+(nullable?"?":"");
+            return name+(args.isEmpty()?"":"<"+String.join(", ",args.stream().map(Object::toString).toList())+">")+(nullable?"?":"");
         }
     }
     record Value(Type type, boolean shared, boolean base) { Value(Type type) {this(type,false,false);} }
@@ -74,7 +77,10 @@ final class EditorModel {
             if(args.stream().anyMatch(Objects::isNull))return null;
             result=new Type(qualify(raw,source),args);
         }
-        for(var ignored:node.arraySuffix())result=new Type("सरणी",List.of(result));
+        for(var child:node.children) {
+            if(child instanceof ArraySuffixContext)result=new Type("सरणी",List.of(result));
+            else if(child instanceof NullableSuffixContext)result=result.optional();
+        }
         return result;
     }
     private Type type(String text, SourceIndex source, Map<String,Type> substitutions) {
@@ -98,6 +104,8 @@ final class EditorModel {
     }
     private boolean subtype(Type from, Type to, Set<Type> seen) {
         if(from==null||to==null)return false;
+        if(to.nullable)return from.name.equals("रिक्त")||subtype(from.nonNull(),to.nonNull(),seen);
+        if(from.nullable)return false;
         if(from.equals(to))return true;
         if(from.name.equals("रिक्त"))return !Set.of("पूर्णांक","लघुपूर्णांक","बाइट","दशमलव","तार्किक","पाठ","शून्य").contains(to.name);
         if(!seen.add(from))return false;
@@ -167,6 +175,10 @@ final class EditorModel {
         List<String> names=parameters==null?List.of():parameters.parameter().stream().map(p->p.IDENTIFIER().getText()).toList();
         List<Type> types=parameters==null?List.of():parameters.parameter().stream().map(p->type(p.valueType(),source,boundEnv)).toList();
         if(types.stream().anyMatch(Objects::isNull))return null;
+        if(index.strictNulls&&source.uri.endsWith("/"+dev.bhash.stdlib.StandardLibrary.SOURCE_NAME)) {
+            if(result.name.equals("सर्ववस्तु"))result=result.optional();
+            types=types.stream().map(t->t.name.equals("सर्ववस्तु")?t.optional():t).toList();
+        }
         return new Member(symbol.name(),result,names,types,callable,shared,access,owner,symbol);
     }
     private static Member builtin(String name,String result,List<String> names,Type... args) {
@@ -245,7 +257,7 @@ final class EditorModel {
     }
     private Type substitute(Type t,Map<String,Type> env) {
         if(t.args.isEmpty()&&env.containsKey(t.name))return env.get(t.name);
-        return new Type(t.name,t.args.stream().map(a->substitute(a,env)).toList());
+        return new Type(t.name,t.args.stream().map(a->substitute(a,env)).toList(),t.nullable);
     }
     private boolean unify(Type formal,Type actual,List<String> variables,Map<String,Type> env,Set<Type> seen) {
         if(actual==null||actual.name.equals("रिक्त"))return true;
@@ -300,6 +312,10 @@ final class EditorModel {
     }
     private Value infer(ParseTree node, Position position, int depth) {
         if(node==null||depth>128)return null;
+        if(node instanceof ExpressionContext e&&e.COALESCE()!=null) {
+            var left=infer(e.logicalOr(),position,depth+1);var right=infer(e.expression(),position,depth+1);
+            return left==null||right==null?null:new Value(right.type.nullable||right.type.name.equals("रिक्त")?left.type:left.type.nonNull());
+        }
         if(node instanceof PostfixContext p) {
             Value value=infer(p.primary(),position,depth+1);
             // Qualified type names can occupy several postfix components.
@@ -325,7 +341,7 @@ final class EditorModel {
                     String member=SourceIndex.key(part.IDENTIFIER().getText());
                     var candidates=members(value,position).stream().filter(m->SourceIndex.key(m.name).equals(member)).toList();
                     Type result=part.LPAREN()!=null?selected(candidates,part.arguments(),position,depth+1,part.typeArguments()):candidates.stream().filter(m->!m.callable).map(Member::result).findFirst().orElse(null);
-                    value=result==null?null:new Value(result);
+                    value=result==null?null:new Value(part.SAFE_DOT()!=null&&!result.name.equals("शून्य")?result.optional():result);
                 }
             }
             return value;
@@ -337,7 +353,7 @@ final class EditorModel {
                 return new Value(t);
             }
             if(p.TYPE_TEST()!=null)return new Value(new Type("तार्किक"));
-            if(p.CONVERT()!=null||p.SAFE_CAST()!=null){var t=type(p.valueType(),index,Map.of());return t==null?null:new Value(t);}
+            if(p.CONVERT()!=null||p.SAFE_CAST()!=null){var t=type(p.valueType(),index,Map.of());return t==null?null:new Value(p.SAFE_CAST()!=null&&index.strictNulls?t.optional():t);}
             if(p.THIS()!=null||p.BASE()!=null) {
                 String here=currentOwner(position);if(here==null)return null;
                 Type t=new Type(here);
@@ -391,6 +407,7 @@ final class EditorModel {
     }
     /** Parse the longest complete expression suffix ending immediately before a dot. */
     private Value receiver(int end,Position position) {
+        if(end>0&&index.text.charAt(end-1)=='?')end--;
         var tokens=before(end);
         for(int i=Math.max(0,tokens.size()-160);i<tokens.size();i++) {
             var token=tokens.get(i);

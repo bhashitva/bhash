@@ -34,6 +34,7 @@ public final class NotebookWorker {
     private final Map<String, String> types = new LinkedHashMap<>();
     private final Set<String> imports = new LinkedHashSet<>();
     private int cellNumber;
+    private boolean strictNulls;
 
     private record Slot(String name, String type, boolean mutable, Object value) {}
     private record Definition(String name, String result, boolean async, String source) {}
@@ -157,6 +158,10 @@ public final class NotebookWorker {
     }
 
     private void evaluate(String code, boolean allowStdin) throws Exception {
+        if(SourceFile.strictDirective(code)&&!strictNulls) {
+            if(!slots.isEmpty()||!functions.isEmpty()||!types.isEmpty())throw new IllegalArgumentException("Restart the kernel and select strict null safety before declaring notebook state.");
+            strictNulls=true;
+        }
         var cell = parse(code);
         boolean fullProgram = cell.packageDecl() != null || cell.notebookDeclaration().stream()
                 .map(BhashParser.NotebookDeclarationContext::functionDecl)
@@ -210,7 +215,7 @@ public final class NotebookWorker {
             nextSlots.values().forEach(x->probe.append("साझा मान ").append(x.name).append(": ").append(x.type).append("; "));
             probe.append("} ");if(statements.stream().anyMatch(NotebookWorker::hasAsync))probe.append("असमकालिक ");
             probe.append("फलन मुख्य()->शून्य { ");for(var item:statements)probe.append(source(item)).append('\n');probe.append("}");
-            inferred=ManagedEmitter.notebookBindingTypes(probe.toString(),STORAGE);
+            inferred=ManagedEmitter.notebookBindingTypes(probe.toString(),STORAGE,strictNulls);
         }
         for (var item : statements) {
             var declaration = item instanceof BhashParser.VariableDeclContext binding ? binding
@@ -224,7 +229,7 @@ public final class NotebookWorker {
             String type = declaration.valueType()==null?inferred.get(key):Identifiers.key(declaration.valueType().getText());
             boolean mutable = declaration.LET() != null;
             if (!declared.add(key)) throw new IllegalArgumentException("Duplicate binding: " + name);
-            if (!TYPES.contains(type)) {
+            if (!TYPES.contains(type.endsWith("?")?type.substring(0,type.length()-1):type)) {
                 body.append(source(declaration)).append('\n');
                 continue;
             }
@@ -273,7 +278,7 @@ public final class NotebookWorker {
         Path directory = Files.createTempDirectory("bhash-cell-");
         Path jar = directory.resolve("cell.jar");
         try {
-            new JvmCompiler().compileNotebook(List.of(new SourceFile("cell-" + (++cellNumber) + ".bhash", program)),
+            new JvmCompiler().compileNotebook(List.of(new SourceFile("cell-" + (++cellNumber) + ".bhash", program,strictNulls)),
                     configuration, jar);
             run(jar, nextSlots, nextFunctions, nextTypes, nextImports, allowStdin);
         } finally {

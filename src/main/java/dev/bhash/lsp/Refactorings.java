@@ -101,8 +101,8 @@ final class Refactorings {
         for(var before:project) {
             if(!edits.containsKey(before.uri)){rewritten.put(before.uri,before);continue;}
             var text=apply(before,edits.getOrDefault(before.uri,List.of()));
-            var after=new SourceIndex(new SourceFile(BhashLanguageServer.path(before.uri).toString(),text));rewritten.put(before.uri,after);
-            if(!BhashLanguageServer.path(before.uri).getFileName().toString().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME))sources.add(new SourceFile(BhashLanguageServer.path(before.uri).toString(),text));
+            var after=new SourceIndex(new SourceFile(BhashLanguageServer.path(before.uri).toString(),text,before.strictNulls));rewritten.put(before.uri,after);
+            if(!BhashLanguageServer.path(before.uri).getFileName().toString().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME))sources.add(new SourceFile(BhashLanguageServer.path(before.uri).toString(),text,before.strictNulls));
         }
         // Verify every resolvable name, including unedited names: a successful compile alone cannot detect capture.
         for(var before:project)if(editable(before.uri,root))for(var original:before.tokens)if(identifier(before,original)) {
@@ -117,7 +117,7 @@ final class Refactorings {
             var actual=new HashSet<String>();after.resolve(after.coordinates.position(offset),rewritten.values()).forEach(s->actual.add(id(s)));
             if(!expected.equals(actual))throw new IllegalArgumentException("नया नाम किसी अन्य घोषणा को छिपाता है या नाम का अर्थ बदलता है।");
         }
-        sources.clear();for(var after:rewritten.values())if(!BhashLanguageServer.path(after.uri).getFileName().toString().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME))sources.add(new SourceFile(BhashLanguageServer.path(after.uri).toString(),after.text));
+        sources.clear();for(var after:rewritten.values())if(!BhashLanguageServer.path(after.uri).getFileName().toString().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME))sources.add(new SourceFile(BhashLanguageServer.path(after.uri).toString(),after.text,after.strictNulls));
         ManagedEmitter.check(sources);
         return edits;
     }

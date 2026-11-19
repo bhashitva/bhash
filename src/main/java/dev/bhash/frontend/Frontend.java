@@ -22,6 +22,9 @@ public final class Frontend {
     }
 
     public static Result parse(String sourceName, String source) {
+        return parse(sourceName,source,SourceFile.strictDirective(source));
+    }
+    public static Result parse(String sourceName, String source,boolean strictNulls) {
         var diagnostics = new ArrayList<Diagnostic>();
         var listener = new BaseErrorListener() {
             @Override public void syntaxError(Recognizer<?, ?> recognizer, Object symbol,
@@ -34,6 +37,7 @@ public final class Frontend {
             @Override public CommonToken create(org.antlr.v4.runtime.misc.Pair<TokenSource, CharStream> pair,
                     int type, String text, int channel, int start, int stop, int line, int column) {
                 var token = new LocatedToken(pair, type, channel, start, stop);
+                token.strictNulls(strictNulls);
                 token.setLine(line);
                 token.setCharPositionInLine(column);
                 if (text != null) token.setText(text);

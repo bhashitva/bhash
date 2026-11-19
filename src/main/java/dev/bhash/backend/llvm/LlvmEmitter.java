@@ -155,7 +155,7 @@ public final class LlvmEmitter {
             "declare void @bh_print_bool(i32)\ndeclare void @bh_print_space()\ndeclare void @bh_print_end()\n"+
             "declare i32 @bh_text_equal(ptr, ptr)\ndeclare i64 @bh_divide(i64, i64, ptr)\n"+
             "declare i64 @bh_remainder(i64, i64, ptr)\n"+
-            "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\n"+
+            "declare ptr @bh_collection_new(ptr, i64, ptr)\ndeclare ptr @bh_array_dimensions(ptr, i64, ptr, ptr)\ndeclare ptr @bh_array_dimensions_optional_text(ptr, i64, ptr, ptr)\n"+
             "declare ptr @bh_collection_literal(ptr, i64, ptr, ptr)\ndeclare i64 @bh_collection_call(ptr, i32, i64, i64, ptr, ptr)\n"+
             "declare i64 @bh_primitive_array_get(ptr, i64, ptr)\ndeclare void @bh_primitive_array_set(ptr, i64, i64, ptr)\n"+
             "declare void @bh_exception_configure(ptr, ptr)\ndeclare i64 @bh_protect(ptr, ptr)\ndeclare ptr @bh_exception_take()\ndeclare void @bh_throw(ptr, ptr) noreturn\ndeclare i32 @bh_run(ptr)\n"+
@@ -327,7 +327,7 @@ public final class LlvmEmitter {
         CollectionType type=collectionTypes.get(c.collection());
         if(c.literal())return instruction(Type.OBJECT,"call ptr @bh_collection_literal(ptr "+collectionInfo(c.collection())+", i64 "+(type.kind()==CollectionKind.MAP?count/2:count)+", ptr "+buffer+", ptr "+location+")");
         if(type.kind()==CollectionKind.BUFFER)return instruction(Type.OBJECT,"call ptr @bh_collection_new(ptr "+collectionInfo(c.collection())+", i64 "+reload(c.arguments().get(0)).ir()+", ptr "+location+")");
-        if(type.kind()==CollectionKind.ARRAY)return instruction(Type.OBJECT,"call ptr @bh_array_dimensions(ptr "+collectionInfo(c.collection())+", i64 "+count+", ptr "+buffer+", ptr "+location+")");
+        if(type.kind()==CollectionKind.ARRAY)return instruction(Type.OBJECT,"call ptr @"+(type.nullableText()?"bh_array_dimensions_optional_text":"bh_array_dimensions")+"(ptr "+collectionInfo(c.collection())+", i64 "+count+", ptr "+buffer+", ptr "+location+")");
         return instruction(Type.OBJECT,"call ptr @bh_collection_new(ptr "+collectionInfo(c.collection())+", i64 0, ptr "+location+")");
     }
     private final Map<Integer,CollectionType> collectionTypes=new HashMap<>();
@@ -338,6 +338,13 @@ public final class LlvmEmitter {
     private Value box(Box b){
         Value input=expression(b.value());
         if(input.type()==Type.OBJECT || input.type()==Type.ANY)return new Value(Type.ANY,input.ir());
+        String merged=null;
+        if(input.type()==Type.TEXT) {
+            String present=freshLabel(),absent=freshLabel();merged=freshLabel();
+            Value hasText=instruction(Type.BOOL,"icmp ne ptr "+input.ir()+", null");
+            line("br i1 "+hasText.ir()+", label %"+present+", label %"+absent);
+            block(absent);line("store ptr null, ptr "+rootAddress(roots.get(b)));jump(merged);block(present);
+        }
         int kind=switch(input.type()){case INT32->8;case BYTE->7;case REAL->6;case INT->1;case BOOL->2;case TEXT->3;default->throw new IllegalStateException("Unchecked box type");};
         Value result=instruction(Type.ANY,"call ptr @bh_alloc(ptr @box_gc"+kind+", i64 16)");
         line("store ptr @box_info"+kind+", ptr "+result.ir());
@@ -350,6 +357,7 @@ public final class LlvmEmitter {
             String payload=temporary();line(payload+" = getelementptr i8, ptr "+result.ir()+", i64 8");
             line("store "+(kind==6?"double":"i64")+" "+input.ir()+", ptr "+payload);
         }
+        if(merged!=null){jump(merged);block(merged);}
         return reload(b);
     }
     private Value typeOperation(TypeOperation t){
@@ -373,9 +381,13 @@ public final class LlvmEmitter {
         if(t.targetType()==Type.TEXT && value.type()==Type.BOOL)
             return instruction(Type.TEXT,"select i1 "+value.ir()+", ptr "+text("सत्य")+", ptr "+text("असत्य"));
         Value allowed=matches;
-        if(dynamic && (t.targetType()==Type.OBJECT || t.targetType()==Type.ANY)){
+        if(dynamic && !t.rejectNull() && (t.targetType()==Type.OBJECT || t.targetType()==Type.ANY)){
             Value empty=instruction(Type.BOOL,"icmp eq ptr "+value.ir()+", null");
             allowed=instruction(Type.BOOL,"or i1 "+matches.ir()+", "+empty.ir());
+        }
+        if(t.rejectNull()&&value.type().reference()) {
+            Value present=instruction(Type.BOOL,"icmp ne ptr "+value.ir()+", null");
+            allowed=instruction(Type.BOOL,"and i1 "+allowed.ir()+", "+present.ir());
         }
         String pass=freshLabel(),fail=freshLabel();
         line("br i1 "+allowed.ir()+", label %"+pass+", label %"+fail);

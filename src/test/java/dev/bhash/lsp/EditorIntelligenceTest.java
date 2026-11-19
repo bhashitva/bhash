@@ -9,6 +9,17 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EditorIntelligenceTest {
+    @Test void nullableReceiversOfferMembersAndKeepNullableDetails() {
+        var main=source("nullable-editor.bhash","वर्ग क {सार्वजनिक मान अंक: पूर्णांक?;} फलन मुख्य()->शून्य {स्थिर व:क?=रिक्त; व?.}");
+        var items=new EditorModel(main,List.of(main)).memberCompletions(after(main,"व?."));
+        assertEquals(List.of("अंक"),labels(items));assertEquals("अंक: पूर्णांक?",items.get(0).getDetail());
+    }
+    @Test void strictLibrarySignatureHelpShowsNullableJsonValues() {
+        var library=source(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME,"संकुल मानक; सार्वजनिक वर्ग जेसन {सार्वजनिक साझा फलन पढ़ो(मानक:पाठ)->सर्ववस्तु{} }");
+        var main=source("strict-editor.bhash","// bhash:null-safety=strict\nफलन मुख्य()->शून्य {मानक.जेसन.}");
+        var items=new EditorModel(main,List.of(main,library)).memberCompletions(after(main,"जेसन."));
+        assertTrue(items.stream().anyMatch(item->item.getDetail().endsWith("सर्ववस्तु?")),items.toString());
+    }
     @Test void asyncSymbolsShowEffectiveTaskResults() {
         var index=source("async-editor.bhash","असमकालिक फलन उत्तर()->पूर्णांक {लौटाओ ४२;}");
         assertEquals("असमकालिक फलन उत्तर() -> कार्यफल<पूर्णांक>",index.outline.get(0).getDetail());

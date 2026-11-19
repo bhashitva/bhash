@@ -28,7 +28,9 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                              List<Integer> interfaceMethods, List<Integer> assignableTypes) {}
     public enum CollectionKind { ARRAY, LIST, MAP, BUFFER }
     public record CollectionType(int id, CollectionKind kind, int keyKind, int valueKind,
-                                 int element, int keyList, int valueList) {}
+                                 int element, int keyList, int valueList,boolean nullableText) {
+        public CollectionType(int id,CollectionKind kind,int keyKind,int valueKind,int element,int keyList,int valueList){this(id,kind,keyKind,valueKind,element,keyList,valueList,false);}
+    }
     public enum CollectionOperation { SIZE, EMPTY, GET, GET_OR, SET, CONTAINS, ADD, INSERT,
         REMOVE, CLEAR, KEYS, VALUES, VERSION, ITER_CHECK, ITER_KEY, ITER_VALUE }
     public record CollectionCall(Type type, CollectionOperation operation, Expression receiver,
@@ -51,7 +53,9 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
     public record Throw(Expression value, Source source) implements Statement {}
     public record Fail(Expression message, Expression location) implements Statement {}
     public enum TypeAction { TEST, SAFE, CAST }
-    public record TypeOperation(Type type, TypeAction action, Expression value, Type targetType, int targetId, Source source) implements Expression {}
+    public record TypeOperation(Type type, TypeAction action, Expression value, Type targetType, int targetId, Source source,boolean rejectNull) implements Expression {
+        public TypeOperation(Type type,TypeAction action,Expression value,Type targetType,int targetId,Source source){this(type,action,value,targetType,targetId,source,false);}
+    }
     public record StructuredTypes(int texts,int values,int object) {}
     public enum BufferOperation { ENCODE, DECODE, READ_FILE, WRITE_FILE, SLICE, ARRAY, FILL, READ_INT, WRITE_INT, READ_REAL, WRITE_REAL }
     public record BufferCall(Type type, BufferOperation operation, List<Expression> arguments, int descriptor, Source source) implements Expression {}
@@ -231,7 +235,9 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             int keyKind=valueKind(key,at),valueKind=valueKind(value,at);
             int element=value.collection!=null?collectionId(value,at):-1;
             int keyList=map?collectionId(listType(key),at):-1,valueList=map?collectionId(listType(value),at):-1;
-            collections.set(slot,new CollectionType(id,CollectionKind.valueOf(t.collection.name()),keyKind,valueKind,element,keyList,valueList));
+            var leaf=t;while(leaf.collection==ManagedEmitter.CollectionKind.ARRAY)leaf=leaf.arguments.get(0);
+            boolean nullableText=leaf.nullable()&&leaf.nonNull()==ManagedEmitter.Type.TEXT;
+            collections.set(slot,new CollectionType(id,CollectionKind.valueOf(t.collection.name()),keyKind,valueKind,element,keyList,valueList,nullableText));
             return id;
         }
         final Map<ManagedEmitter.Constructor,Integer> initializers=new IdentityHashMap<>();
@@ -286,6 +292,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             for(var c:classes)if(c.enumeration!=null)enumLookups.put(c,ids.size()+constructors.size()+initializers.size()+classInitializers.size()+enumLookups.size());
         }
         Type type(ManagedEmitter.Type t,ParserRuleContext at) throws CompilationException {
+            if(t.nullable())return t.nonNull().scalar()?Type.ANY:type(t.nonNull(),at);
             if(t.collection!=null){collectionId(t,at);return Type.OBJECT;}
             if(t==ManagedEmitter.Type.INT)return Type.INT;
             if(t==ManagedEmitter.Type.BYTE)return Type.BYTE;
@@ -368,7 +375,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                             continue;
                         }
                         Type t=type(f.type(),f.declaration());
-                        Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(t,t==Type.TEXT?"":t==Type.BOOL?false:(t==Type.INT || t==Type.BYTE || t==Type.INT32)?(Object)0L:t==Type.REAL?(Object)0.0:null,source(f.declaration()));
+                        Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(f.type().nullable()?Type.OBJECT:t,f.type().nullable()?null:t==Type.TEXT?"":t==Type.BOOL?false:(t==Type.INT || t==Type.BYTE || t==Type.INT32)?(Object)0L:t==Type.REAL?(Object)0.0:null,source(f.declaration()));
                         statements.add(new FieldWrite(new FieldRead(new Read(self,source(at)),fields.get(f),source(f.declaration())),coerce(value,t)));
                     }
                     resultType=Type.VOID;
@@ -402,7 +409,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                 if(c.parent!=null && c.parent!=exceptionClass)statements.add(new Initialize(classIds.get(c.parent)));
                 for(var f:c.fields.values())if(f.shared()){
                     Type t=type(f.type(),f.declaration());
-                    Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(t,t==Type.TEXT?"":t==Type.BOOL?false:(t==Type.INT || t==Type.BYTE || t==Type.INT32)?(Object)0L:t==Type.REAL?(Object)0.0:null,source(f.declaration()));
+                    Expression value=f.declaration().expression()!=null?expression(f.declaration().expression()):new Constant(f.type().nullable()?Type.OBJECT:t,f.type().nullable()?null:t==Type.TEXT?"":t==Type.BOOL?false:(t==Type.INT || t==Type.BYTE || t==Type.INT32)?(Object)0L:t==Type.REAL?(Object)0.0:null,source(f.declaration()));
                     statements.add(new StaticWrite(statics.get(f),coerce(value,t)));
                 }
                 result.add(new Function(classInitializers.get(c),Type.VOID,List.of(),new Block(List.copyOf(statements),List.of()),source(c.declaration)));
@@ -680,6 +687,10 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             boolean contract=f.owner.isInterface();
             return new Call(type(f.result,at),contract?-1:ids.get(f),List.copyOf(args),source(at),true,slot,contract?interfaceSlots.get(f):-1);
         }
+        Expression narrowField(Expression value,ParserRuleContext at)throws CompilationException {
+            var narrowed=a.narrowedFields.get(at);
+            return narrowed!=null&&type(narrowed,at)!=value.type()?new TypeOperation(type(narrowed,at),TypeAction.CAST,value,type(narrowed,at),runtimeId(narrowed,at),source(at),true):value;
+        }
         Expression expression(ParserRuleContext c) throws CompilationException {
             Object constant=a.constants.get(c);
             if(constant!=null)return new Constant(constant instanceof Long?Type.INT:constant instanceof Double?Type.REAL:Type.TEXT,constant,source(c));
@@ -687,9 +698,16 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                 if(p.CONVERT()!=null || p.TYPE_TEST()!=null || p.SAFE_CAST()!=null){
                     var destination=a.conversions.get(p);Type target=type(destination,p);
                     Expression value=expression(p.expression());
-                    if(target==Type.ANY && p.TYPE_TEST()==null)return coerce(value,Type.ANY);
+                    var unwrapped=a.conversionSources.get(p);
+                    if(unwrapped!=null)value=new TypeOperation(type(unwrapped,p),TypeAction.CAST,value,type(unwrapped,p),runtimeId(unwrapped,p),source(p),true);
+                    if(target==Type.ANY && p.TYPE_TEST()==null) {
+                        value=coerce(value,Type.ANY);
+                        boolean strict=p.start instanceof LocatedToken token&&token.strictNulls();
+                        if(destination.nullable()||!strict)return value;
+                        return new TypeOperation(Type.ANY,TypeAction.CAST,value,Type.ANY,-4,source(p),true);
+                    }
                     if(p.CONVERT()!=null){
-                        var original=a.expressions.get(p.expression()).type();
+                        var original=unwrapped==null?a.expressions.get(p.expression()).type():unwrapped;
                         if(original==destination)return value;
                         boolean enumSource=original.object!=null && original.object.enumeration!=null;
                         boolean enumTarget=destination.object!=null && destination.object.enumeration!=null;
@@ -715,7 +733,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                     if(p.CONVERT()!=null && (target==Type.BYTE || target==Type.INT32) && value.type()==Type.TEXT)
                         value=new TextCall(Type.INT,TextOperation.PARSE_INTEGER,List.of(value),source(p));
                     var action=p.TYPE_TEST()!=null?TypeAction.TEST:p.SAFE_CAST()!=null?TypeAction.SAFE:TypeAction.CAST;
-                    return new TypeOperation(action==TypeAction.TEST?Type.BOOL:target,action,value,target,runtimeId(destination,p),source(p));
+                    return new TypeOperation(action==TypeAction.TEST?Type.BOOL:target,action,value,target,runtimeId(destination,p),source(p),p.start instanceof LocatedToken token&&token.strictNulls()&&!destination.nullable());
                 }
                 if(p.NULL()!=null)return new Constant(Type.OBJECT,null,source(c));
                 if(p.THIS()!=null || p.BASE()!=null)return new Read(self,source(c));
@@ -736,10 +754,15 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                     if(ctor==null || !constructors.containsKey(ctor))throw unsupported(p);
                     return new Call(Type.OBJECT,constructors.get(ctor),checkedArguments(p.arguments(),ctor.parameters()),source(c),false,-1,-1,actual.object.record()?-1:classIds.get(actual.object));
                 }
-                if(a.fields.containsKey(p)){var field=a.fields.get(p);return field.shared()?new StaticRead(statics.get(field),source(c)):new FieldRead(new Read(self,source(c)),fields.get(field),source(c));}
+                if(a.fields.containsKey(p)){var field=a.fields.get(p);return narrowField(field.shared()?new StaticRead(statics.get(field),source(c)):new FieldRead(new Read(self,source(c)),fields.get(field),source(c)),p);}
                 if(p.TRUE()!=null || p.FALSE()!=null)return new Constant(Type.BOOL,p.TRUE()!=null,source(c));
                 if(p.IDENTIFIER()!=null) {
-                    if(p.LPAREN()==null)return new Read(binding(a.reads.get(p),p),source(c));
+                    if(p.LPAREN()==null) {
+                        Expression read=new Read(binding(a.reads.get(p),p),source(c));
+                        var narrowed=a.narrowedReads.get(p);
+                        if(narrowed!=null&&type(narrowed,p)!=read.type())read=new TypeOperation(type(narrowed,p),TypeAction.CAST,read,type(narrowed,p),runtimeId(narrowed,p),source(p),true);
+                        return read;
+                    }
                     var f=a.calls.get(p);
                     if(f==null && Identifiers.key(p.IDENTIFIER().getText()).equals(Identifiers.key("लंबाई")))
                         return new CollectionCall(Type.INT,CollectionOperation.SIZE,expression(p.arguments().expression(0)),List.of(),-1,source(p));
@@ -797,6 +820,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                     if(selected!=null) {
                         if(selected.shared())value=new StaticRead(statics.get(selected),source(part));
                         else {if(value==null)value=expression(p.primary());value=new FieldRead(value,fields.get(selected),source(part));}
+                        value=narrowField(value,part);
                         if(f!=null){var args=new ArrayList<Expression>();args.add(value);args.addAll(arguments(part.arguments()));value=methodCall(f,args,part);}
                         previous=a.expressions.get(part).type();continue;
                     }
@@ -808,6 +832,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                     }else{
                         var field=fields.get(a.fields.get(part));if(field==null)throw unsupported(part);
                         value=new FieldRead(value,field,source(part));
+                        value=narrowField(value,part);
                     }
                     previous=a.expressions.get(part).type();
                 }
@@ -820,7 +845,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                 String op=c.getChild(i).getText();
                 Expression right=expression((ParserRuleContext)c.getChild(i+1));
                 Type t=Set.of("==","!=","<","<=",">",">=","&&","||").contains(op)?Type.BOOL:(result.type()==Type.BYTE || result.type()==Type.INT32)?Type.INT:result.type();
-                if((op.equals("==") || op.equals("!=")) && (result.type()==Type.ANY || right.type()==Type.ANY)){
+                if((op.equals("==") || op.equals("!=")) && (result.type()==Type.ANY || right.type()==Type.ANY || result instanceof Constant empty&&empty.value()==null || right instanceof Constant otherEmpty&&otherEmpty.value()==null)){
                     result=coerce(result,Type.ANY);right=coerce(right,Type.ANY);
                 }
                 result=new Binary(t,op,result,right,source(c));

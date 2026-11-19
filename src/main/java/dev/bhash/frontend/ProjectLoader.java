@@ -97,7 +97,7 @@ public final class ProjectLoader {
             Path previous = logicalPaths.putIfAbsent(logical, path);
             if (previous != null)
                 throw new IOException("[BH6002] इन स्रोत फ़ाइलों के नाम एक ही पहचान दर्शाते हैं। — " + previous + " / " + path);
-            sources.add(new SourceFile(path.toString(),read(path,overlays)));
+            sources.add(new SourceFile(path.toString(),read(path,overlays),metadata.strictNulls()));
         }
         return new Project(input,root,name,List.copyOf(roots),List.copyOf(files),List.copyOf(sources),metadata.version(),metadata.library(),List.of(input,root.resolve(SourcePackages.LOCK)));
     }
