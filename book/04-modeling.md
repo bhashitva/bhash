@@ -71,3 +71,8 @@ constructor और generic collection नियम पढ़ें। फिर 
 **खुद आज़माएँ।** `खोजो(सत्य)` को `खोजो(असत्य)` करें। पहले अनुमान लगाएँ
 कि कौन सा वैकल्पिक नाम छपेगा। फिर `?.` को `.` से बदलकर compiler का
 रिक्त-सुरक्षा निदान पढ़ें।
+
+
+## विकल्पसमूह और अपेक्षित विफलता (Tagged unions and Result)
+
+जब किसी काम की निश्चित अलग अवस्थाएँ हों, प्रत्येक अवस्था के लिए अलग विकल्प और आवश्यक payload रखें। Compiler मिलान की सभी सम्भावनाएँ जाँचता है। अपेक्षित त्रुटि को `मानक.परिणाम<त, द>` से स्पष्ट बनाइए; exception और cancellation के अर्थ अलग रहते हैं। [विस्तृत हिन्दी पाठ](../tutorial/tagged-unions/README.md), [छात्र-खोज और Result क्रमानुदेश](../tutorial/tagged-unions/results.bhash) और [async Result क्रमानुदेश](../tutorial/tagged-unions/async-result.bhash) पढ़कर चलाएँ।

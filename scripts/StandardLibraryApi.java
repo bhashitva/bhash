@@ -65,7 +65,10 @@ class StandardLibraryApi {
         List<String> parents = new ArrayList<>();
         if (type.valueType() != null) parents.add(type.valueType().getText());
         parents.addAll(types(type.typeList()));
-        if (type.RECORD() != null) {
+        if(type.unionKeyword()!=null) {
+            String result=name+(type.typeParameters()==null?"":"<"+String.join(",",typeParameters(type.typeParameters()))+">");
+            for(var option:type.unionCase())members.add(new Member("method",option.IDENTIFIER().getText(),parameters(option.parameters()),result,true,false,false));
+        } else if (type.RECORD() != null) {
             var parameters = parameters(type.parameters());
             members.add(constructor(parameters));
             parameters.forEach(p -> members.add(new Member("field", p.name, List.of(), p.type, false, false, false)));
@@ -83,7 +86,7 @@ class StandardLibraryApi {
                 }
             }
         }
-        return new ApiType(name, type.RECORD() == null ? "class" : "record",
+        return new ApiType(name, type.unionKeyword()!=null?"union":type.RECORD() == null ? "class" : "record",
                 typeParameters(type.typeParameters()), parents, source, members);
     }
 

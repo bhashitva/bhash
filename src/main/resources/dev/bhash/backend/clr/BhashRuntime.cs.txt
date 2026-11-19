@@ -365,12 +365,25 @@ internal static class BhashRuntime {
     public abstract class BRecord {
         protected abstract object[] dataFields();
         public sealed override bool Equals(object other) {
-            if(other==null || other.GetType()!=GetType()) return false;
-            object[] a=dataFields(),b=((BRecord)other).dataFields();
-            for(int i=0;i<a.Length;i++) if(!collectionSame(a[i],b[i])) return false;
-            return true;
+            var work=new System.Collections.Generic.Stack<(object,object)>();work.Push((this,other));
+            var seen=new System.Collections.Generic.Dictionary<BRecord,System.Collections.Generic.HashSet<BRecord>>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+            while(work.Count>0){var (left,right)=work.Pop();if(object.ReferenceEquals(left,right))continue;
+                if(left is BRecord a){if(right is not BRecord b||a.GetType()!=b.GetType())return false;
+                    if(!seen.TryGetValue(a,out var partners)){partners=new System.Collections.Generic.HashSet<BRecord>(System.Collections.Generic.ReferenceEqualityComparer.Instance);seen.Add(a,partners);}
+                    if(!partners.Add(b))continue;var af=a.dataFields();var bf=b.dataFields();for(int i=0;i<af.Length;i++)work.Push((af[i],bf[i]));
+                }else if(!collectionSame(left,right))return false;
+            }return true;
         }
-        public sealed override int GetHashCode() { int hash=GetType().GetHashCode(); foreach(object item in dataFields()) hash=unchecked(31*hash+collectionHash(item)); return hash; }
+        public sealed override int GetHashCode() {
+            var memo=new System.Collections.Generic.Dictionary<BRecord,int>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
+            var work=new System.Collections.Generic.Stack<(BRecord value,object[] fields,int index,int hash)>();work.Push((this,dataFields(),0,GetType().GetHashCode()));
+            while(work.Count>0){var f=work.Pop();if(f.index==f.fields.Length){memo[f.value]=f.hash;continue;}
+                object field=f.fields[f.index];int child;
+                if(field is BRecord record){if(!memo.TryGetValue(record,out child)){work.Push(f);work.Push((record,record.dataFields(),0,record.GetType().GetHashCode()));continue;}}
+                else child=collectionHash(field);
+                work.Push((f.value,f.fields,f.index+1,unchecked(31*f.hash+child)));
+            }return memo[this];
+        }
     }
     internal sealed class BBuffer : BSeq<byte> {
         internal readonly byte[] items;

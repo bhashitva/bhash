@@ -10,6 +10,13 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class RefactoringsTest {
+    @Test void unionCasesAndPatternBindingsHaveIndependentRenameScopes()throws Exception {
+        var source=source("union.bhash","विकल्पसमूह खोज {मिला(अंक:पूर्णांक);नहीं();} फलन मुख्य()->शून्य {स्थिर व=खोज.मिला(७); मिलान(व){विकल्प खोज.मिला(स्थिर अंक):{लिखो(अंक);} विकल्प खोज.नहीं():{}}}");
+        var refactorings=new Refactorings(List.of(source));
+        assertEquals(3,refactorings.references(source,at(source,"मिला(अंक"),true).size());
+        assertEquals(2,refactorings.references(source,at(source,"अंक):{लिखो"),true).size());
+    }
+
     @TempDir Path root;
     private SourceIndex source(String name,String text){return new SourceIndex(new SourceFile(root.resolve(name).toString(),text));}
     private Position at(SourceIndex i,String needle){return i.coordinates.position(i.text.indexOf(needle));}

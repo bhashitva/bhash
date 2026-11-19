@@ -336,7 +336,8 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                     itable.add(implementation==null?-1:ids.get(implementation));
                 }
                 String displayName=originalName(c.declaration!=null?c.declaration.IDENTIFIER().getSymbol():c.enumeration.IDENTIFIER().getSymbol());
-                objectTypes.add(new ObjectType(classIds.get(c),displayName,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList(),List.copyOf(itable),java.util.stream.Stream.concat(membership.stream().map(classIds::get),c.record()?java.util.stream.Stream.of(-4,-9):java.util.stream.Stream.of(-4)).toList()));
+                if(c.unionCase())displayName=originalName(c.parent.declaration.IDENTIFIER().getSymbol())+"."+((dev.bhash.frontend.LocatedToken)c.declaration.start).unionCaseName();
+                objectTypes.add(new ObjectType(classIds.get(c),displayName,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList(),List.copyOf(itable),java.util.stream.Stream.concat(membership.stream().map(classIds::get),c.record()?java.util.stream.Stream.of(-4,-9):c.unionCase()?java.util.stream.Stream.of(-4,-10):java.util.stream.Stream.of(-4)).toList()));
                 for(var methods:c.methods.values())for(var f:methods){
                     self=f.shared?null:new Binding(nextBinding++,Type.OBJECT);
                     var parameters=new ArrayList<Binding>();if(self!=null)parameters.add(self);
@@ -462,6 +463,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
         private int exportHandleType(ManagedEmitter.Type type, NativeExports.Request request) throws CompilationException {
             if (type == ManagedEmitter.Type.INT || type == ManagedEmitter.Type.BOOL ||
                     type == ManagedEmitter.Type.TEXT || type == ManagedEmitter.Type.VOID) return 0;
+            if(type.object!=null&&(type.object.unionFamily()||type.object.unionCase()))throw new CompilationException(request.location()+": [BH3320] विकल्पसमूह/परिणाम सीधे C/JNI export में उपलब्ध नहीं हैं; scalar/text/handle wrapper दें।");
             if (type.object != null && classIds.containsKey(type.object) && !type.object.isInterface())
                 return classIds.get(type.object) + 16;
             throw new CompilationException(request.location() + ": Unsupported native export type: " + type.bhash);

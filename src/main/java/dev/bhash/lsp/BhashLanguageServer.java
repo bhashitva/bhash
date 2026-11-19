@@ -220,6 +220,11 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
             var actions=new ArrayList<Either<Command,CodeAction>>();
             for(var diagnostic:params.getContext().getDiagnostics()) {
                 String code=diagnostic.getCode()==null||!diagnostic.getCode().isLeft()?"":diagnostic.getCode().getLeft();
+                if(code.equals("BH3312")) {
+                    var edits=new EditorModel(index,project.indexes.values()).missingMatchArms(diagnostic.getRange().getStart());
+                    if(!edits.isEmpty()){var action=new CodeAction("छूटी मिलान शाखाएँ जोड़ें");action.setKind(CodeActionKind.QuickFix);action.setDiagnostics(List.of(diagnostic));action.setEdit(new WorkspaceEdit(Map.of(index.uri,edits)));actions.add(Either.forRight(action));}
+                    continue;
+                }
                 if (code.equals("BH1003")) {
                     int at = index.coordinates.offset(diagnostic.getRange().getStart());
                     if (at >= index.text.length() || !Set.of(0x200C,0x200D).contains(index.text.codePointAt(at))) continue;

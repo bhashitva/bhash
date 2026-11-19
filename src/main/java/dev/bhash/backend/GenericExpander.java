@@ -246,13 +246,15 @@ final class GenericExpander {
         if(t.rank>0)return typeName(new Ty(t.name,t.args,0),at)+"[]".repeat(t.rank);
         if(CollectionTypes.builtin(t.name)){var args=new ArrayList<String>();for(var a:t.args)args.add(typeName(a,at));return t.name+"<"+String.join(",",args)+">";}
         var c=template(t);if(c==null){if(!t.args.isEmpty())throw error(at,"Type arguments require a generic type: "+t.name);return t.name;}
+        if(c.name instanceof LocatedToken token&&(token.unionKind()==1||token.unionKind()==2)&&t.args.stream().anyMatch(a->a.equals(VOID)))throw error(at,"[BH3304] विकल्पसमूह में शून्य payload प्रकार नहीं हो सकता; मानक.इकाई उपयोग करें।");
         var subst=classSubst(t,at);constraints(c.parameters,subst,at);concrete.putIfAbsent(t,c);
         if(c.parameters==null)return t.name;
         return instantiate("type:"+t,c,subst,t,at);
     }
+    private long specializationCount(){return uses.size()+instances.values().stream().filter(i->!(i.template.name instanceof LocatedToken t)||t.unionKind()!=2).count();}
     private String instantiate(String key,Template template,Map<String,Ty> subst,Ty ty,ParserRuleContext at)throws CompilationException {
         var old=instances.get(key);if(old!=null)return old.name;
-        if(instances.size()+uses.size()>=256)throw error(at,"Generic specialization limit exceeded (256); check expanding recursive types.");
+        if(specializationCount()>=256)throw error(at,"Generic specialization limit exceeded (256); check expanding recursive types.");
         var instance=new Instance(template,Map.copyOf(subst),fresh(),ty);instances.put(key,instance);pending.add(instance);return instance.name;
     }
     private List<FunctionDeclContext> declaredMethods(ParserRuleContext c){return c instanceof ClassDeclContext d?d.classMember().stream().filter(x->x.functionDecl()!=null).map(ClassMemberContext::functionDecl).toList():((InterfaceDeclContext)c).functionDecl();}
@@ -403,7 +405,7 @@ final class GenericExpander {
     private String demand(Method method,List<Ty> args,ParserRuleContext at)throws CompilationException {
         String id=method.owner+":"+method.tree.start.getTokenIndex()+":"+args;
         var old=uses.get(id);if(old!=null)return old.name;
-        if(instances.size()+uses.size()>=256)throw error(at,"Generic specialization limit exceeded (256); check expanding recursive types.");
+        if(specializationCount()>=256)throw error(at,"Generic specialization limit exceeded (256); check expanding recursive types.");
         var s=bind(method.tree.typeParameters(),args,method.subst,at);constraints(method.tree.typeParameters(),s,at);
         String name=methodNames.computeIfAbsent(key(method.tree.IDENTIFIER().getText())+":"+args,k->fresh());
         uses.put(id,new Use(method,List.copyOf(args),name));return name;
@@ -445,7 +447,7 @@ final class GenericExpander {
             if(instances.containsKey(id))continue;
             var subst=bind(f.typeParameters(),args,Map.of(),at);
             try{constraints(f.typeParameters(),subst,at);}catch(CompilationException invalid){continue;}
-            if(instances.size()+uses.size()>=256)throw error(at,"Generic specialization limit exceeded (256); check expanding recursive types.");
+            if(specializationCount()>=256)throw error(at,"Generic specialization limit exceeded (256); check expanding recursive types.");
             var i=new Instance(new Template(f,f.typeParameters(),f.IDENTIFIER().getSymbol()),subst,emitted,null);instances.put(id,i);pending.add(i);
         }
         return emitted;
@@ -468,6 +470,8 @@ final class GenericExpander {
     }
     private Ty infer(ParseTree node,Map<String,Ty> s)throws CompilationException {
         if(node==null)return null;
+        if(node instanceof MatchExpressionContext m)return matchPlan(m,m.expression(),m.matchExpressionArm().stream().map(a->new Arm(a,a.matchPattern(),a.guard,a.result,null,a.DEFAULT()!=null)).toList(),s).result;
+        if(node instanceof BlockValueContext b)return type(b.valueType(),s);
         if(node instanceof ExpressionContext e&&e.COALESCE()!=null) {
             var left=infer(e.logicalOr(),s);var right=infer(e.expression(),s);
             if(left==null||!left.optional())throw error(e,"?? requires a nullable left operand.");
@@ -500,6 +504,8 @@ final class GenericExpander {
             return value;
     }
     private Ty inferPrimary(PrimaryContext p,Map<String,Ty> s)throws CompilationException {
+            if(p.matchExpression()!=null)return infer(p.matchExpression(),s);
+            if(p.blockValue()!=null)return type(p.blockValue().valueType(),s);
             if(p.NEW()!=null){var t=type(p.valueType(),s);typeName(t,p);if(p.arguments()!=null)for(var a:p.arguments().expression())infer(a,s);for(var ignored:p.arrayDimension())t=t.array();return t;}
             if(p.INTEGER_LITERAL()!=null)return INT;if(p.REAL_LITERAL()!=null)return REAL;if(p.STRING_LITERAL()!=null)return TEXT;if(p.TRUE()!=null||p.FALSE()!=null||p.TYPE_TEST()!=null)return BOOL;if(p.NULL()!=null)return NIL;
             if(p.CONVERT()!=null||p.SAFE_CAST()!=null){var t=type(p.valueType(),s);return p.SAFE_CAST()!=null&&p.start instanceof LocatedToken token&&token.strictNulls()?t.optionalType():t;}
@@ -584,6 +590,8 @@ final class GenericExpander {
             nullHelpers.put(name,new Helper("फलन "+name+"(व:"+from+")->"+to+" {यदि(व==रिक्त){लौटाओ रिक्त;} लौटाओ परिवर्तित<"+base+">(व);}",p.start));
             append(name+"(",p.start);render(p.expression(),subst,renamed,replacement);append(")",p.stop);return;
         }
+        if(node instanceof MatchExpressionContext m){renderMatch(m,m.expression(),m.matchExpressionArm().stream().map(a->new Arm(a,a.matchPattern(),a.guard,a.result,null,a.DEFAULT()!=null)).toList(),subst,renamed,replacement);return;}
+        if(node instanceof MatchStatementContext m){renderMatch(m,m.expression(),m.matchStatementArm().stream().map(a->new Arm(a,a.matchPattern(),a.guard,null,a.block(),a.DEFAULT()!=null)).toList(),subst,renamed,replacement);return;}
         if(node instanceof ReturnTypeContext r){append(typeName(result(r,subst),r),r.start);return;}
         if(node instanceof ParameterContext p&&strictProfile&&standard(p)&&type(p.valueType(),subst).equals(ANY)) {
             append(p.IDENTIFIER().getText()+": सर्ववस्तु?",p.start);return;
@@ -672,5 +680,178 @@ final class GenericExpander {
         }
         if(node instanceof TerminalNode n){append(n.getSymbol()==renamed?replacement:n.getText(),n.getSymbol());return;}
         for(int i=0;i<node.getChildCount();i++)render(node.getChild(i),subst,renamed,replacement);
+    }
+    private record Arm(ParserRuleContext at,MatchPatternContext pattern,ExpressionContext guard,ExpressionContext value,BlockContext block,boolean rest) {}
+    private record Shape(String tag,List<Ty> fields,List<String> names,Ty runtime) {}
+    private record Pat(Shape shape,List<Pat> children) { static Pat any(){return new Pat(null,List.of());} }
+    private record Pattern(Pat coverage,String test,LinkedHashMap<String,Ty> bindings,List<String> declarations) {}
+    private record MatchPlan(Ty selector,Ty result,String name,List<Pattern> patterns,boolean requireNonNullProof) {}
+    private boolean union(Ty t){var c=template(t);return c!=null&&c.name instanceof LocatedToken token&&token.unionKind()==1;}
+    private List<Shape> cases(Ty t,ParserRuleContext at)throws CompilationException {
+        var result=new ArrayList<Shape>();
+        for(var c:types.values())if(c.name instanceof LocatedToken token&&token.unionKind()==2&&c.tree instanceof ClassDeclContext d) {
+            if(!key(d.valueType().IDENTIFIER().getText()).equals(t.name))continue;
+            var ct=new Ty(c.name.getText(),t.args,0);var s=classSubst(ct,at);
+            if(type(d.valueType(),s).equals(t)) {
+                var fields=d.classMember().stream().filter(m->m.fieldDecl()!=null).map(ClassMemberContext::fieldDecl).toList();
+                var ts=new ArrayList<Ty>();for(var f:fields)ts.add(type(f.valueType(),s));
+                result.add(new Shape(t+"."+token.unionCaseName(),ts,fields.stream().map(f->f.IDENTIFIER().getText()).toList(),ct));
+            }
+        }return result;
+    }
+    private boolean nullDomain(Ty t){return t.optional()||!strictProfile&&reference(t);}
+    // -1 marks a coverage-only non-null projection. It is never emitted as a source type;
+    // it prevents the legacy reference domain from reintroducing null after specialization.
+    private List<Shape> domain(Ty t,ParserRuleContext at)throws CompilationException {
+        if(t.nullable.contains(-1)){var marks=new HashSet<>(t.nullable);marks.remove(-1);return nonnullDomain(new Ty(t.name,t.args,t.rank,marks),at);}
+        if(nullDomain(t)){var marks=new HashSet<>(t.nonNull().nullable);marks.add(-1);return List.of(new Shape("null",List.of(),List.of(),null),new Shape("nonnull",List.of(new Ty(t.name,t.args,t.rank,marks)),List.of(),null));}
+        return nonnullDomain(t,at);
+    }
+    private List<Shape> nonnullDomain(Ty t,ParserRuleContext at)throws CompilationException {
+        if(t.equals(BOOL))return List.of(new Shape("true",List.of(),List.of(),null),new Shape("false",List.of(),List.of(),null));
+        if(union(t))return cases(t,at);
+        var e=enums.get(t.name);if(e!=null)return e.enumMember().stream().map(m->new Shape(t+"."+m.IDENTIFIER().getText(),List.<Ty>of(),List.<String>of(),null)).toList();
+        var c=template(t);if(c!=null&&c.tree instanceof ClassDeclContext d&&d.RECORD()!=null) {
+            var ps=d.parameters()==null?List.<ParameterContext>of():d.parameters().parameter();var s=classSubst(t,at);var ts=new ArrayList<Ty>();for(var p:ps)ts.add(type(p.valueType(),s));
+            return List.of(new Shape(t.toString(),ts,ps.stream().map(p->p.IDENTIFIER().getText()).toList(),t));
+        }return null;
+    }
+    private Ty knownNonNull(Ty t){var marks=new HashSet<>(t.nonNull().nullable);marks.add(-1);return new Ty(t.name,t.args,t.rank,marks);}
+    private Pat typedCoverage(Ty selector,Ty actual,Pat pattern){return wrap(selector,selector.nonNull().equals(ANY)?new Pat(new Shape("type:"+actual,List.of(knownNonNull(actual)),List.of(),actual),List.of(pattern)):pattern);}
+    private Pat wrap(Ty t,Pat p){return nullDomain(t)?new Pat(new Shape("nonnull",List.of(t.nonNull()),List.of(),null),List.of(p)):p;}
+    private Pattern pattern(MatchPatternContext p,Ty selector,String value,Map<String,Ty> s,Set<String> bound)throws CompilationException {
+        var vars=new LinkedHashMap<String,Ty>();var declarations=new ArrayList<String>();
+        if(p==null)return new Pattern(Pat.any(),"सत्य",vars,declarations);
+        if(p.CONST()!=null) {
+            String name=p.IDENTIFIER().getText();if(name.equals("_")||!bound.add(key(name)))throw error(p,"[BH3310] मिलान में बन्धन नाम अद्वितीय होना चाहिए; '_' के साथ स्थिर न लिखें।");
+            Ty t=p.valueType()==null?selector:type(p.valueType(),s);String test="सत्य";Pat coverage=Pat.any();String extract=value;
+            if(p.valueType()!=null){if(!reference(t)&&!enums.containsKey(t.name)&&!Set.of(INT,BOOL,TEXT,REAL,new Ty("बाइट"),new Ty("लघुपूर्णांक")).contains(t)||t.optional())throw error(p,"[BH3310] प्रकार प्रतिरूप के लिए non-null प्रकार चाहिए।");
+                if(!selector.nonNull().equals(ANY)&&!assignable(selector.nonNull(),t)&&!assignable(t,selector.nonNull()))throw error(p,"[BH3310] प्रतिरूप का प्रकार चयनकर्ता से असंगत है।");
+                test="प्रकारहै<"+typeName(t,p)+">("+value+")";extract="परिवर्तित<"+typeName(t,p)+">("+value+")";
+                coverage=assignable(t,selector.nonNull())?wrap(selector,Pat.any()):typedCoverage(selector,t,Pat.any());
+            }
+            vars.put(key(name),t);declarations.add("स्थिर "+name+":"+typeName(t,p)+"="+extract+";");return new Pattern(coverage,test,vars,declarations);
+        }
+        if(p.NULL()!=null){if(!nullDomain(selector))throw error(p,"[BH3310] इस प्रकार में रिक्त सम्भव नहीं है।");return new Pattern(new Pat(new Shape("null",List.of(),List.of(),null),List.of()),value+"==रिक्त",vars,declarations);}
+        if(p.WILDCARD()!=null)return new Pattern(Pat.any(),"सत्य",vars,declarations);
+        String literal=null,tag=null;
+        if(p.TRUE()!=null||p.FALSE()!=null){if(!selector.nonNull().equals(BOOL)&&!selector.nonNull().equals(ANY))throw error(p,"[BH3310] तार्किक प्रतिरूप का प्रकार असंगत है।");literal=p.getText();tag=p.TRUE()!=null?"true":"false";}
+        if(p.STRING_LITERAL()!=null){if(!selector.nonNull().equals(TEXT)&&!selector.nonNull().equals(ANY))throw error(p,"[BH3310] पाठ प्रतिरूप का प्रकार असंगत है।");literal=p.getText();tag="text:"+decodePatternText(literal);}
+        if(p.INTEGER_LITERAL()!=null){if(!Set.of(INT,ANY,new Ty("बाइट"),new Ty("लघुपूर्णांक")).contains(selector.nonNull()))throw error(p,"[BH3310] पूर्णांक प्रतिरूप का प्रकार असंगत है।");literal=p.getText();var digits=new StringBuilder();for(int cp:literal.codePoints().toArray())digits.appendCodePoint(Character.isDigit(cp)?'0'+Character.digit(cp,10):cp);try{tag="int:"+new java.math.BigInteger(digits.toString());}catch(NumberFormatException bad){throw error(p,"Invalid integer pattern.");}}
+        if(literal!=null){Ty actual=p.STRING_LITERAL()!=null?TEXT:p.TRUE()!=null||p.FALSE()!=null?BOOL:INT;return new Pattern(typedCoverage(selector,actual,new Pat(new Shape(tag,List.of(),List.of(),null),List.of())),value+"=="+literal,vars,declarations);}
+        var pn=p.patternName();var ids=new ArrayList<String>();for(var child:pn.children){if(child instanceof TerminalNode n&&n.getSymbol().getType()==dev.bhash.parser.BhashParser.IDENTIFIER)ids.add(n.getText());if(child instanceof TypeQualifierContext q)ids.add(q.IDENTIFIER().getText());}
+        String name=ids.get(0);var args=arguments(pn.typeArguments(),s);Ty owner=new Ty(name,args,0);Shape shape=null;
+        if(p.LPAREN()==null) {
+            if(ids.size()!=2||!enums.containsKey(key(name))||!selector.nonNull().equals(owner)&&!selector.nonNull().equals(ANY))throw error(p,"[BH3310] अज्ञात स्थिर प्रतिरूप।");
+            var member=ids.get(1);if(enums.get(key(name)).enumMember().stream().noneMatch(m->key(m.IDENTIFIER().getText()).equals(key(member))))throw error(p,"[BH3310] अज्ञात परिगणना सदस्य।");
+            shape=new Shape(owner+"."+member,List.of(),List.of(),null);return new Pattern(typedCoverage(selector,owner,new Pat(shape,List.of())),value+"=="+name+"."+member,vars,declarations);
+        }
+        if(ids.size()==2) {
+            if(args.isEmpty()&&union(selector.nonNull())&&key(name).equals(selector.name))owner=selector.nonNull();
+            if(!union(owner))throw error(p,"[BH3310] विकल्प प्रतिरूप में बन्द विकल्पसमूह प्रकार चाहिए।");
+            for(var c:cases(owner,p))if(c.tag.equals(owner+"."+ids.get(1)))shape=c;
+        }else if(ids.size()==1){var ds=nonnullDomain(owner,p);if(ds!=null&&ds.size()==1&&ds.get(0).runtime!=null&&!union(owner))shape=ds.get(0);}
+        if(shape==null)throw error(p,"[BH3310] अज्ञात विकल्प या अभिलेख प्रतिरूप।");
+        if(!selector.nonNull().equals(ANY)&&!selector.nonNull().equals(owner))throw error(p,"[BH3310] प्रतिरूप का परिवार चयनकर्ता से भिन्न है।");
+        if(shape.fields.size()!=p.matchPattern().size())throw error(p,"[BH3310] प्रतिरूप के payload की संख्या गलत है।");
+        String runtime=typeName(shape.runtime,p),cast="(परिवर्तित<"+runtime+">("+value+"))";var tests=new ArrayList<String>();tests.add("प्रकारहै<"+runtime+">("+value+")");var children=new ArrayList<Pat>();
+        for(int i=0;i<shape.fields.size();i++){var child=pattern(p.matchPattern(i),shape.fields.get(i),cast+"."+shape.names.get(i),s,bound);tests.add("("+child.test+")");children.add(child.coverage);vars.putAll(child.bindings);declarations.addAll(child.declarations);}
+        return new Pattern(typedCoverage(selector,owner,new Pat(shape,children)),String.join(" && ",tests),vars,declarations);
+    }
+    private String decodePatternText(String value){var out=new StringBuilder();for(int i=1;i<value.length()-1;i++){char c=value.charAt(i);if(c!='\\'){out.append(c);continue;}char e=value.charAt(++i);switch(e){case 'n'->out.append('\n');case 'r'->out.append('\r');case 't'->out.append('\t');case 'u'->{out.append((char)Integer.parseInt(value.substring(i+1,i+5),16));i+=4;}default->out.append(e);}}return out.toString();}
+    private int coverageBudget;
+    private boolean useful(List<List<Pat>> rows,List<Pat> vector,List<Ty> ts,ParserRuleContext at,int depth)throws CompilationException {
+        if(++coverageBudget>10000||depth>64)throw error(at,"[BH3313] प्रतिरूप जाँच बहुत जटिल है; प्रतिरूप सरल करें।");
+        if(vector.isEmpty())return rows.isEmpty();if(rows.isEmpty())return true;if(rows.stream().anyMatch(row->row.stream().allMatch(p->p.shape==null)))return false;Pat head=vector.get(0);var tail=vector.subList(1,vector.size());var rest=ts.subList(1,ts.size());
+        if(head.shape!=null)return usefulSpecial(rows,head.shape,head.children,tail,rest,at,depth);
+        var domain=domain(ts.get(0),at);if(domain!=null){for(var c:domain)if(usefulSpecial(rows,c,Collections.nCopies(c.fields.size(),Pat.any()),tail,rest,at,depth))return true;return false;}
+        var defaults=new ArrayList<List<Pat>>();for(var row:rows)if(row.get(0).shape==null)defaults.add(row.subList(1,row.size()));
+        return useful(defaults,tail,rest,at,depth+1);
+    }
+    private boolean usefulSpecial(List<List<Pat>> rows,Shape c,List<Pat> fields,List<Pat> tail,List<Ty> rest,ParserRuleContext at,int depth)throws CompilationException {
+        var specialized=new ArrayList<List<Pat>>();for(var row:rows){var h=row.get(0);if(h.shape==null||h.shape.tag.equals(c.tag)||h.shape.tag.startsWith("type:")&&c.tag.startsWith("type:")&&h.children.stream().allMatch(p->p.shape==null)&&assignable(h.shape.runtime,c.runtime)){var r=new ArrayList<Pat>(h.shape==null?Collections.nCopies(c.fields.size(),Pat.any()):h.children);r.addAll(row.subList(1,row.size()));specialized.add(r);}}
+        var v=new ArrayList<>(fields);v.addAll(tail);var types=new ArrayList<>(c.fields);types.addAll(rest);return useful(specialized,v,types,at,depth+1);
+    }
+    private boolean hasMatch(ParseTree node){if(node instanceof MatchExpressionContext)return true;for(int i=0;i<node.getChildCount();i++)if(hasMatch(node.getChild(i)))return true;return false;}
+    private record ExpectedCall(ParametersContext parameters,TypeParametersContext variables,Map<String,Ty> outer,TypeArgumentsContext explicit) {}
+    private Ty argumentExpected(ArgumentsContext args,ParseTree argument,Map<String,Ty> s)throws CompilationException {
+        int slot=args.expression().indexOf(argument);if(slot<0)return null;var candidates=new ArrayList<ExpectedCall>();var parent=args.getParent();
+        if(parent instanceof PrimaryContext p&&p.NEW()!=null){var receiver=type(p.valueType(),s);var c=template(receiver);if(c!=null&&c.tree instanceof ClassDeclContext d){var outer=classSubst(receiver,p);if(d.RECORD()!=null)candidates.add(new ExpectedCall(d.parameters(),null,outer,null));else for(var m:d.classMember())if(m.constructorDecl()!=null)candidates.add(new ExpectedCall(m.constructorDecl().parameters(),null,outer,null));}}
+        else {
+            List<Method> ms=List.of();List<FunctionDeclContext> fs=List.of();TypeArgumentsContext explicit=null;
+            if(parent instanceof PrimaryContext p&&p.IDENTIFIER()!=null){var callback=local(p.IDENTIFIER().getText());if(callback!=null&&callback.function()&&callback.args.size()==args.expression().size()+1)return callback.args.get(slot);ms=methods(owner,p.IDENTIFIER().getText(),new HashSet<>());if(ms.isEmpty())fs=functions.getOrDefault(key(p.IDENTIFIER().getText()),List.of());explicit=p.typeArguments();}
+            if(parent instanceof PostfixPartContext part&&part.getParent() instanceof PostfixContext p&&part.IDENTIFIER()!=null){var receiver=inferPostfix(p,p.postfixPart().indexOf(part),s);ms=methods(receiver,part.IDENTIFIER().getText(),new HashSet<>());explicit=part.typeArguments();}
+            for(var m:ms)candidates.add(new ExpectedCall(m.tree.parameters(),m.tree.typeParameters(),m.subst,explicit));for(var f:fs)candidates.add(new ExpectedCall(f.parameters(),f.typeParameters(),Map.of(),explicit));
+        }
+        Ty expected=null;
+        for(var c:candidates){var formal=signature(c.parameters,c.outer);if(formal.size()!=args.expression().size())continue;var subst=new HashMap<>(c.outer);var variables=parameterNames(c.variables);
+            if(c.explicit!=null){var actual=arguments(c.explicit,s);if(actual.size()!=variables.size())continue;subst.putAll(bind(c.variables,actual,c.outer,args));}
+            else for(int i=0;i<formal.size();i++)if(i!=slot&&!hasMatch(args.expression(i)))unify(formal.get(i),infer(args.expression(i),s),variables,subst);
+            var target=signature(c.parameters,subst).get(slot);if(containsVariable(target,variables.stream().filter(v->!subst.containsKey(v)).collect(java.util.stream.Collectors.toSet())))return null;
+            if(expected!=null&&!expected.equals(target))return null;expected=target;
+        }return expected;
+    }
+    private Ty matchExpected(ParserRuleContext at,Map<String,Ty> s)throws CompilationException {
+        ParseTree child=at;for(var parent=at.getParent();parent!=null;child=parent,parent=parent.getParent()) {
+            if(parent instanceof ArgumentsContext args)return argumentExpected(args,child,s);
+            if(parent instanceof MatchExpressionArmContext arm)return arm.result==child&&arm.getParent() instanceof MatchExpressionContext outer?matchExpected(outer,s):null;
+            if(parent instanceof UnaryContext u&&u.postfix()==null||parent instanceof PostfixContext postfix&&!postfix.postfixPart().isEmpty()||parent instanceof PrimaryContext primary&&(primary.CONVERT()!=null||primary.SAFE_CAST()!=null||primary.TYPE_TEST()!=null)||parent instanceof ExpressionContext e&&e.COALESCE()!=null)return null;
+            if((parent instanceof LogicalOrContext||parent instanceof LogicalAndContext||parent instanceof BitwiseOrContext||parent instanceof BitwiseXorContext||parent instanceof BitwiseAndContext||parent instanceof EqualityContext||parent instanceof ComparisonContext||parent instanceof ShiftContext||parent instanceof AdditiveContext||parent instanceof MultiplicativeContext)&&parent.getChildCount()>1)return null;
+            if(parent instanceof VariableDeclContext v)return v.valueType()==null?null:type(v.valueType(),s);
+            if(parent instanceof StatementContext st){if(st.RETURN()==null)return null;
+                for(var f=st.getParent();f!=null;f=f.getParent()){if(f instanceof FunctionDeclContext d){var r=result(d.returnType(),s);return d.ASYNC()!=null?r.element():r;}if(f instanceof LambdaExpressionContext l){var r=result(l.returnType(),s);return l.ASYNC()!=null?r.element():r;}}return null;}
+        }return null;
+    }
+    private String missingPatternHint(List<List<Pat>> rows,Ty selector,ParserRuleContext at)throws CompilationException {
+        if(nullDomain(selector)&&rows.stream().noneMatch(row->row.get(0).shape==null||row.get(0).shape.tag.equals("null")))return "रिक्त";
+        var options=nonnullDomain(selector.nonNull(),at);if(options==null)return "_ अथवा शेष";
+        var heads=new HashSet<String>();for(var row:rows){var p=row.get(0);if(p.shape!=null&&p.shape.tag.equals("nonnull"))p=p.children.get(0);if(p.shape!=null)heads.add(p.shape.tag);}
+        for(var shape:options)if(!heads.contains(shape.tag)) {
+            if(shape.tag.equals("true"))return "सत्य";if(shape.tag.equals("false"))return "असत्य";
+            return shape.tag+(shape.runtime==null?"":"("+String.join(",",Collections.nCopies(shape.fields.size(),"_"))+")");
+        }return "nested payload के शेष मान (_ अथवा शेष)";
+    }
+    private MatchPlan matchPlan(ParserRuleContext at,ExpressionContext selector,List<Arm> arms,Map<String,Ty> s)throws CompilationException {
+        int saved=coverageBudget;try {coverageBudget=0;return checkedMatchPlan(at,selector,arms,s);}finally{coverageBudget=saved;}
+    }
+    private MatchPlan checkedMatchPlan(ParserRuleContext at,ExpressionContext selector,List<Arm> arms,Map<String,Ty> s)throws CompilationException {
+        Ty t=infer(selector,s);if(t==null||t.equals(VOID)||t.equals(NIL))throw error(at,"[BH3310] चयनकर्ता के लिए स्पष्ट मान प्रकार चाहिए।");
+        String name=fresh();var patterns=new ArrayList<Pattern>();var rows=new ArrayList<List<Pat>>();Ty expected=matchExpected(at,s),result=expected;coverageBudget=0;
+        for(int i=0;i<arms.size();i++){var a=arms.get(i);if(a.rest&&(a.guard!=null||i!=arms.size()-1))throw error(a.at,"[BH3311] शेष अन्तिम और बिना guard होना चाहिए।");
+            var p=pattern(a.pattern,t,name,s,new HashSet<>());patterns.add(p);
+            if(!useful(rows,List.of(p.coverage),List.of(t),a.at,0))throw error(a.at,"[BH3311] यह प्रतिरूप पहले ही पूरा ढक चुका है।");
+            if(a.guard==null)rows.add(List.of(p.coverage));
+            scopes.push(p.bindings);try {if(a.guard!=null&&!BOOL.equals(infer(a.guard,s)))throw error(a.at,"[BH3310] guard तार्किक होना चाहिए।");
+                if(a.value!=null){Ty value=infer(a.value,s);if(value==null||value.equals(VOID))throw error(a.at,"[BH3314] मिलान शाखा में मान चाहिए।");
+                    if(expected!=null&&!assignable(expected,value))throw error(a.at,"[BH3314] मिलान शाखा का मान अपेक्षित प्रकार से असंगत है।");
+                    if(result==null)result=value;else if(assignable(result,value)){}else if(assignable(value,result))result=value;else if(value.equals(NIL)&&reference(result))result=result.optionalType();else if(result.equals(NIL)&&reference(value))result=value.optionalType();else throw error(a.at,"[BH3314] मिलान शाखाओं के मान प्रकार असंगत हैं; स्पष्ट प्रकार दें।");}
+            }finally{scopes.pop();}
+        }
+        boolean proof=false;
+        if(useful(rows,List.of(Pat.any()),List.of(t),at,0)) {
+            if(strictProfile&&t.optional()&&!useful(rows,List.of(wrap(t,Pat.any())),List.of(t),at,0))proof=true;
+            else throw error(at,"[BH3312] मिलान अपूर्ण है। छूटा प्रतिरूप: "+missingPatternHint(rows,t,at)+"।");
+        }
+        return new MatchPlan(proof?t.nonNull():t,result,name,patterns,proof);
+    }
+    private Token matchOrigin(Token at){var t=new LocatedToken(new org.antlr.v4.runtime.misc.Pair<>(at.getTokenSource(),at.getInputStream()),at.getType(),at.getChannel(),at.getStartIndex(),at.getStopIndex());t.setText(at.getText());t.locate(at);t.unionOrigin(3,null);return t;}
+    private void renderMatch(ParserRuleContext at,ExpressionContext selector,List<Arm> arms,Map<String,Ty> s,Token renamed,String replacement)throws CompilationException {
+        var plan=matchPlan(at,selector,arms,s);Token trusted=matchOrigin(at.start);boolean expression=at instanceof MatchExpressionContext;String selected=fresh();
+        append(expression?"भाषमिलानमूल्य<"+typeName(plan.result,at)+"> {":"{ मान "+selected+":पूर्णांक=-१;",trusted);
+        append("स्थिर "+plan.name+":"+typeName(plan.selector,at)+"=",trusted);
+        if(plan.requireNonNullProof){var proof=(LocatedToken)matchOrigin(at.start);proof.unionOrigin(4,null);append("परिवर्तित<"+typeName(plan.selector,at)+"> (",proof);}
+        render(selector,s,renamed,replacement);if(plan.requireNonNullProof)append(")",trusted);append(";",trusted);
+        for(int i=0;i<arms.size();i++){var a=arms.get(i);var p=plan.patterns.get(i);append("यदि("+(expression?"":selected+"<० && (")+p.test+(expression?"":" )")+"){ "+String.join(" ",p.declarations),trusted);
+            scopes.push(p.bindings);try {if(a.guard!=null){append("यदि(",trusted);render(a.guard,s,renamed,replacement);append("){",trusted);}
+                if(expression){append("लौटाओ",trusted);render(a.value,s,renamed,replacement);append(";",trusted);}else append(selected+"="+i+";",trusted);
+                if(a.guard!=null)append("}",trusted);
+            }finally{scopes.pop();}append("}",trusted);
+        }
+        if(expression)append("फेंको नया अपवाद(\"अमान्य मिलान मान।\"); }",trusted);
+        else {
+            append("चयन("+selected+"){",trusted);
+            for(int i=0;i<arms.size();i++){var a=arms.get(i);var p=plan.patterns.get(i);append("विकल्प "+i+": {"+String.join(" ",p.declarations),trusted);scopes.push(p.bindings);try{render(a.block,s,renamed,replacement);}finally{scopes.pop();}append("}",trusted);}
+            append("शेष: {फेंको नया अपवाद(\"अमान्य मिलान मान।\");} } }",trusted);
+        }
     }
 }

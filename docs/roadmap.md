@@ -1,5 +1,17 @@
 # Implementation roadmap
 
+## Tagged unions, pattern matching and typed results
+
+The approved design ([Hindi](tagged-unions-pattern-matching-design.md),
+[English](tagged-unions-pattern-matching-design.en.md)) is implemented on the feature branch.
+See the [Hindi tutorial](../tutorial/tagged-unions/README.md) and
+[validation record](tagged-unions-validation.md) for the shared lowering, GC and host checks.
+Public packaging follows merge and CI validation.
+
+**हिन्दी:** विकल्पसमूह, सम्पूर्ण मिलान और प्रकारयुक्त परिणाम का कार्यान्वयन उपलब्ध है।
+[हिन्दी उदाहरण](../tutorial/tagged-unions/README.md) पढ़ें और चलाएँ।
+मिलान के लिए सभी सम्भावनाएँ सम्भालें; native runtime ABI 18 उपयोग होता है।
+
 ## Asynchronous task core
 
 The [approved design](async-await-design.md) is saved for future work. The
@@ -88,8 +100,9 @@ deployment/toolchain improvements remain follow-ups.
 
 Generic member methods, constraints, local/call inference, constructor-assigned immutable fields,
 and project-scoped rename/references are implemented; see [the Hindi tutorial](../tutorial/safer-everyday/README.md).
-[Null safety](null-safety-design.md) is a review proposal, not implemented syntax.
-Abstract/final members, record bodies/patterns, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, broader standard
+[Null safety](null-safety-design.md) is implemented and released in compiler/VS Code
+0.26.0 and Jupyter 0.1.12; strict mode remains opt-in.
+Abstract/final members, record bodies and richer patterns, collection slices/copy constructors/custom iterators, arbitrary-precision arithmetic, broader standard
 library coverage, debugger support, editor tooling, dependency package management and FFI. Changes require a spec update,
 examples and tests. Generated code, JVM JARs, CLR deployment folders and browser bundles remain build products.
 

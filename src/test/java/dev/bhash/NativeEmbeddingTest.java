@@ -13,6 +13,12 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeEmbeddingTest {
+    @Test void unionExportsRequireAnExplicitBoundaryWrapper()throws Exception {
+        var program=List.of(new SourceFile("unions-lib.bhash","विकल्पसमूह उत्तर {मिला(व:पूर्णांक);नहीं();} फलन लो()->उत्तर {लौटाओ उत्तर.मिला(७);}"));
+        var error=assertThrows(CompilationException.class,()->ManagedEmitter.libraryCore(program,exports("bhash_get = लो() -> उत्तर")));
+        assertTrue(error.getMessage().contains("BH3320"),error.getMessage());
+    }
+
     @TempDir Path work;
 
     private List<NativeExports.Request> exports(String text) throws Exception {

@@ -16,6 +16,7 @@ final class SourceIndex {
     }
     final String uri, text, pkg;
     final boolean strictNulls;
+    private boolean hasPatterns;
     final TextCoordinates coordinates;
     final List<Symbol> symbols = new ArrayList<>();
     final Map<Symbol,ParserRuleContext> declarations = new LinkedHashMap<>();
@@ -75,10 +76,13 @@ final class SourceIndex {
         return coordinates.range(start + shift,end + shift);
     }
     private void collect(ParserRuleContext context, List<DocumentSymbol> destination, boolean exported, boolean global, int scopeStart, int scopeEnd) {
+        if(context instanceof PatternNameContext)hasPatterns=true;
         TerminalNode id = null; SymbolKind kind = null; String detail = "";
-        if (context instanceof ClassDeclContext c) { id=c.IDENTIFIER(); kind=c.RECORD()!=null?SymbolKind.Struct:SymbolKind.Class; detail=c.RECORD()!=null?"अभिलेख":"वर्ग"; }
+        if (context instanceof ClassDeclContext c) { id=c.IDENTIFIER(); kind=c.RECORD()!=null?SymbolKind.Struct:SymbolKind.Class; detail=c.RECORD()!=null?"अभिलेख":c.unionKeyword()!=null?"विकल्पसमूह":"वर्ग"; }
         else if (context instanceof InterfaceDeclContext c) { id=c.IDENTIFIER();kind=SymbolKind.Interface;detail="अनुबंध"; }
         else if (context instanceof EnumDeclContext c) { id=c.IDENTIFIER();kind=SymbolKind.Enum;detail="परिगणना"; }
+        else if(context instanceof UnionCaseContext c){id=c.IDENTIFIER();kind=SymbolKind.Method;detail="विकल्प "+c.IDENTIFIER().getText()+"("+(c.parameters()==null?"":c.parameters().getText())+")";}
+        else if(context instanceof MatchPatternContext c&&c.CONST()!=null){id=c.IDENTIFIER();kind=SymbolKind.Constant;detail=c.valueType()==null?"मिलान बन्धन":c.valueType().getText();}
         else if (context instanceof EnumMemberContext c) { id=c.IDENTIFIER();kind=SymbolKind.EnumMember; }
         else if (context instanceof FunctionDeclContext c) { id=c.IDENTIFIER();kind=global?SymbolKind.Function:SymbolKind.Method;detail=(c.ASYNC()==null?"फलन ":"असमकालिक फलन ") + c.IDENTIFIER() + (c.typeParameters()==null?"":c.typeParameters().getText()) + "(" + (c.parameters()==null?"":c.parameters().getText()) + ") -> " + (c.returnType()==null?"?":c.ASYNC()==null?c.returnType().getText():"कार्यफल<"+c.returnType().getText()+">"); }
         else if (context instanceof FieldDeclContext c) { id=c.IDENTIFIER();kind=c.CONST()==null?SymbolKind.Field:SymbolKind.Constant;detail=c.valueType()==null?"":c.valueType().getText(); }
@@ -117,6 +121,7 @@ final class SourceIndex {
             }
         }
         boolean scope = context instanceof BlockContext || context instanceof ClassDeclContext || context instanceof InterfaceDeclContext
+                || context instanceof UnionCaseContext || context instanceof MatchExpressionArmContext || context instanceof MatchStatementArmContext
                 || context instanceof EnumDeclContext || context instanceof FunctionDeclContext || context instanceof ConstructorDeclContext
                 || context instanceof LambdaExpressionContext || context instanceof CatchClauseContext || context instanceof ForeachStatementContext || context instanceof ResourceStatementContext;
         int childStart = scope?start(context):scopeStart, childEnd=scope?end(context):scopeEnd;
@@ -141,6 +146,7 @@ final class SourceIndex {
         if (token==null || token.getType()!=dev.bhash.parser.BhashLexer.IDENTIFIER) return List.of();
         String name=key(token.getText());
         for(var symbol:symbols)if(symbol.selection.equals(range(token.getStartIndex(),token.getStopIndex()+1)))return List.of(symbol);
+        if(hasPatterns){var pattern=new EditorModel(this,project).resolvePattern(position);if(!pattern.isEmpty())return pattern;}
         String imported=importReferences.get(token.getStartIndex());
         if(imported!=null)return project.stream().flatMap(i->i.symbols.stream()).filter(s->s.global&&s.qualified.equals(imported)&&(s.exported||pkg.equals(packageOf(s.qualified)))).toList();
         boolean typeReference=typeReferences.containsKey(token.getStartIndex());
@@ -203,6 +209,7 @@ final class SourceIndex {
             var item=new CompletionItem(word+" · "+alias);item.setKind(CompletionItemKind.Keyword);item.setFilterText(word+" "+alias);
             item.setTextEdit(org.eclipse.lsp4j.jsonrpc.messages.Either.forLeft(new TextEdit(replace,word)));result.add(item);
         }
+        for(String keyword:List.of("विकल्पसमूह","मिलान")){var item=new CompletionItem(keyword);item.setKind(CompletionItemKind.Keyword);item.setDetail("Bhash contextual keyword");item.setTextEdit(org.eclipse.lsp4j.jsonrpc.messages.Either.forLeft(new TextEdit(replace,keyword)));result.add(item);}
         for(String builtin:List.of("पढ़ो","पाठपढ़ो","लंबाई","अंश","अंकपाठ","पूर्णांकपाठ","बड़ाअक्षर","त्रुटि","यूटीएफ८बफ़र","यूटीएफ८पाठ","सरणी","सूची","मानचित्र","अपवाद")) {
             var item=new CompletionItem(builtin);item.setKind(CompletionItemKind.Function);item.setDetail("Bhash built-in");result.add(item);
         }

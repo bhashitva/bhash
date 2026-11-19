@@ -11,12 +11,19 @@ public final class LocatedToken extends CommonToken {
     }
     private String originalText;
     private boolean strictNulls;
+    private int unionKind; // 1: generated family; 2: generated case; 3: checked match code; 4: a checked non-null proof obligation
+    private String unionCaseName;
+    public int unionKind() { return unionKind; }
+    public String unionCaseName() { return unionCaseName; }
+    public void unionOrigin(int kind, String name) { unionKind=kind; unionCaseName=name; }
     public boolean strictNulls() { return strictNulls; }
     public void strictNulls(boolean value) { strictNulls = value; }
     public String originalText() { return originalText == null ? getText() : originalText; }
     public void locate(Token origin) {
         originalText = origin instanceof LocatedToken token ? token.originalText() : origin.getText();
         strictNulls = origin instanceof LocatedToken token && token.strictNulls();
+        unionKind = origin instanceof LocatedToken token ? token.unionKind : 0;
+        unionCaseName = origin instanceof LocatedToken token ? token.unionCaseName : null;
         // Cache lowered spelling before changing its backing input stream.
         setText(getText());
         source = new Pair<>(origin.getTokenSource(), origin.getInputStream());

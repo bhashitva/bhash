@@ -232,6 +232,29 @@ public final class ProjectResolver {
                 || scopes.stream().anyMatch(s -> s.contains(name));
     }
     private void walk(ParseTree node, Unit unit, Deque<Set<String>> scopes, Set<String> typeParameters, Members members) throws CompilationException {
+        if(node instanceof MatchExpressionArmContext arm) {
+            if(arm.matchPattern()!=null)walk(arm.matchPattern(),unit,scopes,typeParameters,members);
+            var locals=new HashSet<String>();patternBindings(arm.matchPattern(),locals);scopes.push(locals);
+            if(arm.guard!=null)walk(arm.guard,unit,scopes,typeParameters,members);
+            walk(arm.result,unit,scopes,typeParameters,members);scopes.pop();return;
+        }
+        if(node instanceof MatchStatementArmContext arm) {
+            if(arm.matchPattern()!=null)walk(arm.matchPattern(),unit,scopes,typeParameters,members);
+            var locals=new HashSet<String>();patternBindings(arm.matchPattern(),locals);scopes.push(locals);
+            if(arm.guard!=null)walk(arm.guard,unit,scopes,typeParameters,members);
+            walk(arm.block(),unit,scopes,typeParameters,members);scopes.pop();return;
+        }
+        if(node instanceof PatternNameContext pattern) {
+            var ids=new ArrayList<TerminalNode>();ids.add(pattern.IDENTIFIER(0));
+            for(var q:pattern.typeQualifier())ids.add(q.IDENTIFIER());
+            if(pattern.IDENTIFIER().size()>1)ids.add(pattern.IDENTIFIER(1));
+            if(ids.size()!=1||!ids.get(0).getText().equals("_")) {
+                Symbol found=null;int length=0;
+                for(int count=ids.size();count>0;count--){String name=String.join(".",ids.subList(0,count).stream().map(ParseTree::getText).toList());found=lookup(unit,name,Kind.TYPE,pattern.start);if(found!=null){length=count;break;}}
+                if(found==null)throw error(pattern.start,"Unknown pattern type: "+pattern.getText());
+                replace(unit,ids.get(0).getSymbol(),ids.get(length-1).getSymbol(),found.lowered);
+            }
+        }
         if (node instanceof PackageDeclContext || node instanceof ImportDeclContext) return;
         if (node instanceof TypeParametersContext parameters) {
             var scope=parameters(parameters,typeParameters);
@@ -280,6 +303,10 @@ public final class ProjectResolver {
                     boolean construction = type.getParent() instanceof PrimaryContext p && p.NEW()!=null;
                     throw error(type.start,(base ? "Unknown base class: " : construction ? "Unknown class: " : "Unknown type: ") + name);
                 }
+                for(var ancestor=type.getParent();ancestor!=null;ancestor=ancestor.getParent())if(ancestor instanceof ClassDeclContext family&&family.unionKeyword()!=null){
+                    var declaration=types.get(full(unit,key(family.IDENTIFIER().getText())));
+                    if(declaration!=null&&declaration.exported&&!symbol.exported)throw error(type.start,"[BH3303] सार्वजनिक विकल्पसमूह का payload प्रकार भी सार्वजनिक होना चाहिए।");break;
+                }
                 replace(unit,type.IDENTIFIER().getSymbol(),type.typeQualifier().isEmpty() ? type.IDENTIFIER().getSymbol()
                         : type.typeQualifier(type.typeQualifier().size()-1).stop,symbol.lowered);
             }
@@ -297,6 +324,11 @@ public final class ProjectResolver {
         if (node instanceof VariableDeclContext variable && !scopes.isEmpty()) scopes.peek().add(key(variable.IDENTIFIER().getText()));
         if (block) scopes.pop();
         if (callable) scopes.pop();
+    }
+    private static void patternBindings(MatchPatternContext pattern,Set<String> names) {
+        if(pattern==null)return;
+        if(pattern.CONST()!=null)names.add(key(pattern.IDENTIFIER().getText()));
+        for(var child:pattern.matchPattern())patternBindings(child,names);
     }
     private void resolvePostfix(PostfixContext postfix, Unit unit, Deque<Set<String>> scopes, Members members,
             Set<String> typeParameters) throws CompilationException {

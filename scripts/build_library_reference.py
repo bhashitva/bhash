@@ -24,6 +24,7 @@ INTRO = "<!-- scripts/build_library_reference.py से बनाया गय�
 
 # Source names are supplied by the compiler's catalog loader.
 GROUPS = {
+    "__bhash_results__.bhash": ("विकल्पसमूह और प्रकारयुक्त परिणाम", "tutorial/tagged-unions/README.md"),
     "__bhash_standard_library__.bhash": ("मूल फलन और रनटाइम बंधन", "tutorial/standard-library/README.md"),
     "__bhash_foundations__.bhash": ("संग्रह और अनुप्रयोग का आधार", "tutorial/application-foundations/README.md"),
     "__bhash_networking__.bhash": ("HTTP क्लाइंट", "tutorial/networking/README.md"),
@@ -43,7 +44,7 @@ GUIDES = {
     "कूटशब्द": "tutorial/authentication/README.md",
     "सुरक्षा": "tutorial/authentication/README.md",
 }
-KINDS = {"class": "वर्ग", "interface": "अनुबंध", "record": "अभिलेख"}
+KINDS = {"class": "वर्ग", "interface": "अनुबंध", "record": "अभिलेख", "union": "विकल्पसमूह"}
 
 
 @dataclass(order=True)

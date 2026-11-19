@@ -419,6 +419,7 @@ Java method/class limits; optimization and debug source maps remain future work.
 | `docs/language-spec.md` | Language contract |
 | `docs/architecture.md` | Current pipeline and future targets |
 | `docs/roadmap.md` | Next milestones |
+| [Hindi design](docs/tagged-unions-pattern-matching-design.md) / [English design](docs/tagged-unions-pattern-matching-design.en.md) | Tagged-union, pattern-matching and Result proposal — awaiting review, not implemented |
 
 GitHub Actions installs .NET 10 and runs Maven tests plus JVM/CLR application
 checks on Windows and Linux. CLR integration tests are skipped locally if .NET 10

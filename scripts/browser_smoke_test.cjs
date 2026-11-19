@@ -77,6 +77,7 @@ build('multi-file', path.resolve('examples/multi-file'));
 build('source-packages', path.resolve('examples/packages/app'));
 compile('closures', fs.readFileSync('tutorial/functions/callbacks.bhash', 'utf8'));
 compile('safer-everyday', fs.readFileSync('examples/safer-everyday.bhash', 'utf8'));
+for (const name of ['results', 'async-result']) compile(`union-${name}`, fs.readFileSync(`tutorial/tagged-unions/${name}.bhash`, 'utf8'));
 compile('null-safety', fs.readFileSync('tutorial/null-safety/null-safety.bhash', 'utf8'));
 compile('exceptions', fs.readFileSync('examples/exceptions.bhash', 'utf8'));
 compile('exception-semantics', fs.readFileSync('src/test/resources/exceptions/browser.bhash', 'utf8'));
@@ -242,6 +243,7 @@ const server = http.createServer((request, response) => {
         await run('sqlite-browser', '', '');
         await run('closures', '', fs.readFileSync('tutorial/functions/callbacks.expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('safer-everyday', '', fs.readFileSync('examples/safer-everyday.expected.txt', 'utf8').replaceAll('\r\n', '\n'));
+        for (const name of ['results', 'async-result']) await run(`union-${name}`, '', fs.readFileSync(`tutorial/tagged-unions/${name}.expected.txt`, 'utf8').replaceAll('\r\n', '\n'));
         await run('null-safety', '', fs.readFileSync('tutorial/null-safety/null-safety.expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('types', '', fs.readFileSync('examples/types/expected.txt', 'utf8').replaceAll('\r\n', '\n'));
         await run('unicode-identifiers', '', '५ ५ ५ ६ ७ ८ ९ ६\n३.०\n६\nक्‍ष असत्य\n');

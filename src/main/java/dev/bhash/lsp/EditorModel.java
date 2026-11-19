@@ -168,6 +168,7 @@ final class EditorModel {
         Type result=null;ParametersContext parameters=null;boolean callable=false,shared=false;String access="सार्वजनिक";
         if(node instanceof FunctionDeclContext c){if(c.returnType()==null)return null;result=type(c.returnType().getText(),source,boundEnv);parameters=c.parameters();callable=true;}
         else if(node instanceof FieldDeclContext c)result=type(c.valueType(),source,env);
+        else if(node instanceof UnionCaseContext c){var definition=types.get(owner);result=new Type(owner,formals(definition.node).stream().map(n->env.getOrDefault(n,new Type(n))).toList());parameters=c.parameters();shared=true;callable=true;}
         else if(node instanceof EnumMemberContext){result=new Type(owner);shared=true;}
         else return null;
         if(node.getParent() instanceof ClassMemberContext c){shared=c.STATIC()!=null;if(c.visibility()!=null)access=c.visibility().getText();}
@@ -294,12 +295,27 @@ final class EditorModel {
         var tied=List.copyOf(best);best.removeIf(m->!variables(m).isEmpty()&&tied.stream().anyMatch(other->variables(other).isEmpty()&&other.parameters.equals(m.parameters)));
         return best.size()==1?best.get(0).result:null;
     }
+    private Type patternType(MatchPatternContext pattern,Position position,int depth) {
+        if(depth>64)return null;if(pattern.valueType()!=null)return type(pattern.valueType(),index,Map.of());
+        if(pattern.getParent() instanceof MatchPatternContext outer){var expected=patternType(outer,position,depth+1);if(expected==null||outer.patternName()==null)return null;
+            var pn=outer.patternName().getText();Type owner=type(pn,index,Map.of());if(owner!=null&&!types.containsKey(owner.name))owner=null;String caseName=null;
+            if(owner==null){int dot=pn.lastIndexOf('.');if(dot<0)return null;owner=type(pn.substring(0,dot),index,Map.of());caseName=pn.substring(dot+1);}
+            if(owner==null)return null;if(owner.args.isEmpty()&&owner.name.equals(expected.nonNull().name))owner=expected.nonNull();
+            var definition=types.get(owner.name);if(definition==null||!(definition.node instanceof ClassDeclContext c))return null;
+            ParametersContext ps=c.parameters();if(caseName!=null){ps=null;for(var option:c.unionCase())if(SourceIndex.key(option.IDENTIFIER().getText()).equals(SourceIndex.key(caseName)))ps=option.parameters();}
+            int slot=outer.matchPattern().indexOf(pattern);return ps!=null&&slot>=0&&slot<ps.parameter().size()?type(ps.parameter(slot).valueType(),definition.index,substitutions(owner,definition)):null;
+        }
+        ExpressionContext selector=null;
+        if(pattern.getParent() instanceof MatchExpressionArmContext arm&&arm.getParent() instanceof MatchExpressionContext match)selector=match.expression();
+        if(pattern.getParent() instanceof MatchStatementArmContext arm&&arm.getParent() instanceof MatchStatementContext match)selector=match.expression();
+        if(selector==null)return null;var value=infer(selector,index.range(selector.start.getStartIndex(),selector.start.getStartIndex()).getStart(),0);return value==null?null:value.type;
+    }
     private Value variable(String name, Position position) {
         var found=index.visibleLexical(position).stream().filter(s->SourceIndex.key(s.name()).equals(SourceIndex.key(name))).toList();
         if(!found.isEmpty()) {
             int width=found.stream().mapToInt(s->s.scopeEnd()-s.scopeStart()).min().orElse(0);
             var s=found.stream().filter(v->v.scopeEnd()-v.scopeStart()==width).findFirst().orElseThrow();
-            var t=type(s.detail(),index,Map.of());
+            var t=index.declarations.get(s) instanceof MatchPatternContext p?patternType(p,position,0):type(s.detail(),index,Map.of());
             if(t!=null)return new Value(t);
             if(index.declarations.get(s) instanceof VariableDeclContext v&&v.valueType()==null&&inferring.add(s)) {
                 try{return infer(v.expression(),index.range(v.start.getStartIndex(),v.start.getStartIndex()).getStart(),0);}
@@ -488,6 +504,46 @@ final class EditorModel {
             item.setAdditionalTextEdits(List.of(new TextEdit(new Range(at,at),addition)));result.add(item);
         }
         return result;
+    }
+    List<TextEdit> missingMatchArms(Position position){return missingMatchArms(index.tree,position);}
+    private List<TextEdit> missingMatchArms(ParseTree node,Position position) {
+        ExpressionContext selector=null;Token close=null;boolean expression=false;List<MatchPatternContext> patterns=new ArrayList<>();
+        if(node instanceof MatchExpressionContext m){selector=m.expression();close=m.RBRACE().getSymbol();expression=true;for(var arm:m.matchExpressionArm()){if(arm.DEFAULT()!=null)return List.of();if(arm.guard==null)patterns.add(arm.matchPattern());}}
+        if(node instanceof MatchStatementContext m){selector=m.expression();close=m.RBRACE().getSymbol();for(var arm:m.matchStatementArm()){if(arm.DEFAULT()!=null)return List.of();if(arm.guard==null)patterns.add(arm.matchPattern());}}
+        if(selector!=null){var context=(ParserRuleContext)node;var range=index.range(context.start.getStartIndex(),context.stop.getStopIndex()+1);int at=index.coordinates.offset(position);
+            if(index.coordinates.offset(range.getStart())>at||at>index.coordinates.offset(range.getEnd()))return List.of();
+            var value=infer(selector,index.range(selector.start.getStartIndex(),selector.start.getStartIndex()).getStart(),0);if(value==null)return List.of();
+            Type t=value.type.nonNull();var expected=new LinkedHashMap<String,String>();var definition=types.get(t.name);
+            if(definition!=null&&definition.node instanceof ClassDeclContext c&&c.unionKeyword()!=null)for(var option:c.unionCase()){int count=option.parameters()==null?0:option.parameters().parameter().size();expected.put(SourceIndex.key(option.IDENTIFIER().getText()),t+"."+option.IDENTIFIER().getText()+"("+String.join(", ",Collections.nCopies(count,"_"))+")");}
+            else if(t.name.equals("तार्किक")){expected.put("सत्य","सत्य");expected.put("असत्य","असत्य");}else return List.of();
+            if(value.type.nullable||!index.strictNulls&&definition!=null)expected.put("रिक्त","रिक्त");
+            for(var p:patterns){if(p==null)return List.of();if(p.NULL()!=null){expected.remove("रिक्त");continue;}if(p.TRUE()!=null){expected.remove("सत्य");continue;}if(p.FALSE()!=null){expected.remove("असत्य");continue;}
+                if(p.CONST()!=null||p.WILDCARD()!=null)return List.of();if(p.patternName()==null||p.LPAREN()==null)return List.of();
+                if(p.matchPattern().stream().anyMatch(child->child.WILDCARD()==null&&(child.CONST()==null||child.valueType()!=null)))return List.of();
+                var name=p.patternName().getText();expected.remove(SourceIndex.key(name.substring(name.lastIndexOf('.')+1)));
+            }
+            if(expected.isEmpty())return List.of();var text=new StringBuilder();
+            if(expression&&context.getChild(context.getChildCount()-2) instanceof TerminalNode last&&last.getSymbol().getType()==BhashParser.COMMA){}else if(expression)text.append(',');
+            for(var pattern:expected.values())text.append("\n    विकल्प ").append(pattern).append(expression?" => शाखा_पूरी_करें(),":": { शाखा_पूरी_करें(); }");text.append('\n');
+            var insertion=index.range(close.getStartIndex(),close.getStartIndex()).getStart();return List.of(new TextEdit(new Range(insertion,insertion),text.toString()));
+        }
+        for(int i=0;i<node.getChildCount();i++){var edits=missingMatchArms(node.getChild(i),position);if(!edits.isEmpty())return edits;}return List.of();
+    }
+    List<SourceIndex.Symbol> resolvePattern(Position position) {
+        int offset=index.coordinates.offset(position);
+        return resolvePattern(index.tree,position,offset);
+    }
+    private List<SourceIndex.Symbol> resolvePattern(ParseTree node,Position position,int offset) {
+        if(node instanceof PatternNameContext p&&index.coordinates.offset(index.range(p.start.getStartIndex(),p.stop.getStopIndex()+1).getStart())<=offset&&offset<=index.coordinates.offset(index.range(p.start.getStartIndex(),p.stop.getStopIndex()+1).getEnd())) {
+            String spelling=p.getText();var owner=type(spelling,index,Map.of());if(owner!=null&&!types.containsKey(owner.name))owner=null;String option=null;
+            if(owner==null){int dot=spelling.lastIndexOf('.');if(dot<0)return List.of();owner=type(spelling.substring(0,dot),index,Map.of());option=spelling.substring(dot+1);}
+            if(owner==null)return List.of();var definition=types.get(owner.name);if(definition==null)return List.of();
+            var token=index.token(position);if(token==null)return List.of();
+            if(option!=null&&SourceIndex.key(token.getText()).equals(SourceIndex.key(option))){String selected=option;return definition.index.declarations.entrySet().stream().filter(e->e.getValue() instanceof UnionCaseContext c&&owner(c)==definition.node&&SourceIndex.key(c.IDENTIFIER().getText()).equals(SourceIndex.key(selected))||e.getValue() instanceof EnumMemberContext enumeration&&owner(enumeration)==definition.node&&SourceIndex.key(enumeration.IDENTIFIER().getText()).equals(SourceIndex.key(selected))).map(Map.Entry::getKey).toList();}
+            if(index.aliases.containsKey(SourceIndex.key(token.getText())))return List.of(index.aliases.get(SourceIndex.key(token.getText())));
+            return List.of(definition.symbol);
+        }
+        for(int i=0;i<node.getChildCount();i++){var result=resolvePattern(node.getChild(i),position,offset);if(!result.isEmpty())return result;}return List.of();
     }
     List<SourceIndex.Symbol> resolveMember(Position position) {
         int offset=index.coordinates.offset(position),start=wordStart(offset),dot=dotBefore(start);
