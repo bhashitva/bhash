@@ -1,9 +1,8 @@
 name: Release null safety packages
 on:
-  push:
-    branches: [release/null-safety-0.26.0]
-    paths: ['.github/workflows/release-026.yml']
   workflow_dispatch:
+env:
+  RELEASE_SHA: 08c44d5527caca408b1af4580e328bacf36bd5b9
 permissions:
   contents: read
 concurrency:
@@ -15,6 +14,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -53,6 +55,9 @@ jobs:
       JUPYTER_DATA_DIR: ${{ github.workspace }}/target/jupyter-user
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -95,6 +100,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: null-safety-release
@@ -106,7 +114,33 @@ jobs:
           set -euo pipefail
           cd target/null-safety-release
           sha256sum -c SHA256SUMS
-          gh release create bhash-0.26.0 --target "$GITHUB_SHA" --latest --title "Bhash standalone compiler 0.26.0" --notes "Opt-in null safety (T?, ?., ??), flow diagnostics and GC-safe nullable scalars across targets. Also includes constructor-assigned immutable fields, inference and constrained generic methods. Full JDK 17+ required. See the [Hindi null-safety tutorial](https://github.com/bhashitva/bhash/blob/$GITHUB_SHA/tutorial/null-safety/README.md)." bhash-compiler-0.26.0.jar bhash-compiler-0.26.0.jar.sha256
-          gh release create vscode-0.26.0 --target "$GITHUB_SHA" --latest=false --title "Bhash VS Code extension 0.26.0" --notes "Bundles compiler 0.26.0 with opt-in null safety, nullable-aware editor assistance, rename/find references and safer everyday programming. See the [changelog](https://github.com/bhashitva/bhash/blob/$GITHUB_SHA/editors/vscode/CHANGELOG.md)." bhash-vscode-0.26.0.vsix bhash-vscode-0.26.0.vsix.sha256
+          # Resolve annotated and lightweight tags before any publication.
+          for tag in bhash-0.26.0 vscode-0.26.0 jupyter-0.1.12; do
+            if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
+              test "$(git rev-parse "$tag^{commit}")" = "$RELEASE_SHA" || { echo "Conflicting source tag: $tag"; exit 1; }
+            fi
+          done
+          publish_release() {
+            local tag="$1"; shift
+            if gh release view "$tag" >/dev/null 2>&1; then
+              local saved
+              saved=$(mktemp -d)
+              gh release download "$tag" --dir "$saved"
+              test "$(find "$saved" -maxdepth 1 -type f | wc -l)" -eq "$ASSETS_COUNT" || { echo "Unexpected assets: $tag"; exit 1; }
+              for asset in $ASSETS; do
+                cmp "$asset" "$saved/$asset" || { echo "Conflicting asset: $tag/$asset"; exit 1; }
+              done
+              echo "Verified existing release: $tag"
+            else
+              # Asset names are fixed above, with no whitespace or wildcards.
+              # shellcheck disable=SC2086
+              gh release create "$tag" --target "$RELEASE_SHA" "$@" $ASSETS
+            fi
+          }
+          ASSETS="bhash-compiler-0.26.0.jar bhash-compiler-0.26.0.jar.sha256"; ASSETS_COUNT=2
+          publish_release bhash-0.26.0 --latest --title "Bhash standalone compiler 0.26.0" --notes "Opt-in null safety (T?, ?., ??), flow diagnostics and GC-safe nullable scalars across targets. Also includes constructor-assigned immutable fields, inference and constrained generic methods. Full JDK 17+ required. See the [Hindi null-safety tutorial](https://github.com/bhashitva/bhash/blob/$RELEASE_SHA/tutorial/null-safety/README.md)."
+          ASSETS="bhash-vscode-0.26.0.vsix bhash-vscode-0.26.0.vsix.sha256"; ASSETS_COUNT=2
+          publish_release vscode-0.26.0 --latest=false --title "Bhash VS Code extension 0.26.0" --notes "Bundles compiler 0.26.0 with opt-in null safety, nullable-aware editor assistance, rename/find references and safer everyday programming. See the [changelog](https://github.com/bhashitva/bhash/blob/$RELEASE_SHA/editors/vscode/CHANGELOG.md)."
           sha256sum bhash_jupyter-0.1.12-py3-none-any.whl hindi-starter.ipynb > SHA256SUMS
-          gh release create jupyter-0.1.12 --target "$GITHUB_SHA" --latest=false --title "Bhash Jupyter kernel 0.1.12" --notes-file ../../editors/jupyter/RELEASE.md bhash_jupyter-0.1.12-py3-none-any.whl SHA256SUMS hindi-starter.ipynb
+          ASSETS="bhash_jupyter-0.1.12-py3-none-any.whl SHA256SUMS hindi-starter.ipynb"; ASSETS_COUNT=3
+          publish_release jupyter-0.1.12 --latest=false --title "Bhash Jupyter kernel 0.1.12" --notes-file ../../editors/jupyter/RELEASE.md
