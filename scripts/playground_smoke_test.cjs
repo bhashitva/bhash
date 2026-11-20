@@ -29,6 +29,10 @@ let logs=''; server.stderr.on('data', data => {logs+=data;});
       assert.equal((await page.locator('#output').textContent()).replaceAll('\r\n','\n'),expected);
       if(exit===0)assert.equal(await page.locator('#errors').textContent(),'');
     }
+    await require('./playground_keyword_checks.cjs')(page);
+    await execute('कीवर्ड से नमस्ते 😀\n');
+    console.log('PASS program assembled with keyword buttons executes in WebAssembly');
+    await page.selectOption('#example','hello');
     await execute('नमस्ते, दुनिया!\n');console.log('PASS playground hello');
     // Same source reuses the completed build and preserves fresh runtime state.
     await execute('नमस्ते, दुनिया!\n');console.log('PASS playground cached rerun');
