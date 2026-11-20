@@ -61,14 +61,15 @@ class Example:
     excerpt: str
 
 
-def inventory(jar):
+def inventory(jar, *, include_enums=False):
     if not jar.is_file():
         raise SystemExit(f"Build the compiler first or pass --jar: {jar}")
     (ROOT / "target").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="library-api-", dir=ROOT / "target") as scratch:
         raw = subprocess.check_output(
             ["java", f"-Djava.io.tmpdir={scratch}", "-cp", str(jar),
-             str(ROOT / "scripts/StandardLibraryApi.java"), scratch],
+             str(ROOT / "scripts/StandardLibraryApi.java"), scratch,
+             *(["--include-enums"] if include_enums else [])],
             cwd=ROOT,
         )
     return json.loads(raw)

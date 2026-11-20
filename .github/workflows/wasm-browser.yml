@@ -18,6 +18,7 @@ on:
       - 'scripts/browser_smoke_test.cjs'
       - 'scripts/playground_smoke_test.cjs'
       - 'scripts/playground_keyword*.cjs'
+      - 'scripts/playground_library*.cjs'
       - 'src/test/resources/stdlib/set.bhash'
       - 'scripts/playground_performance.cjs'
       - 'scripts/profile_browser_publish.py'
@@ -88,6 +89,8 @@ jobs:
             target/browser-factorial.png
             target/playground-desktop.png
             target/playground-mobile.png
+            target/library-ui/*.png
+            target/keyword-ui/*.png
             target/browser-publish-profile/results.json
             target/browser-publish-profile/*/*.log
             target/browser-publish-profile/*/*phases.json

@@ -29,7 +29,41 @@ The picker uses the same grammar-generated keyword list as highlighting and
 completion, including contextual `विकल्पसमूह` and `मिलान`. Its controls work
 with mouse, touch, or keyboard, and remain available while editing offline.
 
-### Runtime and editor
+### मानक पुस्तकालय खोजें (Library lookup)
+
+संपादक के ऊपर **पुस्तकालय · Library** खोलें। हिन्दी नाम या अंग्रेज़ी अर्थ से
+खोजें, जैसे `पाठ्य`, `split`, `math` या `database`। बाईं सूची से प्रकार या
+सदस्य चुनें। दाईं ओर निर्माता, फलन, ओवरलोड, मापदंड, फल का प्रकार, हिन्दी
+विवरण और संबंधित कोड अंश मिलते हैं। छोटे फ़ोन पर चयन का विवरण अलग दृश्य
+में खुलता है; **खोज के नतीजे** से सूची में लौटें।
+
+**कॉल / नाम डालें** से चुना API कर्सर पर आता है। तर्क और generic प्रकार
+स्थानचिह्न हैं; उन्हें बदलें और Tab से अगले पर जाएँ। सदस्य विधि में `वस्तु`
+को अपनी variable से बदलें। साझा कॉल में `मानक` का पूरा नाम आता है, इसलिए
+अलग आयात जोड़ना आवश्यक नहीं है। चयन करने से क्रमानुदेश नहीं चलता। Undo,
+Escape और स्पष्ट बंद करने का बटन उपलब्ध हैं।
+
+खोज पूरे मानक पुस्तकालय की है। फ़ाइल, डेटाबेस, सर्वर और संपीड़न की होस्ट
+सुविधाएँ Playground में पूरी तरह उपलब्ध नहीं हैं; विवरण में लक्ष्य की
+सीमाएँ पढ़ें। हस्ताक्षर default legacy profile के हैं; strict रिक्त-सुरक्षा
+की भिन्नताएँ प्रकार की टिप्पणियों में हैं। संदर्भ और कोड अंश editor के साथ
+cache होते हैं। पहले editor खोलने पर cache तैयार होने दें, फिर पृष्ठ को
+दोबारा लोड करें; उसके बाद offline खोज भी उपलब्ध है।
+बाहरी पूर्ण मार्गदर्शिका के लिंक के लिए इंटरनेट चाहिए।
+
+The offline catalog is generated from the compiler's public declarations and
+the existing Hindi reference data/pages, including inherited members and public
+compression enums. After changing the library or its reference, run:
+
+```sh
+python scripts/build_library_reference.py
+python scripts/build_playground_library.py
+```
+
+CI checks the committed `playground/public/library.json` against the compiler.
+The frontend build itself remains Node-only and needs no Java introspection.
+
+### Runtime and editor components
 
 - CodeMirror mobile-friendly editor, keyword completion/snippets generated from
   the ANTLR grammar, statement/full-program modes and four starter examples.

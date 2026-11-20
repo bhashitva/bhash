@@ -3,12 +3,13 @@ import {EditorView, basicSetup} from 'codemirror';
 import {EditorSelection} from '@codemirror/state';
 import {isolateHistory} from '@codemirror/commands';
 import {StreamLanguage} from '@codemirror/language';
-import {autocompletion, snippetCompletion} from '@codemirror/autocomplete';
+import {autocompletion, snippetCompletion, snippet} from '@codemirror/autocomplete';
 import {setDiagnostics, lintGutter} from '@codemirror/lint';
 import {compilerDiagnostics} from './diagnostics.mjs';
 import {identifierWord, identifierKey} from './identifier-profile.js';
 import {keywordStyle} from './keywords.mjs';
 import {keywordEntries, keywordGroups, filterKeywords, keywordInsertion} from './keyword-picker.mjs';
+import {mountLibraryBrowser} from './library-browser.mjs';
 const $ = id => document.getElementById(id);
 const track = (name, values) => window.bhashAnalytics?.(name, values);
 const keywordData = BHASH_KEYWORDS;
@@ -124,6 +125,17 @@ function renderKeywords() {
 $('keyword-search').addEventListener('input', renderKeywords);
 $('keyword-group').addEventListener('change', renderKeywords);
 renderKeywords();
+let librarySelection;
+mountLibraryBrowser(template => {
+  // Native dialog close can restore DOM focus before inserting. Keep the
+  // selection from when the lookup opened, not that incidental focus change.
+  const range=librarySelection;
+  snippet(template)({state:editor.state,dispatch:transaction=>editor.dispatch({
+    changes:transaction.changes,selection:transaction.selection,effects:transaction.effects,
+    userEvent:'input.library',annotations:isolateHistory.of('full'),scrollIntoView:true
+  })},null,range.from,range.to);
+  editor.focus();
+}, () => { librarySelection=editor.state.selection.main; });
 document.querySelector('.keyword-picker').addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     event.preventDefault(); document.querySelector('.keyword-picker').open = false; editor.focus();
@@ -214,7 +226,7 @@ async function run() {
   } catch (error) { if (id !== current) return; track('playground_run_failed', {stage: 'compile'}); showCompilerErrors(error.message, compiledSource); finish('Could not run · क्रमानुदेश नहीं चला'); }
 }
 $('run').addEventListener('click', run);
-addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); run(); } });
+addEventListener('keydown', event => { if (!$('library-dialog').open && (event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); run(); } });
 addEventListener('message', event => {
   if (!frame || event.source !== frame.contentWindow || event.origin !== config.runOrigin || !event.data) return;
   if (event.data.type === 'ready') { frame.contentWindow.postMessage({type: 'start', input: $('stdin').value, nonce}, config.runOrigin); return; }
