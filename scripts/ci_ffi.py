@@ -44,7 +44,18 @@ def main():
         raise SystemExit("Maven is required by the CI producer")
     jar = ROOT / "target/bhash-compiler-0.1.0-SNAPSHOT.jar"
     # Native compiler setup is deliberate; FFI analysis/compilation never invokes it.
-    run(java, "-jar", jar, "native", "toolchain", "install", "--json")
+    # The CLI deliberately never selects a remote archive implicitly. Use the
+    # same immutable SDK assets and trusted digests as the VS Code integration.
+    sdk_name, sdk_archive, sdk_sha = (
+        ("native-sdk-windows-1.0.0", "bhash-windows-x86_64-llvm18-v1.zip",
+         "b0d5934ea134e500ff598f737c40b3076400e85e5760a22bfcc28f7aaf321f3f") if windows else
+        ("native-sdk-macos-1.0.0", "bhash-macos-arm64-llvm18-v1.zip",
+         "c92917d04e8514ed497173326fafa138ba1b9767ac17a0f88b568d6b6ee3e22d") if macos else
+        ("native-sdk-1.1.0", "bhash-linux-x86_64-llvm18-v1-jammy.zip",
+         "52e8a1c7bd1b71082c0c9d7364776a53f5d7a3b8b87d6501f1cf0894ed09e844"))
+    run(java, "-jar", jar, "native", "toolchain", "install", "--url",
+        "https://github.com/bhashitva/bhash/releases/download/" + sdk_name + "/" + sdk_archive,
+        "--sha256", sdk_sha, "--json")
     os.environ["BHASH_NATIVE_TOOLCHAIN"] = "managed"
     cc, ar = shutil.which("clang"), shutil.which("ar")
     if windows:
