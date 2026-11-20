@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.29.0
+
+- Add **Bhash: Standard Library Lookup**, the editor book icon and status-bar shortcut.
+- Share the Playground's Hindi/English catalog and renderer: 131 types and 940 declared/inherited members, signatures, parameters, return types and examples.
+- Insert qualified calls/types with editable VS Code Tab placeholders and isolated Undo; reject stale source selections.
+- Support dark/light themes, narrow panes, offline browsing and Restricted Mode without executing programs or sending source to the webview.
+- Preserve the verified compiler 0.28.0 and its bundled C-library providers. Hindi usage instructions are included in the Marketplace README.
+
 ## 0.28.0
 
 - Bundle compiler 0.28.0 with typed C-library interoperability and bounded zlib/gzip compression.

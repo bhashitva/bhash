@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');
 const {runTests,downloadAndUnzipVSCode}=require('@vscode/test-electron');
-const {execFile}=require('node:child_process');const {promisify}=require('node:util');
+const {execFile,spawn}=require('node:child_process');const {promisify}=require('node:util');
 (async()=>{
     const workspace=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'bhash-vscode-')));
     try {
@@ -26,7 +26,21 @@ const {execFile}=require('node:child_process');const {promisify}=require('node:u
             await fs.access(vscodeExecutablePath,require('node:fs').constants.X_OK);
             console.log(`Resolved Mac test executable from application metadata: ${executable}`);
         }
-        await runTests({version,vscodeExecutablePath,extensionDevelopmentPath:path.resolve(__dirname,'..'),extensionTestsPath:path.join(__dirname,'host.cjs'),
-            launchArgs:[workspace,'--disable-workspace-trust','--skip-welcome','--skip-release-notes','--no-sandbox','--disable-gpu'],extensionTestsEnv:{BHASH_TEST_WORKSPACE:workspace, BHASH_TEST_NATIVE:process.env.BHASH_TEST_NATIVE||'0', BHASH_TOOLCHAIN_HOME:path.join(workspace,'native-cache')}});
-    } finally {await fs.rm(workspace,{recursive:true,force:true});}
+        const launchArgs=[workspace,'--disable-workspace-trust','--skip-welcome','--skip-release-notes','--no-sandbox','--disable-gpu',
+            '--user-data-dir='+path.join(workspace,'user-data'),'--extensions-dir='+path.join(workspace,'extensions')];
+        const extensionTestsEnv={BHASH_TEST_WORKSPACE:workspace,BHASH_TEST_NATIVE:process.env.BHASH_TEST_NATIVE||'0',BHASH_TOOLCHAIN_HOME:path.join(workspace,'native-cache')};
+        if(process.platform==='win32'){
+            // test-electron 2.5 uses cmd.exe on Windows and splits paths at spaces.
+            // Launch the vendor executable directly with an argv array instead.
+            vscodeExecutablePath=await downloadAndUnzipVSCode({version});
+            await new Promise((resolve,reject)=>{
+                const child=spawn(vscodeExecutablePath,[...launchArgs,'--disable-updates','--extensionDevelopmentPath='+path.resolve(__dirname,'..'),'--extensionTestsPath='+path.join(__dirname,'host.cjs')],
+                    {shell:false,windowsHide:true,stdio:'inherit',env:{...process.env,...extensionTestsEnv}});
+                child.once('error',reject);child.once('exit',(code,signal)=>code===0?resolve():reject(Error(`VS Code tests failed: ${code??signal}`)));
+            });
+        }else await runTests({version,vscodeExecutablePath,extensionDevelopmentPath:path.resolve(__dirname,'..'),extensionTestsPath:path.join(__dirname,'host.cjs'),launchArgs,extensionTestsEnv});
+    } finally {
+        if(path.dirname(workspace)!==await fs.realpath(os.tmpdir())||!path.basename(workspace).startsWith('bhash-vscode-'))throw Error('Unexpected test cleanup directory');
+        await fs.rm(workspace,{recursive:true,force:true});
+    }
 })().catch(error=>{console.error(error);process.exitCode=1;});

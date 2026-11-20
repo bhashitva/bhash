@@ -10,6 +10,11 @@ on:
       - 'NOTICE'
       - 'licenses/**'
       - 'editors/vscode/**'
+      - 'playground/src/library*.mjs'
+      - 'playground/src/identifier-profile.js'
+      - 'playground/public/library.json'
+      - 'playground/public/index.html'
+      - 'playground/public/style.css'
       - 'scripts/native-vscode-clean.Dockerfile'
       - '!**/*.md'
       - 'LICENSING.md'
@@ -44,6 +49,18 @@ jobs:
       - run: npm ci --prefix editors/vscode --no-audit --no-fund
       - run: npm run build --prefix editors/vscode
       - run: npm test --prefix editors/vscode
+      - name: Test library webview themes, search and editor message bridge
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+          node editors/vscode/test/library-webview.cjs
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.os == 'ubuntu-24.04'
+        with:
+          name: bhash-library-ui
+          path: target/vscode-library/*.png
+          if-no-files-found: warn
       - name: Test Apple Silicon launcher with local Command Line Tools and no system LLVM 18
         if: runner.os == 'macOS'
         run: node editors/vscode/test/native-macos.cjs
@@ -68,6 +85,6 @@ jobs:
       - run: npm run package --prefix editors/vscode
       - uses: actions/upload-artifact@v4
         with:
-          name: bhash-vscode-${{ runner.os }}
+          name: bhash-vscode-${{ matrix.os }}
           path: target/bhash-vscode-*.vsix
           if-no-files-found: error

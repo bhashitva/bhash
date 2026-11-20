@@ -5,6 +5,7 @@ exports.run=async()=>{
     const workspace=process.env.BHASH_TEST_WORKSPACE;let uri=vscode.Uri.file(path.join(workspace,'src','main.bhash'));
     const document=await vscode.workspace.openTextDocument(uri);uri=document.uri;await vscode.window.showTextDocument(document);
     assert.equal(document.languageId,'bhash');const extension=vscode.extensions.getExtension('bhashitva.bhash');assert.ok(extension);await extension.activate();
+    await require('./library-host.cjs')(extension);await vscode.window.showTextDocument(document);
     // Resolve the shipped task type, then exercise VS Code's real CustomExecution
     // dispatch. A provider-less task fails here on Windows before open() runs.
     // The terminal is synthetic: this regression needs no LLVM, SDK or compiler run.

@@ -1,0 +1,100 @@
+name: Publish VS Code library lookup 0.29.0
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full tested source commit (40 lowercase hex characters)
+        required: true
+permissions:
+  contents: read
+env:
+  SOURCE_SHA: ${{ inputs.source_sha }}
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Require an immutable source revision
+        shell: bash
+        run: '[[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]'
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - name: Preserve the verified compiler and bundled providers
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import urllib.request, hashlib
+          target=Path('target/bhash-compiler-0.1.0-SNAPSHOT.jar')
+          target.parent.mkdir(exist_ok=True)
+          with urllib.request.urlopen('https://github.com/bhashitva/bhash/releases/download/bhash-0.28.0/bhash-compiler-0.28.0.jar',timeout=120) as response:
+              target.write_bytes(response.read())
+          assert hashlib.sha256(target.read_bytes()).hexdigest()=='8fbcef3abb5a56f0a13d41c0d66cdcae00dfc2656f481f578d97d82cd0863fd0'
+          PY
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar ffi verify compression --offline
+      - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      - run: npm run package --prefix editors/vscode
+      - run: npm test --prefix editors/vscode
+      - name: Verify and stage the public VSIX
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,shutil,zipfile
+          package=Path('target/bhash-vscode-0.29.0.vsix')
+          with zipfile.ZipFile(package) as archive:
+              manifest=json.loads(archive.read('extension/package.json'))
+              assert manifest['version']=='0.29.0'
+              assert any(c['command']=='bhash.openStandardLibrary' for c in manifest['contributes']['commands'])
+              for item in ['library.html','library.json','library-webview.js','library-theme.css','library-base.css']:
+                  assert archive.read('extension/dist/'+item)
+              assert hashlib.sha256(archive.read('extension/server/bhash-compiler.jar')).hexdigest()=='8fbcef3abb5a56f0a13d41c0d66cdcae00dfc2656f481f578d97d82cd0863fd0'
+          staged=Path('target/vscode-release');staged.mkdir()
+          shutil.copy2(package,staged/package.name)
+          (staged/(package.name+'.sha256')).write_text(hashlib.sha256(package.read_bytes()).hexdigest()+'  '+package.name+'\n')
+          shutil.copy2('editors/vscode/images/library-lookup.png',staged/'library-lookup.png')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vscode-0.29.0-release
+          path: target/vscode-release/
+          if-no-files-found: error
+  publish:
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: vscode-0.29.0-release
+          path: target/vscode-release
+      - name: Publish the checked VSIX without replacing an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          (cd target/vscode-release && sha256sum -c bhash-vscode-0.29.0.vsix.sha256)
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/vscode-0.29.0" >/dev/null 2>&1; then
+            echo 'Refusing to replace an existing release tag.' >&2
+            exit 1
+          fi
+          gh release create vscode-0.29.0 --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --latest=false \
+            --title 'VS Code extension 0.29.0 — standard library lookup' \
+            --notes-file .github/release-notes/vscode-0.29.0.md \
+            target/vscode-release/bhash-vscode-0.29.0.vsix \
+            target/vscode-release/bhash-vscode-0.29.0.vsix.sha256 \
+            target/vscode-release/library-lookup.png

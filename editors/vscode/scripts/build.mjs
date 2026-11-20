@@ -54,7 +54,14 @@ await writeFile('syntaxes/bhash.tmLanguage.json',JSON.stringify(syntax,null,2)+'
 const tsc=spawnSync(process.execPath,['node_modules/typescript/bin/tsc','--project','.'],{stdio:'inherit'});
 if(tsc.status!==0)process.exit(tsc.status || 1);
 await mkdir('dist',{recursive:true});await mkdir('server',{recursive:true});
-await build({entryPoints:['src/extension.ts','src/native-task.ts','src/native.ts','src/task-console.ts','src/native-debug.ts','src/windows-debug-adapter.ts'],bundle:true,platform:'node',format:'cjs',target:'node20',external:['vscode'],outdir:'dist',legalComments:'eof'});
+await build({entryPoints:['src/extension.ts','src/library.ts','src/native-task.ts','src/native.ts','src/task-console.ts','src/native-debug.ts','src/windows-debug-adapter.ts'],bundle:true,platform:'node',format:'cjs',target:'node20',external:['vscode'],outdir:'dist',legalComments:'eof'});
+await build({entryPoints:['src/library-webview.mjs'],bundle:true,platform:'browser',format:'iife',target:'es2022',outfile:'dist/library-webview.js',legalComments:'eof'});
+const libraryHtml=(await readFile(new URL('playground/public/index.html',root),'utf8')).match(/<dialog id="library-dialog"[\s\S]*?<\/dialog>/)?.[0];
+if(!libraryHtml)throw Error('Missing shared library lookup markup.');
+await writeFile('dist/library.html',libraryHtml);
+await copyFile(new URL('playground/public/library.json',root),'dist/library.json');
+await copyFile(new URL('playground/public/style.css',root),'dist/library-base.css');
+await copyFile('media/library-theme.css','dist/library-theme.css');
 await copyFile(new URL('target/bhash-compiler-0.1.0-SNAPSHOT.jar',root),'server/bhash-compiler.jar');
 for(const file of ['LICENSE','NOTICE','LICENSING.md','THIRD_PARTY_NOTICES.md'])await copyFile(new URL(file,root),file);
 const lock=JSON.parse(await readFile('package-lock.json','utf8')), notices=[];

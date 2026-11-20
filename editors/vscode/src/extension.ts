@@ -5,6 +5,7 @@ import * as fs from 'node:fs/promises';
 import {NativeOptions, requireNativeHost} from './native';
 import {ConsoleRequest, TaskConsole} from './task-console';
 import {registerAndroid} from './android';
+import {registerLibraryLookup} from './library';
 import {registerNativeDebug} from './debug-integration';
 import {LanguageClient, LanguageClientOptions, ServerOptions} from 'vscode-languageclient/node';
 
@@ -168,6 +169,7 @@ async function newProject() {
 export function activate(extensionContext: vscode.ExtensionContext) {
     context = extensionContext;
     output = vscode.window.createOutputChannel('Bhash');context.subscriptions.push(output);
+    registerLibraryLookup(context);
     registerAndroid(context, {trusted, tools, execution: consoleExecution});
     registerNativeDebug(context, {activeInput, save: saveInput, log: text => output.appendLine(text), tools: folder => {
         const config = vscode.workspace.getConfiguration('bhash', folder?.uri);
@@ -210,6 +212,11 @@ export function activate(extensionContext: vscode.ExtensionContext) {
             return nativeToolsTask(definition,folder);
         }
     }));
-    void startServer();
+    // Reference-only activation needs no Java process. Start analysis when an
+    // actual Bhash document is opened, including documents restored at startup.
+    context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(document=>{
+        if(['bhash','bhash-project'].includes(document.languageId))void startServer();
+    }));
+    if(vscode.workspace.textDocuments.some(document=>['bhash','bhash-project'].includes(document.languageId)))void startServer();
 }
 export async function deactivate() {serverWatcher?.dispose();await client?.stop();client=undefined;}
