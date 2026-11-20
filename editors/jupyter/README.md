@@ -44,7 +44,7 @@ python -m bhash_jupyter.install
 python -m pip show bhash-jupyter
 ```
 
-**हिन्दी:** Notebook 7 के लिए `[lab]` की जगह `[notebook]` लिखें। पहले अलग Java या database drivers चुने हों तो पंजीकरण में वही `--java`, `--mysql-driver` और `--sqlserver-driver` विकल्प फिर दें। उसके बाद सर्वर और पृष्ठ दोबारा खोलें तथा **Bhash (भाष)** कर्नेल चुनें।
+**हिन्दी:** Notebook 7 के लिए `[lab]` की जगह `[notebook]` लिखें। पहले अलग compiler JAR, Java या database drivers चुने हों तो पंजीकरण में वही `--compiler`, `--java`, `--mysql-driver` और `--sqlserver-driver` विकल्प फिर दें। `--compiler` शामिल संकलक के बदले अपना JAR चुनता है; उसे तभी दोहराएँ जब वही संकलक उपयोग करना हो। उसके बाद सर्वर और पृष्ठ दोबारा खोलें तथा **Bhash (भाष)** कर्नेल चुनें।
 
 ### Build from source
 

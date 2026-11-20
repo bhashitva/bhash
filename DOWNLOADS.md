@@ -65,10 +65,11 @@ Install or update from the [Visual Studio Marketplace](https://marketplace.visua
 
 ## Jupyter kernel
 
-Install the wheel, then open the Hindi starter notebook. See the [kernel installation guide](editors/jupyter/README.md).
+Install the wheel in the Python environment running the Jupyter server, then restart the server and reload the page. Open the Hindi starter notebook and use **📚 पुस्तकालय** for Hindi/English API lookup. See the [kernel installation guide](editors/jupyter/README.md) and [Hindi lookup tutorial](tutorial/jupyter-library-lookup/README.md).
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.1.15](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.15) | 2026-11-20 23:16 | [Wheel](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/bhash_jupyter-0.1.15-py3-none-any.whl) · [Hindi notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/hindi-starter.ipynb) · [Compression notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/compression.ipynb) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/SHA256SUMS) |
 | [0.1.14](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.14) | 2026-11-20 12:27 | [Wheel](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.14/bhash_jupyter-0.1.14-py3-none-any.whl) · [Hindi notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.14/hindi-starter.ipynb) · [Compression notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.14/compression.ipynb) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.14/SHA256SUMS) |
 | [0.1.13](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.13) | 2026-11-19 18:05 | [Wheel](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.13/bhash_jupyter-0.1.13-py3-none-any.whl) · [Hindi notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.13/hindi-starter.ipynb) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.13/SHA256SUMS) |
 | [0.1.12](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.12) | 2026-11-19 04:18 | [Wheel](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.12/bhash_jupyter-0.1.12-py3-none-any.whl) · [Hindi notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.12/hindi-starter.ipynb) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.12/SHA256SUMS) |
@@ -99,7 +100,7 @@ Read the [online edition](book/README.md), download the PDF, or get the companio
 
 ## C-library providers
 
-Compiler 0.28.0, VS Code 0.28.0 and Jupyter 0.1.14 already bundle these verified compression providers. Use this separate archive when preparing an offline provider catalog or rebuilding packages. It includes static and shared providers for Linux x64 (glibc 2.35+), Windows x64 (UCRT), and macOS Apple Silicon (macOS 14+), with redistribution notices. Browser and Android C-library calls are not supported. See the [Hindi compression tutorial](tutorial/compression/README.md) and [typed binding design](docs/typed-c-interop-design.en.md).
+Compiler 0.28.0+, VS Code 0.28.0+ and Jupyter 0.1.14+ bundle these verified compression providers. Use this separate archive when preparing an offline provider catalog or rebuilding packages. It includes static and shared providers for Linux x64 (glibc 2.35+), Windows x64 (UCRT), and macOS Apple Silicon (macOS 14+), with redistribution notices. Browser and Android C-library calls are not supported. See the [Hindi compression tutorial](tutorial/compression/README.md) and [typed binding design](docs/typed-c-interop-design.en.md).
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
