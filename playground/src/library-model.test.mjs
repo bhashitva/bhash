@@ -51,6 +51,7 @@ test('availability and profile guidance is explicit, and documentation links are
   assert.equal(type('पाठ्य').browser,'supported');
   for(const name of ['फ़ाइल','डेटा','संपीड़न'])assert.equal(type(name).browser,'host');
   assert.match(type('जेसन').notes,/Strict|nullable/u);
+  assert.ok(type('माईएसक्यूएलविन्यास').members.filter(m=>m.kind==='field').every(m=>!m.description.includes('PostgreSQL')));
   for(const t of catalog.types)for(const path of [t.reference,t.guide]){
     assert.ok(existsSync(new URL('../../'+path,import.meta.url)),path);
     assert.ok(documentationUrl(path).startsWith('https://github.com/bhashitva/bhash/blob/main/'));
