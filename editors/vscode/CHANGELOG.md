@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.28.0
+
+- Bundle compiler 0.28.0 with typed C-library interoperability and bounded zlib/gzip compression.
+- Include verified Linux x64, Windows x64 and Apple Silicon static/shared providers.
+- Preserve checked ownership, GC-safe copied buffers, typed errors, offline compilation and explicit restore.
+- Link Hindi compression tutorials and binding-author documentation; reject C bindings in browser/Android targets.
+
 ## 0.27.0
 
 - Bundle compiler 0.27.0 with tagged unions, exhaustive matching, typed Result and Unit.

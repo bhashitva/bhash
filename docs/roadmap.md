@@ -1,14 +1,10 @@
 # Implementation roadmap
 
-## In progress: typed external-library interoperability
+## Typed external-library interoperability and compression
 
-The C-binding and compression proposal is available in
-[Hindi](typed-c-interop-design.md) and [English](typed-c-interop-design.en.md).
-It covers ownership, GC-safe marshaling, resource cleanup, distribution and
-native/JVM/CLR behavior. **Approved; implementation is in progress.**
+The approved design ([Hindi](typed-c-interop-design.md), [English](typed-c-interop-design.en.md)) is implemented in compiler/VS Code 0.28.0 and Jupyter 0.1.14. Verified provider distribution covers Linux x64, Windows x64 and Apple Silicon. See the [Hindi compression tutorial](../tutorial/compression/README.md), [binding guide](typed-c-library-bindings.md) and [validation record](typed-c-interop-validation.md). Browser/Android C bindings remain unsupported.
 
-**हिन्दी:** प्रकारयुक्त C bindings और संपीड़न का प्रस्ताव स्वीकृत है।
-संकलक, रनटाइम और वितरण का कार्यान्वयन जारी है।
+**हिन्दी:** प्रकारयुक्त C bindings, GC-सुरक्षित ownership, संसाधन सफ़ाई और सीमित जेडलिब/गज़िप संपीड़न उपलब्ध हैं। प्रदाता सार्वजनिक पैकेजों में शामिल हैं; विश्लेषण और संकलन अपने-आप code डाउनलोड नहीं करते।
 
 ## Tagged unions, pattern matching and typed results
 
