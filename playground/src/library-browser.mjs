@@ -15,17 +15,17 @@ export function mountLibraryBrowser(insert, rememberSelection) {
   const use=(type,member)=>{dialog.close('insert');insert(librarySnippet(type,member));};
   const copy=async text=>{try{await navigator.clipboard.writeText(text);$('library-notice').textContent='हस्ताक्षर कॉपी हुआ। · Signature copied.';}catch{$('library-notice').textContent='कॉपी उपलब्ध नहीं है; नीचे दिया हस्ताक्षर चुनकर कॉपी करें।';}};
   function memberButton(type, member, position) {
-    const button=action('',()=>select({type,member,id:`member:${type.name}:${position}`}));
+    const button=action('',()=>select({type,member,id:`member:${type.name}:${position}`},true));
     button.className='library-member';button.append(element('strong',`${member.name} · ${member.english}`),element('code',signature(type,member)));
     return button;
   }
-  function select(entry) {
+  function select(entry, focus=false) {
     selected=entry; const {type,member}=entry;
     $('library-body').dataset.detail='true';
     for(const button of list.querySelectorAll('button[data-id]'))button.setAttribute('aria-pressed',String(button.dataset.id===entry.id));
-    const heading=element('h2',member?member.name:type.name); heading.id='library-detail-title';
+    const heading=element('h2',member?member.name:type.name); heading.id='library-detail-title';heading.tabIndex=-1;
     const top=element('div','','library-detail-top');
-    const back=action('← '+type.name,()=>select({type,member:null,id:`type:${type.name}`}));
+    const back=action('← '+type.name,()=>select({type,member:null,id:`type:${type.name}`},true));
     if(member)top.append(back);
     top.append(element('p',member?typeName(type,true):`मानक · ${kindNames[type.kind]}`,'library-kicker'),heading,
       element('p',member?member.english:type.english,'library-english'));
@@ -63,6 +63,7 @@ export function mountLibraryBrowser(insert, rememberSelection) {
     if(type.examples.length)detail.append(section(`${type.name} के कोड अंश · Examples`,element('p','ये प्रकार के उपयोग के अंश हैं; आवश्यक आयात और तैयारी के लिए पूरा संदर्भ देखें।'),...type.examples.map(code=>element('pre',code))));
     const links=element('div','','library-doc-links');links.append(link('पूरा हिन्दी API संदर्भ ↗',type.reference),link('विषय की मार्गदर्शिका ↗',type.guide));detail.append(links);
     detail.append(element('p','हस्ताक्षर default legacy profile के हैं। Strict रिक्त-सुरक्षा में nullable सीमाओं के लिए प्रकार की टिप्पणियाँ और रिक्त-सुरक्षा मार्गदर्शिका देखें।','library-hint'),link('रिक्त-सुरक्षा के नियम ↗','tutorial/null-safety/README.md'));
+    if(focus)heading.focus({preventScroll:true});
   }
   function render(keepScroll=false) {
     if(!index)return;
@@ -71,7 +72,7 @@ export function mountLibraryBrowser(insert, rememberSelection) {
     list.replaceChildren();
     $('library-count').textContent=`${matches.length} नतीजे · results`;
     for(const entry of matches.slice(0,limit)) {
-      const button=action('',()=>select(entry));button.className='library-result';button.dataset.id=entry.id;
+      const button=action('',()=>select(entry,true));button.className='library-result';button.dataset.id=entry.id;
       button.setAttribute('aria-pressed',String(entry.id===selected?.id));
       button.append(element('span',entry.member?`${entry.member.kind==='field'?'क्षेत्र':'फलन'} · ${entry.type.name}`:kindNames[entry.type.kind],'library-result-kind'),
         element('strong',entry.member?entry.member.name:entry.type.name),element('span',entry.member?entry.member.english:entry.type.english));
@@ -83,7 +84,8 @@ export function mountLibraryBrowser(insert, rememberSelection) {
       const previous=limit;limit+=60;render(true);list.querySelectorAll('button[data-id]')[previous]?.focus();
     }));
     list.scrollTop=scroll;
-    if(matches.length&&!matches.some(entry=>entry.id===selected?.id))select(matches[0]);
+    const current=matches.find(entry=>entry.id===selected?.id);
+    if(matches.length&&(!keepScroll||!current))select(current||matches[0]);
     if(!matches.length){selected=null;detail.replaceChildren(element('p','किसी वर्ग या फलन को चुनकर उसका विवरण देखें।','library-empty'));}
     // On phones show results until a deliberate selection, not the automatic preview.
     $('library-body').dataset.detail='false';
@@ -95,9 +97,11 @@ export function mountLibraryBrowser(insert, rememberSelection) {
   dialog.addEventListener('keydown',event=>{
     if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}
   },{capture:true});
-  dialog.addEventListener('close',()=>{if(!dialog.returnValue)trigger.focus();dialog.returnValue='';});
   trigger.addEventListener('click',async()=>{
     rememberSelection();
+    // Native dialog restores its opener on close. A delayed close handler must
+    // not steal focus back after the user has already returned to the editor.
+    dialog.returnValue='';
     dialog.showModal();$('library-search').focus();$('library-notice').textContent='';
     if(index){render();return;}
     $('library-count').textContent='पुस्तकालय लोड हो रहा है…';

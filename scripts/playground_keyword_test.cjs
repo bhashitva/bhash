@@ -40,7 +40,9 @@ const server = http.createServer((request,response) => {
     await page.locator('#library-search').fill('split');
     await page.locator('.library-result').filter({hasText:'बाँटो'}).waitFor();
     await page.locator('#library-search').press('Escape');
-    await page.locator('.cm-content').fill('');
+    await page.locator('.cm-content').press((process.platform==='darwin'?'Meta':'Control')+'+a');
+    await page.locator('.cm-content').press('Backspace');
+    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('bhash-draft'))?.source==='');
     await page.locator('.keyword-picker summary').click();
     await page.getByRole('button',{name:'स्थिर · Constant',exact:true}).click();
     assert.equal(await page.locator('.cm-content').innerText(),'स्थिर ');
