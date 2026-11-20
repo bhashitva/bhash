@@ -18,7 +18,7 @@ function fixture(language='bhash') {
     const module={exports:{}};
     vm.runInNewContext(fs.readFileSync(path.join(root,'dist/library.js'),'utf8'),{module,exports:module.exports,Buffer,console,require:name=>name==='vscode'?vscode:require(name)});
     const lookup=new module.exports.LibraryLookup({extensionUri:uri(root)});
-    return {lookup,panel,messages,insertions,links,copies,document,editor,vscode,selection:()=>selectionListener({textEditor:editor}),active:(value=editor)=>{vscode.window.activeTextEditor=value;activeListener(value);},module};
+    return {lookup,panel,messages,insertions,links,copies,document,editor,vscode,selection:()=>selectionListener({textEditor:editor}),active:(...args)=>{const value=args.length?args[0]:editor;vscode.window.activeTextEditor=value;activeListener(value);},module};
 }
 test('bundled catalog and shared renderer are available offline with a restricted CSP',async()=>{
     const f=fixture();await f.lookup.open();
@@ -57,6 +57,22 @@ test('an edit during editor activation is rejected before inserting a snippet',a
     const f=fixture();await f.lookup.open();
     f.vscode.window.showTextDocument=async()=>{f.document.version++;return f.editor;};
     await f.lookup.handleMessage({type:'insert',id:'type:पाठ्य',request:1});assert.equal(f.insertions.length,0);assert.equal(f.messages.at(-1).ok,false);f.lookup.dispose();
+});
+
+test('finishing an insertion preserves a newer editor target or its cleared state',async()=>{
+    for(const languageId of ['bhash','plaintext']) {
+        const f=fixture();await f.lookup.open();let finish;
+        f.editor.insertSnippet=()=>new Promise(resolve=>{finish=resolve;});
+        const pending=f.lookup.handleMessage({type:'insert',id:'type:पाठ्य',request:1});
+        await new Promise(resolve=>setImmediate(resolve));assert.equal(typeof finish,'function');
+        const newer={...f.editor,document:{...f.document,languageId},selections:[{start:20,end:25}],insertSnippet:async(...args)=>{f.insertions.push(args);return true;}};
+        f.active(newer);f.document.version++;finish(true);await pending;
+        f.active(undefined); // Moving focus back to the webview must preserve the newer target.
+        f.vscode.window.showTextDocument=async document=>{assert.equal(document,newer.document);return newer;};
+        await f.lookup.handleMessage({type:'insert',id:'type:पाठ्य',request:2});
+        assert.equal(f.insertions.length,languageId==='bhash'?1:0);
+        assert.equal(f.messages.at(-1).ok,languageId==='bhash');f.lookup.dispose();
+    }
 });
 test('library entry points are contributed and command IDs are unique',()=>{
     const manifest=require('../package.json');const commands=manifest.contributes.commands.map(c=>c.command);
