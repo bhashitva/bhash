@@ -17,6 +17,7 @@ on:
       - 'examples/**'
       - 'scripts/browser_smoke_test.cjs'
       - 'scripts/playground_smoke_test.cjs'
+      - 'scripts/playground_keyword*.cjs'
       - 'src/test/resources/stdlib/set.bhash'
       - 'scripts/playground_performance.cjs'
       - 'scripts/profile_browser_publish.py'
@@ -53,7 +54,9 @@ jobs:
       - run: npm install --no-save --package-lock=false playwright@1.56.1
       - run: npx playwright install --with-deps chromium
       - run: npm ci --prefix playground --no-audit --no-fund
+      - run: npm test --prefix playground
       - run: npm run build --prefix playground
+      - run: node scripts/playground_keyword_test.cjs
       - name: Profile full publishing before preparing the reusable browser host
         run: python3 scripts/profile_browser_publish.py
       - name: Compare Run to first output on the same host

@@ -14,6 +14,23 @@ for incoming HTTP or WebSocket connections.
 
 ## Components
 
+### कीवर्ड चुनकर लिखें (Keyword picker)
+
+संपादक के ऊपर **शब्द चुनें · Keywords** खोलने पर अक्सर उपयोग होने वाले शब्दों
+के बटन दिखाई देते हैं। **समूह · Category** से सभी शब्द या कोई विषय चुनें। हिन्दी
+या अंग्रेज़ी में खोजें, जैसे `यदि`, `if` या `function`। बटन पर शब्द का अंग्रेज़ी
+अर्थ दिखता है; focus या pointer रखने पर नीचे उसका छोटा हिन्दी विवरण आता है।
+बटन दबाने पर शब्द कर्सर पर जुड़ता है, या चुने हुए पाठ की जगह आता है। फिर
+संपादक में बाकी व्यंजक, कोष्ठक और खंड लिखें। Undo से डालने का काम वापस लें।
+चुनने के बाद सूची समेट जाती है और कर्सर संपादक में लौटता है। कीवर्ड चुनना
+अपने आप क्रमानुदेश नहीं चलाता। शीर्षक या Escape से भी सूची समेट सकते हैं।
+
+The picker uses the same grammar-generated keyword list as highlighting and
+completion, including contextual `विकल्पसमूह` and `मिलान`. Its controls work
+with mouse, touch, or keyboard, and remain available while editing offline.
+
+### Runtime and editor
+
 - CodeMirror mobile-friendly editor, keyword completion/snippets generated from
   the ANTLR grammar, statement/full-program modes and four starter examples.
 - Local draft saving, download/upload, source-in-fragment sharing, cached offline

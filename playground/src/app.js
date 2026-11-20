@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import {EditorView, basicSetup} from 'codemirror';
+import {EditorSelection} from '@codemirror/state';
+import {isolateHistory} from '@codemirror/commands';
 import {StreamLanguage} from '@codemirror/language';
 import {autocompletion, snippetCompletion} from '@codemirror/autocomplete';
 import {setDiagnostics, lintGutter} from '@codemirror/lint';
 import {compilerDiagnostics} from './diagnostics.mjs';
 import {identifierWord, identifierKey} from './identifier-profile.js';
 import {keywordStyle} from './keywords.mjs';
+import {keywordEntries, keywordGroups, filterKeywords, keywordInsertion} from './keyword-picker.mjs';
 const $ = id => document.getElementById(id);
 const track = (name, values) => window.bhashAnalytics?.(name, values);
 const keywordData = BHASH_KEYWORDS;
@@ -87,6 +90,45 @@ const editor = new EditorView({doc: initial.source, parent: $('editor'), extensi
   EditorView.contentAttributes.of({'aria-label': 'Bhash source code', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off'}),
   EditorView.updateListener.of(update => { if (update.docChanged) { save(); queueMicrotask(clearCompilerErrors); } if (update.selectionSet || update.docChanged) { const pos = update.state.selection.main.head, line = update.state.doc.lineAt(pos); $('position').textContent = `Ln ${line.number}, Col ${pos - line.from + 1}`; } })
 ]});
+const pickerEntries = keywordEntries(keywordData);
+for (const [value, label] of keywordGroups) $('keyword-group').add(new Option(label, value));
+function renderKeywords() {
+  const entries = filterKeywords(pickerEntries, $('keyword-search').value, $('keyword-group').value);
+  const buttons = entries.map(entry => {
+    const button = document.createElement('button');
+    button.type = 'button'; button.dataset.keyword = entry.value;
+    button.setAttribute('aria-label', `${entry.value} · ${entry.english}`);
+    button.title = entry.description; button.setAttribute('aria-describedby', 'keyword-help');
+    const word = document.createElement('span'); word.textContent = entry.value;
+    const meaning = document.createElement('small'); meaning.textContent = entry.english;
+    button.append(word, meaning);
+    const explain = () => { $('keyword-help').textContent = `${entry.value} (${entry.english}): ${entry.description}`; };
+    button.addEventListener('focus', explain); button.addEventListener('pointerenter', explain);
+    button.addEventListener('click', () => {
+      const change = editor.state.changeByRange(range => {
+        const insert = keywordInsertion(entry.value, editor.state.doc.sliceString(Math.max(0, range.from - 2), range.from), editor.state.doc.sliceString(range.to, range.to + 2));
+        return {changes: {from: range.from, to: range.to, insert}, range: EditorSelection.cursor(range.from + insert.length)};
+      });
+      editor.dispatch({...change, userEvent: 'input.keyword', annotations: isolateHistory.of('full'), scrollIntoView: true});
+      document.querySelector('.keyword-picker').open = false;
+      editor.focus();
+      $('keyword-help').textContent = `${entry.value} डाला गया। Undo से वापस लें।`;
+    });
+    return button;
+  });
+  $('keyword-list').replaceChildren(...buttons);
+  $('keyword-count').textContent = `${entries.length} शब्द · keywords`;
+  $('keyword-empty').hidden = entries.length !== 0;
+  $('keyword-help').textContent = 'शब्द चुनें: कर्सर पर जुड़ेगा, चुना पाठ बदलेगा। बाकी वाक्यरचना आप लिखें।';
+}
+$('keyword-search').addEventListener('input', renderKeywords);
+$('keyword-group').addEventListener('change', renderKeywords);
+renderKeywords();
+document.querySelector('.keyword-picker').addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault(); document.querySelector('.keyword-picker').open = false; editor.focus();
+  }
+});
 function clearCompilerErrors() {
   if ($('diagnostics').childElementCount) {
     $('diagnostics').replaceChildren();
