@@ -1,3 +1,15 @@
+## zlib 1.4 (typed compression provider)
+
+Source: https://zlib.net/zlib-1.4.tar.gz
+
+SHA-256: `02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584`.
+The in-memory zlib/gzip provider uses the zlib license, preserved without
+modification in [zlib-LICENSE.txt](src/main/resources/dev/bhash/ffi/zlib-LICENSE.txt).
+Private provider bundles and generated applications carry that license. Windows
+provider bundles also carry the MinGW runtime redistribution notices. The Bhash
+adapter is Apache-2.0; zlib is not relicensed. No zlib headers or development
+packages are required by consumers of the complete provider distribution.
+
 # ANTLR 4.13.2
 
 Source: https://github.com/antlr/antlr4/blob/4.13.2/LICENSE.txt

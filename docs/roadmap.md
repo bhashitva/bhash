@@ -1,12 +1,23 @@
 # Implementation roadmap
 
+## In progress: typed external-library interoperability
+
+The C-binding and compression proposal is available in
+[Hindi](typed-c-interop-design.md) and [English](typed-c-interop-design.en.md).
+It covers ownership, GC-safe marshaling, resource cleanup, distribution and
+native/JVM/CLR behavior. **Approved; implementation is in progress.**
+
+**हिन्दी:** प्रकारयुक्त C bindings और संपीड़न का प्रस्ताव स्वीकृत है।
+संकलक, रनटाइम और वितरण का कार्यान्वयन जारी है।
+
 ## Tagged unions, pattern matching and typed results
 
 The approved design ([Hindi](tagged-unions-pattern-matching-design.md),
-[English](tagged-unions-pattern-matching-design.en.md)) is implemented on the feature branch.
+[English](tagged-unions-pattern-matching-design.en.md)) is implemented and released
+in compiler/VS Code 0.27.0 and Jupyter 0.1.13.
 See the [Hindi tutorial](../tutorial/tagged-unions/README.md) and
 [validation record](tagged-unions-validation.md) for the shared lowering, GC and host checks.
-Public packaging follows merge and CI validation.
+The public packages and Playground include this milestone.
 
 **हिन्दी:** विकल्पसमूह, सम्पूर्ण मिलान और प्रकारयुक्त परिणाम का कार्यान्वयन उपलब्ध है।
 [हिन्दी उदाहरण](../tutorial/tagged-unions/README.md) पढ़ें और चलाएँ।

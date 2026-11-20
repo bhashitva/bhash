@@ -28,6 +28,7 @@ class StandardLibraryApi {
             List<SourceFile> sources = new ArrayList<>();
             sources.add(StandardLibrary.source());
             sources.addAll(StandardLibrary.implementations(names));
+            sources.add(dev.bhash.ffi.ForeignCatalog.declarations(false));
             List<ApiType> api = new ArrayList<>();
             for (SourceFile source : sources) {
                 ProgramContext program = parse(source);
@@ -73,7 +74,8 @@ class StandardLibraryApi {
             members.add(constructor(parameters));
             parameters.forEach(p -> members.add(new Member("field", p.name, List.of(), p.type, false, false, false)));
         } else {
-            if (type.classMember().stream().noneMatch(m -> m.constructorDecl() != null)) members.add(constructor(List.of()));
+            boolean foreign=type.IDENTIFIER().getSymbol() instanceof dev.bhash.frontend.LocatedToken token && token.foreignOwner()!=null;
+            if (!foreign && type.classMember().stream().noneMatch(m -> m.constructorDecl() != null)) members.add(constructor(List.of()));
             for (var member : type.classMember()) {
                 if (member.visibility() != null && member.visibility().PUBLIC() == null) continue;
                 boolean shared = member.STATIC() != null;

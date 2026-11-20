@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "abiVersion": 1,
+  "package": "fixture",
+  "contractVersion": "1",
+  "namespace": "परीक्षण",
+  "resources": [
+    {
+      "name": "परीक्षण.गणक",
+      "kind": "counter",
+      "release": "fixture_counter_release"
+    }
+  ],
+  "artifacts": [],
+  "functions": [
+    {
+      "owner": "परीक्षण.जोड़",
+      "name": "जोड़ो",
+      "symbol": "fixture_add",
+      "execution": "owner-sync",
+      "parameters": [
+        {
+          "name": "पहला",
+          "type": "पूर्णांक",
+          "wire": "i64"
+        },
+        {
+          "name": "दूसरा",
+          "type": "पूर्णांक",
+          "wire": "i64"
+        }
+      ],
+      "return": {
+        "type": "पूर्णांक",
+        "wire": "status+i64"
+      }
+    },
+    {
+      "owner": "परीक्षण.जोड़",
+      "name": "प्रतिध्वनि",
+      "symbol": "fixture_echo",
+      "execution": "owner-sync",
+      "parameters": [
+        {
+          "name": "मूल",
+          "type": "पाठ",
+          "wire": "utf8",
+          "ownership": "borrow-call",
+          "marshal": "copy"
+        }
+      ],
+      "return": {
+        "type": "पाठ",
+        "wire": "status+owned-utf8",
+        "release": "bhffi_v1_bytes_release"
+      }
+    },
+    {
+      "owner": "परीक्षण.जोड़",
+      "name": "स्तर",
+      "symbol": "fixture_level",
+      "execution": "owner-sync",
+      "parameters": [
+        {
+          "name": "मूल",
+          "type": "पूर्णांक",
+          "wire": "i32",
+          "range": [
+            0,
+            9
+          ]
+        }
+      ],
+      "return": {
+        "type": "पूर्णांक",
+        "wire": "status+i32"
+      }
+    },
+    {
+      "owner": "परीक्षण.गणक",
+      "name": "बनाओ",
+      "symbol": "fixture_counter_create",
+      "execution": "owner-sync",
+      "parameters": [
+        {
+          "name": "मूल",
+          "type": "पूर्णांक",
+          "wire": "i64"
+        }
+      ],
+      "return": {
+        "type": "परीक्षण.गणक",
+        "wire": "status+owned-handle",
+        "resource": "परीक्षण.गणक",
+        "release": "fixture_counter_release"
+      }
+    },
+    {
+      "owner": "परीक्षण.गणक",
+      "name": "मूल्य",
+      "symbol": "fixture_counter_get",
+      "execution": "owner-sync",
+      "parameters": [
+        {
+          "name": "गणक",
+          "type": "परीक्षण.गणक",
+          "wire": "handle",
+          "ownership": "borrow-call"
+        }
+      ],
+      "return": {
+        "type": "पूर्णांक",
+        "wire": "status+i64"
+      }
+    },
+    {
+      "owner": "परीक्षण.गणक",
+      "name": "दुबारा",
+      "symbol": "fixture_counter_duplicate",
+      "execution": "owner-sync",
+      "parameters": [{"name":"विधि","type":"पूर्णांक","wire":"i64","range":[0,1]}],
+      "return": {"type":"परीक्षण.गणक","wire":"status+owned-handle","resource":"परीक्षण.गणक","release":"fixture_counter_release"}
+    },
+    {
+      "owner": "परीक्षण.जोड़",
+      "name": "वास्तविकदुगुना",
+      "symbol": "fixture_real",
+      "execution": "owner-sync",
+      "parameters": [{"name":"मूल","type":"दशमलव","wire":"f64"}],
+      "return": {"type":"दशमलव","wire":"status+f64"}
+    },
+    {
+      "owner": "परीक्षण.जोड़",
+      "name": "बाइटलो",
+      "symbol": "fixture_byte",
+      "execution": "owner-sync",
+      "parameters": [{"name":"मूल","type":"बाइट","wire":"u8"}],
+      "return": {"type":"बाइट","wire":"status+u8"}
+    },
+    {
+      "owner": "परीक्षण.जोड़",
+      "name": "नकारो",
+      "symbol": "fixture_bool",
+      "execution": "owner-sync",
+      "parameters": [{"name":"मूल","type":"तार्किक","wire":"bool"}],
+      "return": {"type":"तार्किक","wire":"status+bool"}
+    },
+    {
+      "owner": "परीक्षण.गणक",
+      "name": "जीवित",
+      "symbol": "fixture_counter_live",
+      "execution": "owner-sync",
+      "parameters": [],
+      "return": {
+        "type": "पूर्णांक",
+        "wire": "status+i64"
+      }
+    }
+  ]
+}

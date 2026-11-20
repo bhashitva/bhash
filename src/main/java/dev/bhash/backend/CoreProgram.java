@@ -11,6 +11,21 @@ import org.antlr.v4.runtime.tree.ParseTree;
 
 /** Target-independent checked core. No host-language expressions or identifiers. */
 public record CoreProgram(List<Function> functions, int entry, int entryArguments, List<ObjectType> classes, List<RuntimeType> runtimeTypes, List<CollectionType> collections, ObjectType exceptionType, StructuredTypes structuredTypes, List<StaticField> staticFields, List<ClassInitialization> initializations, boolean networking, boolean database, boolean postgresql, boolean server, boolean authentication) {
+    public List<ForeignCall> foreignCalls() {
+        var calls=new ArrayList<ForeignCall>();
+        for(var function:functions)foreignOperations(function.body(),value->{if(value instanceof ForeignCall call)calls.add(call);});
+        return List.copyOf(calls);
+    }
+    public boolean foreignRuntime(){boolean[] found={false};for(var function:functions)foreignOperations(function.body(),value->found[0]=true);return found[0];}
+    private static void foreignOperations(Object value,java.util.function.Consumer<Expression> result) {
+        if(value instanceof ForeignCall || value instanceof ForeignClose)result.accept((Expression)value);
+        if(value instanceof List<?> list){for(var element:list)foreignOperations(element,result);return;}
+        if(!(value instanceof Expression || value instanceof Statement))return;
+        // Traverse only compiler-owned immutable IR records; declaration/model records
+        // and host objects are deliberately outside this walk.
+        try{for(var field:value.getClass().getRecordComponents())foreignOperations(field.getAccessor().invoke(value),result);}
+        catch(ReflectiveOperationException impossible){throw new AssertionError(impossible);}
+    }
     public static final int APPLICATION_ARGUMENTS = 13;
     public enum Type { INT, BYTE, INT32, REAL, BOOL, TEXT, OBJECT, ANY, VOID;
         public boolean reference() { return this==TEXT || this==OBJECT || this==ANY; }
@@ -63,6 +78,11 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
     public enum TimeOperation { NOW, READ, WRITE, YEAR, MONTH, DAY }
     public record TimeCall(Type type, TimeOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public record DatabaseCall(Type type,int operation,List<Expression> arguments,int descriptor,Source source) implements Expression {}
+    /** Effectful external call, identified by its checked declaration rather than a library name. */
+    public record ForeignError(int status,long code,String message) {}
+    public record ForeignClose(Expression receiver,Source source) implements Expression {public Type type(){return Type.VOID;}}
+    public record ForeignResult(Type payload,int descriptor,int success,int failure,int errorConstructor,int errorEnumLookup,int payloadEnumLookup,int unitConstructor,List<ForeignError> errors) {}
+    public record ForeignCall(Type type,dev.bhash.ffi.ForeignDeclaration declaration,List<Expression> arguments,ForeignResult result,Source source) implements Expression {}
     public record ServerCall(Type type,int operation,List<Expression> arguments,int descriptor,Source source) implements Expression {}
     public record NetworkCall(Type type,int operation,List<Expression> arguments,int descriptor,Source source) implements Expression {}
     public record FoundationCall(Type type,int operation,List<Expression> arguments,int descriptor,Source source) implements Expression {}
@@ -107,7 +127,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
         public Function(int id, Type result, List<Binding> parameters, Block body, Source source, int initialization){this(id,result,parameters,body,source,initialization,"");}
         public Function(int id, Type result, List<Binding> parameters, Block body, Source source){this(id,result,parameters,body,source,-1);}
     }
-    public sealed interface Expression permits DatabaseCall, ServerCall, NetworkCall, FoundationCall, StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
+    public sealed interface Expression permits ForeignClose, ForeignCall, DatabaseCall, ServerCall, NetworkCall, FoundationCall, StaticRead, Constant, Read, Unary, Binary, Call, TextCall, NumericCall, StructuredCall, FileCall, BufferCall, TimeCall, InputCall, Allocate, FieldRead, TypeOperation, Box, CollectionCall, NewCollection, IndexRead {
         Type type(); Source source();
     }
     public record Box(Expression value, Source source) implements Expression { public Type type(){return Type.ANY;} }
@@ -124,7 +144,10 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
     }
     public record TextCall(Type type, TextOperation operation, List<Expression> arguments, Source source) implements Expression {}
     public record Allocate(int objectType, Source source) implements Expression { public Type type(){return Type.OBJECT;} }
-    public record FieldRead(Expression receiver, ObjectField field, Source source) implements Expression { public Type type(){return field.type();} }
+    public record FieldRead(Expression receiver, ObjectField field, Source source, boolean foreignEnum) implements Expression {
+        public FieldRead(Expression receiver,ObjectField field,Source source){this(receiver,field,source,false);}
+        public Type type(){return field.type();}
+    }
     public sealed interface Statement permits ResourceCheck, Fail, Initialize, StaticWrite, Block, Assign, FieldWrite, Branch, Loop, Return, Jump, Print, Evaluate, IndexWrite, Foreach, Try, Throw, Selection {}
     public record ResourceCheck(Binding binding,Source source) implements Statement {}
     public record FieldWrite(FieldRead destination, Expression value) implements Statement {}
@@ -270,6 +293,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                 }
                 layouts.put(c,List.copyOf(layout));
                 for(var methods:c.methods.values())for(var f:methods){
+                    if(f.foreign!=null && !f.foreign.close())continue;
                     if(f.shared || f.access==ManagedEmitter.Access.PRIVATE)continue;
                     int index=-1;
                     for(int i=0;i<table.size();i++)if(table.get(i).java.equals(f.java)){index=i;break;}
@@ -340,6 +364,10 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                 objectTypes.add(new ObjectType(classIds.get(c),displayName,this.layouts.get(c),tables.get(c).stream().map(ids::get).toList(),List.copyOf(itable),java.util.stream.Stream.concat(membership.stream().map(classIds::get),c.record()?java.util.stream.Stream.of(-4,-9):c.unionCase()?java.util.stream.Stream.of(-4,-10):java.util.stream.Stream.of(-4)).toList()));
                 for(var methods:c.methods.values())for(var f:methods){
                     self=f.shared?null:new Binding(nextBinding++,Type.OBJECT);
+                    if(f.foreign!=null){
+                        if(f.foreign.close())result.add(new Function(ids.get(f),Type.VOID,List.of(self),new Block(List.of(new Evaluate(new ForeignClose(new Read(self,source(f.declaration)),source(f.declaration)))),List.of()),source(f.declaration)));
+                        continue;
+                    }
                     var parameters=new ArrayList<Binding>();if(self!=null)parameters.add(self);
                     if(f.declaration.parameters()!=null)for(var p:f.declaration.parameters().parameter())parameters.add(binding(a.bindings.get(p),p));
                     resultType=type(f.result,f.declaration);
@@ -590,6 +618,40 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
             for(int i=0;i<values.size();i++)values.set(i,coerce(values.get(i),type(parameters.get(i),c)));
             return List.copyOf(values);
         }
+        ForeignCall foreignCall(ManagedEmitter.Function function,ParserRuleContext at,ArgumentsContext arguments) throws CompilationException {
+            var values=new ArrayList<>(checkedArguments(arguments,function.parameters));
+            for(int i=0;i<values.size();i++) {
+                var type=function.parameters.get(i);
+                if(type.object!=null && type.object.enumeration!=null)
+                    values.set(i,new FieldRead(values.get(i),fields.get(type.object.fields.get(Identifiers.key("अंक"))),source(at),true));
+            }
+            var payload=function.result;
+            int success=-1,failure=-1,errorConstructor=-1,errorEnum=-1,unit=-1;
+            var errors=new ArrayList<ForeignError>();
+            if(!function.foreign.function().result().errors().isEmpty()) {
+                var family=function.result.object;
+                if(family==null || !family.unionFamily())throw new CompilationException(source(at)+": [BH8101] Foreign Result requires मानक.परिणाम.");
+                var good=family.methods.get(Identifiers.key("सफल"));var bad=family.methods.get(Identifiers.key("असफल"));
+                if(good==null || bad==null || good.size()!=1 || bad.size()!=1)throw new CompilationException(source(at)+": [BH8101] Invalid foreign Result factories.");
+                payload=good.get(0).parameters.get(0);var error=bad.get(0).parameters.get(0);
+                if(error.object==null || !error.object.record() || error.object.constructors.size()!=1)throw new CompilationException(source(at)+": [BH8101] Foreign Result error must be a record(enum, पाठ).");
+                var ctor=error.object.constructors.get(0);var types=ctor.parameters();
+                if(types.size()!=2 || types.get(0).object==null || types.get(0).object.enumeration==null || types.get(1)!=ManagedEmitter.Type.TEXT)throw new CompilationException(source(at)+": [BH8101] Foreign Result error must be a record(enum, पाठ).");
+                for(var mapping:function.foreign.function().result().errors()) {
+                    Long code=types.get(0).object.enumValues.get(Identifiers.key(mapping.code()));
+                    if(code==null)throw new CompilationException(source(at)+": [BH8101] Unknown foreign error code: "+mapping.code());
+                    errors.add(new ForeignError(mapping.status(),code,mapping.message()));
+                }
+                success=ids.get(good.get(0));failure=ids.get(bad.get(0));errorConstructor=constructors.get(ctor);errorEnum=enumLookups.get(types.get(0).object);
+                if(function.foreign.function().result().wire().equals("status")) {
+                    if(payload.object==null || !payload.object.record() || !payload.object.constructors.get(0).parameters().isEmpty())throw new CompilationException(source(at)+": [BH8101] Status-only Result requires an empty unit record.");
+                    unit=constructors.get(payload.object.constructors.get(0));
+                }
+            }
+            int enumLookup=payload.object!=null && payload.object.enumeration!=null?enumLookups.get(payload.object):-1;
+            var plan=new ForeignResult(type(payload,at),payload==ManagedEmitter.Type.VOID?0:runtimeId(payload,at),success,failure,errorConstructor,errorEnum,enumLookup,unit,List.copyOf(errors));
+            return new ForeignCall(type(function.result,at),function.foreign,List.copyOf(values),plan,source(at));
+        }
         Expression libraryCall(ManagedEmitter.Function f,ParserRuleContext at,ArgumentsContext args) throws CompilationException {
             if(f.java.equals("BhashRuntime.readText") || f.java.equals("BhashRuntime.readInteger")){
                 if (embedded) throw new CompilationException(source(at) + ": Console input is unavailable in native libraries.");
@@ -769,6 +831,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                     if(f==null && Identifiers.key(p.IDENTIFIER().getText()).equals(Identifiers.key("लंबाई")))
                         return new CollectionCall(Type.INT,CollectionOperation.SIZE,expression(p.arguments().expression(0)),List.of(),-1,source(p));
                     if(f==null)throw unsupported(p);
+                    if(f.foreign!=null)return f.foreign.close()?new ForeignClose(new Read(self,source(p)),source(p)):foreignCall(f,p,p.arguments());
                     if(!ids.containsKey(f))return libraryCall(f,p,p.arguments());
                     if(f.shared && f.owner!=null)return new Call(type(f.result,p),ids.get(f),checkedArguments(p.arguments(),f.parameters),source(p));
                     if(f.owner!=null){var args=new ArrayList<Expression>();args.add(new Read(self,source(p)));args.addAll(arguments(p.arguments()));return methodCall(f,args,p);}
@@ -816,6 +879,11 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
                         previous=result;continue;
                     }
                     var f=a.calls.get(part);
+                    if(f!=null && f.foreign!=null){
+                        if(f.foreign.close()){if(value==null)value=expression(p.primary());value=new ForeignClose(value,source(part));}
+                        else value=foreignCall(f,part,part.arguments());
+                        previous=a.expressions.get(part).type();continue;
+                    }
                     if(f!=null && f.intrinsic!=null){value=libraryCall(f,part,part.arguments());previous=a.expressions.get(part).type();continue;}
                     var selected=a.fields.get(part);
                     if(f!=null && f.shared){value=new Call(type(f.result,part),ids.get(f),checkedArguments(part.arguments(),f.parameters),source(part));previous=a.expressions.get(part).type();continue;}

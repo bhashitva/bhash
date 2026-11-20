@@ -58,6 +58,7 @@ public final class Main {
         if (args.length > 0 && args[0].equals("test")) return TestCommands.run(args,out,err);
         if (args.length > 0 && args[0].equals("native")) return NativeCommands.run(args,out,err);
         if (args.length > 0 && args[0].equals("android")) return AndroidCommands.run(args, launchDirectory.get(), out, err);
+        if (args.length > 0 && args[0].equals("ffi")) return ForeignCommands.run(args, launchDirectory.get(), out, err);
         if (args.length == 1 && args[0].equals("targets")) {
             for (var target : Target.values()) {
                 out.println(target.name().toLowerCase(java.util.Locale.ROOT) + ": "
@@ -130,6 +131,8 @@ public final class Main {
         err.println("       java -jar bhash-compiler.jar compile <file.bhash|project-directory|bhash.project> [-o <output>] [--target jvm|clr|wasm-browser|native] [--debug]");
         err.println("       java -jar bhash-compiler.jar run <file.bhash|project-directory|bhash.project> [--target jvm|clr|native] [--debug] [-- <program arguments...>]");
         err.println("       java -jar bhash-compiler.jar deps lock|restore|verify <project> [--offline]");
+        err.println("       java -jar bhash-compiler.jar ffi prepare <manifest>|--builtin compression -o <new-directory>");
+        err.println("       java -jar bhash-compiler.jar ffi restore|verify|doctor <manifest|compression> [--offline]");
         err.println("       java -jar bhash-compiler.jar native toolchain status|verify|install [--archive FILE|--url HTTPS_URL --sha256 HASH] [--json]");
         err.println("       java -jar bhash-compiler.jar native doctor [--json]");
         err.println("       java -jar bhash-compiler.jar native library <source|project> --exports <file> -o <new-directory>");

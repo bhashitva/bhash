@@ -14,3 +14,7 @@
 माईएसक्यूएलविन्यास|src/test/resources/mysql/integration.bhash::स्थिर व:|src/test/resources/mysql/integration.bhash::व.मेज़बान=
 परिणाम|tutorial/tagged-unions/results.bhash|tutorial/tagged-unions/async-result.bhash
 इकाई|tutorial/tagged-unions/results.bhash|tutorial/tagged-unions/unit.bhash
+संपीड़न|tutorial/compression/roundtrip.bhash|tutorial/compression/errors.bhash
+संपीड़नदोष|tutorial/compression/README.md|tutorial/compression/errors.bhash
+डेटा|tutorial/database-providers/migrations.bhash::डेटा.एसक्यूलाइट|tutorial/database-providers/sqlserver.md::डेटा.एसक्यूएलसर्वर
+फ़ाइल|tutorial/standard-library/examples/06-files.bhash::स्थिर पढ़ी: बाइटबफ़र|tutorial/standard-library/06-files.md::स्थिर पढ़ी: बाइटबफ़र

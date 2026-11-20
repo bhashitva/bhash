@@ -62,6 +62,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         int unionKind() { return declaration!=null&&declaration.start instanceof LocatedToken t?t.unionKind():0; }
         boolean unionFamily() { return unionKind()==1; }
         boolean unionCase() { return unionKind()==2; }
+        boolean foreign() { return declaration!=null && declaration.start instanceof LocatedToken t && t.foreignOwner()!=null; }
         final List<ClassInfo> contracts = new ArrayList<>();
         ParserRuleContext at() { return enumeration!=null?enumeration:declaration == null ? contract : declaration; }
         boolean isInterface() { return contract != null; }
@@ -83,6 +84,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     static final class Function {
         final String java;
         final String intrinsic;
+        final dev.bhash.ffi.ForeignDeclaration foreign;
         final Type result;
         final List<Type> parameters;
         final ClassInfo owner;
@@ -93,6 +95,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         Function(String java, Type result, List<Type> parameters, ClassInfo owner, Access access,
                  boolean overriding, FunctionDeclContext declaration, boolean shared) {
             this.intrinsic=dev.bhash.stdlib.StandardLibrary.intrinsic(declaration);
+            this.foreign=declaration!=null && declaration.start instanceof LocatedToken token ? token.foreign() : null;
             this.java = java; this.result = result; this.parameters = parameters; this.owner = owner;
             this.access = access; this.overriding = overriding; this.declaration = declaration; this.shared = shared;
         }
@@ -102,6 +105,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     private static final BigInteger MIN = BigInteger.valueOf(Long.MIN_VALUE);
     private static final BigInteger MAX = BigInteger.valueOf(Long.MAX_VALUE);
     private final String sourceName;
+    private final Set<dev.bhash.ffi.ForeignDeclaration> foreignCalls = new LinkedHashSet<>();
+    private boolean browser;
     private final Target target;
     private final Map<String, List<Function>> functions = new LinkedHashMap<>();
     private final Map<String,String> slots = new LinkedHashMap<>();
@@ -242,6 +247,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (target != Target.JVM && target != Target.CLR) throw new IllegalArgumentException("Not a managed target");
         return emitResolved(sources.isEmpty() ? "project" : sources.get(0).name(), ProjectResolver.resolve(sources), target);
     }
+    public static String emitForBrowser(List<SourceFile> sources)throws CompilationException{
+        return emitResolved(sources.isEmpty()?"project":sources.get(0).name(),ProjectResolver.resolve(sources),Target.CLR,true,true);
+    }
 
     /** Whole-project semantic analysis without a toolchain, output files, or a required executable entry point. */
     public static void check(List<SourceFile> sources) throws CompilationException {
@@ -252,9 +260,15 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return emitResolved(sourceName, resolution, target, true);
     }
     private static String emitResolved(String sourceName, ProjectResolver.Resolution resolution, Target target, boolean requireEntry) throws CompilationException {
+        return emitResolved(sourceName,resolution,target,requireEntry,false);
+    }
+    private static String emitResolved(String sourceName, ProjectResolver.Resolution resolution, Target target, boolean requireEntry,boolean browser) throws CompilationException {
         try {
             var emitter=new ManagedEmitter(sourceName,target);
-            return emitter.program(prepare(sourceName,resolution,emitter,requireEntry),requireEntry);
+            emitter.browser=browser;
+            String result=emitter.program(prepare(sourceName,resolution,emitter,requireEntry),requireEntry);
+            if(browser && !emitter.foreignCalls.isEmpty())throw new CompilationException("[BH8103] बाहरी C पुस्तकालय browser/Playground में समर्थित नहीं हैं। — Native bindings are unavailable in the isolated browser runtime.");
+            return result;
         }
         catch (Invalid error) { throw new CompilationException(resolution.describe(error.getMessage())); }
         catch (CompilationException error) { throw new CompilationException(resolution.describe(error.getMessage())); }
@@ -286,6 +300,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
     }
 
     private Invalid error(ParserRuleContext at, String message) {
+        if(at==null)return new Invalid(sourceName+": "+message);
         return new Invalid(LocatedToken.source(at.getStart(), sourceName) + ":" + at.getStart().getLine() + ":"
                 + (at.getStart().getCharPositionInLine() + 1) + ": " + message);
     }
@@ -366,7 +381,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         var main=entries == null ? null : entries.get(0);
         if (target == Target.JVM) {
             output.append("public final class BhashProgram {\n");
-            if (main != null)
+            if(main!=null && classOrder.stream().anyMatch(ClassInfo::foreign)){
+                output.append("public static void main(String[] args){int exit=0;try{BhashStandard.appSetArguments(args);").append(main.java)
+                    .append('(').append(entryArgument(main,"args")).append(");}catch(RuntimeException|ExceptionInInitializerError e){Throwable f=bhashFailure(e);if(!(f instanceof BhashRuntime.BException || f instanceof ArithmeticException))throw e;BhashRuntime.report(f.getMessage());exit=1;}finally{try{dev.bhash.ffi.NativeModules.shutdownCurrent();}catch(dev.bhash.ffi.NativeModules.Failure e){BhashRuntime.report(e.getMessage());exit=1;}}if(exit!=0)System.exit(exit);}\n");
+            }else if (main != null)
             output.append("public static void main(String[] args) { try { BhashStandard.appSetArguments(args); ").append(main.java)
                     .append('(').append(entryArgument(main, "args")).append("); } catch (RuntimeException | ExceptionInInitializerError e) { Throwable f=bhashFailure(e);")
                     .append(" if (!(f instanceof BhashRuntime.BException || f instanceof ArithmeticException)) throw e;")
@@ -388,7 +406,9 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             }
         } else {
             output.append("using System;\ninternal static class BhashProgram {\n");
-            output.append("public static int Main(string[] args) { try { BhashStandard.appSetArguments(args); ").append(main.java)
+            if(!browser && classOrder.stream().anyMatch(ClassInfo::foreign))output.append("public static int Main(string[] args){int exit=0;try{BhashStandard.appSetArguments(args);").append(main.java)
+                .append('(').append(entryArgument(main,"args")).append(");}catch(Exception e) when(bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException){BhashRuntime.report(bhashFailure(e).Message);exit=1;}finally{try{BhashForeign.shutdownCurrent();}catch(BhashForeign.Failure e){BhashRuntime.report(e.Message);exit=1;}}return exit;}\n");
+            else output.append("public static int Main(string[] args) { try { BhashStandard.appSetArguments(args); ").append(main.java)
                     .append('(').append(entryArgument(main, "args")).append("); return 0; } catch (Exception e) when (bhashFailure(e) is BhashRuntime.BException || bhashFailure(e) is ArithmeticException) {")
                     .append(" BhashRuntime.report(bhashFailure(e).Message); return 1; } }\n");
             output.append("private static Exception bhashFailure(Exception e) { while(e is TypeInitializationException && e.InnerException!=null) e=e.InnerException; return e; }\n");
@@ -409,8 +429,91 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         return output.append("}\n").toString();
     }
 
+    private void emitForeignFunction(Function function) {
+        var binding=function.foreign;var contract=binding.function();
+        if(!binding.close())for(int i=0;i<function.parameters.size();i++){
+            var type=function.parameters.get(i);String wire=contract.parameters().get(i).wire();
+            if(wire.equals("i32") && type!=Type.INT && type!=Type.INT32 && (type.object==null || type.object.enumeration==null))
+                throw error(function.declaration,"[BH8101] i32 requires an integer or a checked enum, not an arbitrary class.");
+            if(wire.equals("handle") && (type.object==null || !type.object.foreign()))
+                throw error(function.declaration,"[BH8101] Handle requires a declared foreign resource.");
+        }
+        if(browser){
+            output.append("public ").append(function.shared?"static ":"").append(typeName(function.result)).append(' ').append(function.java).append('(');
+            for(int i=0;i<function.parameters.size();i++){if(i>0)output.append(',');output.append(typeName(function.parameters.get(i))).append(" a").append(i);}
+            output.append("){throw new BhashRuntime.Failure(\"[BH8103] Browser native bindings are unsupported.\");}\n");return;
+        }
+        boolean jvm=target==Target.JVM;String runtime=jvm?"dev.bhash.ffi.NativeModules":"BhashForeign",fence=jvm?"java.lang.ref.Reference.reachabilityFence":"GC.KeepAlive";
+        if(binding.close()){
+            output.append("public void ").append(function.java).append("(){try{").append(jvm?"foreignResource.close();":"BhashForeign.close(foreignResource);")
+                .append("}catch(").append(runtime).append(".Failure error){throw new BhashRuntime.Failure(").append(jvm?"error.getMessage()":"error.Message")
+                .append(");}finally{").append(fence).append("(this);}}\n");return;
+        }
+        String adapter=dev.bhash.ffi.ForeignJniGenerator.className(binding.module());
+        output.append("public static ").append(typeName(function.result)).append(' ').append(function.java).append('(');
+        var arguments=new ArrayList<String>();var kinds=new ArrayList<String>();
+        for(int i=0;i<function.parameters.size();i++){
+            if(i>0)output.append(',');var type=function.parameters.get(i);String value="a"+i;
+            output.append(typeName(type)).append(' ').append(value);
+            String wire=contract.parameters().get(i).wire();
+            if(type.object!=null && type.object.enumeration!=null)value=jvm?"("+value+"==null?null:Long.valueOf("+value+".bcode))":"("+value+"==null?null:(object)"+value+".bcode)";
+            else if(wire.equals("i32") && type!=Type.INT && type!=Type.INT32)throw error(function.declaration,"[BH8101] i32 wire requires an integer or enum.");
+            else if(wire.equals("bytes"))value="BhashRuntime.foreignBytes("+value+")";
+            else if(wire.equals("handle"))value="("+value+"==null?null:"+value+".foreignResource)";
+            arguments.add(value);
+            kinds.add(switch(wire){case "utf8"->"1";case "bytes"->"2";case "handle"->"3";default->"0";});
+        }
+        String wire=contract.result().wire();int kind=switch(wire){case "status+owned-utf8"->1;case "status+owned-bytes"->2;case "status+owned-handle"->3;default->0;};
+        output.append("){").append(jvm?"Object":"object").append("[] keepAlive=new ").append(jvm?"Object":"object").append("[]{").append(String.join(",",java.util.stream.IntStream.range(0,function.parameters.size()).mapToObj(i->"a"+i).toList()))
+            .append("};").append(runtime).append(".Value raw=null;try{raw=").append(runtime).append(".invoke(").append(adapter).append(jvm?".identity(),":".identity,")
+            .append(adapter).append(jvm?"::binding,":".binding,").append(binding.module().functions().indexOf(contract)).append(",new int[]{").append(String.join(",",kinds))
+            .append("},new ").append(jvm?"Object":"object").append("[]{").append(String.join(",",arguments)).append("},").append(kind).append(");\n");
+        if(contract.result().errors().isEmpty()){
+            output.append("if(raw.status!=0)throw new BhashRuntime.Failure(\"[BH8105] बाहरी पुस्तकालय ने असफल या अमान्य परिणाम दिया।\");\n");
+            output.append(function.result==Type.VOID?"return;":"return "+foreignJavaValue(function.result,"raw",false,wire)+";");
+        }else{
+            var family=function.result.object;
+            var success=family==null?null:family.methods.get(Identifiers.key("सफल"));var failure=family==null?null:family.methods.get(Identifiers.key("असफल"));
+            if(family==null || !family.unionFamily() || success==null || failure==null || success.size()!=1 || failure.size()!=1)
+                throw error(function.declaration,"[BH8101] Foreign Result requires मानक.परिणाम.");
+            Type payload=success.get(0).parameters.get(0),errorType=failure.get(0).parameters.get(0);
+            if(errorType.object==null || !errorType.object.record() || errorType.object.constructors.size()!=1)throw error(function.declaration,"[BH8101] Foreign Result error must be record(enum, पाठ).");
+            var constructor=errorType.object.constructors.get(0);var types=constructor.parameters();
+            if(types.size()!=2 || types.get(0).object==null || types.get(0).object.enumeration==null || types.get(1)!=Type.TEXT)throw error(function.declaration,"[BH8101] Foreign Result error must be record(enum, पाठ).");
+            output.append("if(raw.status==0)return ").append(family.java).append('.').append(success.get(0).java).append('(')
+                .append(foreignJavaValue(payload,"raw",wire.equals("status"),wire)).append(");\n");
+            for(var mapping:contract.result().errors()){
+                Long code=types.get(0).object.enumValues.get(Identifiers.key(mapping.code()));
+                if(code==null)throw error(function.declaration,"[BH8101] Unknown foreign error code: "+mapping.code());
+                output.append("if(raw.status==").append(mapping.status()).append(")return ").append(family.java).append('.').append(failure.get(0).java)
+                    .append("(new ").append(errorType.java).append('(').append(types.get(0).java).append(".from(").append(code).append("L),")
+                    .append(hostString(mapping.message())).append(",new ").append(constructor.tag).append("()));\n");
+            }
+            output.append("throw new BhashRuntime.Failure(\"[BH8105] बाहरी पुस्तकालय ने असफल या अमान्य परिणाम दिया।\");\n");
+        }
+        output.append("}catch(").append(runtime).append(".Failure error){throw new BhashRuntime.Failure(").append(jvm?"error.getMessage()":"error.Message")
+            .append(");}finally{try{if(raw!=null && raw.resource!=null)raw.resource.releaseUnbound();}finally{").append(fence).append("(keepAlive);}}}\n");
+    }
+    private String foreignJavaValue(Type type,String raw,boolean unit,String wire){
+        if(wire.equals("status+i32") && type!=Type.INT && type!=Type.INT32 && (type.object==null || type.object.enumeration==null))
+            throw error(type.object==null?null:type.object.at(),"[BH8101] i32 result requires an integer or checked enum.");
+        if(wire.equals("status+owned-handle") && (type.object==null || !type.object.foreign()))
+            throw error(type.object==null?null:type.object.at(),"[BH8101] Handle result requires a declared foreign resource.");
+        if(unit){if(type.object==null || !type.object.record() || !type.object.constructors.get(0).parameters().isEmpty())throw error(type.object==null?null:type.object.at(),"[BH8101] Status-only Result requires an empty unit record.");return "new "+type.java+"(new "+type.object.constructors.get(0).tag+"())";}
+        if(type==Type.TEXT)return target==Target.JVM?"new String("+raw+".bytes,java.nio.charset.StandardCharsets.UTF_8)":"System.Text.Encoding.UTF8.GetString("+raw+".bytes)";
+        if(type==Type.BUFFER)return "BhashRuntime.foreignBuffer("+raw+".bytes)";
+        if(type==Type.REAL)return (target==Target.JVM?"Double.longBitsToDouble(":"BitConverter.Int64BitsToDouble(")+raw+".scalar)";
+        if(type==Type.BOOL)return "("+raw+".scalar!=0)";
+        if(type==Type.BYTE)return (target==Target.JVM?"(short)":"(byte)")+raw+".scalar";
+        if(type==Type.INT32)return "(int)"+raw+".scalar";
+        if(type.object!=null && type.object.enumeration!=null)return type.java+".from("+raw+".scalar)";
+        if(type.object!=null && type.object.foreign())return "new "+type.java+"("+raw+".resource)";
+        if(type==Type.INT)return raw+".scalar";
+        throw error(type.object==null?null:type.object.at(),"[BH8101] Unsupported foreign result conversion.");
+    }
     private void emitFunction(Function function) {
         if(function.intrinsic!=null)return;
+        if(function.foreign!=null){emitForeignFunction(function);return;}
         nonNullBindings.clear();
         var declaration = function.declaration;
         notebookDisplay = declaration.IDENTIFIER().getText().equals(notebookDisplayFunction);
@@ -503,6 +606,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                 definition.parent = classes.get(Identifiers.key(name));
                 if (definition.parent == null) throw error(definition.at(), "Unknown base class: " + name);
                 if (definition.parent.record() || definition.parent.enumeration!=null) throw error(definition.at(),"Cannot extend a record or enum.");
+                if (definition.parent.foreign()) throw error(definition.at(),"[BH8101] External resource types cannot be extended.");
                 if(definition.parent.unionCase() || definition.parent.unionFamily()&&!definition.unionCase())throw error(definition.at(),"[BH3301] विकल्पसमूह बन्द है। — A union cannot be extended outside its declared cases.");
                 if (definition.parent.isInterface()) throw error(definition.at(),"Use पालन to implement an interface.");
             }
@@ -559,7 +663,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
                     definition.constructors.add(new Constructor(signature, access, declaration,"CtorTag"+constructorId++));
                 } else {
                     var declaration = member.functionDecl();
-                    if (declaration.block()==null) throw error(declaration,"A class method requires a body.");
+                    if (declaration.block()==null && !(declaration.start instanceof LocatedToken token && token.foreign()!=null)) throw error(declaration,"A class method requires a body.");
                     String name = Identifiers.key(declaration.IDENTIFIER().getText());
                     if (definition.fields.containsKey(name) || field(definition.parent, name) != null)
                         throw error(member, "Duplicate or hidden member: " + declaration.IDENTIFIER().getText());
@@ -725,6 +829,8 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         if (!definition.contracts.isEmpty()) output.append(target==Target.JVM?" implements ":definition.parent==null?" : ":",")
                 .append(String.join(",",definition.contracts.stream().map(c->c.java).toList()));
         output.append(" {\n");
+        if(!browser && definition.foreign())output.append("public ").append(target==Target.JVM?"dev.bhash.ffi.NativeModules":"BhashForeign").append(".Resource foreignResource; public ")
+            .append(definition.java).append('(').append(target==Target.JVM?"dev.bhash.ffi.NativeModules":"BhashForeign").append(".Resource value){foreignResource=value;value.bind(this);}\n");
         Map<Field, String> initializers = new LinkedHashMap<>();
         Map<Field, String> staticInitializers = new LinkedHashMap<>();
         for (Field field : definition.fields.values()) recover(() -> {
@@ -1758,8 +1864,10 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (object.base) analysis.baseCalls.add(at);
         }
         if(method.intrinsic!=null)return tagged(new Expr(method.result,"BhashStandard."+method.intrinsic+"("+join(arguments)+")",true));
+        if(method.foreign!=null)foreignCalls.add(method.foreign);
         String receiver=method.shared?method.owner.java:memberReceiver(object, method.owner, method.access);
-        return new Expr(method.result, receiver + "." + method.java + "(" + join(arguments) + ")", true);
+        String marker=method.foreign==null?"":"/*bhash-ffi:"+method.foreign.module().fingerprint()+"*/";
+        return new Expr(method.result, marker+receiver + "." + method.java + "(" + join(arguments) + ")", true);
     }
     private Expr classReceiver(ClassInfo definition) { return new Expr(definition.type,definition.java,false,null,false,true); }
     private Expr callValue(ParserRuleContext at,Expr receiver,List<Expr> arguments) {
@@ -1830,6 +1938,7 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
             if (definition == null) throw error(ctx, "Unknown class: " + ctx.valueType().getText());
             if (definition.enumeration!=null) throw error(ctx,"Enum values must be named members or explicit numeric conversions.");
             if (definition.isInterface()) throw error(ctx,"Cannot construct an interface.");
+            if (definition.foreign()) throw error(ctx,"[BH8104] बाहरी संसाधन उसके घोषित factory फलन से बनाएँ। — External types cannot be constructed with नया.");
             if(definition.unionFamily())throw error(ctx,"[BH3302] नामित विकल्प बनाएँ। — Construct a union using its case factory.");
             var arguments = arguments(ctx.arguments());
             var constructor=selectConstructor(ctx,definition,arguments);

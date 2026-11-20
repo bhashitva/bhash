@@ -10,9 +10,9 @@ import java.util.*;
 
 /** Declarative UTF-8 source-package metadata. No build scripts or lifecycle hooks. */
 public record ProjectManifest(Path input, String name, String version, boolean library,
-        List<String> roots, SortedMap<String,Dependency> dependencies, String digest,boolean strictNulls) {
+        List<String> roots, SortedMap<String,Dependency> dependencies, String digest,boolean strictNulls,String ffi) {
     public record Dependency(String alias, String version, String path, String git, String revision, String directory) {}
-    private static final Set<String> BASE=Set.of("name","sources","version","kind","nullSafety");
+    private static final Set<String> BASE=Set.of("name","sources","version","kind","nullSafety","ffi");
     private static final Set<String> FIELDS=Set.of("path","git","rev","dir","version");
     public static ProjectManifest read(Path requested,Map<Path,String> overlays) throws IOException {
         Path input=requested.toAbsolutePath().normalize();
@@ -39,6 +39,9 @@ public record ProjectManifest(Path input, String name, String version, boolean l
         if(!Set.of("application","library").contains(kind))throw failure(input,"kind must be application or library.");
         String version=props.getProperty("version","").strip();
         String nullSafety=props.getProperty("nullSafety","legacy").strip();
+        String ffi=props.getProperty("ffi","").strip();
+        if(props.containsKey("ffi")&&(ffi.isEmpty()||ffi.contains("\\")||ffi.contains(":")||path(input,ffi).isAbsolute()
+                ||path(input,ffi).normalize().startsWith("..")))throw failure(input,"ffi must identify a binding manifest inside the project, using forward slashes.");
         if(!Set.of("legacy","strict").contains(nullSafety))throw failure(input,"nullSafety must be legacy or strict.");
         if(!version.isEmpty())version(input,version);
         if(kind.equals("library")&&(!props.containsKey("name")||version.isEmpty()))throw failure(input,"A library requires explicit name and version properties.");
@@ -70,7 +73,14 @@ public record ProjectManifest(Path input, String name, String version, boolean l
         for(String key:props.stringPropertyNames())canonical.put(key,props.getProperty(key).strip());
         canonical.putIfAbsent("sources","src");canonical.putIfAbsent("kind","application");
         return new ProjectManifest(input,name,version,kind.equals("library"),List.copyOf(roots),Collections.unmodifiableSortedMap(deps),
-                SourcePackages.sha(new Gson().toJson(canonical)),nullSafety.equals("strict"));
+                SourcePackages.sha(new Gson().toJson(canonical)),nullSafety.equals("strict"),ffi);
+    }
+    public Path foreignPath() throws IOException {
+        if(ffi.isEmpty())return null;
+        Path boundary=input.getParent().toRealPath(),file=input.getParent().resolve(ffi).normalize();
+        if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)||Files.isSymbolicLink(file)||!file.toRealPath().startsWith(boundary))
+            throw failure(input,"Binding manifest must be an existing regular file inside the project: "+ffi);
+        return file;
     }
     private static Path path(Path input,String value) throws IOException {
         try{return Path.of(value);}catch(InvalidPathException invalid){throw failure(input,"Invalid package path: "+invalid.getMessage());}

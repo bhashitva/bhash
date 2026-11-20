@@ -1,0 +1,71 @@
+name: Typed C bindings and compression
+on:
+  pull_request:
+    paths: &ffi-paths
+      - 'src/main/**'
+      - 'src/test/**'
+      - 'pom.xml'
+      - 'scripts/*ffi*.py'
+      - 'tutorial/compression/**'
+      - 'editors/jupyter/test_kernel.py'
+      - '.github/workflows/typed-c-interop.yml'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths: *ffi-paths
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      hosts:
+        type: string
+        default: '["ubuntu-22.04", "windows-2022"]'
+permissions:
+  contents: read
+jobs:
+  bindings:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.hosts || '["ubuntu-22.04", "windows-2022"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      BHASH_REQUIRE_NATIVE: 'true'
+      BHASH_REQUIRE_CLR: 'true'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - name: Install Linux producer tools on the glibc 2.35 baseline
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang build-essential
+      - name: Build producer compiler
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Install Jupyter client and kernel
+        run: python -m pip install build ./editors/jupyter
+      - name: Reproduce providers and test all three Bhash targets and Jupyter
+        run: python scripts/ci_ffi.py --jupyter
+      - name: Run generated applications in Linux runtime-only images
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -v "$PWD/target/ffi-ci/consumer:/app:ro" eclipse-temurin:17-jre-jammy sh -c 'test ! -f /usr/include/stdio.h && ! command -v cc && ! command -v clang && java -jar /app/app.jar'
+          docker run --rm -v "$PWD/target/ffi-ci/consumer:/app:ro" mcr.microsoft.com/dotnet/runtime:10.0 sh -c 'test ! -f /usr/include/stdio.h && ! command -v cc && ! command -v clang && dotnet /app/clr/BhashProgram.dll && /app/program'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: typed-c-${{ matrix.os }}
+          path: |
+            target/surefire-reports/
+            target/ffi-catalog/
+            target/ffi-ci/first/provenance.json
+          if-no-files-found: error

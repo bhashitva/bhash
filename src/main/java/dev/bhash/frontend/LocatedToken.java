@@ -10,6 +10,12 @@ public final class LocatedToken extends CommonToken {
         super(source, type, channel, start, stop);
     }
     private String originalText;
+    private dev.bhash.ffi.ForeignDeclaration foreign;
+    private dev.bhash.ffi.ForeignManifest foreignOwner;
+    public dev.bhash.ffi.ForeignManifest foreignOwner() { return foreignOwner; }
+    public void foreignOwner(dev.bhash.ffi.ForeignManifest module) { foreignOwner = module; }
+    public dev.bhash.ffi.ForeignDeclaration foreign() { return foreign; }
+    public void foreign(dev.bhash.ffi.ForeignDeclaration declaration) { foreign = declaration; }
     private boolean strictNulls;
     private int unionKind; // 1: generated family; 2: generated case; 3: checked match code; 4: a checked non-null proof obligation
     private String unionCaseName;
@@ -24,6 +30,8 @@ public final class LocatedToken extends CommonToken {
         strictNulls = origin instanceof LocatedToken token && token.strictNulls();
         unionKind = origin instanceof LocatedToken token ? token.unionKind : 0;
         unionCaseName = origin instanceof LocatedToken token ? token.unionCaseName : null;
+        foreign = origin instanceof LocatedToken token ? token.foreign : null;
+        foreignOwner = origin instanceof LocatedToken token ? token.foreignOwner : null;
         // Cache lowered spelling before changing its backing input stream.
         setText(getText());
         source = new Pair<>(origin.getTokenSource(), origin.getInputStream());

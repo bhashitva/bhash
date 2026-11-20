@@ -9,6 +9,7 @@
 
 | ट्यूटोरियल | क्या मिलेगा |
 | --- | --- |
+| [संपीड़न और बाहरी C पुस्तकालय (Compression and C bindings)](compression/README.md) | जेडलिब, गज़िप, सीमित memory, Result त्रुटियाँ और सुरक्षित provider वितरण |
 | [सुरक्षित दैनिक प्रोग्रामिंग (Safer Everyday Programming)](safer-everyday/README.md) | निर्माता में अचल क्षेत्र, प्रकार-अनुमान, generic methods/constraints और सुरक्षित rename/references |
 | [विकल्पसमूह और परिणाम (Tagged unions and Result)](tagged-unions/README.md) | बन्द डेटा-अवस्थाएँ, nested मिलान, सम्पूर्णता, Result/Unit और async परिणाम |
 | [रिक्त-सुरक्षा (Null safety)](null-safety/README.md) | वैकल्पिक प्रकार, रिक्त-जाँच, सुरक्षित सदस्य पहुँच, विकल्प, collections और async में GC सुरक्षा |

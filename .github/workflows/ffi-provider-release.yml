@@ -1,0 +1,63 @@
+name: Build complete C binding distribution
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Immutable provider bundle version
+        type: string
+        default: '1.0.0'
+        required: true
+      publish:
+        description: Publish verified provider assets as a permanent GitHub release
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  validate:
+    uses: ./.github/workflows/typed-c-interop.yml
+    with:
+      hosts: '["ubuntu-22.04", "windows-2022", "macos-15"]'
+  distribution:
+    needs: validate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      PROVIDER_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: typed-c-*
+          path: target/provider-inputs
+      - name: Validate and combine all independently tested hosts
+        run: |
+          [[ "$PROVIDER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          python -m unittest discover -s scripts -p test_ffi_catalogs.py
+          python scripts/merge_ffi_catalogs.py target/provider-inputs/typed-c-ubuntu-22.04/ffi-catalog target/provider-inputs/typed-c-windows-2022/ffi-catalog target/provider-inputs/typed-c-macos-15/ffi-catalog --output target/ffi-catalog --zip "target/bhash-ffi-providers-$PROVIDER_VERSION.zip"
+          mvn --batch-mode --no-transfer-progress -DskipTests package
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar ffi verify compression --offline
+      - uses: actions/upload-artifact@v4
+        with:
+          name: complete-ffi-distribution
+          path: |
+            target/bhash-ffi-providers-*.zip
+            target/bhash-ffi-providers-*.sha256
+            target/bhash-compiler-0.1.0-SNAPSHOT.jar
+          if-no-files-found: error
+      - name: Publish immutable provider assets
+        if: inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "ffi-providers-$PROVIDER_VERSION" "target/bhash-ffi-providers-$PROVIDER_VERSION.zip" "target/bhash-ffi-providers-$PROVIDER_VERSION.zip.sha256" --target "$GITHUB_SHA" --title "Typed C providers $PROVIDER_VERSION" --notes 'Verified zlib 1.4 providers for Linux x64 glibc 2.35+, Windows x64 UCRT and macOS 14+ Apple Silicon. Includes pinned contracts, runtime identity, per-host provenance and redistribution notices. Built only after cross-target and Jupyter validation on every host.'

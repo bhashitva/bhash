@@ -352,6 +352,8 @@ final class BhashRuntime {
         BArray<Short> toArray() { BArray<Short> result=new BArray<>(items.length,(short)0); for(int i=0;i<items.length;i++) result.set(i,get(i)); return result; }
     }
     static BBuffer bufferOf(short... values) { BBuffer result=new BBuffer(values.length); for(int i=0;i<values.length;i++) result.set(i,values[i]); return result; }
+    static byte[] foreignBytes(BBuffer buffer) { return buffer==null?null:buffer.items; }
+    static BBuffer foreignBuffer(byte[] bytes) { return new BBuffer(bytes); }
     static BBuffer encodeUtf8(String text) { return new BBuffer(text.getBytes(StandardCharsets.UTF_8)); }
     static String decodeUtf8(BBuffer buffer) {
         try { return StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)

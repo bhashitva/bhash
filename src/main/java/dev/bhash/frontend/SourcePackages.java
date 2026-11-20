@@ -26,7 +26,7 @@ public final class SourcePackages {
         if(!input.getFileName().toString().equals(ProjectLoader.MANIFEST))return ProjectLoader.loadOwn(input,overlays,null);
         var manifest=ProjectManifest.read(input,overlays);
         Path lock=input.getParent().resolve(LOCK);
-        if(manifest.dependencies().isEmpty()&&!Files.exists(lock,LinkOption.NOFOLLOW_LINKS)){
+        if(manifest.ffi().isEmpty()&&manifest.dependencies().isEmpty()&&!Files.exists(lock,LinkOption.NOFOLLOW_LINKS)){
             var project=ProjectLoader.loadOwn(input,overlays,manifest);if(manifest.library())noEntry(project);return project;
         }
         return new Graph(manifest,overlays,readLock(lock),false).resolve().project;
@@ -39,6 +39,14 @@ public final class SourcePackages {
         boolean locking=action.equals("lock");
         if(!Set.of("lock","restore","verify").contains(action))throw new IllegalArgumentException("Dependency action must be lock, restore or verify.");
         var result=new Graph(manifest,Map.of(),locking?null:readLock(lock),!offline&&!action.equals("verify")).resolve();
+        if(!locking)for(var source:result.project.sources())if(source.foreign()!=null){
+            var module=source.foreign();String host=dev.bhash.ffi.ForeignArtifacts.host();
+            for(var artifact:module.artifacts())if(artifact.target().equals(host)){
+                if(action.equals("restore"))dev.bhash.ffi.ForeignArtifacts.restore(module,artifact,offline);
+                else if(Files.exists(module.packageRoot().resolve(artifact.path()),LinkOption.NOFOLLOW_LINKS))dev.bhash.ffi.ForeignArtifacts.verify(module.packageRoot(),artifact);
+                else {dev.bhash.ffi.ForeignArtifacts.license(module,artifact);dev.bhash.ffi.ForeignArtifacts.cached(artifact);}
+            }
+        }
         if(locking)writeLock(lock,result.lock);
         return result.project;
     }
@@ -59,8 +67,8 @@ public final class SourcePackages {
             this.rootManifest=manifest;this.root=manifest.input().getParent();this.overlays=overlays;this.previous=previous;this.fetch=fetch;
             if(previous!=null){
                 if(!previous.keySet().equals(Set.of("lockVersion","root","packages"))||!previous.get("lockVersion").isJsonPrimitive()
-                        ||!previous.getAsJsonPrimitive("lockVersion").isNumber()||!previous.get("lockVersion").getAsString().equals("1"))throw stale("Unsupported lockfile format.");
-                var expected=new JsonObject();expected.addProperty("manifestSha256",manifest.digest());
+                        ||!previous.getAsJsonPrimitive("lockVersion").isNumber()||!Set.of("1","2").contains(previous.get("lockVersion").getAsString()))throw stale("Unsupported lockfile format.");
+                var expected=rootIdentity(manifest);
                 if(!expected.equals(previous.get("root")))throw stale("The root manifest changed, or its lockfile is invalid.");
                 if(!previous.get("packages").isJsonArray()||previous.getAsJsonArray("packages").size()>512)throw stale("Invalid lockfile package list.");
                 for(var entry:previous.getAsJsonArray("packages")){
@@ -84,7 +92,8 @@ public final class SourcePackages {
                     if(!identities.add(physical))throw graphError("Source is included by multiple packages: "+path);
                     paths.add(path);sources.add(project.sources().get(i));}}
             Path lock=root.resolve(LOCK);if(Files.exists(lock,LinkOption.NOFOLLOW_LINKS))manifests.add(lock);
-            var result=new JsonObject();result.addProperty("lockVersion",1);var rootValue=new JsonObject();rootValue.addProperty("manifestSha256",rootManifest.digest());result.add("root",rootValue);
+            boolean foreign=sources.stream().anyMatch(s->s.foreign()!=null);
+            var result=new JsonObject();result.addProperty("lockVersion",foreign?2:1);result.add("root",rootIdentity(rootManifest));
             var array=new JsonArray();packages.values().forEach(array::add);result.add("packages",array);
             if(previous!=null&&!result.equals(previous))throw stale("The dependency graph differs from bhash.lock. Restore the locked sources or run deps lock deliberately.");
             return new Result(new ProjectLoader.Project(application.input(),application.root(),application.name(),List.copyOf(roots),List.copyOf(paths),List.copyOf(sources),
@@ -129,6 +138,12 @@ public final class SourcePackages {
             visited.put(identity,viewed);projects.add(viewed);
         }
     }
+    private static JsonObject rootIdentity(ProjectManifest manifest) throws IOException {
+        var root=new JsonObject();root.addProperty("manifestSha256",manifest.digest());
+        Path binding=manifest.foreignPath();
+        if(binding!=null)root.addProperty("bindingsSha256",dev.bhash.ffi.ForeignManifest.read(binding,false).inventoryFingerprint());
+        return root;
+    }
     private static void noEntry(ProjectLoader.Project project) throws IOException {
         for(var source:project.sources()){
             var parsed=source.parse();if(!parsed.valid())throw failure("BH8001","पुस्तकालय का स्रोत जाँचें।",source.name()+": "+parsed.diagnostics());
@@ -163,7 +178,7 @@ public final class SourcePackages {
             case BEGIN_OBJECT->{var object=new JsonObject();reader.beginObject();while(reader.hasNext()){String name=reader.nextName();if(object.has(name))throw stale("Duplicate lockfile key: "+name);object.add(name,readJson(reader,depth+1));}reader.endObject();yield object;}
             case BEGIN_ARRAY->{var array=new JsonArray();reader.beginArray();while(reader.hasNext())array.add(readJson(reader,depth+1));reader.endArray();yield array;}
             case STRING->new JsonPrimitive(reader.nextString());
-            case NUMBER->{String number=reader.nextString();if(!number.equals("1"))throw stale("Invalid lockfile numeric value.");yield new JsonPrimitive(1);}
+            case NUMBER->{String number=reader.nextString();if(!Set.of("1","2").contains(number))throw stale("Invalid lockfile numeric value.");yield new JsonPrimitive(Integer.parseInt(number));}
             default->throw stale("Invalid lockfile value.");
         };
     }

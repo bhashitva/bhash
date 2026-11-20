@@ -6,6 +6,11 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include "bhash_runtime.h"
+#ifdef BHASH_FFI
+#include "bhffi.h"
+static void bh_ffi_gc_drain(void);
+static void bh_ffi_shutdown(void);
+#endif
 #include <limits.h>
 #include <float.h>
 #include <math.h>
@@ -42,6 +47,9 @@ typedef struct bh_object {
     struct bh_object *next, *work_next, *hash_next;
     const bh_type *type;
     void *diagnostic_trace; /* Precise header reference; retained only with its exception. */
+#ifdef BHASH_FFI
+    bhffi_handle foreign_resource;
+#endif
     size_t bytes;
     unsigned marked;
     uint64_t identity;
@@ -170,12 +178,19 @@ void bh_collect(void) {
             bh_object **bucket = &object_index[object_bucket(o->payload, index_count)];
             while (*bucket != o) bucket = &(*bucket)->hash_next;
             *bucket = o->hash_next;
-            *link = o->next; live_bytes -= o->bytes + offsetof(bh_object, payload); --live_objects; free(o);
+            *link = o->next; live_bytes -= o->bytes + offsetof(bh_object, payload); --live_objects;
+#ifdef BHASH_FFI
+            if(o->foreign_resource.cleanup)bhffi_v1_resource_queue(o->foreign_resource.cleanup);
+#endif
+            free(o);
         }
     }
     threshold = live_bytes > (UINT64_MAX - 1048576) / 2
         ? UINT64_MAX : live_bytes * 2 + 1048576;
     collecting = 0;
+#ifdef BHASH_FFI
+    bh_ffi_gc_drain();
+#endif
 }
 void *bh_alloc(const bh_type *type, uint64_t requested) {
     if (collecting || !type || requested < type->minimum_size)
@@ -254,6 +269,9 @@ void bh_shutdown(void) {
     for(uint64_t i=0;i<static_root_count;++i)*static_roots[i]=NULL;
     static_roots=NULL;static_root_count=0;
     bh_collect();
+#ifdef BHASH_FFI
+    bh_ffi_shutdown();
+#endif
     if (object_index != initial_index) free(object_index);
     memset(initial_index, 0, sizeof initial_index);
     object_index = initial_index; index_count = 1024;
@@ -1965,6 +1983,9 @@ uint64_t bh_foundation_call(uint32_t op,uint64_t a,uint64_t b,const bh_collectio
     return 0;
 }
 
+#ifdef BHASH_FFI
+#include "bhash_ffi.inc"
+#endif
 #ifdef BHASH_NETWORKING
 #include "bhash_http.inc"
 #endif

@@ -18,6 +18,9 @@ public final class ProjectLoader {
             Path destination = physical(output);
             if (destination.startsWith(physical(root.resolve(SourcePackages.CACHE))))
                 throw new IOException("Output must not overwrite the dependency cache: " + output);
+            Path foreignCache=physical(dev.bhash.ffi.ForeignArtifacts.cacheRoot());
+            if(destination.startsWith(foreignCache) || directory && foreignCache.startsWith(destination))
+                throw new IOException("Output must not overwrite the native provider cache: "+output);
             var protectedPaths = new ArrayList<>(sourcePaths);
             protectedPaths.addAll(manifests);
             protectedPaths.add(root.resolve(SourcePackages.LOCK));
@@ -91,6 +94,7 @@ public final class ProjectLoader {
         }
         if (files.isEmpty()) throw new IOException(input + ": Project contains no .bhash source files.");
         var sources = new ArrayList<SourceFile>();
+        var manifests = new ArrayList<Path>(List.of(input,root.resolve(SourcePackages.LOCK)));
         var logicalPaths = new HashMap<String, Path>();
         for (Path path : files) {
             String logical = Identifiers.key(root.relativize(path).toString().replace('\\', '/'));
@@ -99,7 +103,18 @@ public final class ProjectLoader {
                 throw new IOException("[BH6002] इन स्रोत फ़ाइलों के नाम एक ही पहचान दर्शाते हैं। — " + previous + " / " + path);
             sources.add(new SourceFile(path.toString(),read(path,overlays),metadata.strictNulls()));
         }
-        return new Project(input,root,name,List.copyOf(roots),List.copyOf(files),List.copyOf(sources),metadata.version(),metadata.library(),List.of(input,root.resolve(SourcePackages.LOCK)));
+        var paths = new ArrayList<Path>(files);
+        Path binding = metadata.foreignPath();
+        if(binding!=null) {
+            if(Files.size(binding)>262144)throw new IOException("[BH8101] बाहरी पुस्तकालय का अनुबंध 256 KiB से बड़ा है।");
+            String text=read(binding,overlays);
+            var foreign=dev.bhash.ffi.ForeignManifest.parse(text,false).at(root);
+            paths.add(binding);sources.add(new SourceFile(binding.toString(),text,metadata.strictNulls(),foreign));manifests.add(binding);
+            for(var artifact:foreign.artifacts()) {
+                manifests.add(root.resolve(artifact.path()));manifests.add(root.resolve(artifact.license()));
+            }
+        }
+        return new Project(input,root,name,List.copyOf(roots),List.copyOf(paths),List.copyOf(sources),metadata.version(),metadata.library(),List.copyOf(manifests));
     }
     private static String read(Path path, Map<Path,String> overlays) throws IOException {
         String text = overlays.get(path);

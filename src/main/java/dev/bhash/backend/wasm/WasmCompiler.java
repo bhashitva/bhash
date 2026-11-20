@@ -46,7 +46,7 @@ public final class WasmCompiler {
 
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
         long started = System.nanoTime();
-        String code = ManagedEmitter.emit(sources, Target.CLR);
+        String code = ManagedEmitter.emitForBrowser(sources);
         long emitted = System.nanoTime();
         String host = System.getenv("BHASH_BROWSER_HOST");
         if (host != null && !host.isBlank()) {
