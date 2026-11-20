@@ -10,7 +10,7 @@ const link = (label, path) => { const a=element('a',label);a.href=documentationU
 export function mountLibraryBrowser(insert, rememberSelection) {
   const $=id=>document.getElementById(id);
   const dialog=$('library-dialog'), trigger=$('library-open'), list=$('library-results'), detail=$('library-detail');
-  let index, loading, matches=[], selected, limit=60;
+  let index, loading, matches=[], selected, originId, limit=60;
   const close=()=>dialog.close();
   const use=(type,member)=>{dialog.close('insert');insert(librarySnippet(type,member));};
   const copy=async text=>{try{await navigator.clipboard.writeText(text);$('library-notice').textContent='हस्ताक्षर कॉपी हुआ। · Signature copied.';}catch{$('library-notice').textContent='कॉपी उपलब्ध नहीं है; नीचे दिया हस्ताक्षर चुनकर कॉपी करें।';}};
@@ -21,6 +21,7 @@ export function mountLibraryBrowser(insert, rememberSelection) {
   }
   function select(entry, focus=false) {
     selected=entry; const {type,member}=entry;
+    if(!focus)originId=entry.id;
     $('library-body').dataset.detail='true';
     for(const button of list.querySelectorAll('button[data-id]'))button.setAttribute('aria-pressed',String(button.dataset.id===entry.id));
     const heading=element('h2',member?member.name:type.name); heading.id='library-detail-title';heading.tabIndex=-1;
@@ -72,7 +73,7 @@ export function mountLibraryBrowser(insert, rememberSelection) {
     list.replaceChildren();
     $('library-count').textContent=`${matches.length} नतीजे · results`;
     for(const entry of matches.slice(0,limit)) {
-      const button=action('',()=>select(entry,true));button.className='library-result';button.dataset.id=entry.id;
+      const button=action('',()=>{originId=entry.id;select(entry,true);});button.className='library-result';button.dataset.id=entry.id;
       button.setAttribute('aria-pressed',String(entry.id===selected?.id));
       button.append(element('span',entry.member?`${entry.member.kind==='field'?'क्षेत्र':'फलन'} · ${entry.type.name}`:kindNames[entry.type.kind],'library-result-kind'),
         element('strong',entry.member?entry.member.name:entry.type.name),element('span',entry.member?entry.member.english:entry.type.english));
@@ -94,7 +95,7 @@ export function mountLibraryBrowser(insert, rememberSelection) {
   for(const id of ['library-search','library-kind','library-group','library-internal'])$(id).addEventListener(id==='library-search'?'input':'change',refresh);
   $('library-back').addEventListener('click',()=>{
     $('library-body').dataset.detail='false';
-    (list.querySelector('[aria-pressed="true"]')||list.querySelector('button[data-id]')||$('library-search')).focus();
+    ([...list.querySelectorAll('button[data-id]')].find(button=>button.dataset.id===originId)||list.querySelector('button[data-id]')||$('library-search')).focus();
   });
   $('library-close').addEventListener('click',close);
   dialog.addEventListener('keydown',event=>{

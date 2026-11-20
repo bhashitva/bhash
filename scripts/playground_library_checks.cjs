@@ -63,7 +63,9 @@ module.exports=async function libraryChecks(page){
   assert.ok((await page.locator('#library-detail').innerText()).includes('स्थानीय लक्ष्य'));
   await page.setViewportSize({width:390,height:844});
   await page.locator('#library-back').click();assert.equal(await page.locator('#library-results').isVisible(),true);
-  await search.fill('गणित');await result('गणित').click();
+  await search.fill('');
+  const mobileOrigin=page.locator('.library-result').nth(1);
+  const mobileOriginId=await mobileOrigin.getAttribute('data-id');await mobileOrigin.click();
   assert.equal(await page.locator('#library-results').isVisible(),false);
   assert.equal(await page.locator('#library-detail').isVisible(),true);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -71,7 +73,7 @@ module.exports=async function libraryChecks(page){
   await page.screenshot({path:'target/library-ui/mobile.png',fullPage:false});
   await page.locator('#library-detail .library-member').first().click();
   await page.locator('#library-back').click();
-  assert.equal(await page.locator('.library-result').first().evaluate(n=>n===n.ownerDocument.activeElement),true);
+  assert.equal(await page.evaluate(()=>document.activeElement.dataset.id),mobileOriginId);
   await search.press('Escape');await page.setViewportSize({width:1280,height:900});
 
   // Return a real runnable expression; the full Playground smoke test executes it.
