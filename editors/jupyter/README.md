@@ -18,9 +18,9 @@ Install the wheel in the Python environment running the Jupyter **server**, then
 
 ## Compression, tagged unions and Result / संपीड़न, विकल्पसमूह और परिणाम
 
-Kernel 0.1.14 bundles compiler 0.28.0 with typed C bindings and bounded zlib/gzip compression, including verified Linux x64, Windows x64 and Apple Silicon providers. Download `compression.ipynb` from the release for the Hindi walkthrough. See the [Hindi compression tutorial](../../tutorial/compression/README.md). It also includes tagged unions (`विकल्पसमूह`), exhaustive pattern matching (`मिलान`), and `मानक.परिणाम<त, द>`. See the [Hindi tutorial](../../tutorial/tagged-unions/README.md). Type and function declarations persist across cells; object bindings remain cell-local, so create and match a Result in the same cell or use a persistent factory function. Restart the kernel after upgrading.
+Kernel 0.1.15 bundles compiler 0.28.0 with typed C bindings and bounded zlib/gzip compression, including verified Linux x64, Windows x64 and Apple Silicon providers. Download `compression.ipynb` from the release for the Hindi walkthrough. See the [Hindi compression tutorial](../../tutorial/compression/README.md). It also includes tagged unions (`विकल्पसमूह`), exhaustive pattern matching (`मिलान`), and `मानक.परिणाम<त, द>`. See the [Hindi tutorial](../../tutorial/tagged-unions/README.md). Type and function declarations persist across cells; object bindings remain cell-local, so create and match a Result in the same cell or use a persistent factory function. Restart the kernel after upgrading.
 
-**हिन्दी:** 0.1.14 में `मानक.संपीड़न` से सीमित जेडलिब/गज़िप डेटा बनाएँ और खोलें। Linux x64, Windows x64 और Apple Silicon के प्रदाता कर्नेल में शामिल हैं; C विकास उपकरण अलग से नहीं चाहिए। रिलीज़ से `compression.ipynb` लेकर हिन्दी अभ्यास करें। `विकल्पसमूह` से बन्द विकल्प और `मिलान` से हर अवस्था की जाँच करें। `मानक.परिणाम<त, द>` सफलता और अपेक्षित दोष को अलग प्रकारों में रखता है। वर्ग/विकल्पसमूह और फलन की घोषणाएँ अगले कक्षों में मिलती हैं; वस्तु bindings उसी कक्ष तक सीमित हैं। [हिन्दी अभ्यास](../../tutorial/tagged-unions/README.md) पढ़ें।
+**हिन्दी:** 0.1.15 में `मानक.संपीड़न` से सीमित जेडलिब/गज़िप डेटा बनाएँ और खोलें। Linux x64, Windows x64 और Apple Silicon के प्रदाता कर्नेल में शामिल हैं; C विकास उपकरण अलग से नहीं चाहिए। रिलीज़ से `compression.ipynb` लेकर हिन्दी अभ्यास करें। `विकल्पसमूह` से बन्द विकल्प और `मिलान` से हर अवस्था की जाँच करें। `मानक.परिणाम<त, द>` सफलता और अपेक्षित दोष को अलग प्रकारों में रखता है। वर्ग/विकल्पसमूह और फलन की घोषणाएँ अगले कक्षों में मिलती हैं; वस्तु bindings उसी कक्ष तक सीमित हैं। [हिन्दी अभ्यास](../../tutorial/tagged-unions/README.md) पढ़ें।
 
 ## Null safety / रिक्त-सुरक्षा
 
@@ -30,11 +30,21 @@ For strict null safety, put `// bhash:null-safety=strict` in the first cell befo
 
 ## Install
 
-For the prebuilt compiler and notebook, follow the [0.1.14 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.14). The source build below is for development.
+For the prebuilt compiler and notebook, follow the [0.1.15 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.15). The source build below is for development.
 
-**हिन्दी:** पहले से बना संकलक और नोटबुक स्थापित करने के लिए [Jupyter 0.1.14 के रिलीज़ निर्देश](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.14) देखें। नीचे का स्रोत निर्माण विकास के लिए है।
+**हिन्दी:** पहले से बना संकलक और नोटबुक स्थापित करने के लिए [Jupyter 0.1.15 के रिलीज़ निर्देश](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.15) देखें। नीचे का स्रोत निर्माण विकास के लिए है।
 
 For Devanagari name equivalence, joiner diagnostics, and examples, see the [Hindi identifier guide](../../tutorial/unicode-identifiers/README.md).
+
+Install in the Python environment running the Jupyter server, then restart the server and reload its browser page:
+
+```sh
+python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/bhash_jupyter-0.1.15-py3-none-any.whl"
+python -m bhash_jupyter.install
+python -m pip show bhash-jupyter
+```
+
+**हिन्दी:** Notebook 7 के लिए `[lab]` की जगह `[notebook]` लिखें। पहले अलग Java या database drivers चुने हों तो पंजीकरण में वही `--java`, `--mysql-driver` और `--sqlserver-driver` विकल्प फिर दें। उसके बाद सर्वर और पृष्ठ दोबारा खोलें तथा **Bhash (भाष)** कर्नेल चुनें।
 
 ### Build from source
 
