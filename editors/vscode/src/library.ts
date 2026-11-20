@@ -75,8 +75,9 @@ export class LibraryLookup implements vscode.Disposable {
         if(target.document.version!==target.version)throw Error('कोड बदल गया है। संपादक में स्थान चुनकर फिर डालें। · Select an insertion point again.');
         const editor=await vscode.window.showTextDocument(target.document,{viewColumn:target.column,preserveFocus:false});
         if(target.document.version!==target.version)throw Error('The source changed; select an insertion point again.');
+        const insertionTarget=this.target;
         if(!await editor.insertSnippet(editorSnippet(librarySnippet(entry.type,entry.member)),target.selections,{undoStopBefore:true,undoStopAfter:true}))throw Error('इस संपादक में पाठ नहीं डाला जा सका। · The editor could not be edited.');
-        if(vscode.window.activeTextEditor===editor)this.capture(editor);
+        if(vscode.window.activeTextEditor===editor||(!vscode.window.activeTextEditor&&insertionTarget?.document===target.document&&this.target===insertionTarget))this.capture(editor);
     }
     dispose(){this.panel?.dispose();for(const listener of this.listeners)listener.dispose();}
 }

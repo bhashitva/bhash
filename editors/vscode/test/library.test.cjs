@@ -79,6 +79,16 @@ test('library entry points are contributed and command IDs are unique',()=>{
     assert.ok(commands.includes('bhash.openStandardLibrary'));assert.equal(new Set(commands).size,commands.length);
     assert.ok(manifest.contributes.menus['editor/title'].some(c=>c.command==='bhash.openStandardLibrary'));
 });
+
+test('returning to the webview during insertion refreshes the unchanged editor target',async()=>{
+    const f=fixture();await f.lookup.open();let finish;
+    f.editor.insertSnippet=()=>new Promise(resolve=>{finish=resolve;});
+    const pending=f.lookup.handleMessage({type:'insert',id:'type:पाठ्य',request:1});
+    await new Promise(resolve=>setImmediate(resolve));f.active(undefined);f.document.version++;finish(true);await pending;
+    f.editor.insertSnippet=async(...args)=>{f.insertions.push(args);return true;};
+    await f.lookup.handleMessage({type:'insert',id:'type:पाठ्य',request:2});
+    assert.equal(f.insertions.length,1);assert.equal(f.messages.at(-1).ok,true);f.lookup.dispose();
+});
 test('forged IDs, arbitrary URLs and source-bearing messages cannot edit or execute anything',async()=>{
     const f=fixture();await f.lookup.open();
     for(const id of ['../../secret','member:गणित:-1','type:missing'])await f.lookup.handleMessage({type:'insert',id,request:1});
