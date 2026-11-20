@@ -5,15 +5,15 @@ import {libraryIndex, searchLibrary, signature, typeName, kindNames, librarySnip
 const element = (tag, text='', className='') => { const node=document.createElement(tag); node.textContent=text; if(className)node.className=className; return node; };
 const action = (label, callback, primary=false) => { const button=element('button',label,primary?'library-insert':'');button.type='button';button.addEventListener('click',callback);return button; };
 const section = (heading, ...children) => { const node=element('section');node.append(element('h3',heading),...children);return node; };
-const link = (label, path) => { const a=element('a',label);a.href=documentationUrl(path);a.target='_blank';a.rel='noopener noreferrer';return a; };
 
-export function mountLibraryBrowser(insert, rememberSelection) {
+export function mountLibraryBrowser(insert, rememberSelection, options={}) {
   const $=id=>document.getElementById(id);
   const dialog=$('library-dialog'), trigger=$('library-open'), list=$('library-results'), detail=$('library-detail');
   let index, loading, matches=[], selected, originId, limit=60;
-  const close=()=>dialog.close();
-  const use=(type,member)=>{dialog.close('insert');insert(librarySnippet(type,member));};
-  const copy=async text=>{try{await navigator.clipboard.writeText(text);$('library-notice').textContent='हस्ताक्षर कॉपी हुआ। · Signature copied.';}catch{$('library-notice').textContent='कॉपी उपलब्ध नहीं है; नीचे दिया हस्ताक्षर चुनकर कॉपी करें।';}};
+  const link=(label,path)=>{const a=element('a',label);a.href=documentationUrl(path);a.target='_blank';a.rel='noopener noreferrer';if(options.openDocumentation)a.addEventListener('click',event=>{event.preventDefault();options.openDocumentation(path);});return a;};
+  const close=()=>options.embedded?options.onClose?.():dialog.close();
+  const use=(type,member,id)=>{if(!options.embedded)dialog.close('insert');insert(librarySnippet(type,member),id);};
+  const copy=async (text,id)=>{try{if(options.copyText)await options.copyText(text,id);else await navigator.clipboard.writeText(text);$('library-notice').textContent='हस्ताक्षर कॉपी हुआ। · Signature copied.';}catch{$('library-notice').textContent='कॉपी उपलब्ध नहीं है; नीचे दिया हस्ताक्षर चुनकर कॉपी करें।';}};
   function memberButton(type, member, position) {
     const button=action('',()=>select({type,member,id:`member:${type.name}:${position}`},true));
     button.className='library-member';button.append(element('strong',`${member.name} · ${member.english}`),element('code',signature(type,member)));
@@ -38,7 +38,7 @@ export function mountLibraryBrowser(insert, rememberSelection) {
     else detail.append(element('span','ब्राउज़र में उपलब्ध · Browser','library-badge'));
     if(type.internal || member?.internal)detail.append(element('p','रनटाइम सहायक API · सामान्य अनुप्रयोग के लिए ऊपर के सार्वजनिक आवरणों को प्राथमिकता दें।','library-target'));
     const actions=element('div','','library-detail-actions');
-    actions.append(action(member?'कॉल / नाम डालें':'प्रकार का नाम डालें',()=>use(type,member),true),action('हस्ताक्षर कॉपी करें',()=>copy(signature(type,member))));
+    actions.append(action(member?'कॉल / नाम डालें':'प्रकार का नाम डालें',()=>use(type,member,entry.id),true),action('हस्ताक्षर कॉपी करें',()=>copy(signature(type,member),entry.id)));
     detail.append(actions,element('pre',signature(type,member),'library-signature'));
     detail.append(element('p',member&&!member.shared&&member.kind!=='constructor'?'वस्तु को अपनी variable से बदलें। चुने हुए तर्क और प्रकार भरें; Tab से अगले स्थान पर जाएँ।':'चुने हुए तर्क और प्रकार भरें; Tab से अगले स्थान पर जाएँ। इससे क्रमानुदेश अपने आप नहीं चलता।','library-hint'));
     if(member) {
@@ -101,20 +101,22 @@ export function mountLibraryBrowser(insert, rememberSelection) {
   dialog.addEventListener('keydown',event=>{
     if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}
   },{capture:true});
-  trigger.addEventListener('click',async()=>{
+  async function open(){
     rememberSelection();
     // Native dialog restores its opener on close. A delayed close handler must
     // not steal focus back after the user has already returned to the editor.
     dialog.returnValue='';
-    dialog.showModal();$('library-search').focus();$('library-notice').textContent='';
+    if(options.embedded)dialog.setAttribute('open','');else dialog.showModal();$('library-search').focus();$('library-notice').textContent='';
     if(index){render();return;}
     $('library-count').textContent='पुस्तकालय लोड हो रहा है…';
     try {
-      loading??=fetch('./library.json').then(response=>{if(!response.ok)throw Error('Library unavailable');return response.json();}).then(catalog=>libraryIndex(catalog));
+      loading??=fetch(options.catalogUrl||'./library.json').then(response=>{if(!response.ok)throw Error('Library unavailable');return response.json();}).then(catalog=>libraryIndex(catalog));
       index=await loading;
       if($('library-group').options.length===1)for(const group of [...new Set(index.types.map(type=>type.group))])$('library-group').add(new Option(group,group));
       $('library-total').textContent=`${index.types.length} प्रकार · ${index.entries.length-index.types.length} सदस्य`;
       render();
     } catch {loading=null;$('library-count').textContent='संदर्भ लोड नहीं हुआ। इंटरनेट जोड़कर बंद करें और फिर खोलें।';}
-  });
+  }
+  trigger.addEventListener('click',open);
+  if(options.embedded)void open();
 }
