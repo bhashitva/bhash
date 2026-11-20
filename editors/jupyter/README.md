@@ -36,6 +36,8 @@ For the prebuilt compiler and notebook, follow the [0.1.14 release instructions]
 
 For Devanagari name equivalence, joiner diagnostics, and examples, see the [Hindi identifier guide](../../tutorial/unicode-identifiers/README.md).
 
+### Build from source
+
 Build the compiler with a full JDK 17 or newer and Maven. Building the browser
 extension from source additionally needs Node.js 22/npm and JupyterLab. In the
 Python environment that runs Jupyter, build/install the wheel and register its kernelspec.

@@ -16,6 +16,11 @@ async function main(){
   const notebook={nbformat:4,nbformat_minor:5,metadata:{kernelspec:{name:'bhash',display_name:'Bhash (भाष)',language:'bhash'},language_info:{name:'bhash'}},cells:[{id:'initial',cell_type:'code',metadata:{},source:'पुराना',outputs:[],execution_count:null}]};
   await fs.writeFile(path.join(directory,'starter.ipynb'),JSON.stringify(notebook));
   await fs.writeFile(path.join(directory,'other.ipynb'),JSON.stringify({...notebook,metadata:{kernelspec:{name:'python3',display_name:'Python 3',language:'python'},language_info:{name:'python'}},cells:[{...notebook.cells[0],source:'untouched'}]}));
+  // Notebook 7.2's stock checkpoint indicator dereferences the last checkpoint
+  // without checking for an empty list. Seed the same initial checkpoint that
+  // a notebook created through Jupyter normally has, rather than ignore errors.
+  await fs.mkdir(path.join(directory,'.ipynb_checkpoints'));
+  for(const name of ['starter','other'])await fs.copyFile(path.join(directory,name+'.ipynb'),path.join(directory,'.ipynb_checkpoints',name+'-checkpoint.ipynb'));
   const listener=net.createServer();await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve));const port=listener.address().port;await new Promise(resolve=>listener.close(resolve));
   const token=crypto.randomBytes(24).toString('hex'),base='http://127.0.0.1:'+port;
   shutdown=()=>fetch(base+'/api/shutdown?token='+token,{method:'POST'}).catch(()=>{});
@@ -88,8 +93,12 @@ async function main(){
   phase='offline';await context.setOffline(true);await search.fill('समुच्चय');assert.ok(await lookup.locator('.library-result').count());await context.setOffline(false);
   phase='examples';
   await lookup.locator('#library-kind').selectOption('types');await search.fill('गणित');await lookup.locator('[data-id="type:गणित"]').click();
+  const example=await lookup.locator('#library-detail section').filter({hasText:'के कोड अंश'}).locator('pre').first().innerText();
+  await page.evaluate(()=>{const notebook=window.__bhashNotebook.content;notebook.notebookConfig={...notebook.notebookConfig,defaultCell:'markdown'};});
   const before=await page.evaluate(()=>window.__bhashNotebook.content.model.cells.length);await lookup.getByRole('button',{name:'उदाहरण नया कक्ष · New example cell',exact:true}).first().click();
   assert.equal(await page.evaluate(()=>window.__bhashNotebook.content.model.cells.length),before+1);assert.equal(await page.evaluate(()=>window.__bhashNotebook.content.activeCell.model.executionCount),null,'example insertion never executes');
+  assert.equal(await page.evaluate(()=>window.__bhashNotebook.content.activeCell.model.type),'code','examples are code even when the default is Markdown');
+  assert.equal(await page.evaluate(()=>window.__bhashNotebook.content.activeCell.model.sharedModel.getSource()),example,'the example is populated after notebook selection signals');
   await open();await page.evaluate(()=>window.__bhashNotebook.content.activeCell.model.sharedModel.setSource('बदला'));await lookup.locator('.library-insert').click();assert.match(await lookup.locator('#library-notice').innerText(),/Cell changed/);
   await page.setViewportSize({width:620,height:900});await lookup.locator('#library-back').click();await search.fill('जेसन');await lookup.locator('.library-result').first().click();
   assert.ok(await lookup.evaluate(node=>{const dialog=node.shadowRoot.querySelector('#library-dialog');return dialog.scrollWidth<=dialog.clientWidth+2;}));await page.screenshot({path:path.join(output,'narrow.png')});

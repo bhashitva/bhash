@@ -22,7 +22,13 @@ with zipfile.ZipFile(wheels[0]) as wheel:
     for package in ("webpack", "esbuild"):
         assert wheel.read(base + f"/static/{package}-LICENSE.txt")
     scripts = b"\n".join(wheel.read(name) for name in wheel.namelist() if name.startswith(base + "/static/") and name.endswith(".js"))
-    assert "मानक.पाठ्य".encode() in scripts or b"library-search" in scripts
+    # esbuild emits ASCII Unicode escapes; verify actual catalog names, not
+    # markup tokens that could survive even when the bundled catalog is empty.
+    text = re.sub(r"\\u([0-9a-fA-F]{4})", lambda match: chr(int(match[1], 16)), scripts.decode("utf-8"))
+    catalog = json.loads((root / "playground/public/library.json").read_text(encoding="utf-8"))
+    for entry in catalog["types"]:
+        for item in [entry, *entry["members"]]:
+            assert item["name"] in text, "Missing catalog name: " + item["name"]
     assert b"library-search" in scripts and b"New example cell" in scripts
     assert "bhash_jupyter/assets/bhash-compiler.jar" in wheel.namelist()
     assert not any("node_modules/" in name or "frontend/src/" in name for name in wheel.namelist())
