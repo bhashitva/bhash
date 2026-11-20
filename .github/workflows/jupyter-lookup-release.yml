@@ -166,7 +166,12 @@ jobs:
             echo 'Refusing to replace an existing release tag.' >&2
             exit 1
           fi
-          gh release create jupyter-0.1.15 --draft --target "$GITHUB_SHA" --latest=false \
+          # Draft releases defer implicit tag creation until publication. Create
+          # and verify the immutable tag first, then attach the tested assets.
+          git push origin "$GITHUB_SHA:refs/tags/jupyter-0.1.15"
+          git fetch --no-tags origin refs/tags/jupyter-0.1.15:refs/release-verification/jupyter-0.1.15
+          test "$(git rev-parse refs/release-verification/jupyter-0.1.15^{commit})" = "$GITHUB_SHA"
+          gh release create jupyter-0.1.15 --draft --verify-tag --latest=false \
             --title 'Bhash Jupyter kernel 0.1.15 — standard-library lookup' \
             --notes-file editors/jupyter/RELEASE.md \
             target/jupyter-dist/bhash_jupyter-0.1.15-py3-none-any.whl \
