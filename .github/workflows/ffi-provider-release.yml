@@ -60,4 +60,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "ffi-providers-$PROVIDER_VERSION" "target/bhash-ffi-providers-$PROVIDER_VERSION.zip" "target/bhash-ffi-providers-$PROVIDER_VERSION.zip.sha256" --target "$GITHUB_SHA" --title "Typed C providers $PROVIDER_VERSION" --notes 'Verified zlib 1.4 providers for Linux x64 glibc 2.35+, Windows x64 UCRT and macOS 14+ Apple Silicon. Includes pinned contracts, runtime identity, per-host provenance and redistribution notices. Built only after cross-target and Jupyter validation on every host.'
+          gh release create "ffi-providers-$PROVIDER_VERSION" "target/bhash-ffi-providers-$PROVIDER_VERSION.zip" "target/bhash-ffi-providers-$PROVIDER_VERSION.zip.sha256" --target "$GITHUB_SHA" --latest=false --title "Typed C providers $PROVIDER_VERSION" --notes 'Verified zlib 1.4 providers for Linux x64 glibc 2.35+, Windows x64 UCRT and macOS 14+ Apple Silicon. Includes pinned contracts, runtime identity, per-host provenance and redistribution notices. Built only after cross-target and Jupyter validation on every host.'
