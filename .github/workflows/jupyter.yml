@@ -8,6 +8,15 @@ on:
       - 'docs/identifier-profile-baseline.g4'
       - 'editors/jupyter/**'
       - 'scripts/package_jupyter.py'
+      - 'scripts/build_jupyter_lookup.py'
+      - 'scripts/test_jupyter_lookup.cjs'
+      - 'scripts/check_jupyter_package.py'
+      - '.github/actions/build-jupyter-ui/**'
+      - 'playground/src/library*.mjs'
+      - 'playground/src/identifier-profile.js'
+      - 'playground/public/library.json'
+      - 'playground/public/index.html'
+      - 'playground/public/style.css'
       - 'src/test/resources/mysql/**'
       - 'src/test/resources/sqlserver/**'
       - '.github/workflows/jupyter.yml'
@@ -19,6 +28,67 @@ on:
 permissions:
   contents: read
 jobs:
+  lookup:
+    strategy:
+      fail-fast: false
+      matrix:
+        frontend: [lab, notebook]
+        profile: [current, minimum]
+        include:
+          - profile: current
+            lab-version: '4.6.6'
+            notebook-version: '7.6.5'
+          - profile: minimum
+            lab-version: '4.2.7'
+            notebook-version: '7.2.3'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: ./.github/actions/build-jupyter-ui
+      - run: python -m pip install build
+      - name: Use the verified compiler for installed-wheel UI tests
+        shell: bash
+        run: |
+          mkdir -p target
+          curl --fail --location --retry 3 'https://github.com/bhashitva/bhash/releases/download/bhash-0.28.0/bhash-compiler-0.28.0.jar' -o target/bhash-compiler-0.1.0-SNAPSHOT.jar
+          echo '8fbcef3abb5a56f0a13d41c0d66cdcae00dfc2656f481f578d97d82cd0863fd0  target/bhash-compiler-0.1.0-SNAPSHOT.jar' | sha256sum -c -
+      - run: python scripts/package_jupyter.py
+      - run: python -m pip install target/jupyter-dist/*.whl 'jupyterlab==${{ matrix.lab-version }}' 'notebook==${{ matrix.notebook-version }}'
+      - name: Verify the wheel contains a portable prebuilt extension
+        run: python scripts/check_jupyter_package.py
+      - name: Install the pinned browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Record Notebook's upstream startup baseline with the lookup disabled
+        if: matrix.frontend == 'notebook'
+        run: node scripts/test_jupyter_lookup.cjs notebook --baseline
+      - run: node scripts/test_jupyter_lookup.cjs ${{ matrix.frontend }}
+      - uses: actions/upload-artifact@v4
+        if: matrix.frontend == 'lab' && matrix.profile == 'current'
+        with:
+          name: bhash-jupyter-library-preview
+          path: |
+            target/jupyter-dist/*.whl
+            target/jupyter-dist/*.whl.sha256
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jupyter-lookup-${{ matrix.frontend }}-${{ matrix.profile }}
+          path: |
+            target/jupyter-lookup-${{ matrix.frontend }}/*.png
+            target/jupyter-lookup-${{ matrix.frontend }}/server.log
+            target/jupyter-lookup-notebook-baseline/result.json
+          if-no-files-found: warn
   kernel:
     strategy:
       fail-fast: false
@@ -37,6 +107,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - uses: ./.github/actions/build-jupyter-ui
       - run: python -m pip install ./editors/jupyter
       - run: python editors/jupyter/test_kernel.py target/bhash-compiler-0.1.0-SNAPSHOT.jar --notebook editors/jupyter/पहली-नोटबुक.ipynb
 
@@ -70,6 +141,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - uses: ./.github/actions/build-jupyter-ui
       - run: mvn --batch-mode --no-transfer-progress org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy -Dartifact=com.mysql:mysql-connector-j:9.3.0 -DoutputDirectory=target/mysql-driver
       - name: Package and install the wheel
         run: |

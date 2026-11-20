@@ -16,6 +16,11 @@ All three targets support the same factorial source.
 | Command line | [Download the prebuilt compiler JAR and checksum](DOWNLOADS.md#standalone-compiler). Use a full JDK 17+. |
 | VS Code | [Install Bhash from the Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash) or [download the VSIX](DOWNLOADS.md#vs-code-extension). |
 | Jupyter | [Get the prebuilt kernel wheel and Hindi starter notebook](DOWNLOADS.md#jupyter-kernel). |
+
+JupyterLab/Notebook users can browse the standard-library reference in Hindi or English,
+insert qualified calls, and add example cells. See the [Hindi notebook lookup guide](tutorial/jupyter-library-lookup/README.md).
+
+**हिन्दी:** JupyterLab/Notebook में मानक वर्ग और फलन खोजें, कॉल डालें और उदाहरण का नया कक्ष बनाएँ। [हिन्दी मार्गदर्शिका](tutorial/jupyter-library-lookup/README.md) देखें।
 | Browser | [Open the Playground](https://play.bhashitva.org/). |
 
 After verifying the checksum, save the downloaded JAR as `bhash-compiler.jar`. From a UTF-8 terminal, run it with your own source file:

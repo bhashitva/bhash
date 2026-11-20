@@ -6,6 +6,16 @@ worker and speaks the standard Jupyter kernel protocol.
 
 **हिन्दी:** भाष कर्नेल अदिश और पाठ बंधन, नामित फलन, आयात, कथन और अंतिम व्यंजक का परिणाम देता है। वह स्थानीय JVM worker में भाष चलाता और मानक Jupyter कर्नेल प्रोटोकॉल उपयोग करता है।
 
+## Standard-library lookup / मानक पुस्तकालय खोज
+
+The 0.1.15 package includes a prebuilt browser extension for JupyterLab 4.2+ (4.x) and Notebook 7.2+ (7.x). In a Bhash notebook, click **📚 पुस्तकालय** or run **Bhash: Standard Library Lookup · मानक पुस्तकालय** from the Command Palette. Search Hindi/English names, inspect signatures, parameters, return types and examples, insert a call into the selected code cell, or add an example as a new cell. The first argument is selected for editing. Nothing executes automatically. Offline browsing, clipboard copy, theme colors and narrow panes are supported.
+
+**हिन्दी:** 0.1.15 पैकेज में तैयार ब्राउज़र विस्तार है। Bhash code कक्ष में स्थान चुनकर **📚 पुस्तकालय** खोलें। हिन्दी/English खोज से वर्ग, निर्माता, फलन, तर्क, फल का प्रकार और उदाहरण पढ़ें। कॉल डालें या उदाहरण का नया कक्ष बनाएँ; कोई कक्ष अपने आप नहीं चलता। बदला हुआ, बंद या केवल पढ़ने वाला कक्ष सुरक्षित रहता है। [पूरा हिन्दी अभ्यास](../../tutorial/jupyter-library-lookup/README.md) पढ़ें।
+
+Install the wheel in the Python environment running the Jupyter **server**, then restart that server and reload the browser. The wheel needs no Node.js/npm or JupyterLab rebuild. Java remains required to execute Bhash cells. Classic Notebook 6/NbClassic and VS Code do not load JupyterLab extensions; use the Bhash VS Code extension's lookup in VS Code. Full documentation links require internet; the catalog and examples are bundled.
+
+**हिन्दी:** wheel Jupyter सर्वर वाले Python वातावरण में लगाएँ, फिर सर्वर और पृष्ठ दोबारा खोलें। उपयोगकर्ता को Node.js/npm या frontend build नहीं चाहिए। Bhash चलाने के लिए Java चाहिए। Notebook 6 में यह नियंत्रण उपलब्ध नहीं है। VS Code में उसका Bhash lookup उपयोग करें। शामिल सूची और उदाहरण offline हैं; पूरे दस्तावेज़ के लिंक को इंटरनेट चाहिए।
+
 ## Compression, tagged unions and Result / संपीड़न, विकल्पसमूह और परिणाम
 
 Kernel 0.1.14 bundles compiler 0.28.0 with typed C bindings and bounded zlib/gzip compression, including verified Linux x64, Windows x64 and Apple Silicon providers. Download `compression.ipynb` from the release for the Hindi walkthrough. See the [Hindi compression tutorial](../../tutorial/compression/README.md). It also includes tagged unions (`विकल्पसमूह`), exhaustive pattern matching (`मिलान`), and `मानक.परिणाम<त, द>`. See the [Hindi tutorial](../../tutorial/tagged-unions/README.md). Type and function declarations persist across cells; object bindings remain cell-local, so create and match a Result in the same cell or use a persistent factory function. Restart the kernel after upgrading.
@@ -26,14 +36,17 @@ For the prebuilt compiler and notebook, follow the [0.1.14 release instructions]
 
 For Devanagari name equivalence, joiner diagnostics, and examples, see the [Hindi identifier guide](../../tutorial/unicode-identifiers/README.md).
 
-Build the compiler with a full JDK 17 or newer and Maven. In the Python environment
-that runs Jupyter, install the adapter and register its kernelspec.
+Build the compiler with a full JDK 17 or newer and Maven. Building the browser
+extension from source additionally needs Node.js 22/npm and JupyterLab. In the
+Python environment that runs Jupyter, build/install the wheel and register its kernelspec.
 
-**हिन्दी:** पूरा JDK 17+ और Maven से संकलक बनाएँ। जिस Python वातावरण में Jupyter चलता है उसमें adapter स्थापित करें और उसका kernelspec पंजीकृत करें।
+**हिन्दी:** पूरा JDK 17+ और Maven से संकलक बनाएँ। स्रोत से ब्राउज़र विस्तार बनाने के लिए Node.js 22/npm और JupyterLab भी चाहिए। जिस Python वातावरण में Jupyter चलता है उसमें wheel बनाएँ/लगाएँ और kernelspec पंजीकृत करें। तैयार wheel उपयोगकर्ताओं को ये build उपकरण नहीं चाहिए।
 
 ```sh
 mvn package -DskipTests
-python -m pip install ./editors/jupyter
+python -m pip install build "jupyterlab==4.6.6"
+python scripts/package_jupyter.py
+python -m pip install target/jupyter-dist/bhash_jupyter-0.1.15-py3-none-any.whl
 bhash-jupyter-install --compiler target/bhash-compiler-0.1.0-SNAPSHOT.jar
 jupyter kernelspec list
 ```

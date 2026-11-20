@@ -7,7 +7,7 @@ const action = (label, callback, primary=false) => { const button=element('butto
 const section = (heading, ...children) => { const node=element('section');node.append(element('h3',heading),...children);return node; };
 
 export function mountLibraryBrowser(insert, rememberSelection, options={}) {
-  const $=id=>document.getElementById(id);
+  const $=id=>(options.root||document).querySelector('#'+id);
   const dialog=$('library-dialog'), trigger=$('library-open'), list=$('library-results'), detail=$('library-detail');
   let index, loading, matches=[], selected, originId, limit=60;
   const link=(label,path)=>{const a=element('a',label);a.href=documentationUrl(path);a.target='_blank';a.rel='noopener noreferrer';if(options.openDocumentation)a.addEventListener('click',event=>{event.preventDefault();options.openDocumentation(path);});return a;};
@@ -40,7 +40,7 @@ export function mountLibraryBrowser(insert, rememberSelection, options={}) {
     const actions=element('div','','library-detail-actions');
     actions.append(action(member?'कॉल / नाम डालें':'प्रकार का नाम डालें',()=>use(type,member,entry.id),true),action('हस्ताक्षर कॉपी करें',()=>copy(signature(type,member),entry.id)));
     detail.append(actions,element('pre',signature(type,member),'library-signature'));
-    detail.append(element('p',member&&!member.shared&&member.kind!=='constructor'?'वस्तु को अपनी variable से बदलें। चुने हुए तर्क और प्रकार भरें; Tab से अगले स्थान पर जाएँ।':'चुने हुए तर्क और प्रकार भरें; Tab से अगले स्थान पर जाएँ। इससे क्रमानुदेश अपने आप नहीं चलता।','library-hint'));
+    detail.append(element('p',options.insertionHint||(member&&!member.shared&&member.kind!=='constructor'?'वस्तु को अपनी variable से बदलें। चुने हुए तर्क और प्रकार भरें; Tab से अगले स्थान पर जाएँ।':'चुने हुए तर्क और प्रकार भरें; Tab से अगले स्थान पर जाएँ। इससे क्रमानुदेश अपने आप नहीं चलता।'),'library-hint'));
     if(member) {
       if(member.kind==='field')detail.append(element('span',member.mutable?'पढ़ना और लिखना · Mutable':'केवल पढ़ना · Read only','library-badge'));
       if(member.origin!==type.name)detail.append(element('p',`विरासत से: ${member.origin}`,'library-hint'));
@@ -61,7 +61,7 @@ export function mountLibraryBrowser(insert, rememberSelection, options={}) {
       }
     }
     if(type.notes)detail.append(section('व्यवहार और सीमाएँ',element('p',type.notes)));
-    if(type.examples.length)detail.append(section(`${type.name} के कोड अंश · Examples`,element('p','ये प्रकार के उपयोग के अंश हैं; आवश्यक आयात और तैयारी के लिए पूरा संदर्भ देखें।'),...type.examples.map(code=>element('pre',code))));
+    if(type.examples.length)detail.append(section(`${type.name} के कोड अंश · Examples`,element('p','ये प्रकार के उपयोग के अंश हैं; आवश्यक आयात और तैयारी के लिए पूरा संदर्भ देखें।'),...type.examples.flatMap((code,i)=>options.insertExample?[element('pre',code),action('उदाहरण नया कक्ष · New example cell',()=>options.insertExample(entry.id,i))]:[element('pre',code)])));
     const links=element('div','','library-doc-links');links.append(link('पूरा हिन्दी API संदर्भ ↗',type.reference),link('विषय की मार्गदर्शिका ↗',type.guide));detail.append(links);
     detail.append(element('p','हस्ताक्षर default legacy profile के हैं। Strict रिक्त-सुरक्षा में nullable सीमाओं के लिए प्रकार की टिप्पणियाँ और रिक्त-सुरक्षा मार्गदर्शिका देखें।','library-hint'),link('रिक्त-सुरक्षा के नियम ↗','tutorial/null-safety/README.md'));
     if(focus)heading.focus({preventScroll:true});
@@ -110,7 +110,7 @@ export function mountLibraryBrowser(insert, rememberSelection, options={}) {
     if(index){render();return;}
     $('library-count').textContent='पुस्तकालय लोड हो रहा है…';
     try {
-      loading??=fetch(options.catalogUrl||'./library.json').then(response=>{if(!response.ok)throw Error('Library unavailable');return response.json();}).then(catalog=>libraryIndex(catalog));
+      loading??=(options.catalog?Promise.resolve(options.catalog):fetch(options.catalogUrl||'./library.json').then(response=>{if(!response.ok)throw Error('Library unavailable');return response.json();})).then(catalog=>libraryIndex(catalog));
       index=await loading;
       if($('library-group').options.length===1)for(const group of [...new Set(index.types.map(type=>type.group))])$('library-group').add(new Option(group,group));
       $('library-total').textContent=`${index.types.length} प्रकार · ${index.entries.length-index.types.length} सदस्य`;
