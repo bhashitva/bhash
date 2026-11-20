@@ -47,7 +47,8 @@ Escape और स्पष्ट बंद करने का बटन उप�
 सुविधाएँ Playground में पूरी तरह उपलब्ध नहीं हैं; विवरण में लक्ष्य की
 सीमाएँ पढ़ें। हस्ताक्षर default legacy profile के हैं; strict रिक्त-सुरक्षा
 की भिन्नताएँ प्रकार की टिप्पणियों में हैं। संदर्भ और कोड अंश editor के साथ
-cache होते हैं, इसलिए पहले editor खोलने के बाद offline खोज भी उपलब्ध है।
+cache होते हैं। पहले editor खोलने पर cache तैयार होने दें, फिर पृष्ठ को
+दोबारा लोड करें; उसके बाद offline खोज भी उपलब्ध है।
 बाहरी पूर्ण मार्गदर्शिका के लिंक के लिए इंटरनेट चाहिए।
 
 The offline catalog is generated from the compiler's public declarations and

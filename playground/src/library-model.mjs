@@ -26,7 +26,7 @@ export function libraryIndex(catalog) {
       search:normalized(`${parent} ${type.description}`), name:normalized(parent)});
     type.members.forEach((member, index) => entries.push({id:`member:${type.name}:${index}`, type, member,
       label:`${type.name}.${member.name}`, name:normalized(`${member.name} ${member.english}`),
-      search:normalized(`${parent} ${member.name} ${member.english} ${member.description} ${signature(type, member)}`)}));
+      search:normalized(`${parent} ${type.name}.${member.name} मानक.${type.name}.${member.name} ${member.name} ${member.english} ${member.description} ${signature(type, member)}`)}));
   }
   return {types:catalog.types, entries};
 }

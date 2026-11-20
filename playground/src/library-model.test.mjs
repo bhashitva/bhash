@@ -19,9 +19,11 @@ test('offline catalog covers the documented public types and compression enums',
     if(entry.member){assert.ok(Array.isArray(entry.member.parameters));assert.ok(entry.member.description&&entry.member.english);}
   }
   assert.ok(index.entries.some(e=>e.member&&e.member.origin!==e.type.name));
+  const mapper=type('रूपांतरक').members.find(m=>m.name==='बदलो');
+  assert.equal(mapper.english,'Map Value');assert.ok(mapper.description.includes('ख प्रकार'));
 });
 test('Hindi and English queries find methods and keep overloads distinct',()=>{
-  for(const query of ['split','SPLIT','text split','बाँटो','बा\u200dँटो'])
+  for(const query of ['split','SPLIT','text split','बाँटो','बा\u200dँटो','पाठ्य.बाँटो','मानक.पाठ्य.बाँटो'])
     assert.ok(searchLibrary(index,{query}).some(e=>e.type.name==='पाठ्य'&&e.member?.name==='बाँटो'),query);
   const overloads=searchLibrary(index,{query:'absolute',kind:'members'}).filter(e=>e.type.name==='गणित'&&e.member?.name==='निरपेक्ष');
   assert.equal(overloads.length,2);assert.notEqual(overloads[0].id,overloads[1].id);
