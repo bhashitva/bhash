@@ -35,6 +35,7 @@ Install or update from the [Visual Studio Marketplace](https://marketplace.visua
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.29.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.29.0) | 2026-11-20 19:19 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.29.0/bhash-vscode-0.29.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.29.0/bhash-vscode-0.29.0.vsix.sha256) |
 | [0.28.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.28.0) | 2026-11-20 12:27 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.28.0/bhash-vscode-0.28.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.28.0/bhash-vscode-0.28.0.vsix.sha256) |
 | [0.27.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.27.0) | 2026-11-19 18:05 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.27.0/bhash-vscode-0.27.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.27.0/bhash-vscode-0.27.0.vsix.sha256) |
 | [0.26.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.26.0) | 2026-11-19 04:18 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.26.0/bhash-vscode-0.26.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.26.0/bhash-vscode-0.26.0.vsix.sha256) |
