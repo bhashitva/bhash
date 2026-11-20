@@ -6,7 +6,12 @@ on:
       - '.github/workflows/library-reference.yml'
       - 'scripts/build_library_reference.py'
       - 'scripts/StandardLibraryApi.java'
+      - 'scripts/build_playground_library.py'
+      - 'playground/public/library.json'
       - 'src/main/resources/dev/bhash/stdlib/**'
+      - 'src/main/resources/dev/bhash/ffi/**'
+      - 'src/main/java/dev/bhash/ffi/ForeignCatalog.java'
+      - 'src/main/java/dev/bhash/ffi/ForeignDeclarations.java'
       - 'src/main/java/dev/bhash/stdlib/**'
       - 'src/main/java/dev/bhash/frontend/**'
       - 'src/main/java/dev/bhash/backend/ManagedEmitter.java'
@@ -43,3 +48,5 @@ jobs:
         run: mvn --batch-mode --no-transfer-progress -DskipTests package
       - name: Check public API coverage and run the reference examples
         run: python scripts/build_library_reference.py --check --test-examples jvm
+      - name: Check the Playground catalog against the compiler and Hindi reference
+        run: python scripts/build_playground_library.py --check

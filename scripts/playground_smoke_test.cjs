@@ -32,6 +32,9 @@ let logs=''; server.stderr.on('data', data => {logs+=data;});
     await require('./playground_keyword_checks.cjs')(page);
     await execute('कीवर्ड से नमस्ते 😀\n');
     console.log('PASS program assembled with keyword buttons executes in WebAssembly');
+    await require('./playground_library_checks.cjs')(page);
+    await execute('५\n');
+    console.log('PASS call inserted from the standard library lookup executes in WebAssembly');
     await page.selectOption('#example','hello');
     await execute('नमस्ते, दुनिया!\n');console.log('PASS playground hello');
     // Same source reuses the completed build and preserves fresh runtime state.

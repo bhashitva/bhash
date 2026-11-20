@@ -25,6 +25,8 @@ class StandardLibraryApi {
             Set<String> names = new LinkedHashSet<>();
             all.classDecl().forEach(c -> names.add(Identifiers.key(c.IDENTIFIER().getText())));
             all.interfaceDecl().forEach(c -> names.add(Identifiers.key(c.IDENTIFIER().getText())));
+            if (args.length > 1 && args[1].equals("--include-enums"))
+                all.enumDecl().forEach(c -> names.add(Identifiers.key(c.IDENTIFIER().getText())));
             List<SourceFile> sources = new ArrayList<>();
             sources.add(StandardLibrary.source());
             sources.addAll(StandardLibrary.implementations(names));
@@ -32,6 +34,16 @@ class StandardLibraryApi {
             List<ApiType> api = new ArrayList<>();
             for (SourceFile source : sources) {
                 ProgramContext program = parse(source);
+                if (args.length > 1 && args[1].equals("--include-enums")) {
+                    for (var type : program.enumDecl()) {
+                        if (publicType(type.IDENTIFIER().getText())) {
+                            String name = type.IDENTIFIER().getText();
+                            api.add(new ApiType(name, "enum", List.of(), List.of(), source.name(),
+                                type.enumMember().stream().map(m -> new Member("field", m.IDENTIFIER().getText(),
+                                    List.of(), name, true, false, false)).toList()));
+                        }
+                    }
+                }
                 for (var type : program.classDecl()) {
                     if (publicType(type.IDENTIFIER().getText())) api.add(readClass(type, source.name()));
                 }
