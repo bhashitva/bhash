@@ -19,7 +19,13 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.27.0 / इस रिलीज़ में
+## What's new in 0.28.0 / इस रिलीज़ में
+
+The bundled compiler adds typed C-library bindings and `मानक.संपीड़न`: bounded zlib/gzip compression, typed errors and GC-safe resource ownership on JVM, desktop .NET and native targets. Verified providers are bundled for Linux x64 (glibc 2.35+), Windows x64 and macOS 14+ Apple Silicon. Users of compression do not need zlib headers, a C compiler or a separate system zlib installation. Native application compilation still needs the supported native SDK.
+
+**हिन्दी:** `मानक.संपीड़न` से जेडलिब/गज़िप डेटा बनाएँ और खोलें। प्रदाता पैकेज में शामिल हैं; पुस्तकालय अपने-आप डाउनलोड नहीं होता। [हिन्दी संपीड़न अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/compression/README.md) और [प्रकारयुक्त C बाइंडिंग मार्गदर्शिका](https://github.com/bhashitva/bhash/blob/main/docs/typed-c-library-bindings.md) पढ़ें। ब्राउज़र/Playground और Android में C bindings उपलब्ध नहीं हैं; संकलक स्पष्ट BH8103 निदान देता है। Native runtime ABI remains 18; the separate C-binding ABI is 1.
+
+## Tagged unions in 0.27.0 / विकल्पसमूह
 
 The bundled compiler adds closed tagged unions (`विकल्पसमूह`), exhaustive pattern matching (`मिलान`), nested case/record patterns, guards, and typed `मानक.परिणाम<त, द>` / `मानक.इकाई`. Match expressions and statements work across JVM, .NET, native and browser targets, including async guards and resource cleanup. Editor assistance includes case factories, pattern bindings, navigation/rename, and missing-case Quick Fixes with explicit placeholders.
 
