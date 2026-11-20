@@ -37,7 +37,8 @@ async function main(){
     // Notebook 7.6.5's shortcut plugin dereferences an unloaded settings schema.
     // Record only this verified upstream startup error with Bhash disabled;
     // never blanket-ignore schema errors or errors from the lookup bundle.
-    assert.ok(errors.every(error=>error.phase==='startup'&&error.message==="Cannot read properties of undefined (reading 'schema')"&&/\/static\/notebook\/notebook_core\.[^/]+\.js/.test(error.stack)));
+    await fs.writeFile(path.join(output,'baseline-errors.json'),JSON.stringify(errors,null,2));
+    assert.ok(errors.every(error=>error.phase==='startup'&&error.message==="Cannot read properties of undefined (reading 'schema')"&&/\/static\/notebook\/notebook_core\.[^/]+\.js/.test(error.stack)),JSON.stringify(errors,null,2));
     await fs.writeFile(path.join(output,'result.json'),JSON.stringify({lookupDisabled:true,fingerprints:errors.map(fingerprint),errors},null,2));
     console.log('PASS Notebook baseline with Bhash lookup disabled; '+errors.length+' known upstream startup error(s).');return;
   }

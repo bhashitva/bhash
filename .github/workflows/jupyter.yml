@@ -87,7 +87,9 @@ jobs:
           path: |
             target/jupyter-lookup-${{ matrix.frontend }}/*.png
             target/jupyter-lookup-${{ matrix.frontend }}/server.log
-            target/jupyter-lookup-notebook-baseline/result.json
+            target/jupyter-lookup-notebook-baseline/*.json
+            target/jupyter-lookup-notebook-baseline/*.png
+            target/jupyter-lookup-notebook-baseline/server.log
           if-no-files-found: warn
   kernel:
     strategy:
