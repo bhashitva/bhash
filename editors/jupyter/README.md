@@ -36,7 +36,11 @@ For the prebuilt compiler and notebook, follow the [0.1.15 release instructions]
 
 For Devanagari name equivalence, joiner diagnostics, and examples, see the [Hindi identifier guide](../../tutorial/unicode-identifiers/README.md).
 
-Install in the Python environment running the Jupyter server, then restart the server and reload its browser page:
+Install in the Python environment running the Jupyter server, then restart the server and reload its browser page.
+
+**Before registration, record any custom settings you want to keep.** Repeat your previous `--compiler`, `--java`, `--mysql-driver` and `--sqlserver-driver` options in the registration command below. Registration replaces the kernelspec. `--compiler` chooses your own JAR instead of the bundled compiler; repeat it only if you intend to keep that compiler.
+
+**हिन्दी:** पंजीकरण से पहले अपना पुराना compiler/Java/driver विकल्प लिख लें। नीचे `python -m bhash_jupyter.install` के साथ वही विकल्प फिर दें; इससे kernelspec बदलता है। शामिल संकलक चाहिए तो `--compiler` न दें।
 
 ```sh
 python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/bhash_jupyter-0.1.15-py3-none-any.whl"

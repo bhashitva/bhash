@@ -6,7 +6,11 @@ The lookup supports Hindi/English search, classes and functions, overloads, para
 
 ## Install or upgrade / स्थापना और अद्यतन
 
-Run these commands in the Python environment that starts the Jupyter **server**:
+Run these commands in the Python environment that starts the Jupyter **server**. **Before registration, record any custom settings you want to keep.**
+
+If you registered a custom compiler, Java executable or database drivers, repeat your previous `--compiler`, `--java`, `--mysql-driver` and `--sqlserver-driver` options when running `python -m bhash_jupyter.install`. `--compiler` overrides the bundled compiler; repeat it only if you want to keep using your own JAR. Registration replaces the kernelspec, so omitting those options may remove the earlier settings. Save downloaded notebooks under new names to preserve existing work.
+
+**हिन्दी:** पंजीकरण से पहले अपना पुराना `--compiler`, `--java`, `--mysql-driver` और `--sqlserver-driver` विकल्प लिख लें और नीचे पंजीकरण करते समय फिर दें। `--compiler` अपना JAR चुनता है; शामिल संकलक चाहिए तो वह विकल्प न दें।
 
 ```sh
 python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/bhash_jupyter-0.1.15-py3-none-any.whl"
@@ -17,8 +21,6 @@ python -m pip show bhash-jupyter
 For Notebook 7, replace `[lab]` with `[notebook]` in the first command. Download `hindi-starter.ipynb` and `compression.ipynb` from this release; both are also included in the wheel. `SHA256SUMS` covers the wheel, notebooks and `release-info.json`. The provenance file records the exact source revision and bundled compiler/catalog hashes; the release tag points to that source revision.
 
 **हिन्दी:** पैकेज केवल किसी दूसरे कर्नेल के Python वातावरण में लगाने से browser के नियंत्रण नहीं बदलेंगे। Jupyter सर्वर वाले वातावरण में लगाएँ। **Jupyter सर्वर बंद करके दोबारा चलाएँ और browser पृष्ठ reload करें**; केवल कर्नेल restart करना पर्याप्त नहीं है। फिर **Bhash (भाष)** कर्नेल चुनें। `pip show` में `0.1.15` दिखना चाहिए। `python -m jupyter labextension list` में `@bhashitva/library-lookup v0.1.15` enabled दिखेगा।
-
-If you registered a custom compiler, Java executable or database drivers, repeat your previous `--compiler`, `--java`, `--mysql-driver` and `--sqlserver-driver` options when running `python -m bhash_jupyter.install`. `--compiler` overrides the bundled compiler; repeat it only if you want to keep using your own JAR. Registration replaces the kernelspec, so omitting those options may remove the earlier settings. Save downloaded notebooks under new names to preserve existing work.
 
 **हिन्दी:** पुराना Notebook 6/NbClassic यह browser विस्तार नहीं चलाता। VS Code की notebook UI भी JupyterLab विस्तार नहीं लोड करती; वहाँ Bhash VS Code extension का **Bhash: Standard Library Lookup** उपयोग करें। JupyterLab में lookup अलग पैनल में और Notebook 7 में दाएँ sidebar में खुलता है।
 
