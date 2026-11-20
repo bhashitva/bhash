@@ -65,15 +65,17 @@ classes, and .NET 10. A JDK-26 run is not a substitute for the Java-17 CI gate.
 | Metadata/editor | Manifest, artifact, CLI, capability and editor tests pass; browser calls fail before runtime publication |
 | Reproducibility | Static/shared Windows provider hashes match across two separate build directories |
 | Documentation | Hindi reference generation and book-link checks pass |
-| Notebook bridge | The actual current Python worker bridge passes compression under forced GC across repeated cell loaders; every cell in the new Hindi compression notebook passes |
+| Notebook bridge | The actual current Python worker bridge passes compression under forced GC across repeated cell loaders; every cell in the new Hindi compression notebook passes; the watchdog also covers worker startup |
+| Full Jupyter client | The complete 97-cell smoke test, compression protocol cells and Hindi starter notebook pass with a writable private native cache; keyword coverage includes all 57 Bhash keywords |
 | Hindi examples | Roundtrip, typed errors and real bounded-file gzip output pass on JVM, .NET and native |
 
 The earlier Jupyter attempt used an old global installation and was stopped;
-that attempt is not counted as validation. A fresh isolated current-source run
-identified a local host restriction: Python blocks in `socket.socketpair()` while
-Jupyter creates its Windows event loop, before kernel startup. The pipe-based
-worker tests above pass, but do not replace the full installed Jupyter client gate
-in GitHub Actions. All remote operating-system gates remain required.
+that attempt is not counted as validation. An isolated current-source run then
+identified a local host permission restriction before kernel startup. After the
+intended execution permissions were applied and the native cache was placed in
+the writable test directory, the full client test passed. The pipe-based worker
+tests supplement the full installed Jupyter client gate in GitHub Actions;
+remote operating-system gates remain required.
 
 ## Automated gates and distribution
 

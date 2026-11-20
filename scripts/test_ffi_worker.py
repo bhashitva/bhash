@@ -11,6 +11,31 @@ import threading
 from bhash_jupyter.kernel import Worker
 
 
+class TimedWorker(Worker):
+    """Cover startup/hello as well as execution with the same watchdog."""
+    def __init__(self, java, compiler, drivers, timeout=180):
+        self.watchdog = threading.Timer(timeout, self.expire)
+        self.watchdog.daemon = True
+        self.watchdog.start()
+        try:
+            super().__init__(java, compiler, drivers)
+        except BaseException:
+            self.watchdog.cancel()
+            raise
+
+    def expire(self):
+        process = getattr(self, "process", None)
+        if process is not None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+    def close(self):
+        self.watchdog.cancel()
+        super().close()
+
+
 def execute(worker, code, expected=None):
     worker.send(kind="execute", code=code, allowStdin=False)
     results = []
@@ -30,10 +55,7 @@ def main():
     parser.add_argument("compiler")
     parser.add_argument("--java", default="java")
     args = parser.parse_args()
-    worker = Worker(args.java, args.compiler, [])
-    timer = threading.Timer(180, worker.process.kill)
-    timer.daemon = True
-    timer.start()
+    worker = TimedWorker(args.java, args.compiler, [])
     try:
         execute(worker, "आयात मानक.संपीड़न; आयात मानक.संपीड़नप्रारूप; आयात मानक.संपीड़नदोष;")
         execute(worker, '''फलन खोलो(फल: मानक.परिणाम<बाइटबफ़र, संपीड़नदोष>) -> बाइटबफ़र {
@@ -53,11 +75,7 @@ def main():
         execute(worker, 'चक्र("अगला cell")', "अगला cell")
         print("Notebook worker bridge: copied compression buffers, persistent scalars and repeated cell loaders passed")
         worker.close()
-        timer.cancel()
-        worker=Worker(args.java,args.compiler,[])
-        timer=threading.Timer(180,worker.process.kill)
-        timer.daemon=True
-        timer.start()
+        worker=TimedWorker(args.java,args.compiler,[])
         notebook=json.loads((Path(__file__).resolve().parents[1]/"editors/jupyter/compression.ipynb").read_text(encoding="utf-8"))
         cells=["".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"]=="code"]
         assert len(cells)==4
@@ -65,7 +83,6 @@ def main():
             execute(worker,code,expected)
         print("Hindi compression notebook: every code cell passed")
     finally:
-        timer.cancel()
         worker.close()
 
 

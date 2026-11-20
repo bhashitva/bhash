@@ -7,6 +7,7 @@ import dev.bhash.backend.ProjectResolver;
 import dev.bhash.backend.ManagedEmitter;
 import dev.bhash.backend.CompilationException;
 import dev.bhash.parser.BhashParser.*;
+import com.google.gson.*;
 import org.antlr.v4.runtime.tree.ParseTree;
 import java.util.*;
 import java.io.IOException;
@@ -64,6 +65,58 @@ class ForeignManifestTest {
     }
     @Test void equivalentNamesCannotCreateDifferentParameters() {
         reject(CONTRACT.replace("पहला", "फ़ल").replace("दूसरा", "फ़ल"));
+    }
+    @Test void releaseSymbolsRejectReservedRuntimeEntriesAndIncompatibleResourceSignatures() throws Exception {
+        var json = JsonParser.parseString(CONTRACT).getAsJsonObject();
+        var resource = new JsonObject();
+        resource.addProperty("name", "परीक्षण.हैंडल");
+        resource.addProperty("kind", "counter");
+        resource.addProperty("release", "fixture_release");
+        json.getAsJsonArray("resources").add(resource);
+        var result = json.getAsJsonArray("functions").get(0).getAsJsonObject().getAsJsonObject("return");
+        result.addProperty("type", "बाइटबफ़र");
+        result.addProperty("wire", "status+owned-bytes");
+        result.addProperty("release", "fixture_release");
+        reject(json.toString()); // No owned-handle-returning function is needed to expose the conflict.
+        result.addProperty("release", "bhffi_v1_context_create");
+        reject(json.toString());
+        result.addProperty("release", "bhffi_v1_bytes_release");
+        assertDoesNotThrow(() -> ForeignManifest.parse(json.toString(), false));
+        resource.addProperty("release", "bhffi_v1_bytes_release");
+        reject(json.toString());
+        resource.addProperty("release", "bhffi_v1_context_shutdown");
+        reject(json.toString());
+    }
+    @Test void discoversForeignCallsInsideCatchHandlersAndSelectionCases() throws Exception {
+        var module = ForeignManifest.parse(CONTRACT, false);
+        for (String body : List.of(
+                "प्रयास { फेंको नया अपवाद(\"दोष\"); } पकड़ो (द: अपवाद) { लिखो(जोड़.जोड़ो(२,३)); }",
+                "चयन (१) { विकल्प १: लिखो(जोड़.जोड़ो(२,३)); विराम; शेष: लिखो(०); }")) {
+            var core = ManagedEmitter.core(List.of(new SourceFile("binding.json", "", false, module),
+                new SourceFile("main.bhash", "आयात परीक्षण.जोड़; फलन मुख्य()->शून्य {" + body + "}")));
+            assertTrue(core.foreignRuntime(), body);
+            assertEquals(1, core.foreignCalls().size(), body);
+        }
+    }
+    @Test void errorMappingMessagesAreEscapedInBothManagedTargets() throws Exception {
+        var json = JsonParser.parseString(CONTRACT).getAsJsonObject();
+        var result = json.getAsJsonArray("functions").get(0).getAsJsonObject().getAsJsonObject("return");
+        result.addProperty("type", "मानक.परिणाम<पूर्णांक,परीक्षण.दोष>");
+        String message = "पहली\nदूसरी\r\n\t\"पंक्ति\"\\\u0085\u2028\u2029";
+        var mapping = new JsonObject();
+        mapping.addProperty("status", 1);
+        mapping.addProperty("code", "अमान्य");
+        mapping.addProperty("message", message);
+        var errors = new JsonArray(); errors.add(mapping); result.add("errors", errors);
+        var module = ForeignManifest.parse(json.toString(), false);
+        var sources = List.of(new SourceFile("binding.json", "", false, module),
+            new SourceFile("types.bhash", "संकुल परीक्षण; सार्वजनिक परिगणना दोषकोड { अमान्य } सार्वजनिक अभिलेख दोष(कोड: दोषकोड, संदेश: पाठ);"),
+            new SourceFile("main.bhash", "आयात परीक्षण.जोड़; फलन मुख्य()->शून्य { स्थिर फल = जोड़.जोड़ो(२,३); }"));
+        for (var target : List.of(dev.bhash.backend.Target.JVM, dev.bhash.backend.Target.CLR)) {
+            String generated = ManagedEmitter.emit(sources, target);
+            assertTrue(generated.contains("पहली\\nदूसरी\\r\\n\\t\\\"पंक्ति\\\"\\\\\\u0085\\u2028\\u2029"), target.toString());
+            assertFalse(generated.contains(message), target.toString());
+        }
     }
     @Test void qualifiedClassCannotMasqueradeAsEnumWire()throws Exception {
         String json=CONTRACT.replace("पूर्णांक","परीक्षण.नकली").replace("status+i64","status+i32").replace("\"wire\":\"i64\"","\"wire\":\"i32\"");

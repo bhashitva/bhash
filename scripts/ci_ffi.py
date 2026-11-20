@@ -116,6 +116,8 @@ def main():
             raise SystemExit("Expected exactly one freshly built kernel wheel")
         run(python,"-m","pip","install","--force-reinstall","--no-deps",wheels[0])
         run(python,"-m","bhash_jupyter.install","--java",java)
+        os.environ["JAVA_TOOL_OPTIONS"] = (os.environ.get("JAVA_TOOL_OPTIONS", "") +
+                                           " -Dbhash.ffi.gcStress=true").strip()
         run(shutil.which("python3") or shutil.which("python"), "scripts/test_ffi_worker.py", jar, "--java", java)
         run(python, "editors/jupyter/test_kernel.py", "--installed", "--ffi")
 

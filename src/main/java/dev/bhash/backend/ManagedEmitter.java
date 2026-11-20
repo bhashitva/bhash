@@ -1390,7 +1390,25 @@ public final class ManagedEmitter extends BhashBaseVisitor<ManagedEmitter.Expr> 
         definition.fields.put(Identifiers.key("अंक"),new Field("bcode",Type.INT,false,Access.PUBLIC,definition,null,false));
     }
     private String hostString(String text) {
-        return "\""+text.replace("\\","\\\\").replace("\"","\\\"")+"\"";
+        var escaped = new StringBuilder("\"");
+        for (int i = 0; i < text.length(); i++) {
+            char value = text.charAt(i);
+            switch (value) {
+                case '\\' -> escaped.append("\\\\");
+                case '"' -> escaped.append("\\\"");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                default -> {
+                    if (Character.isISOControl(value) || value == '\u2028' || value == '\u2029')
+                        escaped.append(String.format(java.util.Locale.ROOT, "\\u%04x", (int)value));
+                    else escaped.append(value);
+                }
+            }
+        }
+        return escaped.append('"').toString();
     }
     private void emitEnum(ClassInfo definition) {
         output.append(target==Target.JVM?"static final class ":"public sealed class ").append(definition.java).append(" {\n");

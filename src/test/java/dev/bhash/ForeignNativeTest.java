@@ -46,6 +46,12 @@ class ForeignNativeTest {
         assertEquals(0,process.exitValue(),Files.readString(error));
         assertEquals("अवैधतर्क\n",Files.readString(output).replace("\r\n","\n"));
         assertTrue(Files.readString(error).contains("live=0"),Files.readString(error));
+        var control = List.of(new SourceFile("control.bhash", Files.readString(Path.of("src/test/ffi/control-flow.bhash"))));
+        new NativeCompiler().compile(control, executable);
+        process=builder.start();if(!process.waitFor(90,TimeUnit.SECONDS)){process.destroyForcibly();fail("Control-flow FFI program timed out");}
+        assertEquals(0,process.exitValue(),Files.readString(error));
+        assertEquals("catch\ncase\n",Files.readString(output).replace("\r\n","\n"));
+        assertTrue(Files.readString(error).contains("live=0"),Files.readString(error));
         }
     }
     private static String resource(String name) throws Exception {

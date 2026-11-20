@@ -20,7 +20,7 @@ public record CoreProgram(List<Function> functions, int entry, int entryArgument
     private static void foreignOperations(Object value,java.util.function.Consumer<Expression> result) {
         if(value instanceof ForeignCall || value instanceof ForeignClose)result.accept((Expression)value);
         if(value instanceof List<?> list){for(var element:list)foreignOperations(element,result);return;}
-        if(!(value instanceof Expression || value instanceof Statement))return;
+        if(!(value instanceof Expression || value instanceof Statement || value instanceof Catch || value instanceof SelectionCase))return;
         // Traverse only compiler-owned immutable IR records; declaration/model records
         // and host objects are deliberately outside this walk.
         try{for(var field:value.getClass().getRecordComponents())foreignOperations(field.getAccessor().invoke(value),result);}

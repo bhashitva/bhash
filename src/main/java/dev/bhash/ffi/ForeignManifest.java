@@ -61,7 +61,7 @@ public record ForeignManifest(String packageName, String contractVersion, String
         var symbols = new HashSet<String>();
         for (JsonElement element : array(root, "resources")) {
             JsonObject item = object(element); fields(item, "name", "kind", "release");
-            String name = qualified(string(item, "name")), kind = string(item, "kind"), release = symbol(string(item, "release"));
+            String name = qualified(string(item, "name")), kind = string(item, "kind"), release = releaseSymbol(string(item, "release"), false);
             if (!name.startsWith(namespace + ".") || name.substring(namespace.length() + 1).contains(".") || !resourceNames.add(name) || !kinds.add(kind)
                     || !kind.matches("[a-z][a-z0-9-]{0,63}") || !symbols.add(release)) throw failure("Duplicate or invalid resource declaration: " + name);
             resources.add(new Resource(name, kind, release));
@@ -128,7 +128,7 @@ public record ForeignManifest(String packageName, String contractVersion, String
                 if (payloadWire.equals("handle") && !resourceNames.contains(payloadType)) throw failure("Handle result must name a declared resource.");
             } else if (!payloadType.equals("शून्य") && !payloadType.equals("मानक.इकाई")) throw failure("A status-only result requires शून्य or मानक.इकाई.");
             if (wire.startsWith("status+owned-")) {
-                symbol(release);
+                releaseSymbol(release, !wire.equals("status+owned-handle"));
                 if (wire.equals("status+owned-handle")) {
                     resource = qualified(resource);
                     String selectedResource = resource;
@@ -149,6 +149,7 @@ public record ForeignManifest(String packageName, String contractVersion, String
         }
         if (functions.isEmpty()) throw failure("A binding must declare at least one function.");
         var releaseTypes = new HashMap<String,String>();
+        for (var resource : resources) releaseTypes.put(resource.release(), "handle");
         for (var function : functions) if (!function.result().release().isEmpty()) {
             String release = function.result().release();
             String signature = function.result().wire().equals("status+owned-handle") ? "handle" : "bytes";
@@ -232,6 +233,12 @@ public record ForeignManifest(String packageName, String contractVersion, String
     }
     private static String symbol(String value) throws IOException {
         if (!value.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) throw failure("Invalid C entry point: " + value);
+        return value;
+    }
+    private static String releaseSymbol(String value, boolean bytes) throws IOException {
+        symbol(value);
+        if (value.startsWith("bhffi_v1_") && !(bytes && value.equals("bhffi_v1_bytes_release")))
+            throw failure("Release entry point cannot replace the binding runtime ABI: " + value);
         return value;
     }
     private static String relative(String value) throws IOException {
