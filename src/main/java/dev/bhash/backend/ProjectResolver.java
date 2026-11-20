@@ -62,6 +62,10 @@ public final class ProjectResolver {
         all.add(library.tree());
         var referenced=new HashSet<String>();
         for(var input:all.subList(0,trees.size()))collectIdentifiers(input,referenced);
+        if(referenced.contains(Identifiers.key("संपीड़न"))){
+            boolean strict=trees.get(0).start instanceof LocatedToken token && token.strictNulls();
+            var foreign=dev.bhash.ffi.ForeignCatalog.declarations(strict).parse();all.add(foreign.tree());collectIdentifiers(foreign.tree(),referenced);
+        }
         if(referenced.contains("कार्यफल"))referenced.addAll(List.of("कार्यतंत्र","कार्य","कार्यसीमा","असमकालिकबंदनीय"));
         for(var source:dev.bhash.stdlib.StandardLibrary.implementations(referenced)) {
             var implementation=source.parse();

@@ -42,7 +42,11 @@ public final class NativeBuildInfo {
         System.arraycopy(sqlite,0,runtime,source.length+http.length,sqlite.length);
         System.arraycopy(server,0,runtime,source.length+http.length+sqlite.length,server.length);
         System.arraycopy(auth,0,runtime,source.length+http.length+sqlite.length+server.length,auth.length);
-        info.put("runtime_sha256",hash(runtime));info.put("runtime_header_sha256",hash(header));
+        var complete=new ByteArrayOutputStream();complete.write(runtime);
+        for(String part:List.of("/dev/bhash/backend/native/bhash_ffi.inc","/dev/bhash/ffi/bhffi.h","/dev/bhash/ffi/bhffi.c")){
+            complete.write(part.getBytes(java.nio.charset.StandardCharsets.UTF_8));complete.write(0);complete.write(resource(part));
+        }
+        info.put("runtime_sha256",hash(complete.toByteArray()));info.put("runtime_header_sha256",hash(header));
         String version="development",compiler="development";
         try(var in=NativeBuildInfo.class.getResourceAsStream("/META-INF/maven/dev.bhash/bhash-compiler/pom.properties")){if(in!=null){var p=new Properties();p.load(in);version=p.getProperty("version",version);}}
         try{Path jar=Path.of(NativeBuildInfo.class.getProtectionDomain().getCodeSource().getLocation().toURI());if(Files.isRegularFile(jar))compiler=fileHash(jar);}catch(java.net.URISyntaxException e){throw new IOException(e);}

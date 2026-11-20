@@ -19,6 +19,7 @@ public final class NativeLibrary {
             throws IOException, CompilationException {
         var library = ManagedEmitter.libraryCore(sources, NativeExports.read(exports));
         var core = library.program();
+        if(core.foreignRuntime())throw new CompilationException("[BH8103] बाहरी C bindings इस चरण में desktop executable के लिए हैं; Android और embedded libraries समर्थित नहीं हैं।");
         if (core.networking() || core.postgresql() || core.server() || core.authentication())
             throw new CompilationException("Native libraries currently support portable computation and SQLite; networking, PostgreSQL, HTTP servers and authentication are unavailable.");
 

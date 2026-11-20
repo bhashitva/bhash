@@ -20,7 +20,7 @@ public final class NativeCompiler {
     public NativeCompiler(boolean sanitize,boolean debug,Path sourceRoot){this.sanitize=sanitize;this.debug=debug;this.sourceRoot=sourceRoot;}
     public static List<SourceFile> normalizeSources(List<SourceFile> sources,Path root)throws IOException{
         Path base=root.toRealPath();var mapped=new ArrayList<SourceFile>();
-        for(var source:sources){Path file=Path.of(source.name()).toRealPath();if(!file.startsWith(base))throw new IOException("Native source is outside --source-root: "+source.name());mapped.add(new SourceFile("/bhash/source/"+base.relativize(file).toString().replace('\\','/'),source.text(),source.strictNulls()));}
+        for(var source:sources){Path file=Path.of(source.name()).toRealPath();if(!file.startsWith(base))throw new IOException("Native source is outside --source-root: "+source.name());mapped.add(new SourceFile("/bhash/source/"+base.relativize(file).toString().replace('\\','/'),source.text(),source.strictNulls(),source.foreign()));}
         return List.copyOf(mapped);
     }
     private static List<String> mapped(Path work,Path sdk,List<String> command){
@@ -43,6 +43,13 @@ public final class NativeCompiler {
         var core=ManagedEmitter.core(sources); // Diagnose source before invoking external tools.
         NativeToolchain.requirePlatform();
         if(sourceRoot!=null)core=ManagedEmitter.core(normalizeSources(sources,sourceRoot));
+        var foreign=new LinkedHashMap<String,dev.bhash.ffi.ForeignManifest>();
+        var foreignArchives=new LinkedHashMap<String,Path>();
+        for(var call:core.foreignCalls()) {
+            var module=call.declaration().module();String identity=module.fingerprint();
+            if(foreign.putIfAbsent(identity,module)!=null)continue;
+        }
+        dev.bhash.ffi.ForeignArtifacts.validateStaticLinkage(foreign.values());
         Path destination=output.toAbsolutePath().normalize();
         if(destination.getParent()==null || Files.isSymbolicLink(destination) || Files.isDirectory(destination))
             throw new IOException("Native output must be an executable file, not a directory or symbolic link.");
@@ -52,6 +59,11 @@ public final class NativeCompiler {
         Path symbols=destination.resolveSibling(destination.getFileName()+".dwarf");
         if(NativePlatform.macos() && debug && (Files.isSymbolicLink(symbols) || Files.isDirectory(symbols)))throw new IOException("Debug symbol output must be a regular file: "+symbols);
         try {
+            for(var module:foreign.values()){
+                Path archive=dev.bhash.ffi.ForeignArtifacts.resolve(module,dev.bhash.ffi.ForeignArtifacts.host(),"static",work);
+                try(var input=Files.newInputStream(archive)){if(!Arrays.equals(input.readNBytes(8),"!<arch>\n".getBytes(StandardCharsets.US_ASCII)))throw new CompilationException("[BH8102] Expected a prebuilt native static archive: "+archive);}
+                foreignArchives.put(module.fingerprint(),archive);
+            }
             var tools=NativeToolchain.require(work);String clang=tools.clang(),opt=tools.opt();
             Path sdk=tools.managed()?Path.of(clang).getParent().getParent():null;
             String buildInfo=NativeBuildInfo.describe(debug,sanitize,tools.version(),tools.linkerVersion(),tools.libcVersion());
@@ -61,6 +73,16 @@ public final class NativeCompiler {
             networkInfo.addProperty("postgresql",core.postgresql());
             networkInfo.addProperty("http_server",core.server());
             networkInfo.addProperty("authentication",core.authentication());
+            if(!foreign.isEmpty()){
+                var bindings=new com.google.gson.JsonArray();
+                for(var module:foreign.values()){
+                    var binding=new com.google.gson.JsonObject();var artifact=dev.bhash.ffi.ForeignArtifacts.select(module,dev.bhash.ffi.ForeignArtifacts.host(),"static");
+                    binding.addProperty("package",module.packageName());binding.addProperty("contract_sha256",module.fingerprint());
+                    binding.addProperty("artifact_sha256",artifact.sha256());binding.addProperty("source_sha256",artifact.sourceSha256());bindings.add(binding);
+                }
+                networkInfo.add("foreign_bindings",bindings);networkInfo.addProperty("foreign_abi",1);
+                networkInfo.addProperty("foreign_core_sha256",dev.bhash.ffi.ForeignRuntimeInfo.coreHash());
+            }
             if(core.database()){networkInfo.addProperty("sqlite_version",SqliteAssets.VERSION);networkInfo.add("sqlite_source_sha3_256",SqliteAssets.lock().get("source_sha3_256"));}
             if(core.networking())networkInfo.addProperty("network_runtime",NativePlatform.windows()?"winhttp":"system-libcurl");
             buildInfo=NativeBuildInfo.JSON.toJson(networkInfo);
@@ -73,10 +95,25 @@ public final class NativeCompiler {
                 notices.append("\n--- ").append(name).append(" ---\n").append(new String(in.readAllBytes(),StandardCharsets.UTF_8));
             }
             if(NativePlatform.windows())notices.append("\n--- MinGW-w64 runtime notices ---\n").append(new String(NativeBuildInfo.resource("/dev/bhash/backend/native/MINGW_RUNTIME_NOTICES.txt"),StandardCharsets.UTF_8));
+            for(var module:foreign.values()){
+                var artifact=dev.bhash.ffi.ForeignArtifacts.select(module,dev.bhash.ffi.ForeignArtifacts.host(),"static");
+                notices.append("\n--- ").append(module.packageName()).append(" provider ---\n").append(new String(dev.bhash.ffi.ForeignArtifacts.license(module,artifact),StandardCharsets.UTF_8));
+            }
             Files.writeString(work.resolve("program.ll"),LlvmEmitter.emit(core,notices.toString(),debug,buildInfo),StandardCharsets.UTF_8);
-            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_http.inc","bhash_sqlite.inc","bhash_postgres.inc","bhash_mysql.inc","bhash_async_database.inc","bhash_server.inc","bhash_auth.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
+            for(String name:List.of("bhash_runtime.c","bhash_runtime.h","bhash_ffi.inc","bhash_http.inc","bhash_sqlite.inc","bhash_postgres.inc","bhash_mysql.inc","bhash_async_database.inc","bhash_server.inc","bhash_auth.inc"))try(var in=NativeCompiler.class.getResourceAsStream("/dev/bhash/backend/native/"+name)){
                 if(in==null)throw new IOException("Missing native runtime: "+name);
                 Files.copy(in,work.resolve(name));
+            }
+            if(core.foreignRuntime()) {
+                for(String name:List.of("bhffi.h","bhffi.c"))try(var input=NativeCompiler.class.getResourceAsStream("/dev/bhash/ffi/"+name)){
+                    if(input==null)throw new IOException("Missing FFI runtime: "+name);Files.copy(input,work.resolve(name));
+                }
+                NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,"-std=c17","-O2","-Wall","-Wextra","-Werror","-c","bhffi.c","-o","bhffi.o"))));
+                for(var module:foreign.values()){
+                    String prefix=dev.bhash.ffi.ForeignCGenerator.prefix(module);
+                    Files.writeString(work.resolve(prefix+".c"),dev.bhash.ffi.ForeignCGenerator.generate(module),StandardCharsets.UTF_8);
+                    NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,"-std=c17","-O2","-Wall","-Wextra","-Werror","-c",prefix+".c","-o",prefix+".o"))));
+                }
             }
             if(core.database())SqliteAssets.copySource(work);
             if(!NativePlatform.windows())NativeToolchain.run(work,List.of(opt,"-passes=verify","-disable-output","program.ll"));
@@ -85,6 +122,7 @@ public final class NativeCompiler {
             // generated async state machines exceed the tool deadline unnecessarily.
             NativeToolchain.run(work,mapped(work,sdk,clangCommand(List.of(clang,debug?"-O0":"-O2","-c","program.ll","-o","program.o"))));
             var runtimeCommand=new ArrayList<>(List.of(clang,"-std=c17",debug?"-O0":"-O2","-Wall","-Wextra","-Werror","-c","bhash_runtime.c","-o","runtime.o"));
+            if(core.foreignRuntime())runtimeCommand.add("-DBHASH_FFI=1");
             if(core.database())runtimeCommand.add("-DBHASH_SQLITE=1");
             if(core.networking())runtimeCommand.add("-DBHASH_NETWORKING=1");
             if(core.server())runtimeCommand.add("-DBHASH_SERVER=1");
@@ -100,6 +138,11 @@ public final class NativeCompiler {
                 for(String object:List.of("program.o","runtime.o"))Files.setLastModifiedTime(work.resolve(object),java.nio.file.attribute.FileTime.fromMillis(0));
             }
             var link=new ArrayList<>(List.of(clang,"program.o","runtime.o","-lm"));
+            if(core.foreignRuntime()){
+                link.add("bhffi.o");for(var module:foreign.values())link.add(dev.bhash.ffi.ForeignCGenerator.prefix(module)+".o");
+                for(var archive:foreignArchives.values())link.add(archive.toString());
+                if(!NativePlatform.windows())link.add("-pthread");
+            }
             if(core.database()){link.add("sqlite3.o");if(!NativePlatform.windows())link.add("-pthread");}
             if(NativePlatform.windows()){link.add("-lshell32");if(core.networking())link.add("-lwinhttp");if(core.server()||core.database())link.add("-lws2_32");if(core.authentication())link.add("-lbcrypt");}
             else if(!NativePlatform.macos()&&(core.networking()||core.authentication()||core.database()))link.add("-ldl");

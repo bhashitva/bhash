@@ -57,7 +57,14 @@ public final class NotebookWorker {
         ClassLoader platform = ClassLoader.getPlatformClassLoader();
         // JDBC registrations and cleanup threads belong to the worker, not each cell.
         try (var drivers = driverUrls.length == 0 ? null : new URLClassLoader(driverUrls, platform)) {
-            new NotebookWorker(drivers == null ? platform : drivers).serve();
+            ClassLoader nativeRuntime=new ClassLoader(drivers == null ? platform : drivers){
+                @Override protected Class<?> loadClass(String name,boolean resolve)throws ClassNotFoundException{
+                    if(name.equals("dev.bhash.ffi.NativeModules") || name.startsWith("dev.bhash.ffi.NativeModules$"))return NotebookWorker.class.getClassLoader().loadClass(name);
+                    return super.loadClass(name,resolve);
+                }
+            };
+            try{new NotebookWorker(nativeRuntime).serve();}
+            finally{dev.bhash.ffi.NativeModules.shutdownCurrent();}
         }
     }
 

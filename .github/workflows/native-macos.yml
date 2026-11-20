@@ -9,6 +9,10 @@ concurrency:
   group: native-macos-${{ github.ref_name }}
   cancel-in-progress: false
 jobs:
+  typed-c-bindings:
+    uses: ./.github/workflows/typed-c-interop.yml
+    with:
+      hosts: '["macos-15"]'
   macos-sdk:
     runs-on: macos-15
     timeout-minutes: 30

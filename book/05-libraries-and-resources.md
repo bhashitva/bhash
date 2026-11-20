@@ -47,3 +47,10 @@
 एक अलग अभ्यास फ़ोल्डर में चलाएँ। सही फ़ाइल के साथ एक अनुपलब्ध पथ भी
 आज़माएँ। Playground में JSON वाला अभ्यास चुनें। स्थानीय फ़ाइल वाले काम
 desktop JVM, CLR या native पर करें।
+## संपीड़न और बाहरी पुस्तकालय (Compression and external libraries)
+
+बाइट डेटा संग्रहित या भेजते समय [संपीड़न ट्यूटोरियल](../tutorial/compression/README.md)
+पढ़ें और [पूरा उदाहरण](../tutorial/compression/roundtrip.bhash) चलाएँ। संपीड़ित input को
+खोलते समय output की स्पष्ट सीमा दें और typed Result में त्रुटि संभालें।
+बाहरी C पुस्तकालयों के लिए [binding मार्गदर्शिका](../docs/typed-c-library-bindings.md)
+स्वामित्व, GC और platform वितरण का अनुबंध समझाती है।

@@ -34,6 +34,9 @@ public final class LlvmEmitter {
     private Source debugSource;
     private Function currentFunction;
     private final Map<NewCollection,Integer> buffers=new IdentityHashMap<>();
+    private final Map<ForeignCall,Integer> foreignBuffers=new IdentityHashMap<>(),foreignRoots=new IdentityHashMap<>();
+    private final Set<String> foreignDeclarations=new HashSet<>();
+    private int nextForeignKinds;
     private final Map<Integer,Integer> objectSizes=new HashMap<>();
     private final Map<Expression,Value> values=new IdentityHashMap<>();
     private record Value(Type type,String ir) { String argument(){return llvm(type)+" "+ir;} }
@@ -290,6 +293,62 @@ public final class LlvmEmitter {
         if(type==Type.VOID)return new Value(type,"");
         return new Value(type,bits.ir());
     }
+    private Value foreignCall(ForeignCall call){
+        String prefix=dev.bhash.ffi.ForeignCGenerator.prefix(call.declaration().module());
+        if(foreignDeclarations.add("runtime"))globals.append("declare i32 @bh_ffi_call(ptr,ptr,i32,i32,ptr,ptr,i32,ptr,ptr,ptr,ptr)\ndeclare void @bh_ffi_require_status(i32,ptr)\n");
+        if(foreignDeclarations.add(prefix))globals.append("declare i32 @").append(prefix).append("_invoke(ptr,i32,ptr,i32,ptr)\ndeclare void @").append(prefix).append("_release(ptr,i32,ptr)\n");
+        int index=call.declaration().module().functions().indexOf(call.declaration().function());
+        String kinds="@ffi_kinds"+nextForeignKinds++;
+        var tags=new ArrayList<String>();
+        for(var parameter:call.declaration().function().parameters())tags.add("i8 "+switch(parameter.wire()){case "utf8"->1;case "bytes"->2;case "handle"->3;default->0;});
+        globals.append(kinds).append(" = private constant [").append(tags.size()).append(" x i8] [").append(String.join(",",tags)).append("]\n");
+        int frame=foreignBuffers.get(call);String arguments="%ffiargs"+frame,output="%ffiout"+frame;
+        for(var argument:call.arguments())expression(argument);
+        for(int i=0;i<call.arguments().size();i++){
+            String slot=temporary();line(slot+" = getelementptr i64, ptr "+arguments+", i64 "+i);
+            line("store i64 "+bits(reload(call.arguments().get(i))).ir()+", ptr "+slot);
+        }
+        String wire=call.declaration().function().result().wire();
+        int kind=switch(wire){case "status+owned-utf8"->1;case "status+owned-bytes"->2;case "status+owned-handle"->3;default->0;};
+        var plan=call.result();
+        String descriptor=kind==2?collectionInfo(plan.descriptor()):kind==3?"@class"+plan.descriptor():"null";
+        String info=kind==3?"@typeinfo"+plan.descriptor():"null",location=text(call.source().toString());
+        traceAt(call.source());
+        String status=temporary();line(status+" = call i32 @bh_ffi_call(ptr @"+prefix+"_invoke, ptr @"+prefix+"_release, i32 "+index+", i32 "+call.arguments().size()+", ptr "+kinds+", ptr "+arguments+", i32 "+kind+", ptr "+descriptor+", ptr "+info+", ptr "+location+", ptr "+output+")");
+        if(plan.success()<0){
+            line("call void @bh_ffi_require_status(i32 "+status+", ptr "+location+")");
+            Value raw=instruction(Type.INT,"load i64, ptr "+output);
+            if(plan.payloadEnumLookup()>=0)return instruction(Type.OBJECT,"call ptr @bfn"+plan.payloadEnumLookup()+"(i64 "+raw.ir()+", ptr "+location+")");
+            return collectionResult(call.type(),raw);
+        }
+        String good=freshLabel(),bad=freshLabel(),unknown=freshLabel(),merge=freshLabel(),ok=temporary();
+        line(ok+" = icmp eq i32 "+status+", 0");line("br i1 "+ok+", label %"+good+", label %"+bad);
+        block(good);
+        Value raw=instruction(Type.INT,"load i64, ptr "+output),payload;
+        if(plan.unitConstructor()>=0)payload=instruction(Type.OBJECT,"call ptr @bfn"+plan.unitConstructor()+"()");
+        else if(plan.payloadEnumLookup()>=0)payload=instruction(Type.OBJECT,"call ptr @bfn"+plan.payloadEnumLookup()+"(i64 "+raw.ir()+", ptr "+location+")");
+        else payload=collectionResult(plan.payload(),raw);
+        if(payload.type().reference())line("store ptr "+payload.ir()+", ptr "+rootAddress(foreignRoots.get(call)));
+        Value success=instruction(Type.OBJECT,"call ptr @bfn"+plan.success()+"("+payload.argument()+")");
+        String goodEnd=label;jump(merge);
+        block(bad);var branches=new ArrayList<String>();
+        for(int i=0;i<plan.errors().size();i++)branches.add(freshLabel());
+        var choices=new ArrayList<String>();for(int i=0;i<branches.size();i++)choices.add("i32 "+plan.errors().get(i).status()+", label %"+branches.get(i));
+        line("switch i32 "+status+", label %"+unknown+" ["+String.join(" ",choices)+"]");
+        var incoming=new ArrayList<String>();incoming.add("[ "+success.ir()+", %"+goodEnd+" ]");
+        for(int i=0;i<branches.size();i++){
+            block(branches.get(i));var error=plan.errors().get(i);
+            Value code=instruction(Type.OBJECT,"call ptr @bfn"+plan.errorEnumLookup()+"(i64 "+error.code()+", ptr "+location+")");
+            Value record=instruction(Type.OBJECT,"call ptr @bfn"+plan.errorConstructor()+"(ptr "+code.ir()+", ptr "+text(error.message())+")");
+            line("store ptr "+record.ir()+", ptr "+rootAddress(foreignRoots.get(call)));
+            Value failed=instruction(Type.OBJECT,"call ptr @bfn"+plan.failure()+"(ptr "+record.ir()+")");
+            incoming.add("[ "+failed.ir()+", %"+label+" ]");jump(merge);
+        }
+        block(unknown);line("call void @bh_ffi_require_status(i32 "+status+", ptr "+location+")");line("unreachable");terminated=true;
+        block(merge);Value result=instruction(Type.OBJECT,"phi ptr "+String.join(", ",incoming));
+        line("store ptr null, ptr "+rootAddress(foreignRoots.get(call)));
+        return result;
+    }
     private Value collectionCall(Type result,CollectionOperation operation,Value receiver,List<Value> arguments,int snapshot,Source source){
         var args=new ArrayList<Value>();for(var arg:arguments)args.add(bits(arg));
         String a=args.isEmpty()?"0":args.get(0).ir(),b=args.size()<2?"0":args.get(1).ir();
@@ -412,6 +471,8 @@ public final class LlvmEmitter {
         if(e instanceof Read r)register(r.binding());
         else if(e instanceof Unary u)scan(u.value());
         else if(e instanceof Binary b){scan(b.left());scan(b.right());}
+        else if(e instanceof ForeignClose c)scan(c.receiver());
+        else if(e instanceof ForeignCall c){foreignBuffers.putIfAbsent(c,foreignBuffers.size());if(c.result().success()>=0 && !foreignRoots.containsKey(c))foreignRoots.put(c,rootCount++);c.arguments().forEach(this::scan);}
         else if(e instanceof Call c)c.arguments().forEach(this::scan);
         else if(e instanceof TextCall c)c.arguments().forEach(this::scan);
         else if(e instanceof NumericCall c)c.arguments().forEach(this::scan);
@@ -461,6 +522,7 @@ public final class LlvmEmitter {
         if(functionResult!=Type.VOID)addresses.add("%return");
         for(var binding:bindings.keySet())addresses.add(address(binding));
         for(int i=0;i<buffers.size();i++)addresses.add("%buffer"+i);
+        for(int i=0;i<foreignBuffers.size();i++){addresses.add("%ffiargs"+i);addresses.add("%ffiout"+i);}
         if(!load)line("%environment = alloca ["+addresses.size()+" x ptr], align 8");
         for(int i=0;i<addresses.size();i++){
             String slot=temporary();line(slot+" = getelementptr ["+addresses.size()+" x ptr], ptr %environment, i64 0, i64 "+i);
@@ -486,6 +548,8 @@ public final class LlvmEmitter {
         if(e==null)return;if(e.type().reference())slots.add(roots.get(e));
         if(e instanceof Unary u)expressionRoots(u.value(),slots);
         else if(e instanceof Binary b){expressionRoots(b.left(),slots);expressionRoots(b.right(),slots);}
+        else if(e instanceof ForeignClose c)expressionRoots(c.receiver(),slots);
+        else if(e instanceof ForeignCall c){if(foreignRoots.containsKey(c))slots.add(foreignRoots.get(c));c.arguments().forEach(a->expressionRoots(a,slots));}
         else if(e instanceof Call c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof TextCall c)c.arguments().forEach(a->expressionRoots(a,slots));
         else if(e instanceof NumericCall c)c.arguments().forEach(a->expressionRoots(a,slots));
@@ -603,7 +667,7 @@ public final class LlvmEmitter {
     private void leaveTrace(){if(traced)line("call void @bh_trace_leave()");}
     private void function(Function f){
         currentFunction=f;traced=!f.name().isEmpty();debugSource=f.source();if(debug!=null)debugScope=debug.function(f,"bfn"+f.id(),!traced);
-        code=new StringBuilder(); values.clear(); roots.clear(); bindingRoots.clear(); bindings.clear();rootCount=0;next=0;buffers.clear();targets.clear();scopes.clear();
+        code=new StringBuilder(); values.clear(); roots.clear(); bindingRoots.clear(); bindings.clear();rootCount=0;next=0;buffers.clear();foreignBuffers.clear();foreignRoots.clear();targets.clear();scopes.clear();
         functionResult=f.result();owner="@bfn"+f.id();outlined=false;nextTarget=0;returnRoot=-1;
         f.parameters().forEach(this::register);scan(f.body());
         if(f.result().reference())returnRoot=rootCount++;
@@ -619,6 +683,10 @@ public final class LlvmEmitter {
         line("%roots = alloca ["+rootCount+" x ptr], align 8");
         line("store ["+rootCount+" x ptr] zeroinitializer, ptr %roots");
         for(var entry:buffers.entrySet().stream().sorted(Map.Entry.comparingByValue()).toList())line("%buffer"+entry.getValue()+" = alloca ["+entry.getKey().arguments().size()+" x i64], align 8");
+        for(var entry:foreignBuffers.entrySet().stream().sorted(Map.Entry.comparingByValue()).toList()){
+            line("%ffiargs"+entry.getValue()+" = alloca ["+entry.getKey().arguments().size()+" x i64], align 8");
+            line("%ffiout"+entry.getValue()+" = alloca i64, align 8");
+        }
         for(var b:bindings.keySet()) {
             if(b.type().reference())line(address(b)+" = getelementptr ["+rootCount+" x ptr], ptr %roots, i64 0, i64 "+bindingRoots.get(b));
             else line(address(b)+" = alloca "+llvm(b.type()));
@@ -666,8 +734,16 @@ public final class LlvmEmitter {
         }
         else if(e instanceof FieldRead f){
             Value receiver=expression(f.receiver());
-            receiver=instance(receiver,f.source());
+            if(!f.foreignEnum())receiver=instance(receiver,f.source());
             String pointer=temporary();line(pointer+" = getelementptr i8, ptr "+receiver.ir()+", i64 "+f.field().offset());
+            if(f.foreignEnum()){
+                // Null in legacy mode becomes an invalid enum wire value, not a dereference.
+                String missing=temporary(),selected=temporary();
+                String fallback="@bhffi_invalid_enum";
+                if(globals.indexOf(fallback+" =")<0)globals.append(fallback).append(" = private constant i64 -9223372036854775808, align 8\n");
+                line(missing+" = icmp eq ptr "+receiver.ir()+", null");
+                line(selected+" = select i1 "+missing+", ptr "+fallback+", ptr "+pointer);pointer=selected;
+            }
             result=instruction(f.type(),"load "+llvm(f.type())+", ptr "+pointer);
         }
         else if(e instanceof Read r)result=instruction(r.type(),"load "+llvm(r.type())+", ptr "+address(r.binding()));
@@ -702,6 +778,11 @@ public final class LlvmEmitter {
             String call="call "+llvm(c.type())+" "+target+"("+String.join(", ",args)+")";
             if(c.type()==Type.VOID){line(call);result=new Value(Type.VOID,"");}
             else result=instruction(c.type(),call);
+        } else if(e instanceof ForeignClose c) {
+            if(foreignDeclarations.add("close"))globals.append("declare void @bh_ffi_close(ptr,ptr)\n");
+            Value receiver=expression(c.receiver());line("call void @bh_ffi_close(ptr "+receiver.ir()+", ptr "+text(c.source().toString())+")");result=new Value(Type.VOID,"");
+        } else if(e instanceof ForeignCall c) {
+            result=foreignCall(c);
         } else if(e instanceof DatabaseCall c) {
             for(var a:c.arguments())expression(a);
             var args=new ArrayList<String>();for(var a:c.arguments())args.add("i64 "+bits(reload(a)).ir());
@@ -773,7 +854,9 @@ public final class LlvmEmitter {
         else throw new IllegalStateException("Unknown core expression");
         if(e.type().reference())line("store ptr "+result.ir()+", ptr "+rootAddress(roots.get(e)));
         // Publish the result before releasing inputs: they may alias its storage.
-        if(e instanceof Call c)c.arguments().forEach(this::release);
+        if(e instanceof ForeignClose c)release(c.receiver());
+        else if(e instanceof ForeignCall c)c.arguments().forEach(this::release);
+        else if(e instanceof Call c)c.arguments().forEach(this::release);
         else if(e instanceof TextCall c)c.arguments().forEach(this::release);
         else if(e instanceof NumericCall c)c.arguments().forEach(this::release);
         else if(e instanceof StructuredCall c)c.arguments().forEach(this::release);

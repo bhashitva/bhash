@@ -414,6 +414,8 @@ internal static class BhashRuntime {
         internal BArray<byte> toArray() => new BArray<byte>(items);
     }
     internal static BBuffer bufferOf(params byte[] values) { var result=new BBuffer(values.LongLength); for(int i=0;i<values.Length;i++) result.set(i,values[i]); return result; }
+    internal static byte[] foreignBytes(BBuffer buffer) { return buffer==null?null:buffer.items; }
+    internal static BBuffer foreignBuffer(byte[] bytes) { return new BBuffer(bytes); }
     internal static BBuffer encodeUtf8(string text) => new BBuffer(new UTF8Encoding(false,true).GetBytes(text));
     internal static string decodeUtf8(BBuffer buffer) {
         try { return new UTF8Encoding(false,true).GetString(instance(buffer).items); }

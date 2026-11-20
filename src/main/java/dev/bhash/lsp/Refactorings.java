@@ -83,7 +83,8 @@ final class Refactorings {
     private boolean editable(String uri,Path root) {
         var path=BhashLanguageServer.path(uri);if(path==null||!path.startsWith(root))return false;
         for(var part:root.relativize(path))if(part.toString().equals(".bhash"))return false;
-        return !path.getFileName().toString().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME);
+        return !path.getFileName().toString().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME)
+            && !path.getFileName().toString().startsWith(dev.bhash.ffi.ForeignDeclarations.EDITOR_PREFIX);
     }
     Map<String,List<TextEdit>> rename(SourceIndex index,Position at,String name,Path root)throws Exception {
         var lexer=new BhashLexer(CharStreams.fromString(name));var errors=new int[1];lexer.removeErrorListeners();

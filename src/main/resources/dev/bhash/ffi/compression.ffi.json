@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "abiVersion": 1,
+  "package": "bhash-compression",
+  "contractVersion": "1",
+  "namespace": "मानक",
+  "resources": [],
+  "artifacts": [],
+  "functions": [
+    {
+      "owner": "मानक.संपीड़न",
+      "name": "संपीड़ितकरो",
+      "symbol": "bhffi_compression_v1_compress",
+      "execution": "owner-sync",
+      "parameters": [
+        {
+          "name": "मूल",
+          "type": "बाइटबफ़र",
+          "wire": "bytes",
+          "ownership": "borrow-call",
+          "marshal": "copy"
+        },
+        {
+          "name": "प्रारूप",
+          "type": "मानक.संपीड़नप्रारूप",
+          "wire": "i32",
+          "range": [
+            0,
+            1
+          ]
+        },
+        {
+          "name": "स्तर",
+          "type": "पूर्णांक",
+          "wire": "i32",
+          "range": [
+            0,
+            9
+          ]
+        }
+      ],
+      "return": {
+        "type": "मानक.परिणाम<बाइटबफ़र, मानक.संपीड़नदोष>",
+        "wire": "status+owned-bytes",
+        "release": "bhffi_compression_v1_bytes_release",
+        "errors": [
+          {
+            "status": 1,
+            "code": "अवैधतर्क",
+            "message": "संपीड़न का तर्क अमान्य है।"
+          },
+          {
+            "status": 2,
+            "code": "आगतसीमा",
+            "message": "संपीड़न आगत ८ MiB सीमा से बड़ा है।"
+          },
+          {
+            "status": 3,
+            "code": "निर्गतसीमा",
+            "message": "विसंपीड़ित डेटा निर्धारित निर्गत सीमा से बड़ा है।"
+          },
+          {
+            "status": 4,
+            "code": "दूषितडेटा",
+            "message": "संपीड़ित डेटा दूषित, अधूरा या अतिरिक्त डेटा वाला है।"
+          },
+          {
+            "status": 5,
+            "code": "शब्दकोशअसमर्थित",
+            "message": "संपीड़न शब्दकोश समर्थित नहीं है।"
+          },
+          {
+            "status": 6,
+            "code": "संसाधनसीमा",
+            "message": "संपीड़न के लिए उपलब्ध संसाधन सीमा पूरी हो गई।"
+          }
+        ]
+      }
+    },
+    {
+      "owner": "मानक.संपीड़न",
+      "name": "विसंपीड़ितकरो",
+      "symbol": "bhffi_compression_v1_decompress",
+      "execution": "owner-sync",
+      "parameters": [
+        {
+          "name": "मूल",
+          "type": "बाइटबफ़र",
+          "wire": "bytes",
+          "ownership": "borrow-call",
+          "marshal": "copy"
+        },
+        {
+          "name": "प्रारूप",
+          "type": "मानक.संपीड़नप्रारूप",
+          "wire": "i32",
+          "range": [
+            0,
+            1
+          ]
+        },
+        {
+          "name": "अधिकतम",
+          "type": "पूर्णांक",
+          "wire": "length",
+          "range": [
+            1,
+            16777216
+          ]
+        }
+      ],
+      "return": {
+        "type": "मानक.परिणाम<बाइटबफ़र, मानक.संपीड़नदोष>",
+        "wire": "status+owned-bytes",
+        "release": "bhffi_compression_v1_bytes_release",
+        "errors": [
+          {
+            "status": 1,
+            "code": "अवैधतर्क",
+            "message": "संपीड़न का तर्क अमान्य है।"
+          },
+          {
+            "status": 2,
+            "code": "आगतसीमा",
+            "message": "संपीड़न आगत ८ MiB सीमा से बड़ा है।"
+          },
+          {
+            "status": 3,
+            "code": "निर्गतसीमा",
+            "message": "विसंपीड़ित डेटा निर्धारित निर्गत सीमा से बड़ा है।"
+          },
+          {
+            "status": 4,
+            "code": "दूषितडेटा",
+            "message": "संपीड़ित डेटा दूषित, अधूरा या अतिरिक्त डेटा वाला है।"
+          },
+          {
+            "status": 5,
+            "code": "शब्दकोशअसमर्थित",
+            "message": "संपीड़न शब्दकोश समर्थित नहीं है।"
+          },
+          {
+            "status": 6,
+            "code": "संसाधनसीमा",
+            "message": "संपीड़न के लिए उपलब्ध संसाधन सीमा पूरी हो गई।"
+          }
+        ]
+      }
+    }
+  ]
+}

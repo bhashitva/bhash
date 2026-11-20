@@ -1,0 +1,154 @@
+// SPDX-License-Identifier: Apache-2.0
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+
+internal static class BhashForeign {
+    internal sealed class Failure : Exception { internal Failure(string message):base("[BH8105] "+message){} }
+    internal sealed class Value { internal int status;internal long scalar;internal byte[] bytes;internal Resource resource; }
+    [StructLayout(LayoutKind.Sequential)] internal struct Wire {internal ulong scalar;internal IntPtr data;internal ulong length;}
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate uint Abi();
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate ulong Layout();
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate IntPtr Core();
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate IntPtr Create();
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate ulong Bytes(IntPtr context);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate int Control(IntPtr context);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate int Close(IntPtr context,ulong token);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate void Queue(IntPtr record);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate IntPtr Allocate(IntPtr context,ulong bytes);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate void Free(IntPtr context,IntPtr memory);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate int Reserve(IntPtr context,ulong size,out Owned output);
+    [StructLayout(LayoutKind.Sequential)] internal struct Owned {internal IntPtr data;internal ulong length;}
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate void ReleaseBytes(IntPtr context,ref Owned output);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate int Invoke(IntPtr context,uint function,IntPtr arguments,uint count,out Wire output);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate void Release(IntPtr context,uint function,ref Wire output);
+    internal sealed class Module {
+        internal readonly IntPtr library;internal readonly string core;internal readonly ulong layout;
+        internal readonly Create create;internal readonly Bytes bytes;internal readonly Control shutdown,drain;
+        internal readonly Close close;internal readonly Queue queue;internal readonly Allocate allocate;internal readonly Free free;
+        internal readonly Reserve reserve;internal readonly ReleaseBytes releaseBytes;internal readonly Invoke invoke;internal readonly Release release;
+        T Symbol<T>(string name) where T:Delegate => Marshal.GetDelegateForFunctionPointer<T>(NativeLibrary.GetExport(library,name));
+        internal Module(string path,string prefix){
+            library=NativeLibrary.Load(path);
+            layout=Symbol<Layout>("bhffi_v1_layout")();
+            if(Symbol<Abi>("bhffi_v1_abi")()!=1 || Marshal.SizeOf<Wire>()!=24 || Marshal.SizeOf<Owned>()!=16)throw new Failure("बाहरी पुस्तकालय ABI असंगत है।");
+            core=Marshal.PtrToStringUTF8(Symbol<Core>(prefix+"_core")());
+            if(core==null || !System.Text.RegularExpressions.Regex.IsMatch(core,"^[a-f0-9]{64}$"))throw new Failure("बाहरी runtime की पहचान अमान्य है।");
+            create=Symbol<Create>("bhffi_v1_context_create");bytes=Symbol<Bytes>("bhffi_v1_context_bytes");shutdown=Symbol<Control>("bhffi_v1_context_shutdown");drain=Symbol<Control>("bhffi_v1_drain");
+            close=Symbol<Close>("bhffi_v1_resource_close");queue=Symbol<Queue>("bhffi_v1_resource_queue");allocate=Symbol<Allocate>("bhffi_v1_allocate");free=Symbol<Free>("bhffi_v1_free");
+            reserve=Symbol<Reserve>("bhffi_v1_bytes_reserve");releaseBytes=Symbol<ReleaseBytes>("bhffi_v1_bytes_release");invoke=Symbol<Invoke>(prefix+"_invoke");release=Symbol<Release>(prefix+"_release");
+        }
+    }
+    internal sealed class Context {
+        internal readonly int owner=Environment.CurrentManagedThreadId;internal readonly Module module;
+        internal readonly HashSet<State> states=new HashSet<State>();internal IntPtr pointer;
+        internal Context(Module module){this.module=module;pointer=module.create();}
+        internal void Check(){if(pointer==IntPtr.Zero || owner!=Environment.CurrentManagedThreadId)throw new Failure("बाहरी संसाधन बन्द है या दूसरे thread का है।");}
+        internal void References(){foreach(State state in new List<State>(states))if(state.lease!=null && !state.lease.TryGetTarget(out Resource ignored))state.Enqueue();}
+    }
+    internal sealed class State {
+        internal readonly Context context;internal ulong token;internal IntPtr record;internal WeakReference<Resource> lease;
+        internal State(Context context){this.context=context;}
+        internal void Enqueue(){lock(context){if(record!=IntPtr.Zero){context.module.queue(record);record=IntPtr.Zero;token=0;context.states.Remove(this);}}}
+    }
+    internal sealed class Resource : SafeHandle {
+        internal readonly State state;private bool bound;
+        internal Resource(State state):base(IntPtr.Zero,true){this.state=state;state.lease=new WeakReference<Resource>(this);}
+        public override bool IsInvalid => handle==IntPtr.Zero;
+        protected override bool ReleaseHandle(){if(state!=null)state.Enqueue();return true;}
+        internal void bind(object wrapper){bound=true;GC.KeepAlive(wrapper);}
+        internal void releaseUnbound(){if(!bound)BhashForeign.close(this);}
+        internal void Attach(ulong token,IntPtr record){state.token=token;state.record=record;SetHandle(record);}
+        internal ulong Token(Context context){if(!ReferenceEquals(context,state.context) || state.record==IntPtr.Zero || IsClosed)throw new Failure("बाहरी संसाधन बन्द है या दूसरे runtime का है।");return state.token;}
+    }
+    private static readonly Dictionary<string,Module> modules=new Dictionary<string,Module>();
+    [ThreadStatic] private static Context current;
+    internal static Module load(string name,string sha,string prefix){
+        lock(modules){
+            string key=prefix+":"+sha;if(modules.TryGetValue(key,out Module found))return found;
+            try{
+                if(!System.Text.RegularExpressions.Regex.IsMatch(name,@"^bhash-ffi/[a-f0-9]{64}\.(dll|so|dylib)$") || !System.Text.RegularExpressions.Regex.IsMatch(sha,"^[a-f0-9]{64}$"))throw new Failure("बाहरी वितरण की पहचान अमान्य है।");
+                string path=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,name.Replace('/',Path.DirectorySeparatorChar)));
+                var info=new FileInfo(path);if(info.LinkTarget!=null || info.Length>134217728)throw new Failure("बाहरी वितरण फ़ाइल अमान्य है।");
+                using(var input=File.OpenRead(path))if(Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant()!=sha)throw new Failure("बाहरी पुस्तकालय checksum नहीं मिलता।");
+                Module module=new Module(path,prefix);modules.Add(key,module);return module;
+            }catch(Failure){throw;}catch(Exception error){throw new Failure("बाहरी पुस्तकालय लोड नहीं हुआ: "+error.Message);}
+        }
+    }
+    internal static Value invoke(string identity,Func<Module> factory,int function,int[] kinds,object[] arguments,int resultKind){
+        Module module=factory();Context context=current;
+        if(context==null){context=new Context(module);if(context.pointer==IntPtr.Zero)return new Value{status=6};current=context;}
+        lock(context){
+            context.Check();context.References();if(context.module.drain(context.pointer)!=0)throw new Failure("बाहरी संसाधन की सफ़ाई विफल हुई।");
+            if(context.module.core!=module.core || context.module.layout!=module.layout)throw new Failure("बाहरी पुस्तकालयों का native runtime असंगत है।");
+            Value value=new Value();Owned[] copies=new Owned[arguments.Length];Wire output=default;
+            IntPtr frame=IntPtr.Zero;bool transferred=false;State state=null;Resource resource=null;
+            if(resultKind==3){state=new State(context);resource=new Resource(state);context.states.Add(state);}
+            try{
+                if(arguments.Length>32)throw new Failure("बाहरी call में बहुत अधिक तर्क हैं।");
+                frame=context.module.allocate(context.pointer,(ulong)(arguments.Length*24));
+                if(frame==IntPtr.Zero){value.status=6;return value;}
+                ulong total=0;
+                for(int i=0;i<arguments.Length;i++){
+                    Wire argument=default;object input=arguments[i];
+                    if(kinds[i]==1 || kinds[i]==2){
+                        if(input==null){value.status=1;return value;}
+                        byte[] data;
+                        if(kinds[i]==1){try{data=new UTF8Encoding(false,true).GetBytes((string)input);}catch(EncoderFallbackException){value.status=1;return value;}}
+                        else data=(byte[])input;
+                        if((ulong)data.LongLength>8388608-total){value.status=2;return value;}total+=(ulong)data.LongLength;
+                        value.status=context.module.reserve(context.pointer,(ulong)data.LongLength,out copies[i]);if(value.status!=0)return value;
+                        if(data.Length!=0)Marshal.Copy(data,0,copies[i].data,data.Length);
+                        argument.data=copies[i].data;argument.length=(ulong)data.LongLength;
+                    }else if(kinds[i]==3){if(!(input is Resource lease))throw new Failure("बाहरी संसाधन अमान्य है।");argument.scalar=lease.Token(context);}
+                    else if(input==null){value.status=1;return value;}
+                    else if(input is double real)argument.scalar=unchecked((ulong)BitConverter.DoubleToInt64Bits(real));
+                    else if(input is bool flag)argument.scalar=flag?1UL:0UL;
+                    else argument.scalar=unchecked((ulong)Convert.ToInt64(input));
+                    Marshal.StructureToPtr(argument,IntPtr.Add(frame,i*24),false);
+                }
+                if(Environment.GetEnvironmentVariable("BHASH_GC_STRESS")=="1"){GC.Collect();context.References();if(context.module.drain(context.pointer)!=0)throw new Failure("बाहरी संसाधन की सफ़ाई विफल हुई।");}
+                value.status=module.invoke(context.pointer,(uint)function,frame,(uint)arguments.Length,out output);
+                if(Environment.GetEnvironmentVariable("BHASH_GC_STRESS")=="1")GC.Collect();
+                if(value.status==0){
+                    value.scalar=unchecked((long)output.scalar);
+                    if(resultKind==1 || resultKind==2){
+                        if(output.length>16777216 || output.data==IntPtr.Zero && output.length!=0)throw new Failure("बाहरी buffer अमान्य है।");
+                        value.bytes=new byte[(int)output.length];if(output.length!=0)Marshal.Copy(output.data,value.bytes,0,value.bytes.Length);
+                    }else if(resultKind==3){
+                        if(output.scalar==0 || output.data==IntPtr.Zero)throw new Failure("बाहरी संसाधन अमान्य है।");
+                        resource.Attach(output.scalar,output.data);value.resource=resource;transferred=true;
+                    }
+                }
+                return value;
+            }finally{
+                if(!transferred)module.release(context.pointer,(uint)function,ref output);
+                for(int i=0;i<copies.Length;i++)context.module.releaseBytes(context.pointer,ref copies[i]);
+                context.module.free(context.pointer,frame);
+                if(state!=null && !transferred){context.states.Remove(state);resource.Dispose();}
+                GC.KeepAlive(arguments);GC.KeepAlive(resource);
+            }
+        }
+    }
+    internal static void close(Resource resource){
+        if(resource==null)throw new Failure("बाहरी संसाधन रिक्त है।");
+        State state=resource.state;Context context=state.context;
+        lock(context){
+            if(state.record==IntPtr.Zero)return;context.Check();
+            if(context.module.close(context.pointer,state.token)!=0)throw new Failure("बाहरी संसाधन व्यस्त है या अमान्य है।");
+            resource.Dispose();if(context.module.drain(context.pointer)!=0)throw new Failure("बाहरी संसाधन की सफ़ाई विफल हुई।");
+        }
+    }
+    internal static void shutdownCurrent(){
+        Context context=current;if(context==null)return;
+        lock(context){context.Check();foreach(State state in new List<State>(context.states)){
+            if(state.record==IntPtr.Zero)continue;
+            if(context.module.close(context.pointer,state.token)!=0)throw new Failure("बाहरी संसाधन बन्द नहीं हुआ।");state.Enqueue();
+        }
+        if(context.module.drain(context.pointer)!=0 || context.module.bytes(context.pointer)!=0 || context.module.shutdown(context.pointer)!=0)throw new Failure("बाहरी native memory शेष है।");
+        context.pointer=IntPtr.Zero;current=null;}
+    }
+}

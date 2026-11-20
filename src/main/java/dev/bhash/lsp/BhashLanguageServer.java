@@ -62,8 +62,12 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
     @Override public void close() {
         executor.shutdownNow();
         if(libraryDirectory!=null)try {
-            var file=libraryDirectory.resolve(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME);file.toFile().setWritable(true);
-            Files.deleteIfExists(file);Files.deleteIfExists(libraryDirectory);
+            try(var entries=Files.list(libraryDirectory)){
+                for(var file:entries.toList())if(file.getFileName().toString().equals(dev.bhash.stdlib.StandardLibrary.SOURCE_NAME) || file.getFileName().toString().startsWith(dev.bhash.ffi.ForeignDeclarations.EDITOR_PREFIX)){
+                    file.toFile().setWritable(true);Files.deleteIfExists(file);
+                }
+            }
+            Files.deleteIfExists(libraryDirectory);
         }catch(IOException ignored) { /* Temporary declaration cache may be in use by an editor. */ }
     }
     private SourceIndex libraryIndex() throws IOException {
@@ -73,7 +77,7 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
         }
         return libraryIndex;
     }
-    private boolean libraryFile(Path file) {return libraryIndex!=null&&file!=null&&file.equals(path(libraryIndex.uri));}
+    private boolean libraryFile(Path file) {return libraryDirectory!=null&&file!=null&&file.startsWith(libraryDirectory);}
     @Override public TextDocumentService getTextDocumentService() { return this; }
     @Override public WorkspaceService getWorkspaceService() { return this; }
     private <T> CompletableFuture<T> submit(Callable<T> task) {
@@ -161,14 +165,16 @@ public final class BhashLanguageServer implements LanguageServer, LanguageClient
                 if(previous!=null && previous.sources.equals(project.sources())) {fresh.put(input,previous);diagnostics.putAll(previous.diagnostics);continue;}
                 var projectDiagnostics=new LinkedHashMap<String,List<Diagnostic>>();
                 var indexes=new LinkedHashMap<String,SourceIndex>();boolean syntaxValid=true;
+                var standard=libraryIndex();
                 for(var source:project.sources()) {
                     String uri=Path.of(source.name()).toUri().toASCIIString();var parsed=source.parse();var coords=new TextCoordinates(source.text());
                     var list=projectDiagnostics.computeIfAbsent(uri,k->new ArrayList<>());
                     for(var error:parsed.diagnostics())list.add(error(coords.diagnostic(error.line(),error.column()),error.message()));
                     syntaxValid &= parsed.valid();
-                    indexes.put(uri,new SourceIndex(source));
+                    var indexed=source.foreign()==null?source:dev.bhash.ffi.ForeignDeclarations.editorSource(libraryDirectory,source.foreign(),source.strictNulls());
+                    var index=new SourceIndex(indexed);indexes.put(index.uri,index);
                 }
-                var standard=libraryIndex();indexes.put(standard.uri,standard);
+                indexes.put(standard.uri,standard);
                 if(syntaxValid)try {ManagedEmitter.check(project.sources());}
                 catch(CompilationException invalid){semanticErrors(invalid.getMessage(),project.sources(),projectDiagnostics,input);}
                 fresh.put(input,new ProjectState(input,project.sources(),indexes,projectDiagnostics));diagnostics.putAll(projectDiagnostics);

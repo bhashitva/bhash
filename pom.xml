@@ -47,6 +47,7 @@
   <build>
     <resources>
       <resource><directory>src/main/resources</directory></resource>
+      <resource><directory>target/ffi-catalog</directory><targetPath>dev/bhash/ffi</targetPath></resource>
       <resource>
         <directory>examples/android-offline-task-list</directory>
         <targetPath>dev/bhash/android-starter</targetPath>

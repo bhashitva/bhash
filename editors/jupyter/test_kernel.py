@@ -2,6 +2,7 @@
 import argparse
 from importlib.metadata import version
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -10,6 +11,8 @@ from time import monotonic
 
 from jupyter_client import KernelManager
 from jupyter_client.kernelspec import KernelSpecManager
+
+CELL_NUMBER = 0
 
 
 def shell_reply(client, request, timeout):
@@ -24,6 +27,10 @@ def shell_reply(client, request, timeout):
 
 
 def execute(client, source, expected=None, status="ok", streams=None, stdin=None, before_stdin=None):
+    global CELL_NUMBER
+    CELL_NUMBER += 1
+    if os.environ.get("BHASH_JUPYTER_SMOKE_PROGRESS") == "1":
+        print("Jupyter smoke cell", CELL_NUMBER, "started", flush=True)
     request = client.execute(source, allow_stdin=stdin is not None)
     output = []
     if stdin is not None:
@@ -251,7 +258,11 @@ def main():
     parser.add_argument("--java", default="java")
     parser.add_argument("--mysql", action="store_true", help="Exercise MySQL with the installed kernelspec and fixture")
     parser.add_argument("--sqlserver", action="store_true", help="Exercise SQL Server with the installed kernelspec and fixture")
+    parser.add_argument("--ffi", action="store_true", help="Exercise the packaged compression provider through real notebook cells")
+    parser.add_argument("--ffi-only", action="store_true", help="Run only the compression protocol cells (requires --ffi)")
     args = parser.parse_args()
+    if args.ffi_only and not args.ffi:
+        parser.error("--ffi-only requires --ffi")
     if args.sqlserver and not args.installed:
         parser.error("--sqlserver requires an installed kernelspec configured with --sqlserver-driver")
     if args.mysql and not args.installed:
@@ -278,6 +289,34 @@ def main():
             client.wait_for_ready(timeout=30)
             info = shell_reply(client, client.kernel_info(), timeout=20)
             assert info["implementation_version"] == version("bhash-jupyter"), info
+            if args.ffi:
+                execute(client, 'आयात मानक.संपीड़न; आयात मानक.संपीड़नप्रारूप; आयात मानक.संपीड़नदोष;')
+                execute(client, '''फलन संपीड़नखोलो(फल: मानक.परिणाम<बाइटबफ़र, संपीड़नदोष>) -> बाइटबफ़र {
+                    लौटाओ मिलान (फल) {
+                        विकल्प मानक.परिणाम.सफल(स्थिर मूल्य) => मूल्य,
+                        विकल्प मानक.परिणाम.असफल(स्थिर दोष) => नया बाइटबफ़र(०),
+                        विकल्प रिक्त => नया बाइटबफ़र(०),
+                    };
+                }''')
+                execute(client, '''फलन संपीड़नपाठ(मूल: पाठ) -> पाठ {
+                    स्थिर पैक=संपीड़नखोलो(संपीड़न.संपीड़ितकरो(यूटीएफ८बफ़र(मूल), संपीड़नप्रारूप.गज़िप, ६));
+                    लौटाओ यूटीएफ८पाठ(संपीड़नखोलो(संपीड़न.विसंपीड़ितकरो(पैक, संपीड़नप्रारूप.गज़िप, १०२४)));
+                }''')
+                execute(client, 'स्थिर संपीड़नमूल: पाठ = "भारत😀";')
+                # Scalar notebook state crosses cell loaders; native buffers remain local to each call.
+                execute(client, 'संपीड़नपाठ(संपीड़नमूल)', expected='भारत😀')
+                execute(client, 'संपीड़नपाठ(संपीड़नमूल)', expected='भारत😀')
+                execute(client, '''यदि (सत्य) {
+                    स्थिर पैक=संपीड़नखोलो(संपीड़न.संपीड़ितकरो(यूटीएफ८बफ़र(संपीड़नमूल), संपीड़नप्रारूप.गज़िप, ६));
+                    मिलान (संपीड़न.विसंपीड़ितकरो(पैक, संपीड़नप्रारूप.गज़िप, १)) {
+                    विकल्प मानक.परिणाम.सफल(स्थिर मूल्य): { लिखो("अप्रत्याशित"); }
+                    विकल्प मानक.परिणाम.असफल(स्थिर दोष): { लिखो(दोष.कोड.नाम); }
+                    विकल्प रिक्त: { लिखो("अप्रत्याशित रिक्त"); }
+                    }
+                }''', streams="निर्गतसीमा\n")
+                if args.ffi_only:
+                    print("Bhash Jupyter compression cells passed", flush=True)
+                    return
             execute(client, 'मान कुल: पूर्णांक = ०; लिखो("एक बार");', streams="एक बार\n")
             execute(client, "कुल = कुल + २; कुल", expected="२")
             execute(client, "कुल = कुल + २; कुल", expected="४")

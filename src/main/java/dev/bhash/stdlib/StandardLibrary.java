@@ -44,8 +44,9 @@ public final class StandardLibrary {
         return new Catalog(String.join("\n",lines)+"\n",Map.copyOf(natives));
     }
     public static boolean owns(String full) {
-        return (CATALOG.source+FOUNDATIONS.text()+NETWORKING.text()+SQLITE.text()+DATABASE.text()+MIGRATIONS.text()+WEB.text()+AUTH.text()+TASKS.text()+ASYNC_DATABASE.text()+ASYNC_WEB.text()+WEBSOCKET.text()+RESULTS.text()).lines().anyMatch(line->{
-            for(String prefix:List.of("सार्वजनिक वर्ग ","सार्वजनिक अनुबंध ","सार्वजनिक अभिलेख ","सार्वजनिक विकल्पसमूह "))
+        if(dev.bhash.ffi.ForeignCatalog.compression().functions().stream().anyMatch(f->f.owner().equals(full)))return true;
+        return (CATALOG.source+FOUNDATIONS.text()+NETWORKING.text()+SQLITE.text()+DATABASE.text()+MIGRATIONS.text()+WEB.text()+AUTH.text()+TASKS.text()+ASYNC_DATABASE.text()+ASYNC_WEB.text()+WEBSOCKET.text()+RESULTS.text()+dev.bhash.ffi.ForeignCatalog.types().text()).lines().anyMatch(line->{
+            for(String prefix:List.of("सार्वजनिक वर्ग ","सार्वजनिक अनुबंध ","सार्वजनिक अभिलेख ","सार्वजनिक विकल्पसमूह ","सार्वजनिक परिगणना "))
                 if(line.startsWith(prefix)&&full.equals("मानक."+Identifiers.key(line.substring(prefix.length()).split("[ <{(]",2)[0])))return true;
             return false;
         });
@@ -60,7 +61,7 @@ public final class StandardLibrary {
     public static final String ASYNC_DATABASE_NAME="__bhash_async_database__.bhash";
     public static final String ASYNC_WEB_NAME="__bhash_async_web__.bhash";
     public static final String WEBSOCKET_NAME="__bhash_websocket__.bhash";
-    public static boolean reserved(String name) {return name.equals(RESULTS_NAME)||name.equals(WEBSOCKET_NAME)||name.equals(ASYNC_WEB_NAME)||name.equals(ASYNC_DATABASE_NAME)||name.equals(TASKS_NAME)||name.equals(DATABASE_NAME)||name.equals(MIGRATIONS_NAME)||name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME)||name.equals(NETWORKING_NAME)||name.equals(SQLITE_NAME)||name.equals(WEB_NAME)||name.equals(AUTH_NAME);}
+    public static boolean reserved(String name) {return name.equals(dev.bhash.ffi.ForeignCatalog.SOURCE_NAME)||name.equals(dev.bhash.ffi.ForeignCatalog.TYPES_NAME)||name.equals(RESULTS_NAME)||name.equals(WEBSOCKET_NAME)||name.equals(ASYNC_WEB_NAME)||name.equals(ASYNC_DATABASE_NAME)||name.equals(TASKS_NAME)||name.equals(DATABASE_NAME)||name.equals(MIGRATIONS_NAME)||name.equals(SOURCE_NAME)||name.equals(FOUNDATIONS_NAME)||name.equals(NETWORKING_NAME)||name.equals(SQLITE_NAME)||name.equals(WEB_NAME)||name.equals(AUTH_NAME);}
     private static final SourceFile FOUNDATIONS=loadImplementation("foundations.bhash",FOUNDATIONS_NAME);
     private static final SourceFile NETWORKING=loadImplementation("networking.bhash",NETWORKING_NAME);
     private static final SourceFile SQLITE=loadImplementation("sqlite.bhash",SQLITE_NAME);
@@ -74,7 +75,7 @@ public final class StandardLibrary {
     private static final SourceFile WEBSOCKET=loadImplementation("websocket.bhash",WEBSOCKET_NAME);
     public static final String RESULTS_NAME="__bhash_results__.bhash";
     private static final SourceFile RESULTS=loadImplementation("results.bhash",RESULTS_NAME);
-    private static final List<SourceFile> IMPLEMENTATIONS=List.of(FOUNDATIONS,NETWORKING,SQLITE,DATABASE,MIGRATIONS,WEB,AUTH,TASKS,ASYNC_DATABASE,ASYNC_WEB,WEBSOCKET,RESULTS);
+    private static final List<SourceFile> IMPLEMENTATIONS=List.of(FOUNDATIONS,NETWORKING,SQLITE,DATABASE,MIGRATIONS,WEB,AUTH,TASKS,ASYNC_DATABASE,ASYNC_WEB,WEBSOCKET,RESULTS,dev.bhash.ffi.ForeignCatalog.types());
     public static SourceFile foundations() {return FOUNDATIONS;}
     private static SourceFile loadImplementation(String resource,String name) {
         try(var input=StandardLibrary.class.getResourceAsStream("/dev/bhash/stdlib/"+resource)) {
@@ -92,6 +93,7 @@ public final class StandardLibrary {
             if(!parsed.valid())throw new IllegalStateException("Invalid bundled library: "+parsed.diagnostics());
             for(var c:parsed.tree().classDecl())declarations.put(Identifiers.key(c.IDENTIFIER().getText()),new Declaration(source,c));
             for(var c:parsed.tree().interfaceDecl())declarations.put(Identifiers.key(c.IDENTIFIER().getText()),new Declaration(source,c));
+            for(var c:parsed.tree().enumDecl())declarations.put(Identifiers.key(c.IDENTIFIER().getText()),new Declaration(source,c));
         }
         var needed=new HashSet<>(referenced);boolean changed;
         do {
@@ -128,6 +130,7 @@ public final class StandardLibrary {
     public static SourceFile editorSource(Path directory) throws IOException {
         Files.createDirectories(directory);Path path=directory.resolve(SOURCE_NAME);
         String text=CATALOG.source;for(var source:IMPLEMENTATIONS)text+=source.text().replace("संकुल मानक;","");
+        text+=dev.bhash.ffi.ForeignDeclarations.documentation(dev.bhash.ffi.ForeignCatalog.compression());
         Files.writeString(path,text,StandardCharsets.UTF_8);path.toFile().setReadOnly();
         return new SourceFile(path.toAbsolutePath().toString(),text);
     }

@@ -23,15 +23,20 @@ public final class JvmCompiler {
     }
 
     public void compile(List<SourceFile> sources, Path output) throws IOException, CompilationException {
-        compileJava(ManagedEmitter.emit(sources, Target.JVM), output, false);
+        compileJava(ManagedEmitter.emit(sources, Target.JVM), output, false,sources);
     }
 
     public void compileNotebook(List<SourceFile> sources, ManagedEmitter.NotebookCell cell, Path output)
             throws IOException, CompilationException {
-        compileJava(ManagedEmitter.emitNotebook(sources, cell), output, true);
+        compileJava(ManagedEmitter.emitNotebook(sources, cell), output, true,sources);
     }
 
-    private void compileJava(String java, Path output, boolean disposable) throws IOException, CompilationException {
+    private static void copyNativeRuntime(Class<?> type,Path classes)throws IOException {
+        String name=type.getName().replace('.','/')+".class";Path destination=classes.resolve(name);Files.createDirectories(destination.getParent());
+        try(var input=type.getResourceAsStream("/"+name)){if(input==null)throw new IOException("Missing JVM FFI runtime class: "+name);Files.copy(input,destination);}
+        for(var nested:type.getDeclaredClasses())copyNativeRuntime(nested,classes);
+    }
+    private void compileJava(String java, Path output, boolean disposable,List<SourceFile> sources) throws IOException, CompilationException {
         boolean sqlite=java.contains("BhashStandard.db");
         boolean postgres=java.contains("BhashStandard.pg")||java.contains("BhashStandard.dbAsyncStart");
         var compiler = ToolProvider.getSystemJavaCompiler();
@@ -58,10 +63,30 @@ public final class JvmCompiler {
                 Files.writeString(standard,text,StandardCharsets.UTF_8);
             }
             Path classes = Files.createDirectory(temporary.resolve("classes"));
+            var javaFiles=new ArrayList<Path>(List.of(program,runtime,standard));
+            if(java.contains("dev.bhash.ffi.NativeModules")){
+                copyNativeRuntime(dev.bhash.ffi.NativeModules.class,classes);
+                var modules=new LinkedHashMap<String,dev.bhash.ffi.ForeignManifest>();
+                for(var source:sources)if(source.foreign()!=null)modules.putIfAbsent(source.foreign().fingerprint(),source.foreign());
+                var bundled=dev.bhash.ffi.ForeignCatalog.compression();if(java.contains(dev.bhash.ffi.ForeignJniGenerator.className(bundled)))modules.putIfAbsent(bundled.fingerprint(),bundled);
+                for(var module:modules.values()){
+                    boolean used=java.contains("/*bhash-ffi:"+module.fingerprint()+"*/");
+                    String sha="0".repeat(64),suffix=System.getProperty("os.name").startsWith("Windows")?".dll":System.getProperty("os.name").contains("Mac")?".dylib":".so";
+                    String resource="/dev/bhash/ffi/assets/"+module.fingerprint()+suffix;
+                    if(used){
+                        var artifact=dev.bhash.ffi.ForeignArtifacts.select(module,dev.bhash.ffi.ForeignArtifacts.host(),"shared");
+                        Path library=dev.bhash.ffi.ForeignArtifacts.resolve(module,dev.bhash.ffi.ForeignArtifacts.host(),"shared",temporary);sha=artifact.sha256();
+                        Path asset=classes.resolve(resource.substring(1));Files.createDirectories(asset.getParent());Files.copy(library,asset);
+                        Path license=classes.resolve("META-INF/bhash/ffi/"+module.fingerprint()+"/LICENSE.txt");Files.createDirectories(license.getParent());Files.write(license,dev.bhash.ffi.ForeignArtifacts.license(module,artifact));
+                    }
+                    Path adapter=temporary.resolve(dev.bhash.ffi.ForeignJniGenerator.className(module)+".java");
+                    Files.writeString(adapter,dev.bhash.ffi.ForeignJniGenerator.adapterJava(module,sha,resource,suffix),StandardCharsets.UTF_8);javaFiles.add(adapter);
+                }
+            }
             var diagnostics = new DiagnosticCollector<JavaFileObject>();
             var messages = new StringWriter();
             try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
-                var units = manager.getJavaFileObjects(program.toFile(), runtime.toFile(), standard.toFile());
+                var units = manager.getJavaFileObjectsFromPaths(javaFiles);
                 boolean success = compiler.getTask(messages, manager, diagnostics,
                         List.of("--release", "17", "-encoding", "UTF-8", "-proc:none", "-classpath", classes.toString(),
                                 "-d", classes.toString()), null, units).call();
@@ -78,7 +103,7 @@ public final class JvmCompiler {
             var manifest = new Manifest();
             manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
             manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, "BhashProgram");
-            if(sqlite)manifest.getMainAttributes().putValue("Enable-Native-Access","ALL-UNNAMED");
+            if(sqlite || java.contains("dev.bhash.ffi.NativeModules"))manifest.getMainAttributes().putValue("Enable-Native-Access","ALL-UNNAMED");
             try (var jar = new JarOutputStream(Files.newOutputStream(stagedJar), manifest);
                  var paths = Files.walk(classes)) {
                 Licensing.addToJar(jar);

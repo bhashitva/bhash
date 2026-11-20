@@ -21,6 +21,7 @@ def main():
     ASSETS.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(JAR, ASSETS / "bhash-compiler.jar")
     shutil.copyfile(PACKAGE / "पहली-नोटबुक.ipynb", ASSETS / "starter.ipynb")
+    shutil.copyfile(PACKAGE / "compression.ipynb", ASSETS / "compression.ipynb")
     for name in ("LICENSE", "NOTICE", "LICENSING.md", "THIRD_PARTY_NOTICES.md"):
         shutil.copyfile(ROOT / name, ASSETS / name)
     subprocess.run([sys.executable, "-m", "build", "--wheel", "--outdir",

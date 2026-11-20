@@ -37,6 +37,8 @@ GROUPS = {
     "__bhash_async_web__.bhash": ("असमकालिक HTTP सर्वर और धाराएँ", "docs/async-http-server.md"),
     "__bhash_websocket__.bhash": ("WebSocket सर्वर और संदेश", "docs/websocket.md"),
     "__bhash_results__.bhash": ("विकल्पसमूह और प्रकारयुक्त परिणाम", "tutorial/tagged-unions/README.md"),
+    "__bhash_compression_types__.bhash": ("संपीड़न के परिणाम और दोष", "tutorial/compression/README.md"),
+    "__bhash_compression__.ffi": ("संपीड़न प्रदाता", "tutorial/compression/README.md"),
 }
 GUIDES = {
     "पाठस्वरूप": "tutorial/standard-library/08-formatting.md",
