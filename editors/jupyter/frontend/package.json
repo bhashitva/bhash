@@ -1,0 +1,32 @@
+{
+  "name": "@bhashitva/library-lookup",
+  "version": "0.1.15",
+  "description": "Hindi and English Bhash standard-library lookup for JupyterLab and Notebook 7",
+  "license": "Apache-2.0",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@jupyterlab/application": "^4.5.11",
+    "@jupyterlab/apputils": "^4.5.11",
+    "@jupyterlab/notebook": "^4.5.11",
+    "@jupyterlab/ui-components": "^4.5.11",
+    "@lumino/widgets": "^2.8.0"
+  },
+  "devDependencies": {
+    "@jupyterlab/builder": "4.5.11",
+    "esbuild": "0.25.12"
+  },
+  "jupyterlab": {
+    "extension": true,
+    "outputDir": "../bhash_jupyter/labextension",
+    "sharedPackages": {
+      "@jupyterlab/application": {"requiredVersion": "^4.2.0", "singleton": true, "bundled": false},
+      "@jupyterlab/apputils": {"requiredVersion": "^4.2.0", "singleton": true, "bundled": false},
+      "@jupyterlab/notebook": {"requiredVersion": "^4.2.0", "singleton": true, "bundled": false},
+      "@lumino/widgets": {"requiredVersion": "^2.0.0", "singleton": true, "bundled": false}
+    }
+  }
+}

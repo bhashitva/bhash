@@ -4,16 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bhash-jupyter"
-version = "0.1.14"
+version = "0.1.15"
 description = "Bhash language kernel for Jupyter"
 requires-python = ">=3.8"
 dependencies = ["ipykernel>=5.1", "jupyter-client>=6"]
 
 [project.optional-dependencies]
-lab = ["jupyterlab>=4"]
+lab = ["jupyterlab>=4.2,<5"]
+notebook = ["notebook>=7.2,<8"]
+
+[tool.setuptools]
+packages = ["bhash_jupyter"]
 
 [tool.setuptools.package-data]
 bhash_jupyter = ["assets/*"]
+
+[tool.setuptools.data-files]
+"share/jupyter/labextensions/@bhashitva/library-lookup" = ["bhash_jupyter/labextension/package.json", "bhash_jupyter/labextension/install.json"]
+"share/jupyter/labextensions/@bhashitva/library-lookup/static" = ["bhash_jupyter/labextension/static/*"]
 
 [project.scripts]
 bhash-jupyter-install = "bhash_jupyter.install:main"

@@ -1,0 +1,16 @@
+name: Build Bhash Jupyter lookup
+description: Build the shared offline lookup as a prebuilt extension for wheel packaging
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: editors/jupyter/frontend/package-lock.json
+    - shell: bash
+      run: python -m pip install 'jupyterlab==4.6.6'
+    - shell: bash
+      run: python scripts/build_jupyter_lookup.py
+    - shell: bash
+      run: node --test editors/jupyter/frontend/test/*.test.cjs
