@@ -30,7 +30,7 @@ async function main(){
   assert.ok(ready,'Jupyter server did not start');
   browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1440,height:1000}});page=await context.newPage();
   const errors=[];let phase='startup';page.on('pageerror',error=>errors.push({message:error.message,stack:error.stack,phase}));
-  page.on('console',message=>{if(message.type()==='error')browserErrors.push(message.text());});
+  page.on('console',message=>{if(message.type()==='error')browserErrors.push({message:message.text(),phase,location:message.location()});});
   await page.goto(base+(frontend==='lab'?'/lab/tree/':'/notebooks/')+'starter.ipynb?token='+token,{waitUntil:'domcontentloaded',timeout:60000});
   await page.waitForFunction(()=>window.jupyterapp?.shell?.currentWidget?.content?.activeCell?.editor,null,{timeout:60000});
   await page.evaluate(()=>{window.__bhashNotebook=window.jupyterapp.shell.currentWidget;});
@@ -45,6 +45,7 @@ async function main(){
     await fs.writeFile(path.join(output,'baseline-errors.json'),JSON.stringify(errors,null,2));
     assert.ok(errors.every(error=>error.phase==='startup'&&error.message==="Cannot read properties of undefined (reading 'schema')"&&/\/static\/notebook\/notebook_core\.[^/]+\.js/.test(error.stack)),JSON.stringify(errors,null,2));
     await fs.writeFile(path.join(output,'result.json'),JSON.stringify({lookupDisabled:true,fingerprints:errors.map(fingerprint),errors},null,2));
+    assert.deepEqual(browserErrors,[],'disabled-extension baseline has no console errors');
     console.log('PASS Notebook baseline with Bhash lookup disabled; '+errors.length+' known upstream startup error(s).');return;
   }
   const prepare=async(source='पुराना')=>{
@@ -105,6 +106,7 @@ async function main(){
   const upstream=frontend==='notebook'?JSON.parse(await fs.readFile(path.join(root,'target/jupyter-lookup-notebook-baseline/result.json'),'utf8')):{lookupDisabled:true,fingerprints:[]};
   assert.equal(upstream.lookupDisabled,true);
   assert.deepEqual(errors.filter(error=>error.phase!=='startup'||!upstream.fingerprints.includes(fingerprint(error))),[]);
+  assert.deepEqual(browserErrors.filter(error=>!(error.phase==='offline'&&error.message==='Failed to load resource: net::ERR_INTERNET_DISCONNECTED')),[],'unexpected browser console errors');
   console.log('PASS '+frontend+': real kernel, Hindi/English search, insertion/selection/Undo, examples, stale-cell guard, offline and themed responsive UI.');
 }
-main().catch(async error=>{console.error((error.stack||String(error)).replace(/token=[a-f0-9]+/gi,'token=<test-token>'));console.error(browserErrors.join('\n'));await page?.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();await shutdown?.();if(server&&server.exitCode===null){await Promise.race([new Promise(resolve=>server.once('exit',resolve)),sleep(10000)]);if(server.exitCode===null)server.kill();}await fs.writeFile(path.join(output,'server.log'),log);});
+main().catch(async error=>{console.error((error.stack||String(error)).replace(/token=[a-f0-9]+/gi,'token=<test-token>'));console.error(JSON.stringify(browserErrors,null,2));await page?.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{await browser?.close();await shutdown?.();if(server&&server.exitCode===null){await Promise.race([new Promise(resolve=>server.once('exit',resolve)),sleep(10000)]);if(server.exitCode===null)server.kill();}await fs.writeFile(path.join(output,'server.log'),log);await fs.writeFile(path.join(output,'browser-console.json'),JSON.stringify(browserErrors,null,2));});

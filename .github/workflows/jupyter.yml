@@ -87,6 +87,7 @@ jobs:
           path: |
             target/jupyter-lookup-${{ matrix.frontend }}/*.png
             target/jupyter-lookup-${{ matrix.frontend }}/server.log
+            target/jupyter-lookup-${{ matrix.frontend }}/*.json
             target/jupyter-lookup-notebook-baseline/*.json
             target/jupyter-lookup-notebook-baseline/*.png
             target/jupyter-lookup-notebook-baseline/server.log
