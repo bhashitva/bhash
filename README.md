@@ -275,7 +275,7 @@ Native UTF-8 text file I/O is available through `मानक.फ़ाइल`; 
 
 ## Typed C libraries and compression / प्रकारयुक्त C पुस्तकालय और संपीड़न
 
-Compiler/VS Code 0.28.0 and Jupyter 0.1.14 bundle verified C providers for Linux x64, Windows x64 and Apple Silicon. Use `मानक.संपीड़न` for bounded zlib/gzip data with typed Results. JVM/.NET applications need no C development tools; native builds use the supported native toolchain. [Hindi compression tutorial](tutorial/compression/README.md) · [Binding-author guide](docs/typed-c-library-bindings.md).
+Compiler/VS Code 0.28.0+ and Jupyter 0.1.14+ bundle verified C providers for Linux x64, Windows x64 and Apple Silicon. Use `मानक.संपीड़न` for bounded zlib/gzip data with typed Results. JVM/.NET applications need no C development tools; native builds use the supported native toolchain. [Hindi compression tutorial](tutorial/compression/README.md) · [Binding-author guide](docs/typed-c-library-bindings.md).
 
 **हिन्दी:** प्रदाता पैकेज में हैं। संकलन या संपादन के समय बाहरी code स्वतः डाउनलोड/लोड नहीं होता। ब्राउज़र और Android में C bindings असमर्थित हैं; सामान्य पुस्तकालय सुविधाएँ पहले की तरह उपलब्ध हैं।
 
