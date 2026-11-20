@@ -69,6 +69,9 @@ module.exports=async function libraryChecks(page){
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   assert.ok(await dialog.evaluate(n=>n.scrollWidth<=n.clientWidth));
   await page.screenshot({path:'target/library-ui/mobile.png',fullPage:false});
+  await page.locator('#library-detail .library-member').first().click();
+  await page.locator('#library-back').click();
+  assert.equal(await page.locator('.library-result').first().evaluate(n=>n===n.ownerDocument.activeElement),true);
   await search.press('Escape');await page.setViewportSize({width:1280,height:900});
 
   // Return a real runnable expression; the full Playground smoke test executes it.

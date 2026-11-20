@@ -92,7 +92,10 @@ export function mountLibraryBrowser(insert, rememberSelection) {
   }
   function refresh(){limit=60;render();}
   for(const id of ['library-search','library-kind','library-group','library-internal'])$(id).addEventListener(id==='library-search'?'input':'change',refresh);
-  $('library-back').addEventListener('click',()=>{$('library-body').dataset.detail='false';list.querySelector('[aria-pressed="true"]')?.focus();});
+  $('library-back').addEventListener('click',()=>{
+    $('library-body').dataset.detail='false';
+    (list.querySelector('[aria-pressed="true"]')||list.querySelector('button[data-id]')||$('library-search')).focus();
+  });
   $('library-close').addEventListener('click',close);
   dialog.addEventListener('keydown',event=>{
     if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}
