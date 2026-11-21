@@ -12,13 +12,13 @@ Package **0.1.16** adds **⌨ शब्द/ढाँचे** to the notebook too
 
 **हिन्दी:** शब्द या पूरा ढाँचा चुनकर डालें; कक्ष अपने-आप नहीं चलता। शब्द के पास के identifiers अलग रहते हैं। कई पंक्तियों के ढाँचे वर्तमान indentation रखते हैं और पहला placeholder चुनते हैं। अपने मान भरें; Undo से पूरा संपादन वापस लें। बदला हुआ, बंद, केवल-पठन या दूसरे भाषा-कर्नेल का कक्ष सुरक्षित रहता है। ये शुरुआती ढाँचे हैं; फलन/वर्ग के सदस्य, async और संसाधन ढाँचों के लिए सही enclosing scope, घोषणाएँ और आयात चाहिए।
 
-This addition is prepared for **0.1.16**; the published 0.1.15 release provides the library lookup only. Until the next release, use the [source build](#build-from-source) or the `bhash-jupyter-library-preview` wheel from the Jupyter CI workflow. No Node/npm is needed when installing the built wheel. [Hindi walkthrough](../../tutorial/jupyter-library-lookup/README.md#शब्द-और-ढाँचे-keywords-and-constructs).
+Install the published **0.1.16** wheel using the [upgrade instructions](#install). No Node/npm is needed; restart the Jupyter server and reload the browser page after upgrading. [Hindi walkthrough](../../tutorial/jupyter-library-lookup/README.md#शब्द-और-ढाँचे-keywords-and-constructs).
 
 ## Standard-library lookup / मानक पुस्तकालय खोज
 
-The 0.1.15 package includes a prebuilt browser extension for JupyterLab 4.2+ (4.x) and Notebook 7.2+ (7.x). In a Bhash notebook, click **📚 पुस्तकालय** or run **Bhash: Standard Library Lookup · मानक पुस्तकालय** from the Command Palette. Search Hindi/English names, inspect signatures, parameters, return types and examples, insert a call into the selected code cell, or add an example as a new cell. The first argument is selected for editing. Nothing executes automatically. Offline browsing, clipboard copy, theme colors and narrow panes are supported.
+The 0.1.16 package includes a prebuilt browser extension for JupyterLab 4.2+ (4.x) and Notebook 7.2+ (7.x). In a Bhash notebook, click **📚 पुस्तकालय** or run **Bhash: Standard Library Lookup · मानक पुस्तकालय** from the Command Palette. Search Hindi/English names, inspect signatures, parameters, return types and examples, insert a call into the selected code cell, or add an example as a new cell. The first argument is selected for editing. Nothing executes automatically. Offline browsing, clipboard copy, theme colors and narrow panes are supported.
 
-**हिन्दी:** 0.1.15 पैकेज में तैयार ब्राउज़र विस्तार है। Bhash code कक्ष में स्थान चुनकर **📚 पुस्तकालय** खोलें। हिन्दी/English खोज से वर्ग, निर्माता, फलन, तर्क, फल का प्रकार और उदाहरण पढ़ें। कॉल डालें या उदाहरण का नया कक्ष बनाएँ; कोई कक्ष अपने आप नहीं चलता। बदला हुआ, बंद या केवल पढ़ने वाला कक्ष सुरक्षित रहता है। [पूरा हिन्दी अभ्यास](../../tutorial/jupyter-library-lookup/README.md) पढ़ें।
+**हिन्दी:** 0.1.16 पैकेज में तैयार ब्राउज़र विस्तार है। Bhash code कक्ष में स्थान चुनकर **📚 पुस्तकालय** खोलें। हिन्दी/English खोज से वर्ग, निर्माता, फलन, तर्क, फल का प्रकार और उदाहरण पढ़ें। कॉल डालें या उदाहरण का नया कक्ष बनाएँ; कोई कक्ष अपने आप नहीं चलता। बदला हुआ, बंद या केवल पढ़ने वाला कक्ष सुरक्षित रहता है। [पूरा हिन्दी अभ्यास](../../tutorial/jupyter-library-lookup/README.md) पढ़ें।
 
 Install the wheel in the Python environment running the Jupyter **server**, then restart that server and reload the browser. The wheel needs no Node.js/npm or JupyterLab rebuild. Java remains required to execute Bhash cells. Classic Notebook 6/NbClassic and VS Code do not load JupyterLab extensions; use the Bhash VS Code extension's lookup in VS Code. Full documentation links require internet; the catalog and examples are bundled.
 
@@ -26,9 +26,9 @@ Install the wheel in the Python environment running the Jupyter **server**, then
 
 ## Compression, tagged unions and Result / संपीड़न, विकल्पसमूह और परिणाम
 
-Kernel 0.1.15 bundles compiler 0.28.0 with typed C bindings and bounded zlib/gzip compression, including verified Linux x64, Windows x64 and Apple Silicon providers. Download `compression.ipynb` from the release for the Hindi walkthrough. See the [Hindi compression tutorial](../../tutorial/compression/README.md). It also includes tagged unions (`विकल्पसमूह`), exhaustive pattern matching (`मिलान`), and `मानक.परिणाम<त, द>`. See the [Hindi tutorial](../../tutorial/tagged-unions/README.md). Type and function declarations persist across cells; object bindings remain cell-local, so create and match a Result in the same cell or use a persistent factory function. Restart the kernel after upgrading.
+Kernel 0.1.16 bundles compiler 0.28.0 with typed C bindings and bounded zlib/gzip compression, including verified Linux x64, Windows x64 and Apple Silicon providers. Download `compression.ipynb` from the release for the Hindi walkthrough. See the [Hindi compression tutorial](../../tutorial/compression/README.md). It also includes tagged unions (`विकल्पसमूह`), exhaustive pattern matching (`मिलान`), and `मानक.परिणाम<त, द>`. See the [Hindi tutorial](../../tutorial/tagged-unions/README.md). Type and function declarations persist across cells; object bindings remain cell-local, so create and match a Result in the same cell or use a persistent factory function. Restart the kernel after upgrading.
 
-**हिन्दी:** 0.1.15 में `मानक.संपीड़न` से सीमित जेडलिब/गज़िप डेटा बनाएँ और खोलें। Linux x64, Windows x64 और Apple Silicon के प्रदाता कर्नेल में शामिल हैं; C विकास उपकरण अलग से नहीं चाहिए। रिलीज़ से `compression.ipynb` लेकर हिन्दी अभ्यास करें। `विकल्पसमूह` से बन्द विकल्प और `मिलान` से हर अवस्था की जाँच करें। `मानक.परिणाम<त, द>` सफलता और अपेक्षित दोष को अलग प्रकारों में रखता है। वर्ग/विकल्पसमूह और फलन की घोषणाएँ अगले कक्षों में मिलती हैं; वस्तु bindings उसी कक्ष तक सीमित हैं। [हिन्दी अभ्यास](../../tutorial/tagged-unions/README.md) पढ़ें।
+**हिन्दी:** 0.1.16 में `मानक.संपीड़न` से सीमित जेडलिब/गज़िप डेटा बनाएँ और खोलें। Linux x64, Windows x64 और Apple Silicon के प्रदाता कर्नेल में शामिल हैं; C विकास उपकरण अलग से नहीं चाहिए। रिलीज़ से `compression.ipynb` लेकर हिन्दी अभ्यास करें। `विकल्पसमूह` से बन्द विकल्प और `मिलान` से हर अवस्था की जाँच करें। `मानक.परिणाम<त, द>` सफलता और अपेक्षित दोष को अलग प्रकारों में रखता है। वर्ग/विकल्पसमूह और फलन की घोषणाएँ अगले कक्षों में मिलती हैं; वस्तु bindings उसी कक्ष तक सीमित हैं। [हिन्दी अभ्यास](../../tutorial/tagged-unions/README.md) पढ़ें।
 
 ## Null safety / रिक्त-सुरक्षा
 
@@ -38,9 +38,9 @@ For strict null safety, put `// bhash:null-safety=strict` in the first cell befo
 
 ## Install
 
-For the prebuilt compiler and notebook, follow the [0.1.15 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.15). The source build below is for development.
+For the prebuilt compiler and notebook, follow the [0.1.16 release instructions](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.16). The source build below is for development.
 
-**हिन्दी:** पहले से बना संकलक और नोटबुक स्थापित करने के लिए [Jupyter 0.1.15 के रिलीज़ निर्देश](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.15) देखें। नीचे का स्रोत निर्माण विकास के लिए है।
+**हिन्दी:** पहले से बना संकलक और नोटबुक स्थापित करने के लिए [Jupyter 0.1.16 के रिलीज़ निर्देश](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.16) देखें। नीचे का स्रोत निर्माण विकास के लिए है।
 
 For Devanagari name equivalence, joiner diagnostics, and examples, see the [Hindi identifier guide](../../tutorial/unicode-identifiers/README.md).
 
@@ -51,7 +51,7 @@ Install in the Python environment running the Jupyter server, then restart the s
 **हिन्दी:** पंजीकरण से पहले अपना पुराना compiler/Java/driver विकल्प लिख लें। नीचे `python -m bhash_jupyter.install` के साथ वही विकल्प फिर दें; इससे kernelspec बदलता है। शामिल संकलक चाहिए तो `--compiler` न दें।
 
 ```sh
-python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/bhash_jupyter-0.1.15-py3-none-any.whl"
+python -m pip install --upgrade "bhash-jupyter[lab] @ https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.16/bhash_jupyter-0.1.16-py3-none-any.whl"
 python -m bhash_jupyter.install
 python -m pip show bhash-jupyter
 ```
