@@ -1,0 +1,184 @@
+name: Publish Jupyter keywords 0.1.16
+on:
+  push:
+    branches: [release/jupyter-0.1.16]
+    paths: ['.github/workflows/jupyter-keywords-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: jupyter-keywords-release
+  cancel-in-progress: false
+env:
+  PYTHONUTF8: '1'
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: ./.github/actions/build-jupyter-ui
+      - name: Preserve the verified compiler and bundled providers
+        run: |
+          mkdir -p target
+          curl --fail --location --retry 3 https://github.com/bhashitva/bhash/releases/download/bhash-0.28.0/bhash-compiler-0.28.0.jar -o target/bhash-compiler-0.1.0-SNAPSHOT.jar
+          echo '8fbcef3abb5a56f0a13d41c0d66cdcae00dfc2656f481f578d97d82cd0863fd0  target/bhash-compiler-0.1.0-SNAPSHOT.jar' | sha256sum -c -
+          java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar ffi verify compression --offline
+      - run: python -m pip install build
+      - run: python scripts/package_jupyter.py
+      - run: python scripts/check_jupyter_package.py
+      - name: Stage notebooks, source provenance and checksums
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os,shutil
+          output=Path('target/jupyter-dist')
+          for source,name in [('editors/jupyter/पहली-नोटबुक.ipynb','hindi-starter.ipynb'),('editors/jupyter/compression.ipynb','compression.ipynb')]:
+              shutil.copyfile(source,output/name)
+          info={'version':'0.1.16','source_revision':os.environ['GITHUB_SHA'],'compiler_version':'0.28.0',
+                'compiler_sha256':'8fbcef3abb5a56f0a13d41c0d66cdcae00dfc2656f481f578d97d82cd0863fd0',
+                'catalog_sha256':hashlib.sha256(Path('playground/public/library.json').read_bytes()).hexdigest(),
+                'grammar_sha256':hashlib.sha256(Path('src/main/antlr4/Bhash.g4').read_bytes()).hexdigest(),
+                'snippets_sha256':hashlib.sha256(Path('editors/vscode/snippets/bhash.json').read_bytes()).hexdigest()}
+          (output/'release-info.json').write_text(json.dumps(info,indent=2)+'\n',encoding='utf-8')
+          names=['bhash_jupyter-0.1.16-py3-none-any.whl','hindi-starter.ipynb','compression.ipynb','release-info.json']
+          (output/'SHA256SUMS').write_text(''.join(hashlib.sha256((output/name).read_bytes()).hexdigest()+'  '+name+'\n' for name in names),encoding='utf-8')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jupyter-0.1.16-release
+          path: target/jupyter-dist/
+          if-no-files-found: error
+  kernel:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      JUPYTER_DATA_DIR: ${{ github.workspace }}/target/jupyter-user
+      JAVA_TOOL_OPTIONS: '-Dbhash.ffi.gcStress=true'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: jupyter-0.1.16-release
+          path: target/jupyter-dist
+      - name: Check and install the exact release wheel
+        shell: bash
+        run: |
+          (cd target/jupyter-dist && if [[ "$RUNNER_OS" == macOS ]]; then shasum -a 256 -c SHA256SUMS; else sha256sum -c SHA256SUMS; fi)
+          python scripts/check_jupyter_package.py
+          python -m pip install target/jupyter-dist/bhash_jupyter-0.1.16-py3-none-any.whl
+          python -m bhash_jupyter.install --notebook target/hindi-starter.ipynb
+          cmp target/hindi-starter.ipynb target/jupyter-dist/hindi-starter.ipynb
+      - name: Full installed-kernel client smoke test, including compression
+        run: python editors/jupyter/test_kernel.py --installed --ffi --notebook target/hindi-starter.ipynb
+  lookup:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        frontend: [lab, notebook]
+        profile: [current, minimum]
+        include:
+          - profile: current
+            lab-version: '4.6.6'
+            notebook-version: '7.6.5'
+          - profile: minimum
+            lab-version: '4.2.7'
+            notebook-version: '7.2.3'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: jupyter-0.1.16-release
+          path: target/jupyter-dist
+      - name: Install the shipped wheel in the supported frontend
+        run: |
+          (cd target/jupyter-dist && sha256sum -c SHA256SUMS)
+          python -m pip install target/jupyter-dist/bhash_jupyter-0.1.16-py3-none-any.whl 'jupyterlab==${{ matrix.lab-version }}' 'notebook==${{ matrix.notebook-version }}'
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Record the disabled-extension Notebook baseline
+        if: matrix.frontend == 'notebook'
+        run: node scripts/test_jupyter_lookup.cjs notebook --baseline
+      - name: Test lookup, insertion, examples and real cell execution
+        run: node scripts/test_jupyter_lookup.cjs ${{ matrix.frontend }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jupyter-release-lookup-${{ matrix.frontend }}-${{ matrix.profile }}
+          path: |
+            target/jupyter-lookup-${{ matrix.frontend }}/*.png
+            target/jupyter-lookup-${{ matrix.frontend }}/*.json
+            target/jupyter-lookup-${{ matrix.frontend }}/server.log
+            target/jupyter-lookup-notebook-baseline/*.json
+            target/jupyter-lookup-notebook-baseline/*.png
+            target/jupyter-lookup-notebook-baseline/server.log
+  publish:
+    needs: [kernel, lookup]
+    if: github.ref == 'refs/heads/release/jupyter-0.1.16'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: jupyter-0.1.16-release
+          path: target/jupyter-dist
+      - name: Publish only the verified wheel without replacing a tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          (cd target/jupyter-dist && sha256sum -c SHA256SUMS)
+          test "$(python -c 'import json; print(json.load(open("target/jupyter-dist/release-info.json"))["source_revision"])')" = "$GITHUB_SHA"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/jupyter-0.1.16" >/dev/null 2>&1; then
+            echo 'Refusing to replace an existing release tag.' >&2
+            exit 1
+          fi
+          # Draft releases defer implicit tag creation until publication. Create
+          # and verify the immutable tag first, then attach the tested assets.
+          git push origin "$GITHUB_SHA:refs/tags/jupyter-0.1.16"
+          git fetch --no-tags origin refs/tags/jupyter-0.1.16:refs/release-verification/jupyter-0.1.16
+          test "$(git rev-parse refs/release-verification/jupyter-0.1.16^{commit})" = "$GITHUB_SHA"
+          gh release create jupyter-0.1.16 --draft --verify-tag --latest=false \
+            --title 'Bhash Jupyter kernel 0.1.16 — keyword and construct lookup' \
+            --notes-file editors/jupyter/RELEASE.md \
+            target/jupyter-dist/bhash_jupyter-0.1.16-py3-none-any.whl \
+            target/jupyter-dist/SHA256SUMS target/jupyter-dist/hindi-starter.ipynb \
+            target/jupyter-dist/compression.ipynb target/jupyter-dist/release-info.json
+          git fetch --no-tags origin refs/tags/jupyter-0.1.16:refs/release-verification/jupyter-0.1.16
+          test "$(git rev-parse refs/release-verification/jupyter-0.1.16^{commit})" = "$GITHUB_SHA"
+          gh release edit jupyter-0.1.16 --draft=false --latest=false

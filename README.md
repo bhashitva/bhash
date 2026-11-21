@@ -17,7 +17,7 @@ All three targets support the same factorial source.
 | VS Code | [Install Bhash from the Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash) or [download the VSIX](DOWNLOADS.md#vs-code-extension). |
 | Jupyter | [Get the prebuilt kernel wheel and Hindi starter notebook](DOWNLOADS.md#jupyter-kernel). |
 
-The upcoming Jupyter package 0.1.16 adds **⌨ शब्द/ढाँचे** for Hindi/English keyword and construct search, previews and editable insertion.
+Jupyter package 0.1.16 adds **⌨ शब्द/ढाँचे** for Hindi/English keyword and construct search, previews and editable insertion.
 
 JupyterLab/Notebook users can browse the standard-library reference in Hindi or English,
 insert qualified calls, and add example cells. See the [Hindi notebook lookup guide](tutorial/jupyter-library-lookup/README.md).
