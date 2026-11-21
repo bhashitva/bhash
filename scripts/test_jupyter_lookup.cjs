@@ -36,6 +36,13 @@ async function main(){
   await page.evaluate(()=>{window.__bhashNotebook=window.jupyterapp.shell.currentWidget;});
   await page.evaluate(async()=>{await window.jupyterapp.restored;await window.__bhashNotebook.sessionContext.ready;});
   await page.locator('.jp-Spinner:visible').first().waitFor({state:'hidden',timeout:60000});
+  // JupyterLab reuses one splash node and removes it 200 ms after fading.
+  // Waiting only for a spinner (or opacity) can overlap removals on the next
+  // theme change. Wait for the requested theme AND actual splash detachment.
+  const changeTheme=async theme=>{
+    await page.evaluate(name=>window.jupyterapp.commands.execute('apputils:change-theme',{theme:name}),theme);
+    await page.waitForFunction(name=>document.body.dataset.jpThemeName===name&&!document.getElementById('jupyterlab-splash'),theme,{timeout:60000});
+  };
   const fingerprint=error=>error.message+'\n'+(error.stack.split('\n')[1]||'').replace(/http:\/\/127\.0\.0\.1:\d+/g,'<test-server>');
   if(baseline){
     await sleep(1000);assert.equal(await page.evaluate(()=>window.jupyterapp.isPluginActivated('@bhashitva/library-lookup:plugin')),false);
@@ -90,7 +97,7 @@ async function main(){
     await open();
   }
   await lookup.getByRole('button',{name:'हस्ताक्षर कॉपी करें',exact:true}).click();await lookup.getByText('हस्ताक्षर कॉपी हुआ। · Signature copied.',{exact:true}).waitFor();
-  phase='theme';await page.screenshot({path:path.join(output,'light.png')});await page.evaluate(()=>window.jupyterapp.commands.execute('apputils:change-theme',{theme:'JupyterLab Dark'}));await page.screenshot({path:path.join(output,'dark.png')});
+  phase='theme';await page.screenshot({path:path.join(output,'light.png')});await changeTheme('JupyterLab Dark');await page.screenshot({path:path.join(output,'dark.png')});
   phase='offline';await context.setOffline(true);await search.fill('समुच्चय');assert.ok(await lookup.locator('#library-results .library-result').count());await context.setOffline(false);
   phase='examples';
   await lookup.locator('#library-kind').selectOption('types');await search.fill('गणित');await lookup.locator('[data-id="type:गणित"]').click();
@@ -135,8 +142,8 @@ async function main(){
   await page.waitForFunction(()=>window.__bhashNotebook.content.model.cells.get(0).outputs.toJSON().some(output=>String(output.text).includes('शब्द और ढाँचे')),null,{timeout:60000});
   await languageOpen();await lookup.locator('#reference-mode-library').click();await search.waitFor();await lookup.locator('#reference-mode-language').click();await languageSearch.waitFor();
   phase='offline';await context.setOffline(true);await languageSearch.fill('function');assert.ok(await lookup.locator('#language-results button').count());await context.setOffline(false);
-  phase='language-theme';await page.evaluate(()=>window.jupyterapp.commands.execute('apputils:change-theme',{theme:'JupyterLab Light'}));await page.locator('.jp-Spinner:visible').first().waitFor({state:'hidden',timeout:60000});await page.screenshot({path:path.join(output,'language-light.png')});
-  await page.evaluate(()=>window.jupyterapp.commands.execute('apputils:change-theme',{theme:'JupyterLab Dark'}));await page.locator('.jp-Spinner:visible').first().waitFor({state:'hidden',timeout:60000});await page.screenshot({path:path.join(output,'language-dark.png')});
+  phase='language-theme';await changeTheme('JupyterLab Light');await page.locator('.jp-Spinner:visible').first().waitFor({state:'hidden',timeout:60000});await page.screenshot({path:path.join(output,'language-light.png')});
+  await changeTheme('JupyterLab Dark');await page.locator('.jp-Spinner:visible').first().waitFor({state:'hidden',timeout:60000});await page.screenshot({path:path.join(output,'language-dark.png')});
   await page.setViewportSize({width:620,height:900});await languageSearch.fill('प्रत्येक');await lookup.locator('[data-id="construct:Collection iteration"]').click();
   assert.ok(await lookup.locator('#language-pane').evaluate(node=>node.scrollWidth<=node.clientWidth+2));await page.screenshot({path:path.join(output,'language-narrow.png')});
   await languageSearch.press('Escape');assert.equal(await lookup.count(),0);
