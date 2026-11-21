@@ -1,6 +1,6 @@
 {
   "name": "@bhashitva/library-lookup",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Hindi and English Bhash standard-library lookup for JupyterLab and Notebook 7",
   "license": "Apache-2.0",
   "main": "lib/index.js",

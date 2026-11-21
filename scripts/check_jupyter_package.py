@@ -30,6 +30,7 @@ with zipfile.ZipFile(wheels[0]) as wheel:
         for item in [entry, *entry["members"]]:
             assert item["name"] in text, "Missing catalog name: " + item["name"]
     assert b"library-search" in scripts and b"New example cell" in scripts
+    assert b"language-search" in scripts and b"bhash:language-reference" in scripts
     assert "bhash_jupyter/assets/bhash-compiler.jar" in wheel.namelist()
     assert not any("node_modules/" in name or "frontend/src/" in name for name in wheel.namelist())
 wheels[0].with_suffix(wheels[0].suffix + ".sha256").write_text(hashlib.sha256(wheels[0].read_bytes()).hexdigest() + "  " + wheels[0].name + "\n", encoding="utf-8")
