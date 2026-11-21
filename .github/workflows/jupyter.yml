@@ -13,6 +13,8 @@ on:
       - 'scripts/check_jupyter_package.py'
       - '.github/actions/build-jupyter-ui/**'
       - 'playground/src/library*.mjs'
+      - 'playground/src/keyword*.mjs'
+      - 'editors/vscode/snippets/bhash.json'
       - 'playground/src/identifier-profile.js'
       - 'playground/public/library.json'
       - 'playground/public/index.html'

@@ -22,6 +22,8 @@ def source_digest():
                FRONTEND / "package-lock.json",
                *sorted((ROOT / "playground/src").glob("library*.mjs")),
                ROOT / "playground/src/identifier-profile.js",
+               ROOT / "playground/src/keywords.mjs", ROOT / "playground/src/keyword-picker.mjs",
+               ROOT / "src/main/antlr4/Bhash.g4", ROOT / "editors/vscode/snippets/bhash.json",
                *[ROOT / "playground/public" / name for name in ("index.html", "style.css", "library.json")]]
     digest = hashlib.sha256()
     digest.update(jupyterlab.__version__.encode())

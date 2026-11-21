@@ -6,6 +6,14 @@ worker and speaks the standard Jupyter kernel protocol.
 
 **हिन्दी:** भाष कर्नेल अदिश और पाठ बंधन, नामित फलन, आयात, कथन और अंतिम व्यंजक का परिणाम देता है। वह स्थानीय JVM worker में भाष चलाता और मानक Jupyter कर्नेल प्रोटोकॉल उपयोग करता है।
 
+## Keywords and constructs / शब्द और ढाँचे
+
+Package **0.1.16** adds **⌨ शब्द/ढाँचे** to the notebook toolbar and **Bhash: Keywords and Constructs · शब्द और ढाँचे** to the Command Palette. The same reference pane has Library/Language buttons. Search in Hindi or English, filter keywords/constructs and topics, preview code and insert into the selected Bhash code cell. All 57 grammar/contextual keywords and 25 construct templates are bundled offline. Templates reuse the VS Code snippets and add while, if/else, async/await, pattern matching and tagged unions.
+
+**हिन्दी:** शब्द या पूरा ढाँचा चुनकर डालें; कक्ष अपने-आप नहीं चलता। शब्द के पास के identifiers अलग रहते हैं। कई पंक्तियों के ढाँचे वर्तमान indentation रखते हैं और पहला placeholder चुनते हैं। अपने मान भरें; Undo से पूरा संपादन वापस लें। बदला हुआ, बंद, केवल-पठन या दूसरे भाषा-कर्नेल का कक्ष सुरक्षित रहता है। ये शुरुआती ढाँचे हैं; फलन/वर्ग के सदस्य, async और संसाधन ढाँचों के लिए सही enclosing scope, घोषणाएँ और आयात चाहिए।
+
+This addition is prepared for **0.1.16**; the published 0.1.15 release provides the library lookup only. Until the next release, use the [source build](#build-from-source) or the `bhash-jupyter-library-preview` wheel from the Jupyter CI workflow. No Node/npm is needed when installing the built wheel. [Hindi walkthrough](../../tutorial/jupyter-library-lookup/README.md#शब्द-और-ढाँचे-keywords-and-constructs).
+
 ## Standard-library lookup / मानक पुस्तकालय खोज
 
 The 0.1.15 package includes a prebuilt browser extension for JupyterLab 4.2+ (4.x) and Notebook 7.2+ (7.x). In a Bhash notebook, click **📚 पुस्तकालय** or run **Bhash: Standard Library Lookup · मानक पुस्तकालय** from the Command Palette. Search Hindi/English names, inspect signatures, parameters, return types and examples, insert a call into the selected code cell, or add an example as a new cell. The first argument is selected for editing. Nothing executes automatically. Offline browsing, clipboard copy, theme colors and narrow panes are supported.
@@ -62,7 +70,7 @@ Python environment that runs Jupyter, build/install the wheel and register its k
 mvn package -DskipTests
 python -m pip install build "jupyterlab==4.6.6"
 python scripts/package_jupyter.py
-python -m pip install target/jupyter-dist/bhash_jupyter-0.1.15-py3-none-any.whl
+python -m pip install target/jupyter-dist/bhash_jupyter-0.1.16-py3-none-any.whl
 bhash-jupyter-install --compiler target/bhash-compiler-0.1.0-SNAPSHOT.jar
 jupyter kernelspec list
 ```
