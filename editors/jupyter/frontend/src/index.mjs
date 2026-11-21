@@ -50,7 +50,7 @@ class LibraryWidget extends Widget {
     if(focus)this.onActivateRequest();
   }
   onActivateRequest(){if(this.mode==='language')this.language?.focus();else this.root.querySelector('#library-search')?.focus();}
-  onCloseRequest(){this.dispose();}
+  onCloseRequest(){this.actions.beforeClose?.();this.dispose();}
 }
 
 export default {
@@ -72,6 +72,10 @@ export default {
       if(panel)capture(panel);else if(tracker.currentWidget)capture(tracker.currentWidget);
       if(!widget||widget.isDisposed) {
         widget=new LibraryWidget({
+          // Notebook 7.2 retains its current sidebar widget on removal. Clear
+          // it through the public shell API before disposal so the same pane
+          // ID can be reopened without being mistaken for an expand/collapse.
+          beforeClose:()=>{if(!labShell&&widget?.isVisible)app.shell.collapseRight?.();},
           insert:entry=>{if(!entry)throw Error('Unknown library entry');target=insertCall(target,librarySnippet(entry.type,entry.member));app.shell.activateById(target.panel.id);},
           language:entry=>{target=insertCall(target,entry.template,entry.kind);app.shell.activateById(target.panel.id);},
           example:async(entry,index)=>{

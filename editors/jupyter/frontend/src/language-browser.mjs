@@ -13,7 +13,7 @@ export function mountLanguageBrowser(root,words,insert,onClose){
   const kind=node('select');kind.id='language-kind';kind.setAttribute('aria-label','नतीजे का प्रकार · Result kind');
   for(const [id,label] of [['all','शब्द और ढाँचे · Both'],['keywords','शब्द · Keywords'],['constructs','ढाँचे · Constructs']])kind.add(new Option(label,id));
   const group=node('select');group.id='language-group';group.setAttribute('aria-label','शब्द विषय · Language topic');
-  for(const [id,label] of keywordGroups)group.add(new Option(label,id));group.value='all';
+  for(const [id,label] of keywordGroups)group.add(new Option(id==='all'?'सभी विषय · All topics':label,id));group.value='all';
   controls.append(searchLabel,search,kind,group);
   const count=node('p');count.id='language-count';count.setAttribute('role','status');controls.append(count);
   const body=node('div',null,'language-body'),list=node('nav'),detail=node('article');list.id='language-results';list.setAttribute('aria-label','शब्द और ढाँचे के नतीजे · Language results');detail.id='language-detail';
