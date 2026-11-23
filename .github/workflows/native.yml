@@ -56,6 +56,9 @@ jobs:
           python3 scripts/test_native_fixed.py
       - name: Build compiler for native checks
         run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Verify published source package reuse with forced GC
+        # Package installation is explicit; the restored application then builds offline.
+        run: python3 scripts/test_package_distribution.py --target native
       - name: Verify compiler archive reproducibility
         run: |
           sha256sum target/bhash-compiler-0.1.0-SNAPSHOT.jar > target/compiler.sha256

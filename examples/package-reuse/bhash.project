@@ -1,0 +1,5 @@
+name=package-reuse
+sources=src
+nullSafety=strict
+dependency.text.path=../../packages/examples/text-utils
+dependency.text.version=1.0.1

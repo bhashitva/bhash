@@ -85,7 +85,7 @@ public record ProjectManifest(Path input, String name, String version, boolean l
     private static Path path(Path input,String value) throws IOException {
         try{return Path.of(value);}catch(InvalidPathException invalid){throw failure(input,"Invalid package path: "+invalid.getMessage());}
     }
-    private static void version(Path input,String value) throws IOException {
+    public static void version(Path input,String value) throws IOException {
         if(value.length()>128||!value.matches("(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?"))
             throw failure(input,"Expected an exact semantic version (for example 1.2.3): "+value);
         int plus=value.indexOf('+');int start=value.substring(0,plus<0?value.length():plus).indexOf('-');if(start>=0){String pre=value.substring(start+1).split("\\+",2)[0];

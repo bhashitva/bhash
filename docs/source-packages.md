@@ -6,6 +6,19 @@ with the same verified source graph on JVM, CLR, or browser WebAssembly.
 Language-level `संकुल` and `आयात` keep their existing meanings: manifest names
 identify distributions; imports identify public source declarations.
 
+## Package publishing and discovery
+
+Use the [English package workflow](package-distribution.en.md) or
+[हिन्दी प्रकाशन मार्गदर्शिका](../tutorial/package-distribution/README.md) for
+`package search/info/add/update/pack/publish`. An index resolves an exact name
+and version into the pinned Git properties below; compile/run/editor analysis
+still use only the verified manifest and lock. Source archives and private
+provider assets have separate distribution contracts.
+
+**हिन्दी:** नई package commands खोज, प्रकाशन और निश्चित संस्करण जोड़ने/बदलने
+के लिए हैं। उसके बाद वही Git declaration और lock काम करते हैं; build के समय
+सूची नहीं खुलती। ऊपर दोनों भाषाओं में पूरा उदाहरण है।
+
 ## Local libraries
 
 `util/bhash.project`:
@@ -75,9 +88,9 @@ publisher identity.
 Only credential-free HTTPS URLs and explicit local `file:` repository URIs are
 supported. Local Git URIs are useful for testing but contain an absolute machine
 location; use HTTPS for a shared lockfile. Git is required for fetching/exporting
-snapshots; set `BHASH_GIT` to an executable path if Git is not on PATH. The initial
-release does not support authenticated private repositories, SSH, credential
-helpers, or interactive sign-in. Git system/global configuration and hooks are
+snapshots; set `BHASH_GIT` to an executable path if Git is not on PATH. Private HTTPS Git uses explicitly host-scoped `BHASH_GIT_HOST`/`BHASH_GIT_TOKEN`
+credentials through environment configuration; authenticated redirects are disabled.
+SSH, credential helpers and interactive sign-in remain unsupported. Git system/global configuration and hooks are
 not used. Servers must allow fetching the requested commit.
 
 ## Lock, restore, verify, build
@@ -190,7 +203,8 @@ Try the checked-in [three-package example](../examples/packages/README.md) and t
 
 ## Deferred work
 
-A public registry, version range solving, credentials/private Git, package
-publishing commands, precompiled Bhash libraries and incremental/separate
-compilation are outside this first milestone. Single-file playground submissions
+Index-backed discovery, publishing and private HTTPS Git are implemented by the
+package distribution workflow. Central registry accounts/signatures, version-range
+solving, precompiled Bhash libraries and incremental/separate compilation remain
+future work. Single-file playground submissions
 remain self-contained; they do not fetch dependencies from a submitted manifest.

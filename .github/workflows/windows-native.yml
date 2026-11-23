@@ -97,6 +97,8 @@ jobs:
           $active=Get-Content "$env:BHASH_TOOLCHAIN_HOME/active.json" | ConvertFrom-Json
           $sdk=Join-Path "$env:BHASH_TOOLCHAIN_HOME/installations" $active.directory
           "BHASH_CLANG=$sdk/bin/clang.exe" >> $env:GITHUB_ENV
+      - name: Verify published source package reuse with forced GC
+        run: python scripts/test_package_distribution.py --target native
       - name: Test native WebSocket wire behavior over HTTP/1.1 and HTTP/2 TLS
         shell: pwsh
         env:

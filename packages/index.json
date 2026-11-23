@@ -1,0 +1,16 @@
+{
+  "indexVersion": 1,
+  "packages": [
+    {
+      "name": "bhash-text-utils",
+      "version": "1.0.1",
+      "description": "Text helpers · पाठ सहायक",
+      "license": "Apache-2.0",
+      "git": "https://github.com/bhashitva/bhash.git",
+      "rev": "c9fe8020fa5465d0a6911a5d98ef529a1d653cb0",
+      "dir": "packages/examples/text-utils",
+      "manifestSha256": "a7806de86f549b64268f750e246a0032b523f1b973eebf83b64bc789e6978d4e",
+      "sourcesSha256": "f35200c5db217723e454375089970e5f0c2dfc3bccf23e859f14299a4cad1961"
+    }
+  ]
+}

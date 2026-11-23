@@ -1,0 +1,53 @@
+name: Package publication and reuse
+on:
+  pull_request:
+    paths: &package-paths
+      - 'src/main/java/dev/bhash/frontend/**'
+      - 'src/main/java/dev/bhash/cli/Main.java'
+      - 'src/main/java/dev/bhash/cli/PackageCommands.java'
+      - 'src/test/java/dev/bhash/PackageDistributionTest.java'
+      - 'src/test/java/dev/bhash/SourcePackagesTest.java'
+      - 'src/test/java/dev/bhash/frontend/GitAuthenticationTest.java'
+      - 'packages/**'
+      - 'examples/package-reuse/**'
+      - 'scripts/test_package_distribution.py'
+      - 'scripts/test_package_index_https.py'
+      - '.github/workflows/package-distribution.yml'
+      - 'pom.xml'
+      - '!**/*.md'
+  push:
+    branches: [main]
+    paths: *package-paths
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reuse:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: mvn --batch-mode --no-transfer-progress -Dtest=PackageDistributionTest,SourcePackagesTest,GitAuthenticationTest package
+      - run: python scripts/test_package_distribution.py --target jvm --target clr
+      - run: python scripts/test_package_index_https.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-reuse-${{ matrix.os }}
+          path: target/surefire-reports/
+          if-no-files-found: error

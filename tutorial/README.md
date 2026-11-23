@@ -38,3 +38,7 @@ See the [shared database providers and migration guide](database-providers/READM
 **हिन्दी:** SQLite/PostgreSQL, मापदंडयुक्त SQL, लेनदेन, तैनाती और हिन्दी उदाहरणों के लिए [साझा डेटाबेस प्रदाता और माइग्रेशन](database-providers/README.md) देखें।
 
 - [असमकालिक HTTP और डेटाबेस (Async I/O)](async-io/README.md): नेटवर्क अनुरोध, मापदंडयुक्त SQL, लेनदेन और निरस्तीकरण।
+
+## Package publishing and reuse / संकुल प्रकाशन और पुनः उपयोग
+
+[हिन्दी उदाहरण](package-distribution/README.md) · [English guide](../docs/package-distribution.en.md): खोज, निश्चित संस्करण, प्रकाशन, निजी HTTPS स्रोत और offline restore।

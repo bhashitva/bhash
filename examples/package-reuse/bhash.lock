@@ -1,0 +1,18 @@
+{
+  "lockVersion": 1,
+  "root": {
+    "manifestSha256": "df382c877eb5bd2d353b6910d36d7119fa91b6c0752e12cb13f380a535d76bde"
+  },
+  "packages": [
+    {
+      "name": "bhash-text-utils",
+      "version": "1.0.1",
+      "source": {
+        "type": "path",
+        "path": "../../packages/examples/text-utils"
+      },
+      "manifestSha256": "a7806de86f549b64268f750e246a0032b523f1b973eebf83b64bc789e6978d4e",
+      "sourcesSha256": "f35200c5db217723e454375089970e5f0c2dfc3bccf23e859f14299a4cad1961"
+    }
+  ]
+}
