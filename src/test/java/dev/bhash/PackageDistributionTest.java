@@ -110,6 +110,7 @@ class PackageDistributionTest {
         assertThrows(IOException.class,()->PackageDistribution.install(app,moved,"math",true,false));
         assertThrows(IOException.class,()->PackageDistribution.install(app,e,"bad.alias",false,false));
         Files.delete(repo.resolve("LICENSE"));assertThrows(IOException.class,()->PackageDistribution.prepare(repo));
+        write("repo/LICENSE","");assertThrows(IOException.class,()->PackageDistribution.prepare(repo));
     }
     @Test void cliRejectsUnknownAndDuplicateOptionsWithoutWriting()throws Exception{
         for(String[] args:List.of(new String[]{"package","search","--unknown"},new String[]{"package","info"},new String[]{"package","search","--index","a","--index","b"},new String[]{"package","pack","repo","--offline"}))assertEquals(2,command(args));

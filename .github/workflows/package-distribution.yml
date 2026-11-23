@@ -42,7 +42,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: mvn --batch-mode --no-transfer-progress -Dtest=PackageDistributionTest,SourcePackagesTest,GitAuthenticationTest package
+      - run: mvn --batch-mode --no-transfer-progress '-Dtest=PackageDistributionTest,SourcePackagesTest,GitAuthenticationTest' package
       - run: python scripts/test_package_distribution.py --target jvm --target clr
       - run: python scripts/test_package_index_https.py
       - uses: actions/upload-artifact@v4
