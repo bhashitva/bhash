@@ -36,7 +36,9 @@ public final class PackageCommands {
                 Path output=cwd.resolve(require(options,"-o")).toAbsolutePath().normalize();prepared.own().protectOutput(output,true);
                 PackageIndex.Entry entry=null;Path index=null;
                 if(action.equals("publish")){
-                    index=cwd.resolve(require(options,"--index")).toAbsolutePath().normalize();
+                    String destination=require(options,"--index");
+                    if(destination.contains("://"))throw PackageIndex.error("publish writes a local index; upload it to your HTTPS host separately.");
+                    index=cwd.resolve(destination).toAbsolutePath().normalize();
                     if(index.startsWith(output)||output.startsWith(index))throw PackageIndex.error("Index and release output must be separate.");
                     prepared.own().protectOutput(index,false);
                     Path state=prepared.own().root().resolve(SourcePackages.CACHE);
@@ -59,7 +61,7 @@ public final class PackageCommands {
             var entries=PackageIndex.read(location,offline,options.get("--index-sha256"));
             if(action.equals("search")){
                 String query=positional.isEmpty()?"":positional.get(0).toLowerCase(Locale.ROOT);var latest=new TreeMap<String,PackageIndex.Entry>();
-                for(var entry:entries)if(!entry.version().contains("-")&&(entry.name()+" "+entry.description()).toLowerCase(Locale.ROOT).contains(query)){
+                for(var entry:entries)if(!PackageIndex.prerelease(entry.version())&&(entry.name()+" "+entry.description()).toLowerCase(Locale.ROOT).contains(query)){
                     var before=latest.get(entry.name());if(before==null||PackageIndex.compareVersions(entry.version(),before.version())>0)latest.put(entry.name(),entry);}
                 latest.values().stream().limit(100).forEach(e->out.println(e.name()+"@"+e.version()+"\t"+e.description()));
                 out.println("Matches / नतीजे: "+latest.size());return 0;

@@ -100,6 +100,7 @@ class PackageDistributionTest {
     @Test void semverOrderingAndPrereleaseSelectionAreExplicit()throws Exception{
         assertTrue(PackageIndex.compareVersions("1.10.0","1.9.0")>0);assertTrue(PackageIndex.compareVersions("1.0.0","1.0.0-rc.10")>0);
         assertTrue(PackageIndex.compareVersions("1.0.0-rc.10","1.0.0-rc.2")>0);
+        assertFalse(PackageIndex.prerelease("1.0.0+build-1"));assertTrue(PackageIndex.prerelease("1.0.0-rc.1+build-1"));
         var e=entry(library());var preview=new PackageIndex.Entry(e.name(),"2.0.0-beta.1",e.description(),e.license(),e.git(),e.rev(),e.dir(),e.manifestSha256(),e.sourcesSha256());
         assertEquals(e,PackageIndex.select(List.of(e,preview),"math-utils",false));assertEquals(preview,PackageIndex.select(List.of(e,preview),"math-utils@2.0.0-beta.1",true));
     }

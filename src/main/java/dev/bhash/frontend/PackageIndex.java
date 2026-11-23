@@ -93,9 +93,10 @@ public final class PackageIndex {
     public static Entry select(List<Entry> entries,String spec,boolean exact)throws IOException{
         int at=spec.lastIndexOf('@');String name=at<0?spec:spec.substring(0,at),version=at<0?null:spec.substring(at+1);
         if(exact&&version==null)throw error("Pin an exact version: name@1.2.3.");
-        return entries.stream().filter(e->e.name().equals(name)&&(version==null?!e.version().contains("-"):e.version().equals(version)))
+        return entries.stream().filter(e->e.name().equals(name)&&(version==null?!prerelease(e.version()):e.version().equals(version)))
             .max((a,b)->compareVersions(a.version(),b.version())).orElseThrow(()->error("Package/version not found: "+spec));
     }
+    public static boolean prerelease(String version){return version.split("\\+",2)[0].contains("-");}
     public static int compareVersions(String a,String b){
         String[] x=a.split("\\+",2)[0].split("-",2),y=b.split("\\+",2)[0].split("-",2);
         String[] p=x[0].split("\\."),q=y[0].split("\\.");for(int i=0;i<3;i++){int c=new BigInteger(p[i]).compareTo(new BigInteger(q[i]));if(c!=0)return c;}
