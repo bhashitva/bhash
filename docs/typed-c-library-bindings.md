@@ -1,5 +1,7 @@
 # प्रकारयुक्त C पुस्तकालय बाइंडिंग (Typed C-library bindings)
 
+[English version](typed-c-library-bindings.en.md)
+
 यह मार्गदर्शिका binding लेखकों के लिए है। [स्वीकृत हिन्दी डिज़ाइन](typed-c-interop-design.md)
 और [English design](typed-c-interop-design.en.md) भाषा तथा runtime का अनुबंध हैं।
 सामान्य उपयोगकर्ता [संपीड़न ट्यूटोरियल](../tutorial/compression/README.md) से शुरू करें।
