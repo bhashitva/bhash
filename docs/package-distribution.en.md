@@ -125,7 +125,7 @@ java -jar bhash-compiler.jar package pack packages/examples/text-utils -o target
 
 Output is a **new** directory containing a deterministic source ZIP,
 `SHA256SUMS` and `release-info.json`. Only the manifest, discovered Bhash sources,
-binding manifest, `LICENSE`, optional `README.md` and declared provider licenses
+binding manifest, `LICENSE`, optional `README.md`/`NOTICE` and declared provider licenses
 are included. `.env`, `.git`, build outputs and install scripts are not swept
 into the archive. Source text line endings are normalized to LF. The ZIP has a
 file-hash inventory and fixed timestamps; unchanged input produces identical

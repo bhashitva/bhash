@@ -54,7 +54,7 @@ class PackageDistributionTest {
         assertThrows(IOException.class,()->PackageDistribution.publishIndex(index,forged));assertArrayEquals(original,Files.readAllBytes(index));
     }
     @Test void archiveIsDeterministicAndOmitsSecretsBuildOutputsAndHooks()throws Exception{
-        Path repo=library();write("repo/.env","PASSWORD=not-for-distribution");write("repo/target/private.txt","private");write("repo/install.sh","echo forbidden");
+        Path repo=library();write("repo/NOTICE","Attribution\n");write("repo/.env","PASSWORD=not-for-distribution");write("repo/target/private.txt","private");write("repo/install.sh","echo forbidden");
         var prepared=PackageDistribution.prepare(repo);Path a,b;TimeZone original=TimeZone.getDefault();
         try{
             TimeZone.setDefault(TimeZone.getTimeZone("UTC"));a=PackageDistribution.pack(prepared,root.resolve("release-a"));
@@ -62,7 +62,7 @@ class PackageDistributionTest {
         }finally{TimeZone.setDefault(original);}
         assertArrayEquals(Files.readAllBytes(a),Files.readAllBytes(b));
         try(var zip=new ZipFile(a.toFile())){
-            assertEquals(Set.of("LICENSE","README.md","bhash.project","src/math.bhash","bhash-package.json"),zip.stream().map(java.util.zip.ZipEntry::getName).collect(java.util.stream.Collectors.toSet()));
+            assertEquals(Set.of("LICENSE","NOTICE","README.md","bhash.project","src/math.bhash","bhash-package.json"),zip.stream().map(java.util.zip.ZipEntry::getName).collect(java.util.stream.Collectors.toSet()));
             var metadata=JsonParser.parseString(new String(zip.getInputStream(zip.getEntry("bhash-package.json")).readAllBytes(),StandardCharsets.UTF_8)).getAsJsonObject();
             for(var item:metadata.getAsJsonObject("files").entrySet())assertEquals(item.getValue().getAsString(),PackageIndex.hash(zip.getInputStream(zip.getEntry(item.getKey())).readAllBytes()));
         }

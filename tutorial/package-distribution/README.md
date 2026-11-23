@@ -121,7 +121,7 @@ java -jar bhash-compiler.jar package pack packages/examples/text-utils -o target
 
 संग्रह बनाना (Pack) नई directory में ZIP, `SHA256SUMS` और `release-info.json`
 देता है। Manifest, खोजे गए Bhash स्रोत, binding manifest, license, वैकल्पिक
-README और घोषित provider licenses ही शामिल होते हैं। `.env`, `.git`, build
+README/NOTICE और घोषित provider licenses ही शामिल होते हैं। `.env`, `.git`, build
 outputs या install scripts पूरे directory के साथ नहीं उठते। UTF-8 पाठ LF में
 बदलता है; समय स्थिर और हर फ़ाइल का hash inventory में है। समान input से समान
 ZIP बनती है। पुराना output directory overwrite नहीं होता। सीमा १०,००० स्रोत

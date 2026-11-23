@@ -23,6 +23,7 @@ public final class PackageDistribution {
         include(files,own.root(),"LICENSE");
         if(files.get("LICENSE").length==0)throw PackageIndex.error("LICENSE must not be empty.");
         if(Files.exists(own.root().resolve("README.md")))include(files,own.root(),"README.md");
+        if(Files.exists(own.root().resolve("NOTICE")))include(files,own.root(),"NOTICE");
         for(var source:own.sources())if(source.foreign()!=null)for(var artifact:source.foreign().artifacts()){
             include(files,own.root(),artifact.license());
             if(files.get(artifact.license()).length==0)throw PackageIndex.error("Provider license must not be empty: "+artifact.license());
