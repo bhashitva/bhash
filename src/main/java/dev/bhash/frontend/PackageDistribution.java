@@ -50,7 +50,8 @@ public final class PackageDistribution {
         try{
             Path archive=stage.resolve(m.name()+"-"+m.version()+".zip");
             try(var zip=new ZipOutputStream(Files.newOutputStream(archive))){for(var file:files.entrySet()){
-                var item=new ZipEntry(file.getKey());item.setTimeLocal(LocalDateTime.of(1980,1,1,0,0));item.setMethod(ZipEntry.STORED);item.setSize(file.getValue().length);
+                // Avoid Java 17's DOS-time sentinel, which can add a zone-dependent extended timestamp.
+                var item=new ZipEntry(file.getKey());item.setTimeLocal(LocalDateTime.of(1980,1,2,0,0));item.setMethod(ZipEntry.STORED);item.setSize(file.getValue().length);
                 var crc=new CRC32();crc.update(file.getValue());item.setCrc(crc.getValue());zip.putNextEntry(item);zip.write(file.getValue());zip.closeEntry();}}
             Files.writeString(stage.resolve("SHA256SUMS"),dev.bhash.backend.llvm.NativeBuildInfo.fileHash(archive)+"  "+archive.getFileName()+"\n");
             Files.writeString(stage.resolve("release-info.json"),PackageIndex.JSON.toJson(metadata)+"\n");
@@ -95,6 +96,7 @@ public final class PackageDistribution {
         var previous=m.dependencies().get(alias);
         if(update){if(previous==null||previous.git()==null||!GitPackage.normalizeUrl(previous.git()).equals(entry.git())||!previous.directory().equals(entry.dir()))throw PackageIndex.error("Update must retain the alias's existing repository and package directory.");}
         else if(previous!=null)throw PackageIndex.error("Dependency already exists; use package update deliberately.");
+        if(update&&previous.version().equals(entry.version())&&!previous.revision().equals(entry.rev()))throw PackageIndex.error("An installed exact version is immutable; publish a new version rather than repointing its commit.");
         Path root=input.getParent(),state=root.resolve(SourcePackages.CACHE),lock=root.resolve(SourcePackages.LOCK);
         if(Files.isSymbolicLink(state)||Files.isSymbolicLink(lock))throw PackageIndex.error("Dependency state must not be symbolic links.");Files.createDirectories(state);
         Path guard=state.resolve("package-edit.lock");if(Files.isSymbolicLink(guard))throw PackageIndex.error("Invalid package edit lock.");

@@ -55,7 +55,11 @@ class PackageDistributionTest {
     }
     @Test void archiveIsDeterministicAndOmitsSecretsBuildOutputsAndHooks()throws Exception{
         Path repo=library();write("repo/.env","PASSWORD=not-for-distribution");write("repo/target/private.txt","private");write("repo/install.sh","echo forbidden");
-        var prepared=PackageDistribution.prepare(repo);Path a=PackageDistribution.pack(prepared,root.resolve("release-a")),b=PackageDistribution.pack(prepared,root.resolve("release-b"));
+        var prepared=PackageDistribution.prepare(repo);Path a,b;TimeZone original=TimeZone.getDefault();
+        try{
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));a=PackageDistribution.pack(prepared,root.resolve("release-a"));
+            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"));b=PackageDistribution.pack(prepared,root.resolve("release-b"));
+        }finally{TimeZone.setDefault(original);}
         assertArrayEquals(Files.readAllBytes(a),Files.readAllBytes(b));
         try(var zip=new ZipFile(a.toFile())){
             assertEquals(Set.of("LICENSE","README.md","bhash.project","src/math.bhash","bhash-package.json"),zip.stream().map(java.util.zip.ZipEntry::getName).collect(java.util.stream.Collectors.toSet()));
@@ -135,5 +139,12 @@ class PackageDistributionTest {
         var error=assertThrows(IOException.class,()->PackageDistribution.install(app,e,"math",false,false));
         assertTrue(error.getMessage().contains("null-safety"));assertArrayEquals(before,Files.readAllBytes(app.resolve("bhash.project")));
         assertFalse(Files.exists(app.resolve("bhash.lock")));
+    }
+    @Test void installedVersionsCannotBeRepointedToAnotherCommit()throws Exception{
+        Path repo=library(),app=app();var first=entry(repo);PackageDistribution.install(app,first,"math",false,false);
+        byte[] before=Files.readAllBytes(app.resolve("bhash.project")),lock=Files.readAllBytes(app.resolve("bhash.lock"));
+        write("repo/src/math.bhash",Files.readString(repo.resolve("src/math.bhash")).replace("* २","* ३"));commit(repo);var changed=entry(repo);
+        var error=assertThrows(IOException.class,()->PackageDistribution.install(app,changed,"math",true,false));
+        assertTrue(error.getMessage().contains("immutable"));assertArrayEquals(before,Files.readAllBytes(app.resolve("bhash.project")));assertArrayEquals(lock,Files.readAllBytes(app.resolve("bhash.lock")));
     }
 }

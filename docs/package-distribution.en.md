@@ -94,7 +94,8 @@ java -jar bhash-compiler.jar deps verify my-app --offline
 ```
 
 The update command requires an existing alias and retains its repository,
-directory and package identity. The example version `1.1.0` must first be
+directory and package identity. An installed exact version cannot be repointed
+to another commit, even if an index entry was edited manually. The example version `1.1.0` must first be
 published to the selected index. No background lookup or update occurs during
 compilation or editor analysis. After a clean checkout, `deps restore` uses the
 manifest/lock without consulting the index; use `--offline` if sources/providers

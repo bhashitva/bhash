@@ -91,7 +91,8 @@ java -jar bhash-compiler.jar deps verify my-app --offline
 ```
 
 उदाहरण का `1.1.0` पहले चुनी हुई सूची में प्रकाशित होना चाहिए। Update मौजूदा alias
-का repository, directory और package identity बचाता है। नया lock diff देखकर
+का repository, directory और package identity बचाता है। सूची हाथ से बदल देने पर
+भी स्थापित निश्चित संस्करण को दूसरे commit पर नहीं मोड़ सकते। नया lock diff देखकर
 स्वीकार करें। Compilation और editor analysis सूची नहीं खोलते और update नहीं
 करते। नई checkout में `deps restore` manifest/lock से स्रोत लाता है; सूची की
 आवश्यकता नहीं है। स्रोत/provider cache में हों तो `--offline` जोड़ें।
