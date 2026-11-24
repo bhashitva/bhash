@@ -89,4 +89,4 @@ Windows से यूनिकोड तर्क ले सकते हैं�
 
 `package search/info/add/update/pack/publish` is included in the 0.30.0 download above. See the [English guide](package-distribution.en.md) and [हिन्दी उदाहरण](../tutorial/package-distribution/README.md).
 
-**हिन्दी:** ये commands नए milestone के build में हैं; ऊपर के पुराने डाउनलोड में नहीं। सार्वजनिक पैकेजों का update अलग release चरण है।
+**हिन्दी:** ये commands ऊपर दिए 0.30.0 डाउनलोड में शामिल हैं। पैकेज प्रकाशित करने पर स्थानीय index और वितरण फ़ाइलें बनती हैं; उन्हें सार्वजनिक होस्ट पर चढ़ाना अलग चरण है।

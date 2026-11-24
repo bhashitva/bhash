@@ -4,7 +4,7 @@
 import argparse
 import hashlib
 import json
-import os
+import subprocess
 from pathlib import Path
 import shutil
 import zipfile
@@ -47,7 +47,7 @@ def main():
              "hindi-starter.ipynb": ROOT / "editors/jupyter/पहली-नोटबुक.ipynb",
              "compression.ipynb": ROOT / "editors/jupyter/compression.ipynb"}
     provenance = {"compiler_version": COMPILER, "kernel_version": KERNEL,
-                  "source_revision": os.environ.get("GITHUB_SHA", "local"),
+                  "source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                   "compiler_sha256": hashlib.sha256(payload).hexdigest()}
     (out / "release-info.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
     files["release-info.json"] = out / "release-info.json"
