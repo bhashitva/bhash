@@ -34,6 +34,10 @@ Run the compiler JAR with a full JDK 17 or newer. See the [command-line guide](d
 
 Install or update from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash). Use a VSIX below to install a specific version manually. The 0.17.0 release notes record the Marketplace release.
 
+Version **0.30.0** is available as the verified VSIX below; its Marketplace publication is pending.
+
+**हिन्दी:** 0.30.0 का जाँचा हुआ VSIX नीचे उपलब्ध है; Marketplace पर प्रकाशन अभी बाकी है।
+
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
 | [0.30.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.30.0) | 2026-11-24 02:29 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.30.0/bhash-vscode-0.30.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.30.0/bhash-vscode-0.30.0.vsix.sha256) |
