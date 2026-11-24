@@ -1,5 +1,7 @@
 # Bhash / भाष
 
+Compiler/VS Code **0.30.0** and Jupyter **0.1.17** include package distribution and reuse: discover libraries, add/update exact versions, retain checked lockfiles and prepare reproducible source releases. [English guide](docs/package-distribution.en.md) · [हिन्दी अभ्यास](tutorial/package-distribution/README.md).
+
 [License: Apache 2.0](LICENSE) · [Support Bhash development](https://www.zeffy.com/en-US/donation-form/knowledge-without-language-barriers)
 
 

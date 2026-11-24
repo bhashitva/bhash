@@ -1,0 +1,239 @@
+name: Release package distribution platform
+on:
+  push:
+    branches: [release/package-distribution-0.30.0]
+    paths:
+      - '.github/workflows/release-030.yml'
+      - 'scripts/*platform_release.py'
+      - 'editors/vscode/package*.json'
+      - 'editors/jupyter/pyproject.toml'
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact payload revision; blank uses this workflow revision
+        type: string
+        default: ''
+env:
+  RELEASE_SHA: ${{ inputs.source_sha || github.sha }}
+  PROVIDER_SHA256: '08497b3621f3bd2057fce901e8e31cd9e070732037b36759b1d01e9ead6f52cc'
+permissions:
+  contents: read
+concurrency:
+  group: release-package-distribution
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install the immutable verified provider bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$PROVIDER_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          mkdir -p target
+          curl --fail --location --retry 3 https://github.com/bhashitva/bhash/releases/download/ffi-providers-1.0.0/bhash-ffi-providers-1.0.0.zip -o target/providers.zip
+          python scripts/install_ffi_release_catalog.py target/providers.zip --sha256 "$PROVIDER_SHA256"
+      - run: mvn --batch-mode --no-transfer-progress package -DskipTests
+      - run: java -jar target/bhash-compiler-0.1.0-SNAPSHOT.jar ffi verify compression --offline
+      - run: npm ci --prefix editors/vscode --no-audit --no-fund
+      - run: npm run package --prefix editors/vscode
+      - run: npm test --prefix editors/vscode
+      - run: npm ci --prefix playground --no-audit --no-fund
+      - run: npm test --prefix playground
+      - run: npm run build --prefix playground
+      - uses: ./.github/actions/build-jupyter-ui
+      - run: python -m pip install build
+      - run: python scripts/package_jupyter.py
+      - run: python scripts/check_jupyter_package.py
+      - run: python scripts/stage_platform_release.py --providers target/providers.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: platform-0.30.0-release
+          path: target/platform-release/
+          if-no-files-found: error
+  verify:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: '1'
+      JUPYTER_DATA_DIR: ${{ github.workspace }}/target/jupyter-user
+      JAVA_TOOL_OPTIONS: '-Dbhash.ffi.gcStress=true'
+      BHASH_GC_STRESS: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: platform-0.30.0-release
+          path: target/platform-release
+      - name: Verify shipped providers and JVM/.NET/native consumers
+        run: python scripts/verify_platform_release.py target/platform-release
+      - run: python -m pip install target/platform-release/bhash_jupyter-0.1.17-py3-none-any.whl
+      - run: python -m bhash_jupyter.install --notebook target/hindi-starter.ipynb
+      - run: python editors/jupyter/test_kernel.py --installed --ffi --notebook target/hindi-starter.ipynb
+  lookup:
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        frontend: [lab, notebook]
+        profile: [current, minimum]
+        include:
+          - profile: current
+            lab-version: '4.6.6'
+            notebook-version: '7.6.5'
+          - profile: minimum
+            lab-version: '4.2.7'
+            notebook-version: '7.2.3'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: platform-0.30.0-release
+          path: target/platform-release
+      - name: Install the shipped wheel in the supported frontend
+        run: |
+          (cd target/platform-release && sha256sum -c SHA256SUMS)
+          python -m pip install target/platform-release/bhash_jupyter-0.1.17-py3-none-any.whl 'jupyterlab==${{ matrix.lab-version }}' 'notebook==${{ matrix.notebook-version }}'
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Record the disabled-extension Notebook baseline
+        if: matrix.frontend == 'notebook'
+        run: node scripts/test_jupyter_lookup.cjs notebook --baseline
+      - name: Test lookup, insertion, examples and real cell execution
+        run: node scripts/test_jupyter_lookup.cjs ${{ matrix.frontend }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jupyter-release-lookup-${{ matrix.frontend }}-${{ matrix.profile }}
+          path: |
+            target/jupyter-lookup-${{ matrix.frontend }}/*.png
+            target/jupyter-lookup-${{ matrix.frontend }}/*.json
+            target/jupyter-lookup-${{ matrix.frontend }}/server.log
+            target/jupyter-lookup-notebook-baseline/*.json
+            target/jupyter-lookup-notebook-baseline/*.png
+            target/jupyter-lookup-notebook-baseline/server.log
+  publish:
+    needs: [verify, lookup]
+    if: github.ref == 'refs/heads/release/package-distribution-0.30.0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: platform-0.30.0-release
+          path: target/platform-release
+      - name: Publish verified GitHub assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd target/platform-release
+          sha256sum -c SHA256SUMS
+          # Establish tags remotely without force; reject concurrent conflicting tags.
+          verify_source_tag() {
+            local tag="$1"
+            local remote_ref="refs/release-verification/$tag"
+            git fetch --no-tags origin "+refs/tags/$tag:$remote_ref"
+            test "$(git rev-parse "$remote_ref^{commit}")" = "$RELEASE_SHA" || { echo "Conflicting source tag: $tag"; exit 1; }
+          }
+          for tag in bhash-0.30.0 vscode-0.30.0 jupyter-0.1.17; do
+            if ! git ls-remote --exit-code --refs origin "refs/tags/$tag" >/dev/null; then
+              # A concurrent creation is safe only if the fetched commit agrees.
+              git push origin "$RELEASE_SHA:refs/tags/$tag" || echo "Checking concurrently created tag: $tag"
+            fi
+            verify_source_tag "$tag"
+          done
+          publish_release() {
+            local tag="$1"; shift
+            if gh release view "$tag" >/dev/null 2>&1; then
+              local saved existing asset
+              saved=$(mktemp -d)
+              existing=$(gh release view "$tag" --json assets --jq '.assets[].name')
+              while IFS= read -r asset; do
+                test -n "$asset" || continue
+                case " $ASSETS " in
+                  *" $asset "*) ;;
+                  *) echo "Unexpected asset: $tag/$asset"; exit 1 ;;
+                esac
+                gh release download "$tag" --pattern "$asset" --dir "$saved"
+                cmp "$asset" "$saved/$asset" || { echo "Conflicting asset: $tag/$asset"; exit 1; }
+              done <<< "$existing"
+              # Compare all existing files before uploading any missing asset.
+              for asset in $ASSETS; do
+                if ! test -f "$saved/$asset"; then gh release upload "$tag" "$asset"; fi
+              done
+              verify_source_tag "$tag"
+              if test "$(gh release view "$tag" --json isDraft --jq .isDraft)" = true; then
+                gh release edit "$tag" --draft=false
+              fi
+              echo "Verified existing release: $tag"
+            else
+              # Asset names are fixed above, with no whitespace or wildcards.
+              # shellcheck disable=SC2086
+              gh release create "$tag" --verify-tag "$@" $ASSETS
+            fi
+          }
+          ASSETS="bhash-compiler-0.30.0.jar bhash-compiler-0.30.0.jar.sha256"
+          publish_release bhash-0.30.0 --latest --title "Bhash standalone compiler 0.30.0" --notes "Package discovery, pinned installation/updates, reproducible source archives and explicit local-index publishing; Hindi/English guides and runnable reuse examples. Retains typed C-library interoperability and bounded zlib/gzip compression (मानक.संपीड़न) on JVM, desktop .NET and native. Includes verified Linux x64, Windows x64 and Apple Silicon static/shared providers, typed errors, ownership checks and GC safety. Full JDK 17+ required; native runtime ABI 18 and C-binding ABI 1. Browser/Android C bindings are unsupported. See the [Hindi tutorial](https://github.com/bhashitva/bhash/blob/$RELEASE_SHA/tutorial/compression/README.md)."
+          ASSETS="bhash-vscode-0.30.0.vsix bhash-vscode-0.30.0.vsix.sha256"
+          publish_release vscode-0.30.0 --latest=false --title "Bhash VS Code extension 0.30.0" --notes "Bundles compiler 0.30.0 with package publishing/distribution/reuse and Hindi/English guides, plus typed C-library interoperability, bounded compression, verified providers for three desktop hosts, GC-safe resource ownership and Hindi documentation. See the [changelog](https://github.com/bhashitva/bhash/blob/$RELEASE_SHA/editors/vscode/CHANGELOG.md)."
+          sha256sum bhash_jupyter-0.1.17-py3-none-any.whl hindi-starter.ipynb compression.ipynb release-info.json > SHA256SUMS
+          ASSETS="bhash_jupyter-0.1.17-py3-none-any.whl SHA256SUMS hindi-starter.ipynb compression.ipynb release-info.json"
+          publish_release jupyter-0.1.17 --latest=false --title "Bhash Jupyter kernel 0.1.17" --notes-file ../../editors/jupyter/RELEASE.md

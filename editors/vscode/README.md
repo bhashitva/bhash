@@ -19,7 +19,15 @@ In the Command Palette, run **Bhash: Open Hindi Book** or **Bhash: Open Hindi AP
 
 कमांड पैलेट से **Bhash: Open Hindi Book** या **Bhash: Open Hindi API Reference** चलाएँ।
 
-## What's new in 0.29.0 / इस रिलीज़ में
+## What's new in 0.30.0 / इस रिलीज़ में
+
+The bundled compiler adds package discovery, exact-version installation and updates, reproducible source archives, and publishing to a local package index. Run `java -jar <compiler.jar> package search` in a terminal; `package info`, `add`, `update`, `pack` and `publish` complete the workflow. Git is required for Git packages. Existing project build/run commands use the saved dependency declarations and lockfile; they do not silently query an index or publish anything. The Playground remains isolated and cannot install arbitrary dependencies.
+
+**हिन्दी:** शामिल संकलक से पैकेज खोजें, निश्चित संस्करण जोड़ें या अद्यतन करें और पुनरुत्पाद्य स्रोत संग्रह बनाएँ। `package publish` स्थानीय index में प्रविष्टि और वितरण फ़ाइलें बनाता है; उन्हें सार्वजनिक होस्ट पर चढ़ाना अलग स्पष्ट चरण है। परियोजना की सामान्य build/run कमांड सहेजी निर्भरताएँ और lockfile उपयोग करती हैं।
+
+[English package guide](https://github.com/bhashitva/bhash/blob/main/docs/package-distribution.en.md) · [हिन्दी पैकेज अभ्यास](https://github.com/bhashitva/bhash/blob/main/tutorial/package-distribution/README.md)
+
+## Standard library lookup / मानक पुस्तकालय खोज
 
 Run **Bhash: Standard Library Lookup** from the Command Palette, use the book icon in a Bhash editor's title bar, or click **Bhash Library** in the status bar. The reference opens beside your source. Search Hindi or English names (including `मानक.पाठ्य.बाँटो`), filter types/members/topics, and inspect constructors, overloads, parameters, return types, Hindi explanations and examples. The same catalog and interface are shared with the Playground.
 
@@ -31,9 +39,9 @@ Select an insertion point or source text before opening the lookup. **कॉल 
 
 **हिन्दी:** lookup खोलने से पहले `.bhash` फ़ाइल में कर्सर या बदलने वाला पाठ चुनें। **कॉल / नाम डालें** से पूरा `मानक` नाम जुड़ता है; अलग आयात जोड़ना आवश्यक नहीं है। चुने तर्क और प्रकार भरें तथा **Tab** से आगे जाएँ। सदस्य कॉल में `वस्तु` को अपनी variable से बदलें। **Undo** से डालने का काम वापस लें। स्रोत बदल जाने पर नया स्थान चुनकर फिर डालें।
 
-The catalog ships in the extension and works offline, in Restricted Mode, on local/WSL/SSH hosts and in untitled Bhash documents. Browsing needs no compiler connection; Java remains required for language-server analysis and compiler commands. **हस्ताक्षर कॉपी करें** copies a signature. Full reference/tutorial links open in your browser and need internet access. The catalog describes the bundled **0.28.0 compiler** with default legacy signatures; read the strict null-safety and target-availability notes. A custom compiler may expose different APIs.
+The catalog ships in the extension and works offline, in Restricted Mode, on local/WSL/SSH hosts and in untitled Bhash documents. Browsing needs no compiler connection; Java remains required for language-server analysis and compiler commands. **हस्ताक्षर कॉपी करें** copies a signature. Full reference/tutorial links open in your browser and need internet access. The catalog describes the bundled **0.30.0 compiler** with default legacy signatures; read the strict null-safety and target-availability notes. A custom compiler may expose different APIs.
 
-**हिन्दी:** संदर्भ एक्सटेंशन में शामिल है; खोज के लिए इंटरनेट या संकलक संबंध आवश्यक नहीं है। Restricted Mode और बिना सहेजी `.bhash` फ़ाइल में भी इसका उपयोग करें। विश्लेषण और संकलन के लिए Java की आवश्यकता बनी रहती है। हस्ताक्षर कॉपी करें या पूरे मार्गदर्शक का लिंक ब्राउज़र में खोलें। लिंक पढ़ने के लिए इंटरनेट चाहिए। वर्तमान सूची bundled संकलक **0.28.0** की है; strict रिक्त-सुरक्षा और अलग लक्ष्यों की सीमाएँ विवरण में पढ़ें।
+**हिन्दी:** संदर्भ एक्सटेंशन में शामिल है; खोज के लिए इंटरनेट या संकलक संबंध आवश्यक नहीं है। Restricted Mode और बिना सहेजी `.bhash` फ़ाइल में भी इसका उपयोग करें। विश्लेषण और संकलन के लिए Java की आवश्यकता बनी रहती है। हस्ताक्षर कॉपी करें या पूरे मार्गदर्शक का लिंक ब्राउज़र में खोलें। लिंक पढ़ने के लिए इंटरनेट चाहिए। वर्तमान सूची bundled संकलक **0.30.0** की है; strict रिक्त-सुरक्षा और अलग लक्ष्यों की सीमाएँ विवरण में पढ़ें।
 
 ## Compression in 0.28.0 / संपीड़न
 
