@@ -1,7 +1,7 @@
 # Bhash command-line compiler / कमांड लाइन संकलक
 
-Download `bhash-compiler-0.28.0.jar` and its checksum from the
-[Bhash 0.28.0 release](https://github.com/bhashitva/bhash/releases/tag/bhash-0.28.0).
+Download `bhash-compiler-0.30.0.jar` and its checksum from the
+[Bhash 0.30.0 release](https://github.com/bhashitva/bhash/releases/tag/bhash-0.30.0).
 Install a full JDK 17 or newer and make sure `java -version` reports that JDK.
 The JAR includes the compiler, standard library, and dependencies. Maven is
 needed only when building the compiler from source.
@@ -9,9 +9,9 @@ needed only when building the compiler from source.
 **हिन्दी:** रिलीज़ से संकलक JAR और उसका SHA-256 चेकसम लें। पूरा JDK 17 या नया
 संस्करण स्थापित करें। अपने भाष स्रोत को UTF-8 में सहेजें और नीचे का आदेश चलाएँ।
 
-Compare the published checksum with `sha256sum -c bhash-compiler-0.28.0.jar.sha256`
-on Linux, `shasum -a 256 -c bhash-compiler-0.28.0.jar.sha256` on macOS, or
-`Get-FileHash .\bhash-compiler-0.28.0.jar -Algorithm SHA256` in PowerShell.
+Compare the published checksum with `sha256sum -c bhash-compiler-0.30.0.jar.sha256`
+on Linux, `shasum -a 256 -c bhash-compiler-0.30.0.jar.sha256` on macOS, or
+`Get-FileHash .\bhash-compiler-0.30.0.jar -Algorithm SHA256` in PowerShell.
 
 Save this as `hello.bhash`:
 
@@ -22,8 +22,8 @@ Save this as `hello.bhash`:
 ```
 
 ```sh
-java -jar bhash-compiler-0.28.0.jar run hello.bhash --target jvm
-java -jar bhash-compiler-0.28.0.jar compile hello.bhash --target jvm -o hello.jar
+java -jar bhash-compiler-0.30.0.jar run hello.bhash --target jvm
+java -jar bhash-compiler-0.30.0.jar compile hello.bhash --target jvm -o hello.jar
 java -jar hello.jar
 ```
 
@@ -63,8 +63,8 @@ Save the example as `args.bhash`. Place compiler options before `--`, and quote 
 उसके बाद क्रमानुदेश के तर्क दें। रिक्त स्थान वाला तर्क उद्धरण में रखें।
 
 ```sh
-java -jar bhash-compiler-0.28.0.jar run args.bhash --target jvm -- input.txt 'two words'
-java -jar bhash-compiler-0.28.0.jar compile args.bhash --target jvm -o args.jar
+java -jar bhash-compiler-0.30.0.jar run args.bhash --target jvm -- input.txt 'two words'
+java -jar bhash-compiler-0.30.0.jar compile args.bhash --target jvm -o args.jar
 java -jar args.jar input.txt 'two words'
 ```
 
@@ -87,6 +87,6 @@ Windows से यूनिकोड तर्क ले सकते हैं�
 
 ## Package workflow / संकुल कार्यप्रवाह
 
-`package search/info/add/update/pack/publish` is available in source containing the package-distribution milestone. It requires a newer compiler build than the 0.28.0 download above. See the [English guide](package-distribution.en.md) and [हिन्दी उदाहरण](../tutorial/package-distribution/README.md).
+`package search/info/add/update/pack/publish` is included in the 0.30.0 download above. See the [English guide](package-distribution.en.md) and [हिन्दी उदाहरण](../tutorial/package-distribution/README.md).
 
-**हिन्दी:** ये commands नए milestone के build में हैं; ऊपर के पुराने डाउनलोड में नहीं। सार्वजनिक पैकेजों का update अलग release चरण है।
+**हिन्दी:** ये commands ऊपर दिए 0.30.0 डाउनलोड में शामिल हैं। पैकेज प्रकाशित करने पर स्थानीय index और वितरण फ़ाइलें बनती हैं; उन्हें सार्वजनिक होस्ट पर चढ़ाना अलग चरण है।

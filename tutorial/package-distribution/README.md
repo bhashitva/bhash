@@ -8,9 +8,9 @@ binding भी हो सकती है। नई `package` commands नाम
 GitHub या अन्य HTTPS स्थान पर रख सकते हैं; अलग registry server आवश्यक नहीं है।
 [आधिकारिक सूची](../../packages/index.json) और अपनी संस्था की सूची दोनों चलती हैं।
 
-ये commands इस milestone के compiler स्रोत में हैं। सार्वजनिक compiler/extension/
-kernel release में आने तक इस revision से बना JAR उपयोग करें। नीचे
-`bhash-compiler.jar` उसी JAR का नाम है।
+ये commands standalone compiler और VS Code extension 0.30.0 तथा Jupyter kernel
+0.1.17 के शामिल संकलक में हैं। [तैयार JAR डाउनलोड करें](https://github.com/bhashitva/bhash/releases/tag/bhash-0.30.0)।
+नीचे `bhash-compiler.jar` उस JAR का संक्षिप्त नाम है।
 
 ## १. पुस्तकालय खोजना (Discovery)
 

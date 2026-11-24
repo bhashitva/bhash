@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-const CACHE = 'bhash-playground-0.28.0-crm-1';
+const CACHE = 'bhash-playground-0.30.0-packages-1';
 const ASSETS = ['/', '/index.html', '/app.js', '/library.json', '/bhash-analytics.js', '/style.css', '/icon.svg', '/manifest.webmanifest'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => (k.startsWith('bhash-editor-') || k.startsWith('bhash-playground-')) && k !== CACHE).map(k => caches.delete(k))))));

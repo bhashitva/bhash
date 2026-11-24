@@ -9,9 +9,9 @@ there is no registry server to install. The built-in index is
 [`packages/index.json`](../packages/index.json). Existing local dependencies,
 pinned Git dependencies and lockfile formats remain supported.
 
-These commands are in the compiler source for this milestone. Use a compiler JAR
-built from this revision until a public compiler/extension/kernel release includes
-them. `java -jar bhash-compiler.jar package` displays the available commands.
+These commands are included in standalone compiler and VS Code extension 0.30.0,
+and in the compiler bundled with Jupyter kernel 0.1.17. Download the prebuilt JAR
+from [Bhash 0.30.0](https://github.com/bhashitva/bhash/releases/tag/bhash-0.30.0). `java -jar bhash-compiler.jar package` displays the available commands.
 
 ## 1. Find a package
 

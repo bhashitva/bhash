@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.30.0
+
+- Bundle compiler 0.30.0 with package search, info, add, update, pack and publish.
+- Preserve exact Git revisions, manifest/source checksums, lockfiles and explicit restore.
+- Include Hindi/English publishing and reuse guides; retain offline lookup and bundled compression providers.
+- Package publication creates local assets/index entries; remote uploads remain explicit.
+
 ## 0.29.0
 
 - Add **Bhash: Standard Library Lookup**, the editor book icon and status-bar shortcut.
