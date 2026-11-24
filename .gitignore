@@ -43,3 +43,6 @@ __pycache__/
 editors/jupyter/frontend/lib/
 editors/jupyter/bhash_jupyter/labextension/
 editors/jupyter/*.egg-info/
+
+# Generated writer guard for the contributed package index.
+/packages/index.json.lock

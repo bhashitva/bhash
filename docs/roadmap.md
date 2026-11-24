@@ -1,5 +1,15 @@
 # Implementation roadmap
 
+## Package publishing, distribution and reuse
+
+Implemented in source: index-backed discovery, exact-version add/update,
+immutable local-index publication, deterministic source ZIPs and host-scoped
+private HTTPS credentials. [English guide](package-distribution.en.md) ·
+[हिन्दी उदाहरण](../tutorial/package-distribution/README.md). Builds remain offline
+and source-based; a central registry service, signatures, version ranges and
+separately compiled libraries remain future work. Public package releases follow
+separately after validation/merge.
+
 ## Typed external-library interoperability and compression
 
 The approved design ([Hindi](typed-c-interop-design.md), [English](typed-c-interop-design.en.md)) is implemented in compiler/VS Code 0.28.0 and Jupyter 0.1.14. Verified provider distribution covers Linux x64, Windows x64 and Apple Silicon. See the [Hindi compression tutorial](../tutorial/compression/README.md), [binding guide](typed-c-library-bindings.md) and [validation record](typed-c-interop-validation.md). Browser/Android C bindings remain unsupported.
@@ -69,7 +79,7 @@ HTTP/database transports remain the next separate milestone.
 - Completed versioned Bhash source packages with local paths, exact Git revisions,
   deterministic integrity lockfiles, explicit restore/verify commands and editor integration.
   See [source packages](source-packages.md) and the [Hindi tutorial](../tutorial/packages/README.md).
-- Public package registry, authenticated private Git and version-range resolution.
+- Index discovery/publication and authenticated private HTTPS Git are implemented; central registry accounts/signatures and version-range resolution remain follow-ups.
 - Incremental compilation, stable exported signatures and separately compiled libraries.
 - Explicit target-specific Java JAR and .NET assembly/NuGet interoperability.
 

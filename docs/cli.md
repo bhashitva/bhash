@@ -84,3 +84,9 @@ through the Windows Unicode command line.
 Playground और Jupyter में सरणी खाली रहती है। Windows में `java.exe` अपनी
 कोड पेज से बाहर के अक्षर बदल सकता है। सीधे चलाए गए .NET और नेटिव निर्माण
 Windows से यूनिकोड तर्क ले सकते हैं।
+
+## Package workflow / संकुल कार्यप्रवाह
+
+`package search/info/add/update/pack/publish` is available in source containing the package-distribution milestone. It requires a newer compiler build than the 0.28.0 download above. See the [English guide](package-distribution.en.md) and [हिन्दी उदाहरण](../tutorial/package-distribution/README.md).
+
+**हिन्दी:** ये commands नए milestone के build में हैं; ऊपर के पुराने डाउनलोड में नहीं। सार्वजनिक पैकेजों का update अलग release चरण है।

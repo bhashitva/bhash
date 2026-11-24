@@ -185,6 +185,17 @@ verified lockfiles. See [dependency management](docs/source-packages.md), the
 Existing single-file commands continue to work. External library distribution and
 Java/.NET library interoperability remain planned.
 
+### Publishing and reusing packages / संकुल प्रकाशन और पुनः उपयोग
+
+The package workflow adds index-backed search/info, exact-version add/update,
+deterministic source archives and immutable local-index publication. See the
+[English guide](docs/package-distribution.en.md), [हिन्दी ट्यूटोरियल](tutorial/package-distribution/README.md)
+and [runnable example](examples/package-reuse/). These commands require a compiler
+containing this milestone; existing released packages are updated separately.
+
+**हिन्दी:** संकुल खोजें, निश्चित संस्करण जोड़ें/बदलें और स्रोत archive व सूची entry
+बनाएँ। निर्माण के समय index/network नहीं खुलता; manifest और lock commit करें।
+
 ## Bitwise operations and chess bitboards
 
 Bhash v0.6 supports `&`, `|`, `^`, `~`, `<<`, `>>` and `>>>` on 64-bit

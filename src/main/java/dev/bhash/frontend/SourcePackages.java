@@ -144,14 +144,14 @@ public final class SourcePackages {
         if(binding!=null)root.addProperty("bindingsSha256",dev.bhash.ffi.ForeignManifest.read(binding,false).inventoryFingerprint());
         return root;
     }
-    private static void noEntry(ProjectLoader.Project project) throws IOException {
+    public static void noEntry(ProjectLoader.Project project) throws IOException {
         for(var source:project.sources()){
             var parsed=source.parse();if(!parsed.valid())throw failure("BH8001","पुस्तकालय का स्रोत जाँचें।",source.name()+": "+parsed.diagnostics());
             for(var function:parsed.tree().functionDecl())if(Identifiers.key(function.IDENTIFIER().getText()).equals(Identifiers.key("मुख्य")))
                 throw graphError("Library packages must not declare a global मुख्य entry point: "+source.name());
         }
     }
-    private static String fingerprint(ProjectLoader.Project project) throws IOException {
+    public static String fingerprint(ProjectLoader.Project project) throws IOException {
         var hash=digest();var paths=new TreeMap<String,String>();var folded=new HashSet<String>();long total=0;
         for(int i=0;i<project.sourcePaths().size();i++){
             String name=project.root().relativize(project.sourcePaths().get(i)).toString().replace('\\','/');GitPackage.safePath(name);

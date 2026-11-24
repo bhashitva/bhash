@@ -10,10 +10,10 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /** Fetch exact commits and export blobs without checkout, filters, hooks, submodules or build scripts. */
-final class GitPackage {
+public final class GitPackage {
     private static final int MAX_FILE=16*1024*1024,MAX_TOTAL=64*1024*1024;
     private GitPackage() {}
-    static String normalizeUrl(String value) throws IOException {
+    public static String normalizeUrl(String value) throws IOException {
         try{
             URI uri=new URI(value);
             if(uri.getUserInfo()!=null||uri.getQuery()!=null||uri.getFragment()!=null)throw new URISyntaxException(value,"Credentials, queries and fragments are not allowed");
@@ -21,9 +21,9 @@ final class GitPackage {
                 return new URI("https",null,uri.getHost().toLowerCase(Locale.ROOT),uri.getPort(),uri.getPath(),null,null).normalize().toASCIIString();
             if("file".equalsIgnoreCase(uri.getScheme())&&uri.getAuthority()==null)return Path.of(uri).toAbsolutePath().normalize().toUri().toASCIIString();
             throw new URISyntaxException(value,"Only HTTPS URLs or explicit local file: repository URIs are supported");
-        }catch(URISyntaxException|IllegalArgumentException invalid){throw error("Invalid Git location: "+value+" ("+invalid.getMessage()+")");}
+        }catch(URISyntaxException|IllegalArgumentException invalid){throw error("Invalid Git location; use credential-free HTTPS or an explicit local file: URI, without queries or fragments.");}
     }
-    static Path snapshot(Path project,String url,String revision,boolean fetch) throws IOException {
+    public static Path snapshot(Path project,String url,String revision,boolean fetch) throws IOException {
         Path base=project.resolve(SourcePackages.CACHE).resolve("dependencies");
         for(Path component:List.of(project.resolve(SourcePackages.CACHE),base))if(Files.isSymbolicLink(component))throw error("Cache directories must not be symbolic links: "+component);
         String key=SourcePackages.sha(url+"\n"+revision);Path destination=base.resolve(key);
@@ -53,21 +53,33 @@ final class GitPackage {
                 if(!fetched.equals(revision))throw error("Fetched commit does not match the declared full revision.");
             }
             if(!text(git(repository,empty,List.of("cat-file","-t",revision),4096)).strip().equals("commit"))throw error("Git rev must identify a commit, not a tag, tree or blob.");
-            byte[] listing=git(repository,empty,List.of("ls-tree","-r","-z","--full-tree",revision),4*1024*1024);
-            var paths=new HashSet<String>();long total=0;int count=0;
+            byte[] listing=git(repository,empty,List.of("ls-tree","-r","-l","-z","--full-tree",revision),4*1024*1024);
+            record Blob(String path,String id,int size) {}
+            var blobs=new ArrayList<Blob>();var paths=new HashSet<String>();long total=0;int count=0;
             for(String entry:StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(listing)).toString().split("\u0000")){
                 if(entry.isEmpty())continue;if(++count>10000)throw error("Git source snapshot exceeds 10000 files.");
                 int tab=entry.indexOf('\t');if(tab<0)throw error("Malformed Git tree entry.");
-                String[] object=entry.substring(0,tab).split(" ");String name=entry.substring(tab+1);safePath(name);
-                if(object.length!=3||!Set.of("100644","100755").contains(object[0])||!object[1].equals("blob"))throw error("Symlinks and submodules are not supported: "+name);
+                String[] object=entry.substring(0,tab).strip().split("\\s+");String name=entry.substring(tab+1);safePath(name);
+                if(object.length!=4||!Set.of("100644","100755").contains(object[0])||!object[1].equals("blob"))throw error("Symlinks and submodules are not supported: "+name);
                 String folded=Identifiers.key(name).toLowerCase(Locale.ROOT);if(!paths.add(folded))throw error("Case- or Unicode-colliding Git paths are not portable: "+name);
                 for(int slash=folded.indexOf('/');slash>=0;slash=folded.indexOf('/',slash+1))if(paths.contains(folded.substring(0,slash)))throw error("Conflicting file and directory paths: "+name);
-                long size=Long.parseLong(text(git(repository,empty,List.of("cat-file","-s",object[2]),4096)).strip());
+                long size;try{size=Long.parseLong(object[3]);}catch(NumberFormatException invalid){throw error("Invalid Git object size.");}
                 if(size>MAX_FILE||size<0||total+size>MAX_TOTAL)throw error("Git source snapshot exceeds file or total size limits.");
-                byte[] content=git(repository,empty,List.of("cat-file","blob",object[2]),MAX_FILE);total+=content.length;
-                if(total>MAX_TOTAL)throw error("Git source snapshot exceeds 64 MiB.");
-                Path output=export.resolve(name).normalize();if(!output.startsWith(export))throw error("Git path escapes its snapshot: "+name);
-                Files.createDirectories(output.getParent());Files.write(output,content,StandardOpenOption.CREATE_NEW);
+                total+=size;blobs.add(new Blob(name,object[2],(int)size));
+            }
+            // One bounded batch replaces two subprocesses per file in a large repository.
+            var requests=new StringBuilder();for(var blob:blobs)requests.append(blob.id()).append('\n');
+            byte[] batch=git(repository,empty,List.of("cat-file","--batch"),MAX_TOTAL+10000*128,requests.toString().getBytes(StandardCharsets.US_ASCII));
+            try(var input=new ByteArrayInputStream(batch)){
+                for(var blob:blobs){
+                    var header=new StringBuilder();int ch;
+                    while((ch=input.read())!='\n'){if(ch<0||header.length()>120)throw error("Malformed Git batch header.");header.append((char)ch);}
+                    if(!header.toString().equals(blob.id()+" blob "+blob.size()))throw error("Git batch object identity/size mismatch.");
+                    byte[] content=input.readNBytes(blob.size());if(content.length!=blob.size()||input.read()!='\n')throw error("Truncated Git batch object.");
+                    Path output=export.resolve(blob.path()).normalize();if(!output.startsWith(export))throw error("Git path escapes its snapshot: "+blob.path());
+                    Files.createDirectories(output.getParent());Files.write(output,content,StandardOpenOption.CREATE_NEW);
+                }
+                if(input.read()!=-1)throw error("Unexpected trailing Git batch data.");
             }
             Files.writeString(export.resolve(".bhash-snapshot"),marker,StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW);
             try{install(export,destination);}
@@ -90,7 +102,7 @@ final class GitPackage {
             catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IOException("Snapshot installation interrupted.",interrupted);}
         }
     }
-    static void safePath(String name) throws IOException {
+    public static void safePath(String name) throws IOException {
         if(name.isEmpty()||name.startsWith("/")||name.contains("\\")||name.chars().anyMatch(c->c<32||"<>:\"|?*".indexOf(c)>=0))throw error("Unsafe or nonportable package path: "+name);
         for(String part:name.split("/",-1)){
             String lower=part.toLowerCase(Locale.ROOT);String stem=lower.split("\\.",2)[0];
@@ -98,7 +110,28 @@ final class GitPackage {
                     ||stem.matches("(?:con|prn|aux|nul|com[1-9]|lpt[1-9])"))throw error("Unsafe or nonportable package path: "+name);
         }
     }
+    record Credentials(String token,String encoded) {}
+    static Credentials authentication(Map<String,String> settings,List<String> arguments,Map<String,String> env)throws IOException {
+        String token=settings.get("BHASH_GIT_TOKEN"),host=settings.get("BHASH_GIT_HOST"),encoded=null;
+        var remote=arguments.stream().filter(a->a.startsWith("https://")).findFirst();
+        if(token!=null&&!token.isBlank()&&host!=null&&remote.isPresent()){
+            URI uri=URI.create(remote.get());
+            if(uri.getHost().equalsIgnoreCase(host)){
+                if(token.indexOf('\r')>=0||token.indexOf('\n')>=0)throw error("Invalid private Git authentication configuration.");
+                encoded=Base64.getEncoder().encodeToString(("x-access-token:"+token).getBytes(StandardCharsets.UTF_8));
+                env.put("GIT_CONFIG_COUNT","2");env.put("GIT_CONFIG_KEY_0","http."+uri.getScheme()+"://"+uri.getRawAuthority()+"/.extraHeader");
+                env.put("GIT_CONFIG_VALUE_0","Authorization: Basic "+encoded);
+                // Do not forward a private credential through even a same-host redirect.
+                env.put("GIT_CONFIG_KEY_1","http.followRedirects");env.put("GIT_CONFIG_VALUE_1","false");
+            }
+        }
+        env.remove("BHASH_GIT_TOKEN");env.remove("BHASH_PACKAGES_TOKEN");
+        return new Credentials(token,encoded);
+    }
     private static byte[] git(Path repository,Path empty,List<String> arguments,int limit) throws IOException {
+        return git(repository,empty,arguments,limit,null);
+    }
+    private static byte[] git(Path repository,Path empty,List<String> arguments,int limit,byte[] input) throws IOException {
         String executable=System.getenv("BHASH_GIT");if(executable==null||executable.isBlank())executable="git";
         var command=new ArrayList<>(List.of(executable,"--no-replace-objects","-c","credential.helper=","-c","core.hooksPath="+empty,
                 "-c","core.fsmonitor=false","-c","protocol.allow=never","-c","protocol.https.allow=always","-c","protocol.file.allow=never"));
@@ -108,16 +141,20 @@ final class GitPackage {
         var env=builder.environment();env.keySet().removeIf(key->key.toUpperCase(Locale.ROOT).startsWith("GIT_"));
         env.put("GIT_CONFIG_NOSYSTEM","1");env.put("GIT_CONFIG_GLOBAL",empty.resolve("config").toString());env.put("GIT_TERMINAL_PROMPT","0");
         env.put("GIT_NO_LAZY_FETCH","1");env.put("GIT_ATTR_NOSYSTEM","1");env.put("GCM_INTERACTIVE","Never");
+        var credentials=authentication(System.getenv(),arguments,env);
+        String token=credentials.token(),encoded=credentials.encoded();
         Process process;
         try{process=builder.start();}catch(IOException missing){throw error("Git is required for Git dependencies; install Git or set BHASH_GIT.");}
         try{
-            process.getOutputStream().close();
+            try(var stdin=process.getOutputStream()){if(input!=null)stdin.write(input);}
             long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(120);
             while(!process.waitFor(100,TimeUnit.MILLISECONDS)){
                 if(Files.size(stdout)>limit||Files.size(stderr)>1024*1024){process.destroyForcibly();throw error("Git response exceeds its size limit.");}
                 if(System.nanoTime()>deadline){process.destroyForcibly();throw error("Git operation timed out.");}
             }
-            if(process.exitValue()!=0){String detail=Files.readString(stderr,StandardCharsets.UTF_8);throw error("Git operation failed: "+detail.substring(0,Math.min(8192,detail.length())));}
+            if(process.exitValue()!=0){String detail=Files.readString(stderr,StandardCharsets.UTF_8);
+                if(token!=null&&!token.isEmpty())detail=detail.replace(token,"[redacted]");if(encoded!=null)detail=detail.replace(encoded,"[redacted]");
+                throw error("Git operation failed: "+detail.substring(0,Math.min(8192,detail.length())));}
             if(Files.size(stdout)>limit)throw error("Git object or response exceeds its size limit.");return Files.readAllBytes(stdout);
         }catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IOException("Git operation interrupted.",interrupted);}
         finally{process.destroyForcibly();Files.deleteIfExists(stdout);Files.deleteIfExists(stderr);}

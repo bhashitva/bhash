@@ -1,0 +1,5 @@
+name=bhash-text-utils
+kind=library
+version=1.0.1
+sources=src
+nullSafety=strict

@@ -100,6 +100,8 @@ jobs:
               out.write(str(cache/'installations'/active['directory']/'bin')+'\n')
           PYTHON
           echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
+      - name: Verify published source package reuse with forced GC
+        run: python3 scripts/test_package_distribution.py --target native
       - name: Verify generated ORM on SQLite with forced GC
         run: python3 examples/orm/verify.py --target native
       - name: Validate native SQL Server 2022 with forced GC
