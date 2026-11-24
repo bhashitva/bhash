@@ -12,6 +12,7 @@ Run the compiler JAR with a full JDK 17 or newer. See the [command-line guide](d
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.30.0](https://github.com/bhashitva/bhash/releases/tag/bhash-0.30.0) | 2026-11-24 02:29 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.30.0/bhash-compiler-0.30.0.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.30.0/bhash-compiler-0.30.0.jar.sha256) |
 | [0.28.0](https://github.com/bhashitva/bhash/releases/tag/bhash-0.28.0) | 2026-11-20 12:27 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.28.0/bhash-compiler-0.28.0.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.28.0/bhash-compiler-0.28.0.jar.sha256) |
 | [0.27.0](https://github.com/bhashitva/bhash/releases/tag/bhash-0.27.0) | 2026-11-19 18:05 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.27.0/bhash-compiler-0.27.0.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.27.0/bhash-compiler-0.27.0.jar.sha256) |
 | [0.26.0](https://github.com/bhashitva/bhash/releases/tag/bhash-0.26.0) | 2026-11-19 04:18 | [JAR](https://github.com/bhashitva/bhash/releases/download/bhash-0.26.0/bhash-compiler-0.26.0.jar) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/bhash-0.26.0/bhash-compiler-0.26.0.jar.sha256) |
@@ -33,8 +34,13 @@ Run the compiler JAR with a full JDK 17 or newer. See the [command-line guide](d
 
 Install or update from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=bhashitva.bhash). Use a VSIX below to install a specific version manually. The 0.17.0 release notes record the Marketplace release.
 
+Version **0.30.0** is available as the verified VSIX below; its Marketplace publication is pending.
+
+**हिन्दी:** 0.30.0 का जाँचा हुआ VSIX नीचे उपलब्ध है; Marketplace पर प्रकाशन अभी बाकी है।
+
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.30.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.30.0) | 2026-11-24 02:29 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.30.0/bhash-vscode-0.30.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.30.0/bhash-vscode-0.30.0.vsix.sha256) |
 | [0.29.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.29.0) | 2026-11-20 19:19 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.29.0/bhash-vscode-0.29.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.29.0/bhash-vscode-0.29.0.vsix.sha256) |
 | [0.28.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.28.0) | 2026-11-20 12:27 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.28.0/bhash-vscode-0.28.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.28.0/bhash-vscode-0.28.0.vsix.sha256) |
 | [0.27.0](https://github.com/bhashitva/bhash/releases/tag/vscode-0.27.0) | 2026-11-19 18:05 | [VSIX](https://github.com/bhashitva/bhash/releases/download/vscode-0.27.0/bhash-vscode-0.27.0.vsix) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/vscode-0.27.0/bhash-vscode-0.27.0.vsix.sha256) |
@@ -69,6 +75,7 @@ Install the wheel in the Python environment running the Jupyter server, then res
 
 | Version | Published (UTC) | Downloads |
 | --- | --- | --- |
+| [0.1.17](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.17) | 2026-11-24 02:29 | [Wheel](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.17/bhash_jupyter-0.1.17-py3-none-any.whl) · [Hindi notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.17/hindi-starter.ipynb) · [Compression notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.17/compression.ipynb) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.17/SHA256SUMS) |
 | [0.1.16](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.16) | 2026-11-21 19:34 | [Wheel](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.16/bhash_jupyter-0.1.16-py3-none-any.whl) · [Hindi notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.16/hindi-starter.ipynb) · [Compression notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.16/compression.ipynb) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.16/SHA256SUMS) |
 | [0.1.15](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.15) | 2026-11-20 23:16 | [Wheel](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/bhash_jupyter-0.1.15-py3-none-any.whl) · [Hindi notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/hindi-starter.ipynb) · [Compression notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/compression.ipynb) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.15/SHA256SUMS) |
 | [0.1.14](https://github.com/bhashitva/bhash/releases/tag/jupyter-0.1.14) | 2026-11-20 12:27 | [Wheel](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.14/bhash_jupyter-0.1.14-py3-none-any.whl) · [Hindi notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.14/hindi-starter.ipynb) · [Compression notebook](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.14/compression.ipynb) · [SHA-256](https://github.com/bhashitva/bhash/releases/download/jupyter-0.1.14/SHA256SUMS) |
